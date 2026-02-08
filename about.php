@@ -21,43 +21,37 @@ include __DIR__ . '/inc/header.php';
 ?>
 
 <style>
-.about-card {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
+/* Force dark text on light backgrounds */
+h4, h3, h1, h2, h5, h6 {
+    color: #1e293b !important;
 }
 
-.about-card .card-header {
-    background: #f1f5f9;
-    color: #1e293b;
-    border-bottom: 2px solid #e5e7eb;
+p, td, th, span, strong, small, li {
+    color: #475569 !important;
 }
 
-.about-card .card-body {
-    color: #1e293b;
+.text-muted {
+    color: #64748b !important;
 }
 
-.about-card .table {
-    color: #1e293b;
+.card-body p {
+    color: #475569 !important;
 }
 
-.about-card .table th {
-    color: #475569;
-    font-weight: 600;
+.card {
+    color: #1e293b !important;
 }
 
-.changelog-card {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
-}
-
-.changelog-card .card-header {
-    background: #f8fafc;
-    color: #1e293b;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.changelog-card .card-body {
-    color: #1e293b;
+/* Stat cards should keep their colored backgrounds with white text */
+.card.bg-primary h1,
+.card.bg-success h1,
+.card.bg-info h1,
+.card.bg-secondary h1,
+.card.bg-primary p,
+.card.bg-success p,
+.card.bg-info p,
+.card.bg-secondary p {
+    color: #ffffff !important;
 }
 </style>
 

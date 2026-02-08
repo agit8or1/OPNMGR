@@ -18,7 +18,8 @@ if (!function_exists('load_env')) {
         $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             // Skip comments
-            if (str starts_with(trim($line), '#')) {
+            $trimmed = trim($line);
+            if (empty($trimmed) || $trimmed[0] === '#') {
                 continue;
             }
 
@@ -29,8 +30,9 @@ if (!function_exists('load_env')) {
                 $value = trim($value);
 
                 // Remove quotes if present
-                if ((str_starts_with($value, '"') && str_ends_with($value, '"')) ||
-                    (str_starts_with($value, "'") && str_ends_with($value, "'"))) {
+                if ((strlen($value) >= 2) &&
+                    (($value[0] === '"' && $value[strlen($value)-1] === '"') ||
+                     ($value[0] === "'" && $value[strlen($value)-1] === "'"))) {
                     $value = substr($value, 1, -1);
                 }
 
