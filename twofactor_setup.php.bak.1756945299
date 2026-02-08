@@ -1,0 +1,83 @@
+<?php
+require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/src/TwoFactorAuth.php';
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+
+requireLogin();
+$userId = $_SESSION['user_id'];
+$username = $_SESSION['username'] ?? 'user';
+$issuer = 'OPNsense Manager';
+$msg = '';
+
+// Generate a new pending secret if none exists
+if (empty($_SESSION['pending_totp_secret'])) {
+    // create a 16-char base32 secret
+    $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $s = '';
+    for ($i = 0; $i < 16; $i++) $s .= $chars[random_int(0, 31)];
+    $_SESSION['pending_totp_secret'] = $s;
+}
+$pending = $_SESSION['pending_totp_secret'];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!empty($_POST['confirm'])) {
+        $code = trim($_POST['code'] ?? '');
+        if (TwoFactorAuth::verify($pending, $code)) {
+            // store the secret in DB
+            $stmt = $DB->prepare('UPDATE users SET totp_secret = :s WHERE id = :id');
+            $stmt->execute([':s' => $pending, ':id' => $userId]);
+            unset($_SESSION['pending_totp_secret']);
+            $msg = '2FA enabled successfully.';
+        } else {
+            $msg = 'Invalid code, please try again.';
+        }
+    } elseif (!empty($_POST['regenerate'])) {
+        // regenerate secret
+        $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        $s = '';
+        for ($i = 0; $i < 16; $i++) $s .= $chars[random_int(0, 31)];
+        $_SESSION['pending_totp_secret'] = $s;
+        $pending = $s;
+    } elseif (!empty($_POST['cancel'])) {
+        unset($_SESSION['pending_totp_secret']);
+        header('Location: /users.php');
+        exit;
+    }
+}
+
+// prepare otpauth URI
+$label = rawurlencode($issuer . ':' . $username);
+$otpauth = "otpauth://totp/{$label}?secret={$pending}&issuer=" . rawurlencode($issuer);
+$qr = 'https://chart.googleapis.com/chart?cht=qr&chs=240x240&chl=' . rawurlencode($otpauth);
+
+include __DIR__ . '/inc/header.php';
+?>
+<div class="row">
+  <div class="col-md-6">
+    <h4>Two Factor Setup</h4>
+    <?php if ($msg): ?>
+      <div class="alert alert-<?=strpos($msg,'success')!==false?'success':'warning'?>"><?=htmlspecialchars($msg)?></div>
+    <?php endif; ?>
+    <div class="card card-dark p-3 mb-3">
+      <p>Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.) or manually enter the secret below.</p>
+      <div class="mb-2"><strong>Account:</strong> <?=htmlspecialchars($username)?></div>
+      <div class="mb-2"><strong>Secret:</strong> <code><?=htmlspecialchars($pending)?></code></div>
+      <form method="post" class="mb-2">
+        <div class="mb-2"><input class="form-control" name="code" placeholder="Enter current 6-digit code from app"></div>
+        <button class="btn btn-primary" name="confirm" value="1">Confirm and Enable 2FA</button>
+        <button class="btn btn-secondary ms-2" name="regenerate" value="1">Regenerate secret</button>
+        <button class="btn btn-link ms-2 text-danger" name="cancel" value="1">Cancel</button>
+      </form>
+      <p class="muted small">After confirming, 2FA will be active for your account.</p>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <h4>QR Code</h4>
+    <div class="card card-dark p-3 text-center">
+      <img src="<?=htmlspecialchars($qr)?>" alt="QR code">
+      <div class="mt-2 muted small">If your environment blocks the QR generator, copy the secret into your app manually.</div>
+    </div>
+  </div>
+</div>
+<?php include __DIR__ . '/inc/footer.php';

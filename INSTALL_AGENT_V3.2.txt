@@ -1,0 +1,51 @@
+MANUAL INSTALLATION: Agent v3.2.0 for Firewall ID 21
+========================================================
+
+SITUATION:
+Agent v3.1 has a command execution bug preventing the command queue from working.
+Manual installation of v3.2.0 required to restore command execution functionality.
+
+INSTALLATION COMMAND (run on firewall via SSH as root):
+--------------------------------------------------------
+
+fetch https://opn.agit8or.net/download/opnsense_agent_v3.2.sh -o /tmp/agent_v3.2.sh && \
+cp /usr/local/bin/opnsense_agent_v2.sh /usr/local/bin/opnsense_agent_v2.sh.backup && \
+cp /tmp/agent_v3.2.sh /usr/local/bin/opnsense_agent_v2.sh && \
+chmod +x /usr/local/bin/opnsense_agent_v2.sh && \
+echo "Agent v3.2.0 installed successfully - will activate on next cron run"
+
+WHAT THIS DOES:
+---------------
+1. Downloads agent v3.2.0 from management server
+2. Backs up current agent (v3.1) to .backup file
+3. Installs v3.2.0 as the active agent
+4. Sets correct permissions
+5. Agent will automatically run on next cron cycle (within 5 minutes)
+
+VERIFICATION:
+-------------
+After 5 minutes:
+1. Check management UI firewall details page
+2. Agent version should show: "3.2.0"
+3. Test command execution by queuing a simple command
+
+ROLLBACK (if issues occur):
+----------------------------
+cp /usr/local/bin/opnsense_agent_v2.sh.backup /usr/local/bin/opnsense_agent_v2.sh
+
+CHANGES IN V3.2.0:
+------------------
+- Fixed multi-line command execution bug
+- Commands are now base64-encoded for safe transmission
+- Agent decodes commands before execution
+- Compatible with existing command queue system
+
+NEXT STEPS AFTER V3.2.0 IS ACTIVE:
+-----------------------------------
+1. Verify command execution works with simple test
+2. Deploy update agent v1.1.0 via command queue
+3. Test update agent check-in functionality
+4. Consider rolling out v3.2.0 to other firewalls
+
+Date: October 9, 2025
+Target: Firewall ID 21 (home.agit8or.net) - TEST ONLY

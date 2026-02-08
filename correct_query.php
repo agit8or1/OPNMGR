@@ -1,0 +1,1 @@
+$query = 'SELECT f.*, t.name as tag_name, t.color as tag_color, ft.tag_id, fa.agent_version as version, fa.status as agent_status, fa.last_checkin as agent_last_checkin, fa.wan_ip, fa.ipv6_address FROM firewalls f LEFT JOIN firewall_agents fa ON f.id = fa.firewall_id LEFT JOIN firewall_tags ft ON f.id = ft.firewall_id LEFT JOIN tags t ON ft.tag_id = t.id WHERE 1=1';

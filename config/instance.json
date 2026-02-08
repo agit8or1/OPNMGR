@@ -1,0 +1,19 @@
+{
+    "customer_name": "Default Customer",
+    "instance_id": "default-001",
+    "main_server": "opn.agit8or.net",
+    "deployment_date": "2024-01-01",
+    "version": "1.0.0",
+    "admin_contact": "admin@customer.com",
+    "features": {
+        "version_management": true,
+        "firewall_management": true,
+        "auto_updates": false,
+        "backup_enabled": true
+    },
+    "settings": {
+        "update_check_interval": 3600,
+        "backup_retention_days": 30,
+        "log_level": "info"
+    }
+}

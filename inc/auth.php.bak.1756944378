@@ -1,0 +1,73 @@
+<?php
+require_once __DIR__ . '/db.php';
+// Simple session-based auth helpers
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+
+// Ensure session 2FA flag matches DB state for the logged-in user.
+// This clears a stale "2fa_required" session flag if the user's DB row
+// no longer has a totp_secret (prevents being asked for a code when 2FA
+// isn't enabled).
+if (!empty($_SESSION['user_id'])) {
+    try {
+        $stmt = $DB->prepare('SELECT totp_secret FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$_SESSION['user_id']]);
+        $row = $stmt->fetch();
+        if ($row && empty($row['totp_secret']) && !empty($_SESSION['2fa_required'])) {
+            unset($_SESSION['2fa_required']);
+        }
+    } catch (Exception $e) {
+        // ignore DB errors here, leave session as-is
+    }
+}
+
+function isLoggedIn() {
+    return !empty($_SESSION['user_id']) && empty($_SESSION['2fa_required']);
+}
+
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: /login.php');
+        exit;
+    }
+}
+
+function loginUser($username, $password) {
+    global $DB;
+    if (empty($username) || empty($password)) return false;
+    $stmt = $DB->prepare('SELECT id, username, password, totp_secret FROM users WHERE username = ? LIMIT 1');
+    $stmt->execute([$username]);
+    $u = $stmt->fetch();
+    if ($u && password_verify($password, $u['password'])) {
+        // if user has a totp_secret, set a flag and require code verification
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $u['id'];
+        $_SESSION['username'] = $u['username'];
+        if (!empty($u['totp_secret'])) {
+            // mark that 2FA is required for this session until verified
+            $_SESSION['2fa_required'] = true;
+            // do not mark fully authenticated yet
+            return '2fa';
+        }
+        return true;
+    }
+    return false;
+}
+
+function is2FARequired() {
+    return !empty($_SESSION['2fa_required']);
+}
+
+function clear2FA() {
+    unset($_SESSION['2fa_required']);
+}
+
+function logout() {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_destroy();
+    header('Location: /login.php');
+    exit;
+}

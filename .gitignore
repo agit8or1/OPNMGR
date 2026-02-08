@@ -1,0 +1,127 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+config.local.php
+secrets/
+*.secret
+
+# Database
+*.sql
+*.db
+*.sqlite
+database/credentials.php
+*.dump
+
+# Credentials and keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+*_key
+ssh_tunnel_agent.sh
+firewall_*_key
+
+# Passwords and tokens
+*password*.txt
+*token*.txt
+*secret*.txt
+*credentials*.txt
+
+# Backups
+*.backup
+*.bak
+*.old
+*.orig
+backup/
+backups/
+.archive/
+*.tar.gz
+opnsense_backup_*.tar.gz
+*_backup_*.php
+
+# Logs
+*.log
+logs/
+*.log.*
+error_log
+access_log
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.directory
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+*.sublime-workspace
+*.sublime-project
+.project
+.settings/
+.classpath
+
+# Dependencies
+node_modules/
+vendor/
+bower_components/
+
+# Temp files
+tmp/
+temp/
+*.tmp
+cache/
+sessions/
+
+# Compiled files
+*.pyc
+*.pyo
+__pycache__/
+*.class
+
+# Package files
+*.zip
+*.tar
+*.rar
+*.7z
+downloads/
+
+# Screenshots and media (optional - remove if you want to commit these)
+screenshots/
+screenshots_*/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+
+# Test and development files
+test_*.php
+debug_*.php
+temp_*.php
+*_test.*
+*_debug.*
+
+# Documentation builds
+docs/_build/
+site/
+
+# Security scan results
+snyk-*.json
+security-*.html
+vulnerability-*.md
+SECURITY_VULNERABILITY_REPORT.md
+
+# System specific
+.htaccess.local
+robots.txt.local
+
+# Claude Code artifacts
+.claude/
+.claude.json
+.claude.json.backup

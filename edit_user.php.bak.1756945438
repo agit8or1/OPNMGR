@@ -1,0 +1,51 @@
+<?php
+require_once __DIR__ . '/inc/header.php';
+require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/auth.php';
+requireLogin();
+$db = get_db();
+$msg = '';
+
+$id = (int)($_GET['id'] ?? 0);
+if ($id <= 0) { header('Location: /users.php'); exit; }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $first_name = trim($_POST['first_name'] ?? '');
+    $last_name = trim($_POST['last_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $role = trim($_POST['role'] ?? '');
+    $stmt = $db->prepare('UPDATE users SET first_name = :fn, last_name = :ln, email = :em, role = :r WHERE id = :id');
+    $stmt->execute([':fn'=>$first_name,':ln'=>$last_name,':em'=>$email,':r'=>$role,':id'=>$id]);
+    $msg = 'User updated.';
+}
+
+$stmt = $db->prepare('SELECT id, username, first_name, last_name, email, role FROM users WHERE id = :id LIMIT 1');
+$stmt->execute([':id'=>$id]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$user) { header('Location: /users.php'); exit; }
+?>
+<div class="container mt-4">
+  <h1>Edit user: <?php echo htmlspecialchars($user['username']); ?></h1>
+  <?php if ($msg): ?><div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">First name</label>
+      <input name="first_name" class="form-control" value="<?php echo htmlspecialchars($user['first_name']); ?>">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Last name</label>
+      <input name="last_name" class="form-control" value="<?php echo htmlspecialchars($user['last_name']); ?>">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input name="email" class="form-control" value="<?php echo htmlspecialchars($user['email']); ?>">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Role</label>
+      <input name="role" class="form-control" value="<?php echo htmlspecialchars($user['role']); ?>">
+    </div>
+    <button class="btn btn-primary">Save</button>
+    <a href="/users.php" class="btn btn-link ms-2">Cancel</a>
+  </form>
+</div>
+<?php require_once __DIR__ . '/inc/footer.php'; ?>

@@ -1,0 +1,8 @@
+/* compact settings styles */
+.settings-section { font-size:0.94rem; }
+.card.card-dark.p-3 { padding:0.6rem; margin-bottom:0.6rem; border-radius:6px; }
+.card.card-dark h5 { margin-bottom:0.4rem; font-size:0.98rem; }
+#settings-nav .btn { padding:0.25rem 0.6rem; font-size:0.85rem; }
+#swatches .swatch { width:26px; height:26px; border-radius:4px; }
+.form-control, .form-select { font-size:0.92rem; padding:0.35rem 0.5rem; }
+.btn { font-size:0.9rem; }

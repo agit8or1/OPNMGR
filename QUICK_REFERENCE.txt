@@ -1,0 +1,130 @@
+================================================================================
+OPNSENSE MANAGEMENT - QUICK REFERENCE CARD
+Generated: October 8, 2025
+================================================================================
+
+FIREWALL STATUS
+---------------
+FW #21: home.agit8or.net [ONLINE] - Missing update agent (deploy needed)
+FW #3:  fw01.companyB.com [OFFLINE 2 months] - Recommend archive/delete
+
+VERIFICATION COMMANDS
+---------------------
+Check dual-agent status:
+  php /var/www/opnsense/check_dual_agents.php
+
+Monitor agent check-ins:
+  tail -f /var/www/opnsense/logs/agent_checkins.log
+
+View firewall details in browser:
+  https://opn.agit8or.net/firewall_view.php?id=21
+
+MANUAL UPDATE AGENT DEPLOYMENT (FW #21)
+----------------------------------------
+Run on firewall console:
+  curl -k -o /tmp/opnsense_update_agent.sh 'https://opn.agit8or.net/download_update_agent.php?firewall_id=21'
+  mv /tmp/opnsense_update_agent.sh /usr/local/bin/opnsense_update_agent.sh
+  chmod +x /usr/local/bin/opnsense_update_agent.sh
+  nohup /usr/local/bin/opnsense_update_agent.sh > /dev/null 2>&1 &
+
+Verify both agents:
+  ps aux | grep opnsense_.*agent.sh | grep -v grep
+
+BACKUP MANAGEMENT
+-----------------
+Access via web:
+  https://opn.agit8or.net/firewall_view.php?id=<firewall_id>
+  Scroll to "Configuration Backups" section
+
+Available actions:
+  - Create new backup
+  - Download backup (XML)
+  - Restore backup (queues command)
+  - Delete backup (with confirmation)
+
+API ENDPOINTS
+-------------
+GET  /api/get_backups.php?firewall_id=<id>  - List backups
+POST /api/create_backup.php                  - Create backup
+GET  /api/download_backup.php?id=<id>       - Download backup
+POST /api/restore_backup.php                 - Restore backup
+POST /api/delete_backup.php                  - Delete backup
+
+CLEANUP FW #3
+-------------
+Archive (safe, reversible):
+  UPDATE firewalls SET status = 'archived', notes = 'Offline since 2025-09-08' WHERE id = 3;
+
+Delete (permanent, backup first):
+  mysqldump opnsense_mgmt > /tmp/fw3_backup.sql
+  DELETE FROM firewall_agents WHERE firewall_id = 3;
+  DELETE FROM firewall_commands WHERE firewall_id = 3;
+  DELETE FROM firewall_tags WHERE firewall_id = 3;
+  DELETE FROM backups WHERE firewall_id = 3;
+  DELETE FROM request_queue WHERE firewall_id = 3;
+  DELETE FROM firewalls WHERE id = 3;
+
+DOCUMENTATION FILES
+-------------------
+/var/www/opnsense/WORK_SUMMARY_OCT08.md            - Today's work summary
+/var/www/opnsense/FIREWALL_STATUS_REPORT.md        - Complete system status
+/var/www/opnsense/MANUAL_UPDATE_AGENT_DEPLOY.md    - Manual deployment guide
+/var/www/opnsense/DUAL_AGENT_SYSTEM.md             - Dual-agent architecture
+/var/www/opnsense/PROXY_ENHANCEMENTS.md            - Proxy improvements
+/var/www/opnsense/CHECKIN_FREQUENCY_FIX.md         - Check-in interval fix
+
+ENHANCED FEATURES
+-----------------
+✅ Backup management UI (complete CRUD)
+✅ Dual-agent failsafe system (documented)
+✅ Proxy auto-timeout (5 minutes)
+✅ Request validation (exists, not finalized)
+✅ Check-in frequency fixed (120s minimum)
+✅ Rate limiting (90s server-side)
+
+AGENT ARCHITECTURE
+------------------
+Primary Agent:
+  - Full functionality
+  - Processes all commands
+  - Can be updated
+  - Check-in: 120 seconds
+
+Update Agent:
+  - Minimal code (~120 lines)
+  - Only processes is_update_command=1
+  - NEVER updates itself
+  - Check-in: 300 seconds (5 min)
+  - Auto-restarts primary if dead
+
+EMERGENCY RECOVERY
+------------------
+If primary agent dies:
+  - Update agent detects (5 min check)
+  - Downloads new primary agent
+  - Installs and restarts
+  - Recovery time: ~8 minutes
+
+Manual recovery:
+  curl -k -o /usr/local/bin/opnsense_agent.sh \
+    'https://opn.agit8or.net/download_tunnel_agent.php?firewall_id=<id>'
+  chmod +x /usr/local/bin/opnsense_agent.sh
+  nohup /usr/local/bin/opnsense_agent.sh > /dev/null 2>&1 &
+
+BACKUPS CREATED
+---------------
+/var/www/opnsense/firewall_view_old.php
+/var/www/opnsense/firewall_view.php.backup_*
+/var/www/opnsense/agent_proxy_update.php.backup
+/var/www/opnsense/agent_proxy_check.php.backup
+
+PRIORITY ACTIONS
+----------------
+1. [HIGH] Deploy update agent to FW #21 (manual procedure above)
+2. [MED]  Archive or delete FW #3 (offline 2 months)
+3. [LOW]  Test backup creation and download
+4. [LOW]  Monitor check-in frequencies
+
+================================================================================
+END OF QUICK REFERENCE
+================================================================================

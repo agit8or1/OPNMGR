@@ -1,0 +1,889 @@
+<?php
+require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/csrf.php';
+requireLogin();
+
+$message = '';
+
+// Handle edit request
+                            <?php if (!empty($firewall['version']) || !empty($agents)): ?>
+                                <div class="mb-2">
+                                <strong class="text-light">Version Info:</strong><br>
+                                <?php if (!empty($firewall['version'])): ?>
+                                    <small class="text-light">OPNsense: <?php echo htmlspecialchars($firewall['version']); ?></small><br>
+                                <?php endif; ?>
+                                <?php if (isset($agents['primary'])): 
+                                    $primary = $agents['primary'];
+                                    $status_class = $primary['status'] === 'online' ? 'success' : 'danger';
+                                    $status_text = $primary['status'] === 'online' ? '●' : '○';
+                                ?>
+                                    <small class="text-light">
+                                        <span class="text-<?php echo $status_class; ?>"><?php echo $status_text; ?></span>
+                                        Primary Agent: <?php echo htmlspecialchars($primary['agent_version']); ?>
+                                        <span class="text-muted">(<?php echo $primary['seconds_ago']; ?>s ago)</span>
+                                    </small><br>
+                                <?php endif; ?>
+                                <?php if (isset($agents['update'])): 
+                                    $update = $agents['update'];
+                                    $status_class = $update['status'] === 'online' ? 'success' : 'danger';
+                                    $status_text = $update['status'] === 'online' ? '●' : '○';
+                                ?>
+                                    <small class="text-light">
+                                        <span class="text-<?php echo $status_class; ?>"><?php echo $status_text; ?></span>
+                                        Update Agent: <?php echo htmlspecialchars($update['agent_version']); ?>
+                                        <span class="text-muted">(<?php echo $update['seconds_ago']; ?>s ago)</span>
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?><?php if (!empty($firewall['uptime'])): ?>R['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_firewall'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = '<div class="alert alert-danger">CSRF verification failed.</div>';
+    } else {
+        $edit_id = (int)$_POST['firewall_id'];
+        $hostname = trim($_POST['hostname'] ?? '');
+        $ip_address = trim($_POST['ip_address'] ?? '');
+        $wan_ip = trim($_POST['wan_ip'] ?? '');
+        $customer_name = trim($_POST['customer_name'] ?? '');
+        $notes = trim($_POST['notes'] ?? '');
+        $api_key = trim($_POST['api_key'] ?? '');
+        $api_secret = trim($_POST['api_secret'] ?? '');
+        $tags = $_POST['tags'] ?? [];
+        $alerts_enabled = isset($_POST['alerts_enabled']) ? 1 : 0;
+        $offline_alert_threshold = (int)($_POST['offline_alert_threshold'] ?? 300);
+        
+        // Debug logging
+        error_log("DEBUG: alerts_enabled isset=" . (isset($_POST['alerts_enabled']) ? 'true' : 'false') . ", value=" . $alerts_enabled);
+        
+        try {
+            // Update firewall basic info
+            $stmt = $DB->prepare('UPDATE firewalls SET hostname = ?, ip_address = ?, wan_ip = ?, customer_name = ?, notes = ?, api_key = ?, api_secret = ?, alerts_enabled = ?, offline_alert_threshold = ? WHERE id = ?');
+            $stmt->execute([$hostname, $ip_address, $wan_ip, $customer_name, $notes, $api_key, $api_secret, $alerts_enabled, $offline_alert_threshold, $edit_id]);
+            
+            // Update tags
+            $stmt = $DB->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
+            $stmt->execute([$edit_id]);
+            
+            if (!empty($tags)) {
+                foreach ($tags as $tag_id) {
+                    $stmt = $DB->prepare('INSERT INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
+                    $stmt->execute([$edit_id, $tag_id]);
+                }
+            }
+            
+            $message = '<div class="alert alert-success">Firewall updated successfully!</div>';
+        } catch (Exception $e) {
+            $message = '<div class="alert alert-danger">Error updating firewall: ' . $e->getMessage() . '</div>';
+        }
+    }
+}
+
+$id = (int)($_GET['id'] ?? 0);
+if (!$id) {
+    header('Location: /firewalls.php');
+    exit;
+}
+
+try {
+    $stmt = $DB->prepare('
+        SELECT f.*, 
+               GROUP_CONCAT(t.name SEPARATOR ", ") as tag_names, 
+               GROUP_CONCAT(t.color SEPARATOR ", ") as tag_colors,
+               GROUP_CONCAT(t.id SEPARATOR ",") as tag_ids,
+               CASE 
+                   WHEN f.last_checkin IS NULL THEN "unknown"
+                   WHEN f.last_checkin < DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN "offline"
+                   ELSE "online"
+               END as current_status
+        FROM firewalls f
+        LEFT JOIN firewall_tags ft ON f.id = ft.firewall_id
+        LEFT JOIN tags t ON ft.tag_id = t.id
+        WHERE f.id = ?
+        GROUP BY f.id
+    ');
+    $stmt->execute([$id]);
+    $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Get agent information for both primary and update agents
+    $stmt = $DB->prepare('
+        SELECT agent_type, agent_version, last_checkin, status,
+               TIMESTAMPDIFF(SECOND, last_checkin, NOW()) as seconds_ago
+        FROM firewall_agents
+        WHERE firewall_id = ?
+        ORDER BY agent_type
+    ');
+    $stmt->execute([$id]);
+    $agents = [];
+    while ($agent = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $agents[$agent['agent_type']] = $agent;
+    }
+    
+    // Get all available tags and customers for dropdowns
+    $stmt = $DB->query('SELECT id, name, color FROM tags ORDER BY name');
+    $all_tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $stmt = $DB->query('SELECT id, name FROM customers ORDER BY name');
+    $all_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (Exception $e) {
+    $firewall = null;
+    $all_tags = [];
+    $all_customers = [];
+}
+
+if (!$firewall) {
+    header('Location: /firewalls.php');
+    exit;
+}
+
+include __DIR__ . '/inc/header.php';
+?>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card card-dark">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <small class="text-light fw-bold mb-0">
+                        <i class="fas fa-network-wired me-1"></i>Firewall Details - <?php echo htmlspecialchars($firewall['hostname']); ?>
+                    </small>
+                    <div class="ms-auto">
+                        <?php if ($firewall['updates_available']): ?>
+                        <button type="button" class="btn btn-warning btn-sm me-2" onclick="updateFirewall(<?php echo $firewall['id']; ?>)" title="Update Firewall">
+                            <i class="fas fa-sync-alt me-1"></i>Update Available
+                        </button>
+                        <?php endif; ?>
+                        <button type="button" class="btn btn-primary btn-sm me-2" onclick="toggleEditMode()">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm me-2" onclick="rebootFirewall(<?php echo $firewall['id']; ?>)" title="Reboot Firewall">
+                            <i class="fas fa-power-off me-1"></i>Reboot
+                        </button>
+                        <a href="/firewalls.php" class="btn btn-outline-light btn-sm">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Firewalls
+                        </a>
+                    </div>
+                </div>
+
+                <?php echo $message; ?>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card card-ghost p-3">
+                            <h6 class="text-light mb-3"><i class="fas fa-info-circle me-2"></i>Basic Information</h6>
+                            <div class="mb-2">
+                                <strong class="text-light">Hostname:</strong>
+                                <span class="text-white"><?php echo htmlspecialchars($firewall['hostname']); ?></span>
+                            </div>
+                            <?php if (!empty($firewall['wan_ip'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">WAN IP:</strong>
+                                <span class="text-white"><?php echo htmlspecialchars($firewall['wan_ip']); ?></span>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($firewall['lan_ip'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">LAN IP:</strong>
+                                <span class="text-white"><?php echo htmlspecialchars($firewall['lan_ip']); ?></span>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($firewall['hardware_id'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Hardware ID:</strong>
+                                <code class="text-info"><?php echo htmlspecialchars($firewall['hardware_id']); ?></code>
+                            </div>
+                            <?php endif; ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Status:</strong>
+                                <span class="badge <?php 
+                                    $status = $firewall['current_status'] ?? 'unknown';
+                                    echo $status === 'online' ? 'bg-success' : ($status === 'offline' ? 'bg-danger' : 'bg-warning'); 
+                                ?>">
+                                    <?php echo htmlspecialchars($status); ?>
+                                </span>
+                                <?php if (!empty($firewall['last_checkin'])): ?>
+                                    <br><small class="text-light">
+                                        Last checkin: <?php echo date('M j, Y H:i:s', strtotime($firewall['last_checkin'])); ?>
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (!empty($firewall['version']) || !empty($firewall['agent_version'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Version Info:</strong><br>
+                                <?php if (!empty($firewall['version'])): ?>
+                                    <small class="text-light">OPNsense: <?php echo htmlspecialchars($firewall['version']); ?></small><br>
+                                <?php endif; ?>
+                                <?php if (!empty($firewall['agent_version'])): ?>
+                                    <small class="text-light">Agent: <?php echo htmlspecialchars($firewall['agent_version']); ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?><?php if (!empty($firewall['uptime'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Uptime:</strong><br>
+                                <?php
+                                $uptime = htmlspecialchars($firewall['uptime']);
+                                // Check if uptime contains "days" and format accordingly
+                                if (preg_match('/(\d+)\s*days?\s*(\d+):(\d+)/', $uptime, $matches)) {
+                                    $days = $matches[1];
+                                    $hours = $matches[2];
+                                    $minutes = $matches[3];
+                                    echo '<span style="font-size: 1rem;" class="text-white">' . $days . 'd ' . $hours . 'h ' . $minutes . 'm</span><br>';
+                                    echo '<small class="text-light" style="font-size: 0.75rem;">' . $uptime . '</small>';
+                                } else {
+                                    echo '<small class="text-light">' . $uptime . '</small>';
+                                }
+                                ?>
+                            </div>
+                            <?php endif; ?>
+                            <!-- System Performance -->
+                            <?php if (!empty($firewall['cpu_usage']) || !empty($firewall['memory_usage'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Performance:</strong><br>
+                                <?php if (!empty($firewall['cpu_usage'])): ?>
+                                    <small class="text-light">CPU: <?php echo htmlspecialchars($firewall['cpu_usage']); ?>%</small><br>
+                                <?php endif; ?>
+                                <?php if (!empty($firewall['memory_usage'])): ?>
+                                    <small class="text-light">Memory: <?php echo htmlspecialchars($firewall['memory_usage']); ?>%</small>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
+                            <!-- Update Information -->
+                            <?php if (isset($firewall['updates_available'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Updates:</strong><br>
+                                <?php if ($firewall['updates_available'] == 1): ?>
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-exclamation-triangle me-1"></i>Available
+                                    </span><br>
+                                    <?php if (!empty($firewall['available_version'])): ?>
+                                        <small class="text-light">Available: <?php echo htmlspecialchars($firewall['available_version']); ?></small><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($firewall['current_version'])): ?>
+                                        <small class="text-light">Current: <?php echo htmlspecialchars($firewall['current_version']); ?></small>
+                                    <?php endif; ?>
+                                <?php elseif ($firewall['updates_available'] === 0): ?>
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Up to date
+                                    </span><br>
+                                    <?php if (!empty($firewall['current_version'])): ?>
+                                        <small class="text-light">Version: <?php echo htmlspecialchars($firewall['current_version']); ?></small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-question me-1"></i>Check needed
+                                    </span>
+                                <?php endif; ?>
+                                <?php if (!empty($firewall['last_update_check'])): ?>
+                                    <br><small class="text-light">Last check: <?php echo date('M j, Y H:i', strtotime($firewall['last_update_check'])); ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($firewall['enrolled_at'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Enrolled:</strong>
+                                <span class="text-white"><?php echo date('M j, Y H:i:s', strtotime($firewall['enrolled_at'])); ?></span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card card-ghost p-3">
+                            <h6 class="text-light mb-3"><i class="fas fa-building me-2"></i>Customer & Organization</h6>
+                            <?php if (!empty($firewall['customer_name'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Customer Name:</strong>
+                                <span class="text-white"><?php echo htmlspecialchars($firewall['customer_name']); ?></span>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($firewall['tag_names'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Tags:</strong><br>
+                                <?php 
+                                $tag_names = explode(', ', $firewall['tag_names']);
+                                $tag_colors = explode(', ', $firewall['tag_colors']);
+                                foreach ($tag_names as $index => $tag_name): 
+                                ?>
+                                    <span class="badge me-1 mt-1" style="background-color: <?php echo htmlspecialchars($tag_colors[$index]); ?>; color: white;">
+                                        <?php echo htmlspecialchars($tag_name); ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </div>
+                            <?php endif; ?>
+                            <?php if (!empty($firewall['reverse_proxy_url'])): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Reverse Proxy URL:</strong>
+                                <span class="text-white"><?php echo htmlspecialchars($firewall['reverse_proxy_url']); ?></span>
+                            </div>
+                            <?php endif; ?>
+                            <?php if ($firewall['updates_available']): ?>
+                            <div class="mb-2">
+                                <strong class="text-light">Updates:</strong>
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-download me-1"></i>Updates Available
+                                </span>
+                                <?php if (!empty($firewall['available_version'])): ?>
+                                    <br><small class="text-light">Available: <?php echo htmlspecialchars($firewall['available_version']); ?></small>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <?php if (!empty($firewall['notes'])): ?>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card card-ghost p-3">
+                            <h6 class="text-light mb-3"><i class="fas fa-sticky-note me-2"></i>Notes</h6>
+                            <div class="text-white" style="white-space: pre-wrap; line-height: 1.5;"><?php echo htmlspecialchars($firewall['notes']); ?></div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <!-- Alert Settings Section -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card card-ghost p-3">
+                            <h6 class="text-light mb-3"><i class="fas fa-bell me-2"></i>Alert Configuration</h6>
+                            <div class="mb-3">
+                                <strong class="text-light d-block mb-2">Offline Detection:</strong>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="view_alerts_enabled" 
+                                               <?php echo $firewall['alerts_enabled'] ? 'checked' : ''; ?> 
+                                               onchange="toggleAlertsEnabled(<?php echo $firewall['id']; ?>, this.checked)">
+                                        <label class="form-check-label text-light" for="view_alerts_enabled">
+                                            <span id="alert_status_text"><?php echo $firewall['alerts_enabled'] ? 'Enabled' : 'Disabled'; ?></span>
+                                        </label>
+                                    </div>
+                                    <?php if ($firewall['alerts_enabled']): ?>
+                                    <div class="text-white">
+                                        <i class="fas fa-clock me-1"></i>
+                                        <strong>Threshold:</strong> 
+                                        <span class="text-white"><?php echo round($firewall['offline_alert_threshold'] / 60); ?> minutes</span>
+                                        <small class="text-white-50">(<?php echo $firewall['offline_alert_threshold']; ?> seconds)</small>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($firewall['alerts_enabled']): ?>
+                                <div class="mt-2">
+                                    <small class="text-white-50">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Alerts will be sent to all admin users with email addresses when this firewall is offline for more than
+                                        <?php echo round($firewall['offline_alert_threshold'] / 60); ?> minutes.
+                                    </small>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Backup Management Section -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card card-ghost">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-light mb-0"><i class="fas fa-download me-2"></i>Configuration Backups</h6>
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="createBackup(<?php echo $firewall['id']; ?>)">
+                                    <i class="fas fa-plus me-1"></i>Create Backup
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="backupContent">
+                                    <div class="text-center py-3">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 text-muted">Loading backups...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editFirewallModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header bg-dark border-secondary">
+                <h5 class="modal-title text-light">Edit Firewall</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post">
+                <div class="modal-body bg-dark">
+                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+                    <input type="hidden" name="firewall_id" value="<?php echo $firewall['id']; ?>">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="hostname" class="form-label text-light fw-bold">Hostname</label>
+                                <input type="text" class="form-control bg-dark text-light border-secondary" id="hostname" name="hostname" value="<?php echo htmlspecialchars($firewall['hostname']); ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ip_address" class="form-label text-light fw-bold">IP Address</label>
+                                <input type="text" class="form-control bg-dark text-light border-secondary" id="ip_address" name="ip_address" value="<?php echo htmlspecialchars($firewall['ip_address']); ?>" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="wan_ip" class="form-label text-light fw-bold">WAN IP Address</label>
+                                <input type="text" class="form-control bg-dark text-light border-secondary" id="wan_ip" name="wan_ip" value="<?php echo htmlspecialchars($firewall['wan_ip'] ?? ''); ?>">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="customer_name" class="form-label text-light fw-bold">Customer</label>
+                                <select class="form-select bg-dark text-light border-secondary" id="customer_name" name="customer_name">
+                                    <option value="">Select Customer</option>
+                                    <?php foreach ($all_customers as $customer): ?>
+                                        <option value="<?php echo htmlspecialchars($customer['name']); ?>" 
+                                                <?php echo ($firewall['customer_name'] === $customer['name']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($customer['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-light fw-bold">Hardware ID</label>
+                                <div class="form-control bg-secondary text-light border-secondary" style="cursor: not-allowed;">
+                                    <code class="text-info"><?php echo htmlspecialchars($firewall['hardware_id'] ?? 'Not Available'); ?></code>
+                                </div>
+                                <small class="text-muted">Hardware ID is read-only and automatically generated</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Empty column for layout -->
+                        </div>
+                    </div>
+                    
+                    <!-- API Credentials Section -->
+                    <div class="mb-4">
+                        <h6 class="text-light mb-3"><i class="fas fa-key me-2"></i>OPNsense API Credentials</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="api_key" class="form-label text-light fw-bold">API Key</label>
+                                    <input type="text" class="form-control bg-dark text-light border-secondary" id="api_key" name="api_key" value="<?php echo htmlspecialchars($firewall['api_key'] ?? ''); ?>" placeholder="Enter OPNsense API Key">
+                                    <small class="text-muted">Required for remote updates. Generate in OPNsense: System > Access > Users > [user] > API Keys</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="api_secret" class="form-label text-light fw-bold">API Secret</label>
+                                    <input type="password" class="form-control bg-dark text-light border-secondary" id="api_secret" name="api_secret" value="<?php echo htmlspecialchars($firewall['api_secret'] ?? ''); ?>" placeholder="Enter OPNsense API Secret">
+                                    <small class="text-muted">Keep this secret secure. Only visible when editing.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="testAPI(<?php echo $firewall['id']; ?>)">
+                                    <i class="fas fa-plug me-1"></i>Test API Connection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label text-light fw-bold">Notes</label>
+                        <textarea class="form-control bg-dark text-light border-secondary" id="notes" name="notes" rows="4" placeholder="Add any notes about this firewall..."><?php echo htmlspecialchars($firewall['notes'] ?? ''); ?></textarea>
+                    </div>
+                    
+                    <!-- Alert Configuration -->
+                    <div class="mb-4">
+                        <h6 class="text-white fw-bold mb-3"><i class="fas fa-bell me-2"></i>Alert Configuration</h6>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="alerts_enabled" name="alerts_enabled"
+                                       <?php echo $firewall['alerts_enabled'] ? 'checked' : ''; ?>>
+                                <label class="form-check-label text-white fw-bold" for="alerts_enabled">
+                                    Enable Offline Alerts
+                                </label>
+                            </div>
+                            <small class="text-white-50">Send email alerts when this firewall goes offline</small>
+                        </div>
+                        <div class="mb-3" id="threshold_settings">
+                            <label for="offline_alert_threshold" class="form-label text-white fw-bold">
+                                Offline Threshold: <span id="threshold_display"><?php echo round($firewall['offline_alert_threshold'] / 60); ?></span> minutes
+                            </label>
+                            <input type="range" class="form-range" id="offline_alert_threshold" name="offline_alert_threshold" 
+                                   min="300" max="3600" step="60" value="<?php echo $firewall['offline_alert_threshold']; ?>"
+                                   oninput="document.getElementById('threshold_display').textContent = Math.round(this.value / 60)">
+                            <div class="d-flex justify-content-between">
+                                <small class="text-white-50">5 min</small>
+                                <small class="text-white-50">60 min</small>
+                            </div>
+                            <small class="text-white-50 d-block mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Alert will be sent to all admin users after firewall is offline for this duration
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tags" class="form-label text-light fw-bold">Tags</label>
+                        <select multiple class="form-select bg-dark text-light border-secondary" id="tags" name="tags[]" size="5">
+                            <?php 
+                            $selected_tag_ids = !empty($firewall['tag_ids']) ? explode(',', $firewall['tag_ids']) : [];
+                            foreach ($all_tags as $tag): 
+                            ?>
+                                <option value="<?php echo $tag['id']; ?>" 
+                                        <?php echo in_array($tag['id'], $selected_tag_ids) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple tags</small>
+                    </div>
+                </div>
+                <div class="modal-footer bg-dark border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_firewall" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleEditMode() {
+    new bootstrap.Modal(document.getElementById('editFirewallModal')).show();
+}
+
+function toggleAlertsEnabled(firewallId, enabled) {
+    const checkbox = document.getElementById('view_alerts_enabled');
+    const statusText = document.getElementById('alert_status_text');
+    const originalState = !enabled;
+    
+    fetch('/api/toggle_alerts.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            alerts_enabled: enabled ? 1 : 0,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusText.textContent = enabled ? 'Enabled' : 'Disabled';
+            // Reload page to update threshold display
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Error updating alert setting: ' + (data.message || 'Unknown error'));
+            checkbox.checked = originalState;
+            statusText.textContent = originalState ? 'Enabled' : 'Disabled';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating alert setting');
+        checkbox.checked = originalState;
+        statusText.textContent = originalState ? 'Enabled' : 'Disabled';
+    });
+}
+
+function updateFirewall(firewallId) {
+    if (!confirm("This will trigger an update on this firewall. The firewall will update automatically and only reboot if necessary. Continue?")) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+    
+    fetch('/api/update_firewall.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Update initiated successfully. The firewall will update automatically and only reboot if necessary. This page will reload.');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to initiate update'));
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error initiating update');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function rebootFirewall(firewallId) {
+    if (!confirm("This will reboot the firewall immediately. The firewall will be unavailable for a few minutes. Continue?")) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Rebooting...';
+    
+    fetch('/api/reboot_firewall.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Reboot command sent successfully. The firewall will reboot in a few moments and will be unavailable for a few minutes.');
+            button.innerHTML = '<i class="fas fa-check me-1"></i>Sent';
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }, 5000);
+        } else {
+            alert('Error: ' + (data.message || 'Failed to send reboot command'));
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error sending reboot command');
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function testAPI(firewallId) {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+    
+    fetch('/api/test_api.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('API Connection Successful!\n\nThe OPNsense API is accessible and responding properly.');
+        } else {
+            alert('API Connection Failed:\n\n' + (data.message || 'Unable to connect to OPNsense API'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('API Test Error: Unable to test connection');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function loadBackups(firewallId) {
+    fetch('/api/get_backups.php?firewall_id=' + firewallId, { credentials: 'same-origin' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayBackups(data.backups);
+            } else {
+                document.getElementById('backupContent').innerHTML = 
+                    '<div class="alert alert-warning">Error loading backups: ' + (data.message || 'Unknown error') + '</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('backupContent').innerHTML = 
+                '<div class="alert alert-danger">Failed to load backups</div>';
+        });
+}
+
+function displayBackups(backups) {
+    const container = document.getElementById('backupContent');
+    
+    if (!backups || backups.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No backups found for this firewall</div>';
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-dark table-striped">';
+    html += '<thead><tr><th>Date</th><th>Size</th><th>Description</th><th>Actions</th></tr></thead>';
+    html += '<tbody>';
+    
+    backups.forEach(backup => {
+        const date = new Date(backup.created_at).toLocaleDateString();
+        const time = new Date(backup.created_at).toLocaleTimeString();
+        
+        // Show "Processing..." for backups less than 5 minutes old with no file size
+        const backupAge = (new Date() - new Date(backup.created_at)) / 1000 / 60; // minutes
+        const size = backup.file_size 
+            ? (backup.file_size / 1024).toFixed(1) + ' KB' 
+            : (backupAge < 5 ? '<span class="text-warning">Processing...</span>' : '<span class="text-danger">Unknown</span>');
+        
+        html += `<tr>
+            <td>
+                <strong>${date}</strong><br>
+                <small class="text-muted">${time}</small>
+            </td>
+            <td>${size}</td>
+            <td>${backup.description || 'Configuration backup'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="downloadBackup(${backup.id})" title="Download">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-warning me-1" onclick="restoreBackup(${backup.id})" title="Restore">
+                    <i class="fas fa-upload"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteBackup(${backup.id})" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function createBackup(firewallId) {
+    if (!confirm('Create a new configuration backup for this firewall?')) return;
+    
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
+    
+    fetch('/api/create_backup.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Backup created successfully!');
+            loadBackups(firewallId);
+        } else {
+            alert('Error creating backup: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating backup');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = originalText;
+    });
+}
+
+function downloadBackup(backupId) {
+    window.open('/api/download_backup.php?id=' + backupId, '_blank');
+}
+
+function restoreBackup(backupId) {
+    if (!confirm('This will restore the configuration backup and may restart the firewall. Continue?')) return;
+    
+    fetch('/api/restore_backup.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            backup_id: backupId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Restore command sent successfully. The firewall will restore the configuration and may restart.');
+        } else {
+            alert('Error restoring backup: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error restoring backup');
+    });
+}
+
+function deleteBackup(backupId) {
+    if (!confirm('Delete this backup? This action cannot be undone.')) return;
+    
+    fetch('/api/delete_backup.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            backup_id: backupId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Backup deleted successfully!');
+            location.reload();
+        } else {
+            alert('Error deleting backup: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting backup');
+    });
+}
+
+// Load backups when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const firewallId = <?php echo $firewall['id']; ?>;
+    loadBackups(firewallId);
+});
+</script>
+
+<?php include __DIR__ . '/inc/footer.php'; ?>
