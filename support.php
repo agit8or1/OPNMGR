@@ -155,14 +155,15 @@ include __DIR__ . '/inc/header.php';
 }
 
 .form-control-custom {
-    background: #1e293b;
-    border: 2px solid #cbd5e1;
+    background: #0f172a;
+    border: 2px solid #334155;
     color: #e2e8f0;
 }
 
 .form-control-custom:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+    background: #1e293b;
 }
 
 .help-section {
@@ -171,6 +172,75 @@ include __DIR__ . '/inc/header.php';
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 1rem;
+}
+
+.support-card .card-header {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-bottom: 2px solid #334155;
+}
+
+.support-card .card-header h5,
+.support-card .card-header h6 {
+    color: #e2e8f0;
+}
+
+.support-card .card-body {
+    color: #cbd5e1;
+}
+
+.support-card h6 {
+    color: #e2e8f0;
+}
+
+.support-card p,
+.support-card li {
+    color: #cbd5e1;
+}
+
+.form-label {
+    color: #e2e8f0;
+}
+
+.form-label strong {
+    color: #f1f5f9;
+}
+
+.text-dark, h2.text-dark, h5.text-dark, h6.text-dark {
+    color: #e2e8f0 !important;
+}
+
+.text-muted, small.text-muted {
+    color: #94a3b8 !important;
+}
+
+.text-primary {
+    color: #60a5fa !important;
+}
+
+.help-section h6 {
+    color: #60a5fa;
+}
+
+.help-section p {
+    color: #cbd5e1;
+}
+
+.help-section ol,
+.help-section li {
+    color: #cbd5e1;
+}
+
+.issue-item h6 {
+    color: #e2e8f0;
+}
+
+.issue-item a {
+    text-decoration: none;
+}
+
+.issue-item a:hover h6 {
+    color: #60a5fa;
 }
 </style>
 
