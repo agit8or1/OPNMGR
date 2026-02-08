@@ -101,15 +101,36 @@ screenshots_*/
 *.mp4
 
 # Test and development files
-test_*.php
-debug_*.php
-temp_*.php
+test_*
+debug_*
+temp_*
 *_test.*
 *_debug.*
+*_broken*
+fix_*.sh
+fix_*.php
+emergency_*
+*_fix.php
+simple_*.sh
+super_simple_*.sh
 
 # Documentation builds
 docs/_build/
 site/
+
+# Redundant/old documentation (keep only README, SECURITY, LICENSE)
+*_FIXES_*.md
+*_FIXES.md
+*_CHANGELOG.md
+*_SUMMARY.md
+*_COMPLETE.md
+*_STATUS.md
+*_GUIDE.md
+*_REQUIREMENTS.md
+*_IMPLEMENTATION.md
+*_DEPLOYMENT.md
+KNOWLEDGE_BASE.md
+QUICK_REFERENCE.*
 
 # Security scan results
 snyk-*.json
