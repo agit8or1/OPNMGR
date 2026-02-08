@@ -164,8 +164,8 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .update-card {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
+    background: #1e293b;
+    border: 2px solid #334155;
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1rem;
@@ -179,7 +179,7 @@ include __DIR__ . '/inc/header.php';
 }
 
 .commit-item {
-    background: #f8fafc;
+    background: #0f172a;
     border-left: 4px solid #3b82f6;
     padding: 1rem;
     margin-bottom: 0.5rem;

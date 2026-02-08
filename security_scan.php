@@ -41,12 +41,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'install_snyk':
+            // Check if npm is installed, if not install it first
+            exec('which npm 2>&1', $npm_check_output, $npm_check_code);
+            if ($npm_check_code !== 0) {
+                // Install nodejs and npm
+                exec('curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - 2>&1', $nodejs_output, $nodejs_return);
+                exec('sudo apt-get install -y nodejs 2>&1', $npm_output, $npm_return);
+
+                if ($npm_return !== 0) {
+                    $config_message = 'Failed to install Node.js/npm automatically. Please install manually: sudo apt-get install nodejs npm';
+                    $config_status = 'danger';
+                    break;
+                }
+                $config_message = 'Node.js and npm installed successfully! Now installing Snyk...<br>';
+                $config_status = 'success';
+            }
+
             exec('npm install -g snyk 2>&1', $output, $return_code);
             if ($return_code === 0) {
-                $config_message = 'Snyk installed successfully! Please configure your API key below.';
+                $config_message .= 'Snyk installed successfully! Please configure your API key below.';
                 $config_status = 'success';
             } else {
-                $config_message = 'Failed to install Snyk. Error: ' . implode("\n", $output);
+                $config_message .= 'Failed to install Snyk. Error: ' . implode("\n", $output);
                 $config_status = 'danger';
             }
             break;
@@ -102,23 +118,29 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .security-card {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
+    background: #1e293b;
+    border: 2px solid #334155;
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1rem;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .security-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
     border-color: #3b82f6;
 }
 
+.security-card h5 {
+    color: #e2e8f0;
+}
+
+.security-card p {
+    color: #cbd5e1;
+}
+
 .scan-output {
-    background: #1e293b;
+    background: #0f172a;
     border: 2px solid #475569;
     border-radius: 6px;
     padding: 1rem;
@@ -131,87 +153,85 @@ include __DIR__ . '/inc/header.php';
     word-wrap: break-word;
 }
 
-.status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.status-success {
-    background: #10b981;
-    color: white;
-}
-
-.status-warning {
-    background: #f59e0b;
-    color: white;
-}
-
-.status-error {
-    background: #ef4444;
-    color: white;
-}
-
-.status-info {
-    background: #3b82f6;
-    color: white;
-}
-
 .config-section {
-    background: #f8fafc;
-    border: 2px solid #cbd5e1;
+    background: #1e293b;
+    border: 2px solid #334155;
     border-radius: 8px;
     padding: 2rem;
 }
 
-.card-header-custom {
-    background: #1e293b;
-    color: white;
-    font-weight: 600;
-}
-
-.security-card h5 {
-    color: #1e293b;
-    font-weight: 600;
-}
-
-.security-card p {
-    color: #64748b;
+.config-section h4 {
+    color: #e2e8f0;
 }
 
 .card-dark-custom {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
+    background: #1e293b;
+    border: 2px solid #334155;
 }
 
 .card-dark-custom .card-header {
-    background: #f1f5f9;
-    color: #1e293b;
-    border-bottom: 2px solid #e5e7eb;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-bottom: 2px solid #334155;
+}
+
+.card-dark-custom .card-header h6 {
+    color: #e2e8f0;
 }
 
 .card-dark-custom .card-body {
-    color: #1e293b;
+    color: #cbd5e1;
+}
+
+.card-dark-custom .card-body dt {
+    color: #94a3b8;
+}
+
+.card-dark-custom .card-body dd {
+    color: #cbd5e1;
+}
+
+.card-dark-custom .card-body p {
+    color: #cbd5e1;
+}
+
+.card-header-custom {
+    background: #0f172a;
+    color: #e2e8f0;
 }
 
 .form-control-custom {
-    background: #ffffff;
-    border: 2px solid #cbd5e1;
-    color: #1e293b;
+    background: #0f172a;
+    border: 2px solid #334155;
+    color: #e2e8f0;
 }
 
 .form-control-custom:focus {
     border-color: #3b82f6;
-    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+    background: #1e293b;
+}
+
+.form-control-custom::placeholder {
+    color: #64748b;
+}
+
+.form-label {
+    color: #e2e8f0;
+}
+
+.text-muted, small.text-muted {
+    color: #94a3b8 !important;
+}
+
+.text-dark {
+    color: #e2e8f0 !important;
 }
 </style>
 
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <h2 class="text-dark"><i class="fas fa-shield-alt me-2 text-primary"></i>Security Scanner</h2>
+            <h2><i class="fas fa-shield-alt me-2 text-primary"></i>Security Scanner</h2>
             <p class="text-muted">Powered by Snyk - Continuous security monitoring for vulnerabilities</p>
         </div>
     </div>
@@ -219,7 +239,7 @@ include __DIR__ . '/inc/header.php';
     <?php if ($config_message): ?>
         <div class="alert alert-<?php echo $config_status; ?> alert-dismissible fade show">
             <i class="fas fa-<?php echo $config_status === 'success' ? 'check-circle' : 'exclamation-triangle'; ?> me-2"></i>
-            <?php echo htmlspecialchars($config_message); ?>
+            <?php echo $config_message; ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -228,7 +248,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row mb-4">
         <div class="col-12">
             <div class="config-section">
-                <h4 class="mb-3 text-dark"><i class="fas fa-cog me-2 text-primary"></i>Snyk Configuration</h4>
+                <h4 class="mb-3"><i class="fas fa-cog me-2 text-primary"></i>Snyk Configuration</h4>
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -269,23 +289,20 @@ include __DIR__ . '/inc/header.php';
                                 <h6 class="mb-0"><i class="fas fa-key me-2"></i>API Configuration</h6>
                             </div>
                             <div class="card-body">
-                                <?php if (!$snyk_available && $npm_available): ?>
-                                    <p class="mb-3 text-dark">Snyk is not installed. Click below to install automatically:</p>
+                                <?php if (!$snyk_available): ?>
+                                    <p class="mb-3">Snyk is not installed. Click below to install automatically:</p>
                                     <form method="post">
                                         <input type="hidden" name="action" value="install_snyk">
                                         <button type="submit" class="btn btn-primary">
                                             <i class="fas fa-download me-2"></i>Install Snyk Now
                                         </button>
                                     </form>
-                                <?php elseif (!$snyk_available): ?>
-                                    <div class="alert alert-danger mb-0">
-                                        <strong>NPM Required:</strong> Install Node.js and npm first.
-                                    </div>
+                                    <small class="text-muted d-block mt-2">This will automatically install Node.js, npm, and Snyk if needed.</small>
                                 <?php else: ?>
                                     <form method="post">
                                         <input type="hidden" name="action" value="save_api_key">
                                         <div class="mb-3">
-                                            <label class="form-label text-dark">
+                                            <label class="form-label">
                                                 <strong>Snyk API Token</strong>
                                                 <small class="text-muted d-block">Get your token from <a href="https://app.snyk.io/account" target="_blank">snyk.io/account</a></small>
                                             </label>
@@ -308,7 +325,6 @@ include __DIR__ . '/inc/header.php';
 
     <!-- Scan Actions -->
     <div class="row mb-4">
-        <!-- Dependency Scan -->
         <div class="col-md-4">
             <div class="security-card">
                 <div class="text-center mb-3">
@@ -327,7 +343,6 @@ include __DIR__ . '/inc/header.php';
             </div>
         </div>
 
-        <!-- Code Scan -->
         <div class="col-md-4">
             <div class="security-card">
                 <div class="text-center mb-3">
@@ -346,7 +361,6 @@ include __DIR__ . '/inc/header.php';
             </div>
         </div>
 
-        <!-- Monitor -->
         <div class="col-md-4">
             <div class="security-card">
                 <div class="text-center mb-3">
@@ -374,7 +388,7 @@ include __DIR__ . '/inc/header.php';
                         <h5 class="mb-0">
                             <i class="fas fa-terminal me-2"></i>Scan Results
                         </h5>
-                        <span class="status-badge status-<?php echo $scan_status; ?>">
+                        <span class="badge bg-<?php echo $scan_status; ?>">
                             <?php echo strtoupper($scan_status); ?>
                         </span>
                     </div>
@@ -396,7 +410,6 @@ include __DIR__ . '/inc/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- Information Panel -->
     <div class="row mt-4">
         <div class="col-md-6">
             <div class="card card-dark-custom">

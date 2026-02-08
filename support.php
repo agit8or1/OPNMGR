@@ -112,15 +112,15 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .support-card {
-    background: #ffffff;
-    border: 2px solid #e5e7eb;
+    background: #1e293b;
+    border: 2px solid #334155;
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1rem;
 }
 
 .issue-item {
-    background: #f8fafc;
+    background: #0f172a;
     border-left: 4px solid #3b82f6;
     padding: 1rem;
     margin-bottom: 0.5rem;
@@ -129,7 +129,7 @@ include __DIR__ . '/inc/header.php';
 }
 
 .issue-item:hover {
-    background: #e0f2fe;
+    background: #334155;
     transform: translateX(5px);
 }
 
@@ -155,9 +155,9 @@ include __DIR__ . '/inc/header.php';
 }
 
 .form-control-custom {
-    background: #ffffff;
+    background: #1e293b;
     border: 2px solid #cbd5e1;
-    color: #1e293b;
+    color: #e2e8f0;
 }
 
 .form-control-custom:focus {
@@ -166,7 +166,7 @@ include __DIR__ . '/inc/header.php';
 }
 
 .help-section {
-    background: #f0f9ff;
+    background: #1e293b;
     border: 2px solid #3b82f6;
     border-radius: 6px;
     padding: 1rem;
