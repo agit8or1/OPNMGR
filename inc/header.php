@@ -389,6 +389,10 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
               <li><hr class="dropdown-divider"></li>
               <!-- Security Scanning -->
               <li><a class="dropdown-item" href="/security_scan.php"><i class="fa fa-bug me-2"></i> Security Scanner</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <!-- System & Support -->
+              <li><a class="dropdown-item" href="/system_update.php"><i class="fa fa-sync-alt me-2"></i> System Update</a></li>
+              <li><a class="dropdown-item" href="/support.php"><i class="fa fa-life-ring me-2"></i> Support</a></li>
             </ul>
           </div>
         </div>

@@ -20,6 +20,47 @@ $total_backups = $stmt->fetchColumn();
 include __DIR__ . '/inc/header.php';
 ?>
 
+<style>
+.about-card {
+    background: #ffffff;
+    border: 2px solid #e5e7eb;
+}
+
+.about-card .card-header {
+    background: #f1f5f9;
+    color: #1e293b;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.about-card .card-body {
+    color: #1e293b;
+}
+
+.about-card .table {
+    color: #1e293b;
+}
+
+.about-card .table th {
+    color: #475569;
+    font-weight: 600;
+}
+
+.changelog-card {
+    background: #ffffff;
+    border: 2px solid #e5e7eb;
+}
+
+.changelog-card .card-header {
+    background: #f8fafc;
+    color: #1e293b;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.changelog-card .card-body {
+    color: #1e293b;
+}
+</style>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-3">
@@ -27,7 +68,7 @@ include __DIR__ . '/inc/header.php';
         </div>
 
         <div class="col-md-9">
-            <div class="card">
+            <div class="card about-card">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-info-circle me-2"></i>About <?= APP_NAME ?>
@@ -153,7 +194,7 @@ include __DIR__ . '/inc/header.php';
                         <div class="col-md-12">
                             <h4><i class="fas fa-history me-2"></i>Recent Changes</h4>
                             <?php foreach (getChangelogEntries(3) as $entry): ?>
-                            <div class="card mb-2">
+                            <div class="card changelog-card mb-2">
                                 <div class="card-header">
                                     <strong>v<?= $entry['version'] ?></strong> - <?= $entry['title'] ?>
                                     <span class="badge bg-<?= $entry['type'] == 'major' ? 'danger' : 'info' ?> float-end">
