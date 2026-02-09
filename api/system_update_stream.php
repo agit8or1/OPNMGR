@@ -31,8 +31,8 @@ function sendEvent($step, $message, $status = 'running') {
     flush();
 }
 
+$wrapper = 'sudo /usr/local/sbin/opnmgr-update-wrapper';
 $app_dir = '/var/www/opnsense';
-$git_dir = '/home/administrator/opnsense';
 
 // Step 1: Create backup directory
 sendEvent('backup_dir', 'Creating backup directory...', 'running');
@@ -64,13 +64,13 @@ if ($rc === 0) {
 // Step 3: Git stash
 sendEvent('git_stash', 'Stashing local changes...', 'running');
 $output = [];
-exec('cd ' . escapeshellarg($git_dir) . ' && git stash 2>&1', $output, $rc);
+exec($wrapper . ' git-stash 2>&1', $output, $rc);
 sendEvent('git_stash', 'Local changes stashed', 'done');
 
 // Step 4: Git pull
 sendEvent('git_pull', 'Pulling latest code from GitHub...', 'running');
 $output = [];
-exec('cd ' . escapeshellarg($git_dir) . ' && git pull origin main 2>&1', $output, $rc);
+exec($wrapper . ' git-pull 2>&1', $output, $rc);
 if ($rc !== 0) {
     sendEvent('git_pull', 'Failed to pull updates: ' . implode(' ', $output), 'error');
     sendEvent('done', 'Update failed', 'error');
@@ -81,7 +81,7 @@ sendEvent('git_pull', 'Code pulled successfully', 'done');
 // Step 5: Sync to production
 sendEvent('sync', 'Syncing to production...', 'running');
 $output = [];
-exec('rsync -a --exclude=".git" --exclude="backups" --exclude=".env" --exclude="keys" ' . escapeshellarg($git_dir . '/') . ' ' . escapeshellarg($app_dir . '/') . ' 2>&1', $output, $rc);
+exec($wrapper . ' sync 2>&1', $output, $rc);
 if ($rc === 0) {
     sendEvent('sync', 'Files synced to production', 'done');
 } else {
@@ -105,7 +105,7 @@ if (file_exists($app_dir . '/scripts/post_update.sh')) {
 // Step 7: Update COMMIT file
 sendEvent('version', 'Updating version info...', 'running');
 $output = [];
-exec('git -C ' . escapeshellarg($git_dir) . ' rev-parse --short HEAD 2>&1', $output, $rc);
+exec($wrapper . ' git-commit 2>&1', $output, $rc);
 if ($rc === 0 && !empty($output)) {
     $new_commit = trim($output[0]);
     file_put_contents($app_dir . '/COMMIT', $new_commit . "\n");
