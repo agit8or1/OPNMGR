@@ -87,7 +87,8 @@ header('Content-Type: text/html; charset=UTF-8');
                 echo "</div>";
             }
         } catch (Exception $e) {
-            echo "<div class='firewall'><p>Error: " . htmlspecialchars($e->getMessage()) . "</p></div>";
+            error_log("monitor.php error: " . $e->getMessage());
+            echo "<div class='firewall'><p>An internal error occurred.</p></div>";
         }
         ?>
         

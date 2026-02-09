@@ -38,7 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt->execute([$current_user]);
                     $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
                 } catch (Exception $e) {
-                    $message = 'Failed to update profile: ' . $e->getMessage();
+                    error_log("profile.php error: " . $e->getMessage());
+                    $message = 'An internal error occurred while updating the profile.';
                     $message_type = 'danger';
                 }
             }
@@ -68,7 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $message = 'Password changed successfully!';
                         $message_type = 'success';
                     } catch (Exception $e) {
-                        $message = 'Failed to change password: ' . $e->getMessage();
+                        error_log("profile.php error: " . $e->getMessage());
+                        $message = 'An internal error occurred while changing the password.';
                         $message_type = 'danger';
                     }
                 } else {

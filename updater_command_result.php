@@ -80,6 +80,7 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Failed to record command result: ' . $e->getMessage()]);
+    error_log("updater_command_result.php error: " . $e->getMessage());
+    echo json_encode(['error' => 'Internal server error']);
 }
 ?>

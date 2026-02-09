@@ -194,7 +194,8 @@ if ($sort_by === 'health') {
         
     } catch (PDOException $e) {
         $firewalls = [];
-        $error = 'Database error: ' . $e->getMessage();
+        error_log("firewalls.php error: " . $e->getMessage());
+        $error = 'An internal error occurred.';
     }
 } else {
     // Normal sorting for other columns
@@ -207,7 +208,8 @@ if ($sort_by === 'health') {
         $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         $firewalls = [];
-        $error = 'Database error: ' . $e->getMessage();
+        error_log("firewalls.php error: " . $e->getMessage());
+        $error = 'An internal error occurred.';
     }
 }
 

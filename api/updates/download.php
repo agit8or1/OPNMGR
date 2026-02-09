@@ -8,9 +8,6 @@
 require_once __DIR__ . '/../../inc/db.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -86,6 +83,6 @@ try {
 } catch (Exception $e) {
     error_log("Update download error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Internal server error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Internal server error']);
 }
 ?>

@@ -29,7 +29,7 @@ try {
     
     echo json_encode([
         'success' => false,
-        'message' => 'Failed to cleanup logs: ' . $e->getMessage()
+        'message' => 'Internal server error'
     ]);
 }
 ?>

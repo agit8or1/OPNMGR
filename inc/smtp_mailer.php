@@ -139,6 +139,7 @@ function send_smtp_email($smtp_settings, $to, $subject, $message, $from_address,
         if ($socket) {
             @fclose($socket);
         }
-        return ['success' => false, 'error' => $e->getMessage()];
+        error_log("smtp_mailer.php error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Internal server error'];
     }
 }

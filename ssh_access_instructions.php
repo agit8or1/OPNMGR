@@ -151,7 +151,7 @@ include __DIR__ . '/inc/header.php';
                     <div class="alert alert-info mt-4">
                         <h6><i class="fas fa-lightbulb me-2"></i>Testing Connection</h6>
                         <p>After adding the rule, test SSH access from this server:</p>
-                        <pre class="bg-dark p-3 border border-secondary rounded text-light mb-0"><code>sudo -u www-data ssh -i /var/www/opnsense/keys/id_firewall_ID root@FIREWALL_IP 'echo "Working"'</code></pre>
+                        <pre class="bg-dark p-3 border border-secondary rounded text-light mb-0"><code>sudo -u www-data ssh -i /etc/opnmgr/keys/id_firewall_ID root@FIREWALL_IP 'echo "Working"'</code></pre>
                     </div>
                 </div>
             </div>

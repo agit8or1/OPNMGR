@@ -56,6 +56,7 @@ try {
     
 } catch (Exception $e) {
     $DB->rollback();
-    echo json_encode(['success' => false, 'message' => 'Error deleting firewall: ' . $e->getMessage()]);
+    error_log("delete_firewall.php error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

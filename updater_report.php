@@ -94,6 +94,7 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    error_log("updater_report.php error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

@@ -49,7 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'group_id' => md5($groupName)
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error adding group: ' . $e->getMessage()]);
+            error_log("manage_groups.php error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Internal server error']);
         }
         
     } elseif ($action === 'delete_group') {
@@ -78,7 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'group_id' => md5($groupName)
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error deleting group: ' . $e->getMessage()]);
+            error_log("manage_groups.php error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Internal server error']);
         }
         
     } else {

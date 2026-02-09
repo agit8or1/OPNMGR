@@ -293,6 +293,7 @@ try {
     }
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    error_log("enroll_firewall.php error: " . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

@@ -47,7 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'tag_id' => $tagId
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error adding tag: ' . $e->getMessage()]);
+            error_log("manage_tags.php error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Internal server error']);
         }
         
     } elseif ($action === 'edit_tag') {
@@ -83,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'tag_color' => $tagColor
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error updating tag: ' . $e->getMessage()]);
+            error_log("manage_tags.php error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Internal server error']);
         }
         
     } elseif ($action === 'delete_tag') {
@@ -115,7 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'tag_id' => $tagId
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Error deleting tag: ' . $e->getMessage()]);
+            error_log("manage_tags.php error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Internal server error']);
         }
         
     } else {

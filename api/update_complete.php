@@ -31,6 +31,7 @@ try {
     echo json_encode(['success' => true, 'message' => 'Update status recorded']);
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    error_log("update_complete.php error: " . $e->getMessage());
+    echo json_encode(['error' => 'Internal server error']);
 }
 ?>

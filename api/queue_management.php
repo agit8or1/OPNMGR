@@ -113,7 +113,8 @@ function cleanupOldRequests() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Cleanup failed: ' . $e->getMessage()]);
+        error_log("queue_management.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -159,7 +160,8 @@ function getQueueStatus() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get queue status: ' . $e->getMessage()]);
+        error_log("queue_management.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -188,7 +190,8 @@ function getFailedRequests() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get failed requests: ' . $e->getMessage()]);
+        error_log("queue_management.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -234,7 +237,8 @@ function getRequestStats() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get request statistics: ' . $e->getMessage()]);
+        error_log("queue_management.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -258,7 +262,8 @@ function clearCompletedRequests() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to clear completed requests: ' . $e->getMessage()]);
+        error_log("queue_management.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 ?>

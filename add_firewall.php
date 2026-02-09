@@ -40,7 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         echo 'Firewall added successfully.';
     } catch (Exception $e) {
-        echo 'Error adding firewall: ' . $e->getMessage();
+        error_log("add_firewall.php error: " . $e->getMessage());
+        echo 'Internal server error';
     }
 } else {
     http_response_code(405);

@@ -70,7 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $smtp_from_email = $rows['smtp_from_email'] ?? '';
                     $smtp_from_name = $rows['smtp_from_name'] ?? 'OPNsense Manager';
                 } catch (Exception $e) {
-                    $notice = '<div class="alert alert-danger">Error saving settings: ' . htmlspecialchars($e->getMessage()) . '</div>';
+                    error_log("smtp_settings.php error: " . $e->getMessage());
+                    $notice = '<div class="alert alert-danger">An internal error occurred while saving settings.</div>';
                 }
             }
         }

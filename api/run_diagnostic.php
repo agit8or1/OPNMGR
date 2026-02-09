@@ -39,7 +39,7 @@ if (!$firewall) {
 }
 
 // SSH key path
-$key_path = "/var/www/opnsense/keys/id_firewall_{$firewall_id}";
+$key_path = "/etc/opnmgr/keys/id_firewall_{$firewall_id}";
 
 if (!file_exists($key_path)) {
     die(json_encode(['success' => false, 'error' => 'SSH key not found']));

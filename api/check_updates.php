@@ -79,7 +79,7 @@ try {
     
     echo json_encode([
         'success' => false,
-        'message' => 'Failed to check for updates: ' . $e->getMessage()
+        'message' => 'Internal server error'
     ]);
 }
 ?>

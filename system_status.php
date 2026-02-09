@@ -54,6 +54,7 @@ try {
     echo json_encode($response, JSON_PRETTY_PRINT);
     
 } catch (Exception $e) {
-    echo json_encode(['error' => $e->getMessage()]);
+    error_log("system_status.php error: " . $e->getMessage());
+    echo json_encode(['error' => 'Internal server error']);
 }
 ?>

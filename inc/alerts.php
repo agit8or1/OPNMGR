@@ -116,14 +116,16 @@ function send_email_alert($level, $type, $subject, $message_html, $firewall_id =
                     $results['errors'][] = "Failed to send to {$to}: {$email_result['error']}";
                 }
             } catch (Exception $e) {
-                $results['errors'][] = "Error sending to {$recipient['email']}: {$e->getMessage()}";
+                error_log("alerts.php error sending to {$recipient['email']}: " . $e->getMessage());
+                $results['errors'][] = "Error sending to {$recipient['email']}";
             }
         }
         
         $results['success'] = $results['sent'] > 0;
         
     } catch (Exception $e) {
-        $results['errors'][] = "System error: {$e->getMessage()}";
+        error_log("alerts.php system error: " . $e->getMessage());
+        $results['errors'][] = "Internal server error";
     }
     
     return $results;

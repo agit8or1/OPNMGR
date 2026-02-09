@@ -125,12 +125,12 @@ try {
         $_SESSION['user_id'] ?? null, $firewall_id);
     
     if (isset($_POST['action'])) {
-        header('Location: /firewalls.php?error=' . urlencode('Failed to initiate update: ' . $e->getMessage()));
+        header('Location: /firewalls.php?error=' . urlencode('Failed to initiate update'));
         exit;
     } else {
         echo json_encode([
             'success' => false,
-            'message' => 'Failed to initiate update: ' . $e->getMessage()
+            'message' => 'Internal server error'
         ]);
     }
 }

@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       try {
         $stmt->execute([':u'=>$username,':p'=>$hash,':fn'=>$first,':ln'=>$last,':em'=>$email,':r'=>$role]);
         header('Location: /users.php'); exit;
-      } catch (Exception $e) { $msg = 'Error creating user: '. $e->getMessage(); }
+      } catch (Exception $e) { error_log("add_user.php error: " . $e->getMessage()); $msg = 'Internal server error'; }
     }
   }
 }

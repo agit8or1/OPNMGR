@@ -54,6 +54,7 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo 'Error downloading backup: ' . $e->getMessage();
+    error_log("download_backup.php error: " . $e->getMessage());
+    echo 'Internal server error';
 }
 ?>

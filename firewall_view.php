@@ -36,7 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_firewall'])) {
             
             $message = '<div class="alert alert-success">Firewall updated successfully!</div>';
         } catch (Exception $e) {
-            $message = '<div class="alert alert-danger">Error updating firewall: ' . $e->getMessage() . '</div>';
+            error_log("firewall_view.php error: " . $e->getMessage());
+            $message = '<div class="alert alert-danger">An internal error occurred while updating the firewall.</div>';
         }
     }
 }

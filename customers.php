@@ -32,7 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($e->getCode() == 23000) {
                     $message = '<div class="alert alert-danger">A customer with this name already exists.</div>';
                 } else {
-                    $message = '<div class="alert alert-danger">Error adding customer: ' . $e->getMessage() . '</div>';
+                    error_log("customers.php error: " . $e->getMessage());
+                    $message = '<div class="alert alert-danger">An internal error occurred while adding the customer.</div>';
                 }
             }
         }
@@ -56,7 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($e->getCode() == 23000) {
                     $message = '<div class="alert alert-danger">A customer with this name already exists.</div>';
                 } else {
-                    $message = '<div class="alert alert-danger">Error updating customer: ' . $e->getMessage() . '</div>';
+                    error_log("customers.php error: " . $e->getMessage());
+                    $message = '<div class="alert alert-danger">An internal error occurred while updating the customer.</div>';
                 }
             }
         }
@@ -77,7 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = '<div class="alert alert-success">Customer deleted successfully!</div>';
             }
         } catch (PDOException $e) {
-            $message = '<div class="alert alert-danger">Error deleting customer: ' . $e->getMessage() . '</div>';
+            error_log("customers.php error: " . $e->getMessage());
+            $message = '<div class="alert alert-danger">An internal error occurred while deleting the customer.</div>';
         }
     }
 }
@@ -88,7 +91,8 @@ try {
     $customers = $stmt->fetchAll();
 } catch (Exception $e) {
     $customers = [];
-    $message = '<div class="alert alert-danger">Error loading customers: ' . $e->getMessage() . '</div>';
+    error_log("customers.php error: " . $e->getMessage());
+    $message = '<div class="alert alert-danger">An internal error occurred while loading customers.</div>';
 }
 ?>
 

@@ -108,7 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: firewall_details.php?id=' . $firewall_id . '&success=1');
             exit;
         } catch (Exception $e) {
-            $error = 'Failed to update firewall: ' . $e->getMessage();
+            error_log("firewall_edit.php error: " . $e->getMessage());
+            $error = 'An internal error occurred while updating the firewall.';
         }
     }
 }

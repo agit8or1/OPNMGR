@@ -104,9 +104,10 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log("queue_os_update.php error: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'message' => 'Failed to queue update commands: ' . $e->getMessage()
+        'message' => 'Internal server error'
     ]);
 }
 ?>

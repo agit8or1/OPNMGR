@@ -25,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $email, $role]);
                 $message = '<div class="alert alert-success">User added successfully!</div>';
             } catch (PDOException $e) {
-                $message = '<div class="alert alert-danger">Error adding user: ' . $e->getMessage() . '</div>';
+                error_log("users.php error: " . $e->getMessage());
+                $message = '<div class="alert alert-danger">An internal error occurred while adding the user.</div>';
             }
         }
     } elseif (isset($_POST['delete_user'])) {
@@ -52,7 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$hashedPassword, $_SESSION['user_id']]);
                 $message = '<div class="alert alert-success">Password changed successfully!</div>';
             } catch (PDOException $e) {
-                $message = '<div class="alert alert-danger">Error changing password: ' . $e->getMessage() . '</div>';
+                error_log("users.php error: " . $e->getMessage());
+                $message = '<div class="alert alert-danger">An internal error occurred while changing the password.</div>';
             }
         }
     } elseif (isset($_POST['edit_user'])) {
@@ -78,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $message = '<div class="alert alert-success">User updated successfully!</div>';
             } catch (PDOException $e) {
-                $message = '<div class="alert alert-danger">Error updating user: ' . $e->getMessage() . '</div>';
+                error_log("users.php error: " . $e->getMessage());
+                $message = '<div class="alert alert-danger">An internal error occurred while updating the user.</div>';
             }
         }
     }

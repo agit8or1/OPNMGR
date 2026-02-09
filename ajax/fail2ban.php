@@ -3,88 +3,89 @@ require_once __DIR__ . '/../inc/auth.php';
 requireLogin();
 header('Content-Type: application/json');
 
- = trim(['jail'] ?? '');
-if ( === '') {
+$jail = trim($_GET['jail'] ?? $_POST['jail'] ?? '');
+if ($jail === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'no jail']);
     exit;
 }
 
- = '/usr/local/sbin/opnmgr-fail2ban-wrapper';
- = trim(shell_exec('command -v fail2ban-client || true'));
+$wrapper = '/usr/local/sbin/opnmgr-fail2ban-wrapper';
+$fbin = trim(shell_exec('command -v fail2ban-client || true'));
+if (empty($fbin) && !is_executable($wrapper)) {
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'fail2ban-client not available']);
     exit;
 }
 
 // prefer wrapper if present
- = is_executable();
+$use_wrapper = is_executable($wrapper);
 
- = ['REQUEST_METHOD'] ?? 'GET';
-if ( === 'POST') {
-     = ['act'] ?? '';
-     = trim(['ip'] ?? '');
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if ($method === 'POST') {
+    $act = $_POST['act'] ?? '';
+    $ip = trim($_POST['ip'] ?? '');
 
-    if ( === 'ban') {
+    if ($act === 'ban') {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
             echo json_encode(['ok' => false, 'error' => 'invalid ip']);
             exit;
         }
-        if () {
-             = sprintf('sudo %s %s %s %s', escapeshellcmd(), 'ban', escapeshellarg(), escapeshellarg());
+        if ($use_wrapper) {
+            $cmd = sprintf('sudo %s %s %s %s', escapeshellcmd($wrapper), 'ban', escapeshellarg($jail), escapeshellarg($ip));
         } else {
-             = sprintf('%s set %s banip %s', escapeshellcmd(), escapeshellarg(), escapeshellarg());
-             = 'sudo ' . ;
+            $cmd = sprintf('%s set %s banip %s', escapeshellcmd($fbin), escapeshellarg($jail), escapeshellarg($ip));
+            $cmd = 'sudo ' . $cmd;
         }
-         = shell_exec( . ' 2>&1');
-        echo json_encode(['ok' => true, 'cmd' => , 'out' => substr(, 0, 2000)]);
+        $out = shell_exec($cmd . ' 2>&1');
+        echo json_encode(['ok' => true, 'cmd' => $cmd, 'out' => substr($out, 0, 2000)]);
         exit;
-    } elseif ( === 'unban') {
+    } elseif ($act === 'unban') {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
             echo json_encode(['ok' => false, 'error' => 'invalid ip']);
             exit;
         }
-        if () {
-             = sprintf('sudo %s %s %s %s', escapeshellcmd(), 'unban', escapeshellarg(), escapeshellarg());
+        if ($use_wrapper) {
+            $cmd = sprintf('sudo %s %s %s %s', escapeshellcmd($wrapper), 'unban', escapeshellarg($jail), escapeshellarg($ip));
         } else {
-             = sprintf('%s set %s unbanip %s', escapeshellcmd(), escapeshellarg(), escapeshellarg());
-             = 'sudo ' . ;
+            $cmd = sprintf('%s set %s unbanip %s', escapeshellcmd($fbin), escapeshellarg($jail), escapeshellarg($ip));
+            $cmd = 'sudo ' . $cmd;
         }
-         = shell_exec( . ' 2>&1');
-        echo json_encode(['ok' => true, 'cmd' => , 'out' => substr(, 0, 2000)]);
+        $out = shell_exec($cmd . ' 2>&1');
+        echo json_encode(['ok' => true, 'cmd' => $cmd, 'out' => substr($out, 0, 2000)]);
         exit;
-    } elseif ( === 'reload') {
-        if () {
-             = sprintf('sudo %s %s', escapeshellcmd(), 'reload');
+    } elseif ($act === 'reload') {
+        if ($use_wrapper) {
+            $cmd = sprintf('sudo %s %s', escapeshellcmd($wrapper), 'reload');
         } else {
-             = escapeshellcmd() . ' reload';
-             = 'sudo ' . ;
+            $cmd = escapeshellcmd($fbin) . ' reload';
+            $cmd = 'sudo ' . $cmd;
         }
-         = shell_exec( . ' 2>&1');
-        echo json_encode(['ok' => true, 'cmd' => , 'out' => substr(, 0, 2000)]);
+        $out = shell_exec($cmd . ' 2>&1');
+        echo json_encode(['ok' => true, 'cmd' => $cmd, 'out' => substr($out, 0, 2000)]);
         exit;
     }
 }
 
 // Default: status
-if () {
-     = sprintf('sudo %s %s %s', escapeshellcmd(), 'status', escapeshellarg());
+if ($use_wrapper) {
+    $cmd = sprintf('sudo %s %s %s', escapeshellcmd($wrapper), 'status', escapeshellarg($jail));
 } else {
-     = escapeshellcmd() . ' status ' . escapeshellarg();
-     = 'sudo ' . ;
+    $cmd = escapeshellcmd($fbin) . ' status ' . escapeshellarg($jail);
+    $cmd = 'sudo ' . $cmd;
 }
- = shell_exec( . ' 2>&1');
+$out = shell_exec($cmd . ' 2>&1');
 
 // parse IPs
- = [];
-if (preg_match('/Banned IP list:\s*(.*)$/mi', , )) {
-     = array_map('trim', array_filter(array_map('trim', preg_split('/[,
-]/', [1]))));
+$ips = [];
+if (preg_match('/Banned IP list:\s*(.*)$/mi', $out, $m)) {
+    $ips = array_map('trim', array_filter(array_map('trim', preg_split('/[,\n]/', $m[1]))));
 }
-if (empty() && preg_match('/Currently banned:\s*(.*)$/mi', , )) {
-     = array_map('trim', array_filter(array_map('trim', preg_split('/[,
-]/', [1]))));
+if (empty($ips) && preg_match('/Currently banned:\s*(.*)$/mi', $out, $m)) {
+    $ips = array_map('trim', array_filter(array_map('trim', preg_split('/[,\n]/', $m[1]))));
 }
-if (empty()) {
-    if (preg_match_all('/(\d{1,3}(?:\.\d{1,3}){3})/', , ))  = array_values(array_unique([1]));
+if (empty($ips)) {
+    if (preg_match_all('/(\d{1,3}(?:\.\d{1,3}){3})/', $out, $m)) $ips = array_values(array_unique($m[1]));
 }
 
-echo json_encode(['ok' => true, 'raw' => substr(, 0, 2000), 'ips' => ]);
+echo json_encode(['ok' => true, 'raw' => substr($out, 0, 2000), 'ips' => $ips]);

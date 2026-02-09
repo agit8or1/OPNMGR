@@ -25,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$pattern, $description, $category, $risk_level, $requires_confirmation, $timeout]);
                 $success = 'Command added successfully.';
             } catch (Exception $e) {
-                $error = 'Error adding command: ' . $e->getMessage();
+                error_log("approved_commands.php error: " . $e->getMessage());
+                $error = 'An internal error occurred while adding the command.';
             }
         }
     } elseif (isset($_POST['delete_command'])) {
@@ -36,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$id]);
                 $success = 'Command deleted successfully.';
             } catch (Exception $e) {
-                $error = 'Error deleting command: ' . $e->getMessage();
+                error_log("approved_commands.php error: " . $e->getMessage());
+                $error = 'An internal error occurred while deleting the command.';
             }
         }
     }

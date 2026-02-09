@@ -100,7 +100,8 @@ function getCommandQueue() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get command queue: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -154,7 +155,8 @@ function getRequestQueue() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get request queue: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -186,7 +188,8 @@ function cancelCommand() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to cancel command: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -218,7 +221,8 @@ function cancelRequest() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to cancel request: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -249,7 +253,8 @@ function deleteCommand() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to delete command: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -280,7 +285,8 @@ function deleteRequest() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to delete request: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -311,7 +317,8 @@ function clearCommandQueue() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to clear command queue: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -342,7 +349,8 @@ function clearRequestQueue() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to clear request queue: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -372,7 +380,8 @@ function retryCommand() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to retry command: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -423,7 +432,8 @@ function getQueueSummary() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get queue summary: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 
@@ -462,7 +472,8 @@ function getRecentActivity() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get recent activity: ' . $e->getMessage()]);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
     }
 }
 ?>

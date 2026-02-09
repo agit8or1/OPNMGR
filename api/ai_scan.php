@@ -241,7 +241,7 @@ try {
     ];
     
 } catch (Exception $e) {
-    $response['error'] = $e->getMessage();
+    $response['error'] = 'Internal server error';
     $error_msg = "AI Scan Error: " . $e->getMessage();
     error_log($error_msg);
 
@@ -272,7 +272,7 @@ function fetchFirewallConfig($firewall) {
     }
 
     // Use SSH key authentication instead of password
-    $key_file = __DIR__ . '/../keys/id_firewall_' . $firewall['id'];
+    $key_file = '/etc/opnmgr/keys/id_firewall_' . $firewall['id'];
     if (!file_exists($key_file)) {
         error_log("[AI_SCAN] No SSH key found for firewall {$firewall['id']}");
         return null;
@@ -316,7 +316,7 @@ function fetchFirewallLogs($firewall, $log_types = ['filter', 'system', 'resolve
     }
 
     // Use SSH key authentication instead of password
-    $key_file = __DIR__ . '/../keys/id_firewall_' . $firewall['id'];
+    $key_file = '/etc/opnmgr/keys/id_firewall_' . $firewall['id'];
     if (!file_exists($key_file)) {
         error_log("[AI_SCAN] No SSH key found for firewall {$firewall['id']}");
         return [];

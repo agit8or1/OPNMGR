@@ -40,7 +40,7 @@ if (!$firewall) {
     exit;
 }
 
-$ssh_key = "/var/www/opnsense/keys/id_firewall_{$firewall_id}";
+$ssh_key = "/etc/opnmgr/keys/id_firewall_{$firewall_id}";
 
 // Check if SSH key exists
 if (!file_exists($ssh_key)) {

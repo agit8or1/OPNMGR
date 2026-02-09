@@ -82,6 +82,7 @@ try {
     
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Failed to restore backup: ' . $e->getMessage()]);
+    error_log("restore_backup.php error: " . $e->getMessage());
+    echo json_encode(['error' => 'Internal server error']);
 }
 ?>

@@ -111,7 +111,8 @@ function check_for_updates($main_server, $instance_id) {
         ];
         
     } catch (Exception $e) {
-        return ['success' => false, 'error' => $e->getMessage()];
+        error_log("updates.php error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Internal server error'];
     }
 }
 
@@ -165,7 +166,8 @@ function apply_update($main_server, $instance_id, $update_id) {
         return execute_update($update_package);
         
     } catch (Exception $e) {
-        return ['success' => false, 'error' => $e->getMessage()];
+        error_log("updates.php error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Internal server error'];
     }
 }
 
@@ -221,7 +223,8 @@ function execute_update($update_data) {
         return ['success' => true, 'message' => 'Update applied successfully'];
         
     } catch (Exception $e) {
-        return ['success' => false, 'error' => $e->getMessage()];
+        error_log("updates.php error: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Internal server error'];
     }
 }
 

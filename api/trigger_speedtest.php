@@ -73,10 +73,11 @@ try {
     ]);
 
 } catch (Exception $e) {
+    error_log("trigger_speedtest.php error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Server error: ' . $e->getMessage()
+        'error' => 'Internal server error'
     ]);
 }
 ?>

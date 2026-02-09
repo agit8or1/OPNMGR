@@ -178,7 +178,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
             header('Location: /firewall_details.php?id=' . $id . '&updated=1');
             exit;
         } catch (Exception $e) {
-            $notice = 'Error updating configuration: ' . $e->getMessage();
+            error_log("firewall_details.php error: " . $e->getMessage());
+            $notice = 'An internal error occurred while updating configuration.';
         }
     }
 }
