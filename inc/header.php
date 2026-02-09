@@ -400,8 +400,8 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
         <?php endif; ?>
 
         <!-- Support This Project - Bottom of sidebar -->
-        <div class="list-group-item border-0 px-0 mt-3">
-          <a href="/support_project.php" class="btn btn-outline-danger w-100" style="border: 2px solid #dc3545; font-weight: 600;">
+        <div class="list-group-item border-0 px-0 mt-3 text-center">
+          <a href="/support_project.php" class="btn btn-outline-danger btn-sm" style="border: 2px solid #dc3545; font-weight: 600;">
             <i class="fa fa-heart me-2 heart-pulse"></i>Support This Project
           </a>
         </div>

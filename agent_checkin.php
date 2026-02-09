@@ -20,12 +20,83 @@ if (!$input) {
 }
 
 $firewall_id = (int)($input['firewall_id'] ?? 0);
+$hardware_id = trim($input['hardware_id'] ?? '');
+
+// If firewall_id not provided, try to look up by hardware_id
+if (!$firewall_id && !empty($hardware_id)) {
+    $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
+    $stmt->execute([$hardware_id]);
+    $fw = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($fw) {
+        $firewall_id = (int)$fw['id'];
+    }
+}
+
+// Check if this is a command result report (agent reporting back command execution status)
+$command_id = (int)($input['command_id'] ?? 0);
+$command_status = trim($input['status'] ?? '');
+$command_result = trim($input['result'] ?? '');
+
+if ($command_id > 0 && !empty($command_status)) {
+    // This is a command result report, not a regular check-in
+    try {
+        // Decode base64 result if present
+        if (!empty($command_result)) {
+            $command_result = base64_decode($command_result);
+        }
+
+        // Update command status
+        $stmt = $DB->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ?');
+        $stmt->execute([$command_status, $command_result, $command_id]);
+
+        error_log("Command $command_id completed with status: $command_status");
+
+        // Check if this was a speedtest command - parse results into bandwidth_tests
+        if ($command_status === 'completed' && !empty($command_result)) {
+            $cmd_stmt = $DB->prepare('SELECT firewall_id, command, command_type FROM firewall_commands WHERE id = ?');
+            $cmd_stmt->execute([$command_id]);
+            $cmd_info = $cmd_stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($cmd_info && ($cmd_info['command'] === 'run_speedtest' || $cmd_info['command_type'] === 'speedtest')) {
+                $speedtest_data = json_decode($command_result, true);
+                if ($speedtest_data && isset($speedtest_data['download_mbps']) && !isset($speedtest_data['error'])) {
+                    $bw_stmt = $DB->prepare("INSERT INTO bandwidth_tests (firewall_id, test_type, test_status, download_speed, upload_speed, latency, test_server, tested_at) VALUES (?, 'manual', 'completed', ?, ?, ?, ?, NOW())");
+                    $bw_stmt->execute([
+                        $cmd_info['firewall_id'],
+                        (float)($speedtest_data['download_mbps'] ?? 0),
+                        (float)($speedtest_data['upload_mbps'] ?? 0),
+                        (float)($speedtest_data['ping_ms'] ?? 0),
+                        $speedtest_data['server'] ?? 'agent-iperf3'
+                    ]);
+                    error_log("Speedtest results saved for firewall {$cmd_info['firewall_id']}: down={$speedtest_data['download_mbps']} up={$speedtest_data['upload_mbps']}");
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Command result recorded']);
+        exit;
+    } catch (Exception $e) {
+        error_log("Failed to update command $command_id: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to record command result']);
+        exit;
+    }
+}
+
 $agent_version = trim($input['agent_version'] ?? '');
 $agent_type = trim($input['agent_type'] ?? 'primary'); // 'primary' or 'update'
 $api_key = trim($input['api_key'] ?? '');
 $wan_ip = trim($input['wan_ip'] ?? '');
 $lan_ip = trim($input['lan_ip'] ?? '');
 $ipv6_address = trim($input['ipv6_address'] ?? '');
+
+// WAN interface auto-detection fields (Agent v3.4.0+)
+$wan_interfaces = trim($input['wan_interfaces'] ?? '');
+$wan_groups = trim($input['wan_groups'] ?? '');
+$wan_interface_stats = $input['wan_interface_stats'] ?? null;
+if (is_array($wan_interface_stats)) {
+    $wan_interface_stats = json_encode($wan_interface_stats);
+}
 
 // New network configuration fields
 $wan_netmask = trim($input['wan_netmask'] ?? '');
@@ -34,11 +105,6 @@ $wan_dns_primary = trim($input['wan_dns_primary'] ?? '');
 $wan_dns_secondary = trim($input['wan_dns_secondary'] ?? '');
 $lan_netmask = trim($input['lan_netmask'] ?? '');
 $lan_network = trim($input['lan_network'] ?? '');
-
-// New WAN interface fields (v3.4.0)
-$wan_interfaces = trim($input['wan_interfaces'] ?? '');
-$wan_groups = trim($input['wan_groups'] ?? '');
-$wan_interface_stats = $input['wan_interface_stats'] ?? null;
 // Handle opnsense_version - can be string or object
 $opnsense_version = $input['opnsense_version'] ?? '';
 if (is_array($opnsense_version) || is_object($opnsense_version)) {
@@ -104,22 +170,22 @@ try {
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
             $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, json_encode($wan_interface_stats), $firewall_id]);
+            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
             $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_interfaces, $wan_groups, json_encode($wan_interface_stats), $firewall_id]);
+            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     } else {
         // Agent doesn't support reboot detection - preserve existing reboot_required value
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
             $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, json_encode($wan_interface_stats), $firewall_id]);
+            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
             $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_interfaces, $wan_groups, json_encode($wan_interface_stats), $firewall_id]);
+            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     }
     
@@ -139,9 +205,64 @@ try {
         log_info('agent', "Agent checkin: firewall_id=$firewall_id, type=$agent_type, version=$agent_version, wan_ip=$wan_ip", null, $firewall_id);
     }
 
-    // Process WAN interface statistics if provided (v3.4.0)
-    if (!empty($wan_interface_stats) && is_array($wan_interface_stats)) {
+    // Process WAN interface statistics if provided (Agent v3.4.0+)
+    if (!empty($wan_interface_stats)) {
         processWANInterfaceStats($firewall_id, $wan_interface_stats);
+    }
+
+    // Store traffic statistics for charts
+    if (isset($input['traffic_stats'])) {
+        $traffic = $input['traffic_stats'];
+        if (isset($traffic['bytes_in']) && $traffic['bytes_in'] > 0) {
+            $stmt = $DB->prepare("
+                INSERT INTO firewall_traffic_stats
+                (firewall_id, wan_interface, bytes_in, bytes_out, packets_in, packets_out, recorded_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([
+                $firewall_id,
+                $traffic['interface'] ?? 'unknown',
+                (int)($traffic['bytes_in'] ?? 0),
+                (int)($traffic['bytes_out'] ?? 0),
+                (int)($traffic['packets_in'] ?? 0),
+                (int)($traffic['packets_out'] ?? 0)
+            ]);
+        }
+    }
+
+    // Store system statistics for charts (CPU, memory, disk)
+    if (isset($input['system_stats'])) {
+        $system = $input['system_stats'];
+        if (isset($system['memory_percent']) || isset($system['cpu_load_1min'])) {
+            $stmt = $DB->prepare("INSERT INTO firewall_system_stats
+                (firewall_id, cpu_load_1min, cpu_load_5min, cpu_load_15min, memory_percent, memory_total_mb, memory_used_mb, disk_percent, disk_total_gb, disk_used_gb, recorded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([
+                $firewall_id,
+                (float)($system['cpu_load_1min'] ?? 0),
+                (float)($system['cpu_load_5min'] ?? 0),
+                (float)($system['cpu_load_15min'] ?? 0),
+                (float)($system['memory_percent'] ?? 0),
+                (int)($system['memory_total_mb'] ?? 0),
+                (int)($system['memory_used_mb'] ?? 0),
+                (float)($system['disk_percent'] ?? 0),
+                (float)($system['disk_total_gb'] ?? 0),
+                (float)($system['disk_used_gb'] ?? 0)
+            ]);
+        }
+    }
+
+    // Note: speedtest results are stored via command result handler (top of file)
+    // when agent reports back run_speedtest command completion
+
+    // Store latency statistics for charts
+    if (isset($input['latency_stats'])) {
+        $latency = $input['latency_stats'];
+        $avg_latency = (float)($latency['average_latency'] ?? 0);
+        if ($avg_latency > 0) {
+            $stmt = $DB->prepare("INSERT INTO firewall_latency (firewall_id, latency_ms, measured_at) VALUES (?, ?, NOW())");
+            $stmt->execute([$firewall_id, $avg_latency]);
+        }
     }
 
     // Check if we need to perform update check (every 5 hours)
@@ -157,9 +278,25 @@ try {
         $check_updates = true;
         
         // Accept update status from agent instead of hardcoded version comparison
-        // Agent should check OPNsense update status and report back
-        $updates_available = isset($_POST['updates_available']) ? intval($_POST['updates_available']) : 0;
-        $latest_stable_version = isset($_POST['available_version']) ? $_POST['available_version'] : $current_version;
+        // Agent sends updates in opnsense_updates nested object or top-level fields
+        $updates_available = 0;
+        $latest_stable_version = $current_version;
+
+        // Handle nested opnsense_updates format (agent v1.3+)
+        if (isset($input['opnsense_updates']) && is_array($input['opnsense_updates'])) {
+            $upd = $input['opnsense_updates'];
+            $updates_available = ($upd['updates_available'] === true || $upd['updates_available'] === 'true' || $upd['updates_available'] == 1) ? 1 : 0;
+            if (!empty($upd['new_version'])) {
+                $latest_stable_version = trim($upd['new_version']);
+            }
+        }
+        // Also check top-level fields (agent v1.5+)
+        if (isset($input['updates_available'])) {
+            $updates_available = ($input['updates_available'] === true || $input['updates_available'] === 'true' || intval($input['updates_available']) == 1) ? 1 : 0;
+        }
+        if (!empty($input['available_version'])) {
+            $latest_stable_version = trim($input['available_version']);
+        }
         
         // Update the database with check results from agent
         $stmt = $DB->prepare('UPDATE firewalls SET last_update_check = NOW(), current_version = ?, available_version = ?, updates_available = ? WHERE id = ?');
@@ -245,9 +382,13 @@ try {
     // Include agent update information
     if ($agent_update_check['update_available']) {
         $response['agent_update_available'] = true;
-        $response['agent_latest_version'] = $agent_update_check['latest_version'];
-        $response['agent_download_url'] = $agent_update_check['download_url'];
-        $response['agent_update_command'] = $agent_update_check['update_command'];
+        $response['latest_version'] = $agent_update_check['latest_version'];
+        if (isset($agent_update_check['download_url'])) {
+            $response['agent_download_url'] = $agent_update_check['download_url'];
+        }
+        if (isset($agent_update_check['update_command'])) {
+            $response['update_command'] = $agent_update_check['update_command'];
+        }
         if (isset($agent_update_check['manual_reinstall_command'])) {
             $response['agent_manual_reinstall_command'] = $agent_update_check['manual_reinstall_command'];
         }
@@ -339,9 +480,10 @@ try {
  */
 function checkAgentUpdate($current_agent_version, $firewall_id) {
     global $DB;
-    
-    // Get latest agent version from settings or define it here
-    $latest_agent_version = "3.4.0"; // Latest version with WAN interface auto-detection
+
+    // Use centralized version constant from inc/agent_version.php
+    require_once __DIR__ . '/inc/agent_version.php';
+    $latest_agent_version = LATEST_AGENT_VERSION;
     
     // Clean version strings for comparison
     $current_clean = preg_replace('/[^0-9.]/', '', $current_agent_version);
@@ -357,10 +499,19 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
     error_log("Agent version check: current='$current_clean' latest='$latest_clean' fw_id=$firewall_id");
     
     if (version_compare($current_clean, $latest_clean, '<')) {
-        // Agent update is available - trigger self-healing for v2.1.2
+        // Agent update is available
         $server_name = 'opn.agit8or.net';
-        
-        if ($current_clean === '2.1.2') {
+
+        // Check if this is a plugin-based agent (v1.x)
+        if (strpos($current_clean, '1.') === 0) {
+            // Plugin-based agent - use plugin installer
+            return [
+                'update_available' => true,
+                'latest_version' => $latest_agent_version,
+                'update_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh | sh > /tmp/agent_update.log 2>&1 &",
+                'manual_reinstall_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh | sh"
+            ];
+        } elseif ($current_clean === '2.1.2') {
             // Special self-healing for v2.1.2 agents
             return [
                 'update_available' => true,
@@ -372,7 +523,7 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
                 'manual_reinstall_command' => 'fetch -o /tmp/reinstall_agent.sh ' . "https://{$server_name}/reinstall_agent.php?firewall_id={$firewall_id}" . ' && chmod +x /tmp/reinstall_agent.sh && /tmp/reinstall_agent.sh'
             ];
         } else {
-            // Normal update for other versions
+            // Normal update for other versions (v2.x standalone agents)
             return [
                 'update_available' => true,
                 'latest_version' => $latest_agent_version,
@@ -461,70 +612,68 @@ function checkQueuedCommandsForUpdateAgent($firewall_id) {
 }
 
 /**
- * Process and store detailed WAN interface statistics (v3.4.0)
+ * Process WAN interface statistics from agent v3.4.0+
+ * Updates the firewall_wan_interfaces table with detailed interface stats
  */
-function processWANInterfaceStats($firewall_id, $wan_interface_stats) {
+function processWANInterfaceStats($firewall_id, $wan_interface_stats_json) {
     global $DB;
 
-    if (empty($wan_interface_stats) || !is_array($wan_interface_stats)) {
+    if (empty($wan_interface_stats_json)) {
+        return;
+    }
+
+    // Parse JSON stats
+    $stats = json_decode($wan_interface_stats_json, true);
+    if (!is_array($stats) || empty($stats)) {
         return;
     }
 
     try {
-        // Process each interface
-        foreach ($wan_interface_stats as $stat) {
-            if (empty($stat['interface'])) {
+        foreach ($stats as $iface_data) {
+            $interface = $iface_data['interface'] ?? '';
+            if (empty($interface)) {
                 continue;
             }
 
-            $interface_name = $stat['interface'];
-            $status = $stat['status'] ?? 'unknown';
-            $ip_address = $stat['ip'] ?? null;
-            $media = $stat['media'] ?? null;
-            $rx_packets = (int)($stat['rx_packets'] ?? 0);
-            $rx_errors = (int)($stat['rx_errors'] ?? 0);
-            $rx_bytes = (int)($stat['rx_bytes'] ?? 0);
-            $tx_packets = (int)($stat['tx_packets'] ?? 0);
-            $tx_errors = (int)($stat['tx_errors'] ?? 0);
-            $tx_bytes = (int)($stat['tx_bytes'] ?? 0);
+            // Prepare data for insertion/update
+            $status = $iface_data['status'] ?? 'unknown';
+            $ip_address = $iface_data['ip_address'] ?? '';
+            $netmask = $iface_data['netmask'] ?? '';
+            $gateway = $iface_data['gateway'] ?? '';
+            $media = $iface_data['media'] ?? '';
+            $rx_packets = (int)($iface_data['rx_packets'] ?? 0);
+            $rx_bytes = (int)($iface_data['rx_bytes'] ?? 0);
+            $rx_errors = (int)($iface_data['rx_errors'] ?? 0);
+            $tx_packets = (int)($iface_data['tx_packets'] ?? 0);
+            $tx_bytes = (int)($iface_data['tx_bytes'] ?? 0);
+            $tx_errors = (int)($iface_data['tx_errors'] ?? 0);
 
             // Insert or update interface stats
             $stmt = $DB->prepare('
                 INSERT INTO firewall_wan_interfaces
-                (firewall_id, interface_name, status, ip_address, media,
-                 rx_packets, rx_errors, rx_bytes, tx_packets, tx_errors, tx_bytes, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (firewall_id, interface_name, status, ip_address, netmask, gateway, media,
+                 rx_packets, rx_bytes, rx_errors, tx_packets, tx_bytes, tx_errors, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE
                     status = VALUES(status),
                     ip_address = VALUES(ip_address),
+                    netmask = VALUES(netmask),
+                    gateway = VALUES(gateway),
                     media = VALUES(media),
                     rx_packets = VALUES(rx_packets),
-                    rx_errors = VALUES(rx_errors),
                     rx_bytes = VALUES(rx_bytes),
+                    rx_errors = VALUES(rx_errors),
                     tx_packets = VALUES(tx_packets),
-                    tx_errors = VALUES(tx_errors),
                     tx_bytes = VALUES(tx_bytes),
+                    tx_errors = VALUES(tx_errors),
                     last_updated = NOW()
             ');
 
             $stmt->execute([
-                $firewall_id,
-                $interface_name,
-                $status,
-                $ip_address,
-                $media,
-                $rx_packets,
-                $rx_errors,
-                $rx_bytes,
-                $tx_packets,
-                $tx_errors,
-                $tx_bytes
+                $firewall_id, $interface, $status, $ip_address, $netmask, $gateway, $media,
+                $rx_packets, $rx_bytes, $rx_errors, $tx_packets, $tx_bytes, $tx_errors
             ]);
         }
-
-        // Log the update
-        error_log("Updated WAN interface stats for firewall $firewall_id: " . count($wan_interface_stats) . " interface(s)");
-
     } catch (Exception $e) {
         error_log("Failed to process WAN interface stats for firewall $firewall_id: " . $e->getMessage());
     }

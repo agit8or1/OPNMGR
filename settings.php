@@ -875,7 +875,7 @@ function updateTunnelDisplay(data) {
     const tbody = document.getElementById('tunnels-table-body');
     
     if (data.ssh_tunnels.length === 0 && data.db_sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><i class="fas fa-check-circle text-success me-2"></i>No active tunnels - system clean</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-light"><i class="fas fa-check-circle text-success me-2"></i>No active tunnels - system clean</td></tr>';
         return;
     }
     
