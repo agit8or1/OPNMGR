@@ -13,14 +13,18 @@ $update_available = false;
 $current_version = file_exists(__DIR__ . '/VERSION') ? trim(file_get_contents(__DIR__ . '/VERSION')) : 'Unknown';
 $latest_version = 'Checking...';
 $commit_log = [];
+$local_commit = 'unknown';
 
 // GitHub configuration
 $github_repo = env('GITHUB_REPO', 'OPNMGR');
 $github_username = env('GITHUB_USERNAME', 'agit8or1');
 $github_token = env('GITHUB_PAT', '');
 
-// Check for updates
-if (isset($_POST['check_updates'])) {
+// Auto-check for updates on page load (not on POST requests)
+$should_check_updates = ($_SERVER['REQUEST_METHOD'] !== 'POST');
+
+// Check for updates (auto on page load, or manual via button)
+if (isset($_POST['check_updates']) || $should_check_updates) {
     $github_api_url = "https://api.github.com/repos/{$github_username}/{$github_repo}/commits/main";
 
     $ch = curl_init();
@@ -43,17 +47,26 @@ if (isset($_POST['check_updates'])) {
         $commit_data = json_decode($response, true);
         $latest_commit = substr($commit_data['sha'], 0, 7);
 
-        // Get local commit
-        exec('cd ' . escapeshellarg(__DIR__) . ' && git rev-parse --short HEAD 2>&1', $local_commit_output, $return_code);
+        // Get local commit - try both /var/www/opnsense and the symlinked directory
+        exec('git -C /var/www/opnsense rev-parse --short HEAD 2>&1', $local_commit_output, $return_code);
+
+        if ($return_code !== 0 || empty($local_commit_output)) {
+            // Try alternative path
+            exec('git -C /home/administrator/opnsense rev-parse --short HEAD 2>&1', $local_commit_output, $return_code);
+        }
+
         $local_commit = ($return_code === 0 && !empty($local_commit_output)) ? trim($local_commit_output[0]) : 'unknown';
 
-        if ($local_commit !== $latest_commit && $local_commit !== 'unknown') {
+        if ($local_commit !== 'unknown' && $local_commit !== $latest_commit) {
             $update_available = true;
             $message = "Update available! Current: {$local_commit}, Latest: {$latest_commit}";
             $message_type = 'warning';
-        } else {
+        } elseif ($local_commit !== 'unknown') {
             $message = "You're running the latest version ({$local_commit})";
             $message_type = 'success';
+        } else {
+            $message = "Unable to determine current version. Git repository may not be initialized.";
+            $message_type = 'warning';
         }
 
         // Get recent commits

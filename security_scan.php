@@ -7,6 +7,43 @@ require_once __DIR__ . '/inc/env.php';
 
 $page_title = "Security Scanner (Snyk Integration)";
 
+// Fetch latest scan results for dashboard
+$latest_scan = null;
+$scan_stats = [
+    'total_vulnerabilities' => 0,
+    'critical' => 0,
+    'high' => 0,
+    'medium' => 0,
+    'low' => 0,
+    'last_scan' => 'Never',
+    'duration' => 0,
+    'status' => 'Not Run',
+    'trend' => 'Stable'
+];
+
+if ($DB) {
+    try {
+        $stmt = $DB->query('SELECT * FROM snyk_scan_results WHERE status = "completed" ORDER BY completed_at DESC LIMIT 1');
+        $latest_scan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($latest_scan) {
+            $scan_stats = [
+                'total_vulnerabilities' => (int)$latest_scan['total_vulnerabilities'],
+                'critical' => (int)$latest_scan['critical_count'],
+                'high' => (int)$latest_scan['high_count'],
+                'medium' => (int)$latest_scan['medium_count'],
+                'low' => (int)$latest_scan['low_count'],
+                'last_scan' => $latest_scan['completed_at'],
+                'duration' => (int)$latest_scan['duration_seconds'],
+                'status' => ucfirst($latest_scan['status']),
+                'trend' => 'Stable' // TODO: Calculate trend from previous scans
+            ];
+        }
+    } catch (Exception $e) {
+        // Silently handle error - dashboard will show "Never"
+    }
+}
+
 // Handle configuration actions
 $config_message = '';
 $config_status = '';
@@ -252,8 +289,87 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <h2><i class="fas fa-shield-alt me-2 text-primary"></i>Security Scanner</h2>
+            <h2><i class="fas fa-shield-alt me-2 text-primary"></i>Security Scanner Dashboard</h2>
             <p class="text-muted">Powered by Snyk - Continuous security monitoring for vulnerabilities</p>
+        </div>
+    </div>
+
+    <!-- Vulnerability Stats Dashboard -->
+    <div class="row mb-4 g-3">
+        <div class="col-md-3">
+            <div class="card card-dark-custom">
+                <div class="card-body text-center">
+                    <h2 class="text-light mb-2"><?php echo $scan_stats['total_vulnerabilities']; ?></h2>
+                    <p class="text-muted mb-0">Total Vulnerabilities</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card card-dark-custom">
+                <div class="card-body text-center">
+                    <h2 class="text-danger mb-2"><?php echo $scan_stats['critical']; ?></h2>
+                    <p class="text-muted mb-0">Critical</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card card-dark-custom">
+                <div class="card-body text-center">
+                    <h2 class="text-warning mb-2"><?php echo $scan_stats['high']; ?></h2>
+                    <p class="text-muted mb-0">High</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card card-dark-custom">
+                <div class="card-body text-center">
+                    <h2 class="text-info mb-2"><?php echo $scan_stats['medium']; ?></h2>
+                    <p class="text-muted mb-0">Medium</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-dark-custom">
+                <div class="card-body text-center">
+                    <h2 class="text-success mb-2"><?php echo $scan_stats['low']; ?></h2>
+                    <p class="text-muted mb-0">Low</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan Details -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card card-dark-custom">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <p class="text-muted mb-1">Last Scan:</p>
+                            <p class="text-light fw-bold"><?php echo $scan_stats['last_scan']; ?></p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="text-muted mb-1">Duration:</p>
+                            <p class="text-light fw-bold"><?php echo $scan_stats['duration']; ?>s</p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="text-muted mb-1">Status:</p>
+                            <p class="text-light fw-bold"><?php echo $scan_stats['status']; ?></p>
+                        </div>
+                        <div class="col-md-2">
+                            <p class="text-muted mb-1">Trend:</p>
+                            <p class="text-light fw-bold">
+                                <i class="fas fa-arrow-right me-1"></i><?php echo $scan_stats['trend']; ?>
+                            </p>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button class="btn btn-primary" onclick="document.getElementById('scan-controls').scrollIntoView({behavior: 'smooth'})">
+                                <i class="fas fa-play me-1"></i>Run New Scan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -362,7 +478,11 @@ include __DIR__ . '/inc/header.php';
         </div>
     <?php endif; ?>
 
-    <div class="row mb-4">
+    <div class="row mb-4" id="scan-controls">
+        <div class="col-12 mb-3">
+            <h4 class="text-light"><i class="fas fa-cog me-2"></i>Scan Controls</h4>
+            <p class="text-muted">Run vulnerability scans on your codebase</p>
+        </div>
         <div class="col-md-4">
             <div class="security-card">
                 <div class="text-center mb-3">
