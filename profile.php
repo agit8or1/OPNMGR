@@ -8,7 +8,7 @@ $message = '';
 $message_type = '';
 
 // Get current user info
-$current_user = $_SESSION['user'] ?? null;
+$current_user = $_SESSION['username'] ?? null;
 $user_data = null;
 
 if ($current_user && $DB) {
