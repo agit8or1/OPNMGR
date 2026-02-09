@@ -9,9 +9,9 @@ define('DB_USER', env('DB_USER', 'opnsense_user'));
 define('DB_PASS', env('DB_PASS'));
 
 // Enforce that critical configuration is set
-if (empty(DB_PASS) || DB_PASS === 'password' || DB_PASS === 'CHANGE_THIS_TO_SECURE_PASSWORD') {
-    error_log('CRITICAL: DB_PASS not properly configured in .env file');
-    die('Configuration error: Please set up your .env file with secure credentials. Copy .env.example to .env and configure it.');
+if (empty(DB_PASS)) {
+    error_log('CRITICAL: DB_PASS not configured in .env file');
+    die('Configuration error: Please set up your .env file with database credentials. Copy .env.example to .env and configure it.');
 }
 
 // Security configuration
