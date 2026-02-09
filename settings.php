@@ -489,7 +489,6 @@ include __DIR__ . '/inc/header.php';
   background-color: #00d4c4;
   border-color: #00d4c4;
 }
-</style>
 
 .btn-primary:hover {
   background-color: #00b8a6;
