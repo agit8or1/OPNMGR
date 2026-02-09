@@ -40,8 +40,20 @@ try {
         exit;
     }
     
+    // Validate IP addresses before using in shell commands
+    $wan_ip_val = $firewall['wan_ip'];
+    if (!empty($wan_ip_val) && !filter_var($wan_ip_val, FILTER_VALIDATE_IP)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid WAN IP address in database']);
+        exit;
+    }
+    $ip_addr_val = $firewall['ip_address'];
+    if (!empty($ip_addr_val) && !filter_var($ip_addr_val, FILTER_VALIDATE_IP)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid IP address in database']);
+        exit;
+    }
+
     // Check if tunnel is already running
-    $tunnel_check = shell_exec("ps aux | grep 'ssh.*8103.*{$firewall['wan_ip']}' | grep -v grep");
+    $tunnel_check = shell_exec("ps aux | grep " . escapeshellarg('ssh.*8103.*' . $wan_ip_val) . " | grep -v grep");
     
     if ($tunnel_check) {
         echo json_encode([
@@ -72,7 +84,7 @@ try {
     
     // Wait a moment and check if tunnel is up
     sleep(1);
-    $tunnel_check = shell_exec("ps aux | grep 'ssh.*{$tunnel_port}.*{$target_ip}' | grep -v grep");
+    $tunnel_check = shell_exec("ps aux | grep " . escapeshellarg("ssh.*{$tunnel_port}.*{$target_ip}") . " | grep -v grep");
     
     if ($tunnel_check) {
         echo json_encode([
@@ -81,17 +93,17 @@ try {
             'tunnel_port' => $tunnel_port
         ]);
     } else {
+        error_log("SSH tunnel failed for firewall_id=$firewall_id target=$target_ip output=" . ($output ?: 'none'));
         echo json_encode([
             'success' => false,
-            'error' => 'Failed to establish SSH tunnel. Output: ' . ($output ?: 'No output'),
-            'hint' => 'Make sure SSH key authentication is configured for root@' . $target_ip
+            'error' => 'Failed to establish SSH tunnel'
         ]);
     }
-    
+
 } catch (Exception $e) {
     error_log("SSH tunnel error: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Server error: ' . $e->getMessage()
+        'error' => 'Internal server error'
     ]);
 }

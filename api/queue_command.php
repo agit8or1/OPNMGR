@@ -1,11 +1,26 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/csrf.php';
 
 /**
  * Queue a custom command for a firewall to execute on next checkin
+ * Requires admin authentication and valid CSRF token.
  */
 
 header('Content-Type: application/json');
+
+// Authentication: require logged-in admin user
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+    exit;
+}
+if (!isAdmin()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Admin access required']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -13,7 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
+// Validate CSRF token (from JSON body or header)
+$input_raw = file_get_contents('php://input');
+$input_check = json_decode($input_raw, true);
+$csrf = $input_check['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+if (!csrf_verify($csrf)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+    exit;
+}
+
+$input = json_decode($input_raw, true);
 $firewall_id = (int)($input['firewall_id'] ?? 0);
 $command = trim($input['command'] ?? '');
 $description = trim($input['description'] ?? '');
@@ -64,7 +89,8 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log("queue_command.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

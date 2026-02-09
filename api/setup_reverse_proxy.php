@@ -111,19 +111,21 @@ server {
     }
     
     // Move to nginx directory with sudo
-    $result = shell_exec("sudo bash -c 'mv {$temp_file} {$config_file}' 2>&1");
+    $result = shell_exec("sudo mv " . escapeshellarg($temp_file) . " " . escapeshellarg($config_file) . " 2>&1");
     if (!file_exists($config_file)) {
         header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Failed to move nginx config: ' . $result]);
+        error_log("Failed to move nginx config for firewall_id=$firewall_id: " . $result);
+        echo json_encode(['success' => false, 'error' => 'Failed to install proxy configuration']);
         exit;
     }
     
     // Create symbolic link to enable site
     if (!file_exists($link_file)) {
-        $result = shell_exec("sudo bash -c 'ln -s {$config_file} {$link_file}' 2>&1");
+        $result = shell_exec("sudo ln -s " . escapeshellarg($config_file) . " " . escapeshellarg($link_file) . " 2>&1");
         if (!file_exists($link_file)) {
             header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Failed to enable nginx site: ' . $result]);
+            error_log("Failed to enable nginx site for firewall_id=$firewall_id: " . $result);
+            echo json_encode(['success' => false, 'error' => 'Failed to enable proxy configuration']);
             exit;
         }
     }
@@ -132,9 +134,10 @@ server {
     $test_output = shell_exec('sudo nginx -t 2>&1');
     if (strpos($test_output, 'syntax is ok') === false || strpos($test_output, 'test is successful') === false) {
         // Remove the config if it's invalid
-        shell_exec("sudo bash -c 'rm -f {$config_file} {$link_file}' 2>&1");
+        shell_exec("sudo rm -f " . escapeshellarg($config_file) . " " . escapeshellarg($link_file) . " 2>&1");
         header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Invalid nginx configuration: ' . $test_output]);
+        error_log("Invalid nginx config for firewall_id=$firewall_id: " . $test_output);
+        echo json_encode(['success' => false, 'error' => 'Invalid proxy configuration generated']);
         exit;
     }
     
@@ -142,7 +145,8 @@ server {
     $reload_output = shell_exec('sudo systemctl reload nginx 2>&1');
     if ($reload_output && strpos($reload_output, 'Failed') !== false) {
         header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Failed to reload nginx: ' . $reload_output]);
+        error_log("Failed to reload nginx for firewall_id=$firewall_id: " . $reload_output);
+        echo json_encode(['success' => false, 'error' => 'Failed to activate proxy configuration']);
         exit;
     }
     

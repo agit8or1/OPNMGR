@@ -39,15 +39,44 @@ $command_result = trim($input['result'] ?? '');
 
 if ($command_id > 0 && !empty($command_status)) {
     // This is a command result report, not a regular check-in
+    // Validate agent identity before processing command results
+    if (!$firewall_id || empty($hardware_id)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Missing firewall_id or hardware_id']);
+        exit;
+    }
+    $auth_stmt = $DB->prepare('SELECT hardware_id, api_key FROM firewalls WHERE id = ?');
+    $auth_stmt->execute([$firewall_id]);
+    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$auth_fw || (
+        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+    )) {
+        error_log("Command result REJECTED: auth failed for firewall_id=$firewall_id");
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
+        exit;
+    }
+
     try {
+        // Verify command belongs to this firewall (prevent cross-firewall command manipulation)
+        $cmd_verify = $DB->prepare('SELECT firewall_id FROM firewall_commands WHERE id = ?');
+        $cmd_verify->execute([$command_id]);
+        $cmd_owner = $cmd_verify->fetch(PDO::FETCH_ASSOC);
+        if (!$cmd_owner || (int)$cmd_owner['firewall_id'] !== $firewall_id) {
+            error_log("Command result REJECTED: command $command_id does not belong to firewall_id=$firewall_id");
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Command not found for this firewall']);
+            exit;
+        }
+
         // Decode base64 result if present
         if (!empty($command_result)) {
             $command_result = base64_decode($command_result);
         }
 
         // Update command status
-        $stmt = $DB->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ?');
-        $stmt->execute([$command_status, $command_result, $command_id]);
+        $stmt = $DB->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ? AND firewall_id = ?');
+        $stmt->execute([$command_status, $command_result, $command_id, $firewall_id]);
 
         error_log("Command $command_id completed with status: $command_status");
 
@@ -122,8 +151,8 @@ if (!$firewall_id || empty($agent_version)) {
     exit;
 }
 
-// Verify firewall exists and get its details
-$stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+// Verify firewall exists and validate agent identity
+$stmt = $DB->prepare('SELECT id, hostname, hardware_id, api_key FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -131,6 +160,33 @@ if (!$firewall) {
     http_response_code(404);
     echo json_encode(['success' => false, 'message' => 'Firewall not found']);
     exit;
+}
+
+// Validate hardware_id matches the registered firewall
+// This prevents an agent from impersonating another firewall
+if (!empty($firewall['hardware_id']) && !empty($hardware_id)) {
+    if (!hash_equals($firewall['hardware_id'], $hardware_id)) {
+        error_log("Agent checkin REJECTED: hardware_id mismatch for firewall_id=$firewall_id (expected={$firewall['hardware_id']}, got=$hardware_id)");
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
+        exit;
+    }
+} elseif (empty($hardware_id)) {
+    // Require hardware_id for all check-ins
+    error_log("Agent checkin REJECTED: no hardware_id provided for firewall_id=$firewall_id");
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Missing hardware_id']);
+    exit;
+}
+
+// Validate api_key if one is configured for this firewall
+if (!empty($firewall['api_key'])) {
+    if (empty($api_key) || !hash_equals($firewall['api_key'], $api_key)) {
+        error_log("Agent checkin REJECTED: api_key mismatch for firewall_id=$firewall_id");
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
+        exit;
+    }
 }
 
 // Rate limiting removed - Agent v3.0 has built-in PID locking to prevent duplicates
@@ -471,8 +527,9 @@ try {
     echo json_encode($response);
 
 } catch (Exception $e) {
+    error_log("agent_checkin.php error for firewall_id=$firewall_id: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 
 /**
