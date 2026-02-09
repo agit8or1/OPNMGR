@@ -1,6 +1,6 @@
 # OPNManager - OPNsense Firewall Management Platform
 
-**Version**: 2.1.0 | **Release**: October 12, 2025 | **Status**: Production Stable ✅
+**Version**: 3.0.1 | **Release**: February 8, 2026 | **Status**: Production Stable ✅
 
 A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
 
@@ -52,6 +52,34 @@ A comprehensive web-based management platform for centralized monitoring, config
 - **SSH Tunneling**: Secure encrypted connections
 - **Web Proxy**: Access firewall web UI through manager
 - **Connection Status**: Real-time tunnel monitoring
+
+---
+
+## 📸 Screenshots
+
+### Login Page
+![Login Page](screenshots/01-login.png)
+
+### Dashboard
+![Dashboard](screenshots/02-dashboard.png)
+
+### Firewall List
+![Firewall List](screenshots/03-firewall-list.png)
+
+### Settings
+![Settings Page](screenshots/04-settings.png)
+
+### Security Scanner
+![Security Scanner](screenshots/05-security-scanner.png)
+
+### System Update
+![System Update](screenshots/06-system-update.png)
+
+### Support
+![Support Page](screenshots/07-support.png)
+
+### About
+![About Page](screenshots/08-about.png)
 
 ---
 
@@ -427,4 +455,4 @@ tail -f /var/log/opnmanager/debug.log
 
 **Built with ❤️ for OPNsense firewall administrators**
 
-**Current Version**: 2.1.0 | **Database**: 1.3.0 | **Agent**: 3.2.0 | **Last Updated**: October 12, 2025
+**Current Version**: 3.0.1 | **Database**: 1.3.0 | **Agent**: 3.2.0 | **Last Updated**: February 8, 2026

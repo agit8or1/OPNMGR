@@ -91,12 +91,7 @@ __pycache__/
 *.7z
 downloads/
 
-# Screenshots and media (optional - remove if you want to commit these)
-screenshots/
-screenshots_*/
-*.png
-*.jpg
-*.jpeg
+# Screenshots are now tracked in git for documentation
 *.gif
 *.mp4
 
