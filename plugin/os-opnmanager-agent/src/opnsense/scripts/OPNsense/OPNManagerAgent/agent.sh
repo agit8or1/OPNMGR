@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.5.4"
+AGENT_VERSION="1.5.6"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
@@ -202,40 +202,108 @@ get_traffic_stats() {
     local wan_iface=$(netstat -rn 2>/dev/null | grep default | head -1 | awk '{print $NF}')
     [ -z "$wan_iface" ] && wan_iface="em0"
 
-    # Use netstat -ibn for both bytes and packets (most reliable on FreeBSD)
-    # Format: Name Mtu Network Address Ipkts Ierrs Idrop Ibytes Opkts Oerrs Obytes Coll
-    local stats=$(netstat -ibn 2>/dev/null | grep "^${wan_iface}" | grep '<Link' | head -1)
+    local link_counter_file="/tmp/opnmanager_link_counter_${wan_iface}"
 
-    if [ -n "$stats" ]; then
-        # Parse from Link layer line for accurate byte/packet counters
-        local packets_in=$(echo "$stats" | awk '{print $5}')
-        local bytes_in=$(echo "$stats" | awk '{print $8}')
-        local packets_out=$(echo "$stats" | awk '{print $9}')
-        local bytes_out=$(echo "$stats" | awk '{print $11}')
-    else
-        # Fallback without Link filter
-        stats=$(netstat -ibn 2>/dev/null | grep "^${wan_iface}" | head -1)
-        if [ -n "$stats" ]; then
-            local packets_in=$(echo "$stats" | awk '{print $5}')
-            local bytes_in=$(echo "$stats" | awk '{print $8}')
-            local packets_out=$(echo "$stats" | awk '{print $9}')
-            local bytes_out=$(echo "$stats" | awk '{print $11}')
+    # Get Link layer and IP layer counters
+    local link_line=$(netstat -ibn 2>/dev/null | grep "^${wan_iface}" | grep '<Link' | head -1)
+    local ip_line=$(netstat -ibn 2>/dev/null | grep "^${wan_iface}" | grep -v '<Link' | grep -v '^\s' | head -1)
+
+    local link_bytes_in=0 link_bytes_out=0
+    local ip_bytes_in=0 ip_bytes_out=0
+
+    if [ -n "$link_line" ]; then
+        link_bytes_in=$(echo "$link_line" | awk '{print $8}')
+        link_bytes_out=$(echo "$link_line" | awk '{print $11}')
+        [ -z "$link_bytes_in" ] && link_bytes_in=0
+        [ -z "$link_bytes_out" ] && link_bytes_out=0
+    fi
+
+    if [ -n "$ip_line" ]; then
+        ip_bytes_in=$(echo "$ip_line" | awk '{print $8}')
+        ip_bytes_out=$(echo "$ip_line" | awk '{print $11}')
+        [ -z "$ip_bytes_in" ] && ip_bytes_in=0
+        [ -z "$ip_bytes_out" ] && ip_bytes_out=0
+    fi
+
+    # Detect frozen/broken Link layer counters (common with virtio_net)
+    # Compare current Link counter with previous reading
+    local link_broken=0
+    if [ -f "$link_counter_file" ]; then
+        local prev_link=$(cat "$link_counter_file" 2>/dev/null)
+        if [ "$link_bytes_in" = "$prev_link" ] && [ "$ip_bytes_in" -gt "$link_bytes_in" ] 2>/dev/null; then
+            link_broken=1
+            if [ ! -f "/tmp/opnmanager_link_broken_${wan_iface}" ]; then
+                log_message "Link layer counter frozen on $wan_iface (stuck at $link_bytes_in), using pf counters"
+                touch "/tmp/opnmanager_link_broken_${wan_iface}"
+            fi
         fi
+    fi
+    echo "$link_bytes_in" > "$link_counter_file"
+
+    local bytes_in=0 bytes_out=0 packets_in=0 packets_out=0
+
+    if [ "$link_broken" -eq 1 ]; then
+        # Link counters frozen (virtio_net bug) - use pf interface counters
+        # pfctl -vvsI tracks all traffic through the packet filter (including forwarded/NAT)
+        local pf_stats=$(pfctl -vvsI -i "$wan_iface" 2>/dev/null)
+        local pf_in4_pass=$(echo "$pf_stats" | grep 'In4/Pass' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+        local pf_out4_pass=$(echo "$pf_stats" | grep 'Out4/Pass' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+        local pf_in4_block=$(echo "$pf_stats" | grep 'In4/Block' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+        local pf_out4_block=$(echo "$pf_stats" | grep 'Out4/Block' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+
+        # Ensure numeric
+        case "$pf_in4_pass" in ''|*[!0-9]*) pf_in4_pass=0 ;; esac
+        case "$pf_out4_pass" in ''|*[!0-9]*) pf_out4_pass=0 ;; esac
+        case "$pf_in4_block" in ''|*[!0-9]*) pf_in4_block=0 ;; esac
+        case "$pf_out4_block" in ''|*[!0-9]*) pf_out4_block=0 ;; esac
+
+        # Total bytes = pass + block (all traffic seen by pf on this interface)
+        bytes_in=$((pf_in4_pass + pf_in4_block))
+        bytes_out=$((pf_out4_pass + pf_out4_block))
+
+        # Get packet counts too
+        local pf_pkts_in=$(echo "$pf_stats" | grep 'In4/Pass' | awk -F'Packets:' '{print $2}' | awk '{print $1}')
+        local pf_pkts_out=$(echo "$pf_stats" | grep 'Out4/Pass' | awk -F'Packets:' '{print $2}' | awk '{print $1}')
+        case "$pf_pkts_in" in ''|*[!0-9]*) pf_pkts_in=0 ;; esac
+        case "$pf_pkts_out" in ''|*[!0-9]*) pf_pkts_out=0 ;; esac
+        packets_in=$pf_pkts_in
+        packets_out=$pf_pkts_out
+
+        # If pf counters are zero or unavailable, fall back to IP layer
+        if [ "$bytes_in" -eq 0 ] 2>/dev/null && [ "$ip_bytes_in" -gt 0 ] 2>/dev/null; then
+            bytes_in=$ip_bytes_in
+            bytes_out=$ip_bytes_out
+            packets_in=$((bytes_in / 500))
+            packets_out=$((bytes_out / 500))
+            log_message "pf counters unavailable, falling back to IP layer"
+        fi
+    else
+        # Link layer working - use whichever counter is higher
+        if [ "$link_bytes_in" -ge "$ip_bytes_in" ] 2>/dev/null; then
+            # Use Link layer (includes forwarded/NAT traffic)
+            bytes_in=$link_bytes_in
+            bytes_out=$link_bytes_out
+            local link_pkts_in=$(echo "$link_line" | awk '{print $5}')
+            local link_pkts_out=$(echo "$link_line" | awk '{print $9}')
+            packets_in=${link_pkts_in:-0}
+            packets_out=${link_pkts_out:-0}
+        else
+            # Link layer seems low - use IP layer
+            bytes_in=$ip_bytes_in
+            bytes_out=$ip_bytes_out
+            local ip_pkts_in=$(echo "$ip_line" | awk '{print $5}')
+            local ip_pkts_out=$(echo "$ip_line" | awk '{print $9}')
+            packets_in=${ip_pkts_in:-0}
+            packets_out=${ip_pkts_out:-0}
+        fi
+
     fi
 
     # Convert dashes and empty values to zero
-    if [ -z "$bytes_in" ] || [ "$bytes_in" = "-" ]; then
-        bytes_in=0
-    fi
-    if [ -z "$bytes_out" ] || [ "$bytes_out" = "-" ]; then
-        bytes_out=0
-    fi
-    if [ -z "$packets_in" ] || [ "$packets_in" = "-" ]; then
-        packets_in=0
-    fi
-    if [ -z "$packets_out" ] || [ "$packets_out" = "-" ]; then
-        packets_out=0
-    fi
+    [ -z "$bytes_in" ] || [ "$bytes_in" = "-" ] && bytes_in=0
+    [ -z "$bytes_out" ] || [ "$bytes_out" = "-" ] && bytes_out=0
+    [ -z "$packets_in" ] || [ "$packets_in" = "-" ] && packets_in=0
+    [ -z "$packets_out" ] || [ "$packets_out" = "-" ] && packets_out=0
 
     cat <<EOF
 {"interface":"$wan_iface","bytes_in":$bytes_in,"bytes_out":$bytes_out,"packets_in":$packets_in,"packets_out":$packets_out}
@@ -262,20 +330,25 @@ get_latency_stats() {
     [ -z "$ping2" ] && ping2="0"
     [ -z "$ping3" ] && ping3="0"
 
-    # Calculate average (if we have valid pings)
-    local avg_latency=0
-    local count=0
-    for lat in $ping1 $ping2 $ping3; do
-        if [ "$lat" != "0" ]; then
-            avg_latency=$(echo "$avg_latency + $lat" | bc 2>/dev/null || echo 0)
-            count=$((count + 1))
-        fi
-    done
+    # Use only server latency (target3) for management purposes
+    # Internet pings (8.8.8.8, 1.1.1.1) are logged but not used for avg
+    local avg_latency="$ping3"
 
-    if [ $count -gt 0 ] && command -v bc >/dev/null 2>&1; then
-        avg_latency=$(echo "scale=2; $avg_latency / $count" | bc)
-    else
+    # Fallback to average if server ping failed
+    if [ "$avg_latency" = "0" ] || [ -z "$avg_latency" ]; then
+        local count=0
         avg_latency=0
+        for lat in $ping1 $ping2; do
+            if [ "$lat" != "0" ]; then
+                avg_latency=$(echo "$avg_latency + $lat" | bc 2>/dev/null || echo 0)
+                count=$((count + 1))
+            fi
+        done
+        if [ $count -gt 0 ] && command -v bc >/dev/null 2>&1; then
+            avg_latency=$(echo "scale=2; $avg_latency / $count" | bc)
+        else
+            avg_latency=0
+        fi
     fi
 
     cat <<EOF
@@ -283,173 +356,250 @@ get_latency_stats() {
 EOF
 }
 
-# Run speedtest (only when requested by server)
-run_speedtest() {
-    log_message "Running speedtest..."
+# Run iperf3 bandwidth test to public server (WAN test)
+# Tries multiple servers with retry logic for reliability
+run_iperf3_test() {
+    log_message "Running iperf3 WAN bandwidth test..."
 
-    # Check if speedtest-cli is installed
-    if ! command -v speedtest-cli >/dev/null 2>&1; then
-        log_message "speedtest-cli not installed, attempting to install..."
+    # Check if iperf3 is installed
+    if ! command -v iperf3 >/dev/null 2>&1; then
+        log_message "iperf3 not installed, attempting to install..."
         if command -v pkg >/dev/null 2>&1; then
-            # Try multiple package versions
-            pkg install -y py311-speedtest-cli >/dev/null 2>&1 || \
-            pkg install -y py310-speedtest-cli >/dev/null 2>&1 || \
-            pkg install -y py39-speedtest-cli >/dev/null 2>&1 || \
-            pkg install -y py38-speedtest-cli >/dev/null 2>&1
+            pkg install -y iperf3 >/dev/null 2>&1
         fi
     fi
 
-    if command -v speedtest-cli >/dev/null 2>&1; then
-        # Run speedtest with JSON output
-        local result=$(speedtest-cli --json 2>/dev/null)
+    if ! command -v iperf3 >/dev/null 2>&1; then
+        log_message "iperf3 not available"
+        echo '{"error":"iperf3 not available"}'
+        return 1
+    fi
 
-        if [ $? -eq 0 ] && [ -n "$result" ]; then
-            # Extract values from JSON
-            local download=$(echo "$result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('download',0)/1000000))" 2>/dev/null)
-            local upload=$(echo "$result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('upload',0)/1000000))" 2>/dev/null)
-            local ping=$(echo "$result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('ping',0))" 2>/dev/null)
-            local server=$(echo "$result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('server',{}).get('name','Unknown'))" 2>/dev/null)
+    # List of public iperf3 servers to try (in order of preference)
+    local servers="iperf.he.net bouygues.iperf.fr speedtest.wtnet.de iperf.par2.as49434.net"
 
-            [ -z "$download" ] && download=0
-            [ -z "$upload" ] && upload=0
-            [ -z "$ping" ] && ping=0
-            [ -z "$server" ] && server="Unknown"
+    for iperf_server in $servers; do
+        log_message "Trying iperf3 server: $iperf_server"
 
-            log_message "Speedtest complete: Down=${download}Mbps, Up=${upload}Mbps, Ping=${ping}ms"
+        # Test download (reverse mode) with 4 parallel streams
+        local download_result=$(timeout 30 iperf3 -c "$iperf_server" -R -P 4 -t 8 -J 2>&1)
+        local download_exit=$?
 
+        # Check if server was busy
+        if echo "$download_result" | grep -q "server is busy"; then
+            log_message "Server $iperf_server is busy, trying next..."
+            sleep 1
+            continue
+        fi
+
+        local download=0
+        if [ $download_exit -eq 0 ] && [ -n "$download_result" ]; then
+            download=$(echo "$download_result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('end',{}).get('sum_received',{}).get('bits_per_second',0)/1000000))" 2>/dev/null)
+        fi
+
+        if [ -z "$download" ] || [ "$download" -le 0 ] 2>/dev/null; then
+            log_message "Download test failed on $iperf_server, trying next..."
+            continue
+        fi
+
+        sleep 2
+
+        # Test upload (normal mode) with 4 parallel streams
+        local upload_result=$(timeout 30 iperf3 -c "$iperf_server" -P 4 -t 8 -J 2>&1)
+        local upload_exit=$?
+
+        local upload=0
+        if [ $upload_exit -eq 0 ] && [ -n "$upload_result" ]; then
+            upload=$(echo "$upload_result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('end',{}).get('sum_sent',{}).get('bits_per_second',0)/1000000))" 2>/dev/null)
+        fi
+
+        [ -z "$upload" ] && upload=0
+
+        if [ "$download" -gt 0 ]; then
+            log_message "iperf3 test complete: Down=${download}Mbps, Up=${upload}Mbps (to $iperf_server)"
             cat <<EOF
-{"download_mbps":$download,"upload_mbps":$upload,"ping_ms":$ping,"server":"$server","timestamp":"$(date '+%Y-%m-%d %H:%M:%S')"}
+{"download_mbps":$download,"upload_mbps":$upload,"ping_ms":0,"server":"WAN-$iperf_server","timestamp":"$(date '+%Y-%m-%d %H:%M:%S')","test_type":"iperf3"}
 EOF
-        else
-            log_message "Speedtest failed to run"
-            echo '{"error":"Speedtest execution failed"}'
+            return 0
         fi
+    done
+
+    log_message "All iperf3 servers failed or busy"
+    echo '{"error":"iperf3 test failed - all servers busy or unreachable"}'
+    return 1
+}
+
+# Run speedtest (only when requested by server) - uses iperf3 for accurate WAN bandwidth
+# Tests to public iperf3 servers that can handle multiple connections
+run_speedtest() {
+    log_message "Running bandwidth test..."
+
+    # Use iperf3 for WAN bandwidth test to public server
+    local iperf_result=$(run_iperf3_test)
+
+    if echo "$iperf_result" | grep -q '"download_mbps"'; then
+        # iperf3 succeeded
+        echo "$iperf_result"
+        return 0
     else
-        log_message "speedtest-cli not available"
-        echo '{"error":"speedtest-cli not installed"}'
+        # iperf3 failed
+        log_message "Bandwidth test failed"
+        echo '{"error":"Bandwidth test failed - all iperf3 servers unavailable"}'
+        return 1
     fi
 }
 
-# Get WAN interface name from default route
-get_wan_interface() {
-    netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $NF}'
-}
+# Detect WAN interfaces from config.xml
+detect_wan_interfaces() {
+    local wan_interfaces=""
 
-# Get network configuration details for WAN and LAN
-get_network_config() {
-    local wan_iface=$(get_wan_interface)
-    [ -z "$wan_iface" ] && wan_iface="em0"
-
-    # WAN netmask - extract from ifconfig
-    local wan_netmask=$(ifconfig "$wan_iface" 2>/dev/null | grep 'inet ' | head -1 | awk '{print $4}')
-    # Convert hex netmask to dotted decimal if needed
-    if echo "$wan_netmask" | grep -q '^0x'; then
-        wan_netmask=$(printf "%d.%d.%d.%d" \
-            $(( $(printf '%d' "$wan_netmask") >> 24 & 255 )) \
-            $(( $(printf '%d' "$wan_netmask") >> 16 & 255 )) \
-            $(( $(printf '%d' "$wan_netmask") >> 8 & 255 )) \
-            $(( $(printf '%d' "$wan_netmask") & 255 )))
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo ""
+        return
     fi
 
-    # WAN gateway from default route
-    local wan_gateway=$(netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $2}')
-
-    # DNS servers from resolv.conf
-    local wan_dns_primary=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
-    local wan_dns_secondary=$(awk '/^nameserver/{n++; if(n==2) print $2}' /etc/resolv.conf 2>/dev/null)
-
-    # LAN - find first RFC1918 interface
-    local lan_ip=$(ifconfig | grep 'inet ' | awk '{print $2}' | grep -E '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -1)
-    local lan_netmask=""
-    local lan_network=""
-    if [ -n "$lan_ip" ]; then
-        # Find which interface has this IP to get its netmask
-        local lan_iface=$(ifconfig | grep -B5 "inet $lan_ip " | grep '^[a-z]' | awk -F: '{print $1}' | tail -1)
-        if [ -n "$lan_iface" ]; then
-            lan_netmask=$(ifconfig "$lan_iface" 2>/dev/null | grep "inet $lan_ip " | awk '{print $4}')
-            if echo "$lan_netmask" | grep -q '^0x'; then
-                lan_netmask=$(printf "%d.%d.%d.%d" \
-                    $(( $(printf '%d' "$lan_netmask") >> 24 & 255 )) \
-                    $(( $(printf '%d' "$lan_netmask") >> 16 & 255 )) \
-                    $(( $(printf '%d' "$lan_netmask") >> 8 & 255 )) \
-                    $(( $(printf '%d' "$lan_netmask") & 255 )))
-            fi
-            # Calculate network address
-            if [ -n "$lan_netmask" ]; then
-                local IFS_OLD="$IFS"
-                IFS='.'
-                set -- $lan_ip
-                local ip1=$1 ip2=$2 ip3=$3 ip4=$4
-                set -- $lan_netmask
-                local nm1=$1 nm2=$2 nm3=$3 nm4=$4
-                IFS="$IFS_OLD"
-                lan_network="$((ip1 & nm1)).$((ip2 & nm2)).$((ip3 & nm3)).$((ip4 & nm4))"
-            fi
-        fi
+    # Try xml command first
+    if command -v xml >/dev/null 2>&1; then
+        # Get interfaces configured as WAN (type='wan' or descr contains 'WAN')
+        wan_interfaces=$(xml sel -t -m "//interfaces/*[enable='1']" -v "if" -n "$CONFIG_FILE" 2>/dev/null | while read iface; do
+            # Check if interface has a real physical device assigned
+            local ifname=$(xml sel -t -v "//interfaces/$iface/if" "$CONFIG_FILE" 2>/dev/null)
+            [ -n "$ifname" ] && echo "$ifname"
+        done | head -5 | tr '\n' ',' | sed 's/,$//')
+    elif command -v xmllint >/dev/null 2>&1; then
+        # Fallback to xmllint
+        wan_interfaces=$(xmllint --xpath "//interfaces/*/if/text()" "$CONFIG_FILE" 2>/dev/null | head -5 | tr '\n' ',' | sed 's/,$//')
     fi
 
-    # List all WAN-facing interfaces (non-loopback, non-tunnel with IPs)
-    local wan_interfaces=$(ifconfig -l 2>/dev/null | tr ' ' '\n' | grep -v '^$')
-    local wan_iface_list=""
-    for iface in $wan_interfaces; do
-        # Skip pure loopback
-        case "$iface" in pflog*|pfsync*|enc*) continue ;; esac
-        if ifconfig "$iface" 2>/dev/null | grep -q 'inet \|flags.*UP'; then
-            [ -n "$wan_iface_list" ] && wan_iface_list="${wan_iface_list},"
-            wan_iface_list="${wan_iface_list}${iface}"
-        fi
-    done
+    # Fallback: detect from routing table
+    if [ -z "$wan_interfaces" ]; then
+        wan_interfaces=$(netstat -rn 2>/dev/null | grep default | awk '{print $NF}' | sort -u | head -3 | tr '\n' ',' | sed 's/,$//')
+    fi
 
-    echo "${wan_netmask:-}|${wan_gateway:-}|${wan_dns_primary:-}|${wan_dns_secondary:-}|${lan_netmask:-}|${lan_network:-}|${wan_iface_list:-}"
+    echo "$wan_interfaces"
 }
 
-# Get per-interface WAN statistics as JSON array
+# Detect WAN gateway groups
+detect_wan_groups() {
+    local wan_groups=""
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo ""
+        return
+    fi
+
+    # Try to get gateway groups from config
+    if command -v xml >/dev/null 2>&1; then
+        wan_groups=$(xml sel -t -m "//gateways/gateway_group" -v "name" -o "," "$CONFIG_FILE" 2>/dev/null | sed 's/,$//')
+    elif command -v xmllint >/dev/null 2>&1; then
+        wan_groups=$(xmllint --xpath "//gateways/gateway_group/name/text()" "$CONFIG_FILE" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+    fi
+
+    echo "$wan_groups"
+}
+
+# Get WAN interface statistics
 get_wan_interface_stats() {
-    local interfaces=$(ifconfig -l 2>/dev/null | tr ' ' '\n')
+    local wan_interfaces="$1"
+
+    if [ -z "$wan_interfaces" ]; then
+        echo "[]"
+        return
+    fi
+
+    # Use a temp file to avoid subshell issues with while loops in pipes
+    local stats_json="["
     local first=1
-    echo -n "["
-    for iface in $interfaces; do
-        case "$iface" in pflog*|pfsync*|enc*|lo*) continue ;; esac
 
-        local iface_data=$(ifconfig "$iface" 2>/dev/null)
-        [ -z "$iface_data" ] && continue
+    # Process each interface
+    local IFS=','
+    for iface in $wan_interfaces; do
+        # Skip empty
+        [ -z "$iface" ] && continue
 
-        # Check if interface is UP
+        # Skip loopback and wireguard virtual interfaces for now
+        echo "$iface" | grep -qE '^(lo[0-9]|wg[0-9]|wireguard)' && continue
+
+        # Get interface status from ifconfig
+        local iface_info=$(ifconfig "$iface" 2>/dev/null)
+        if [ -z "$iface_info" ]; then
+            continue
+        fi
+
+        # Parse status
         local status="down"
-        echo "$iface_data" | grep -q 'status: active' && status="active"
-        echo "$iface_data" | grep -q 'status: associated' && status="active"
-        # If no status line but UP flag, treat as active
-        if [ "$status" = "down" ]; then
-            echo "$iface_data" | grep -q 'flags=.*UP' && ! echo "$iface_data" | grep -q 'status: no carrier' && status="active"
+        echo "$iface_info" | grep -q "status: active" && status="active"
+        echo "$iface_info" | grep -q "status: no carrier" && status="no carrier"
+
+        # Parse IP address and netmask
+        local ip_line=$(echo "$iface_info" | grep 'inet ' | head -1)
+        local ip_address=$(echo "$ip_line" | awk '{print $2}')
+        local netmask=$(echo "$ip_line" | awk '{print $4}')
+
+        # Get gateway from routing table
+        local gateway=$(netstat -rn 2>/dev/null | grep "^default" | grep "$iface" | head -1 | awk '{print $2}')
+
+        # Get media information
+        local media=$(echo "$iface_info" | grep "media:" | sed 's/.*media: //' | sed 's/ .*//')
+
+        # Get statistics from netstat (Link layer)
+        local stats=$(netstat -ibn 2>/dev/null | grep "^${iface}" | grep '<Link' | head -1)
+        local rx_packets=0
+        local rx_bytes=0
+        local rx_errors=0
+        local tx_packets=0
+        local tx_bytes=0
+        local tx_errors=0
+
+        if [ -n "$stats" ]; then
+            rx_packets=$(echo "$stats" | awk '{print $5}')
+            rx_bytes=$(echo "$stats" | awk '{print $8}')
+            rx_errors=$(echo "$stats" | awk '{print $6}')
+            tx_packets=$(echo "$stats" | awk '{print $9}')
+            tx_bytes=$(echo "$stats" | awk '{print $11}')
+            tx_errors=$(echo "$stats" | awk '{print $10}')
         fi
 
-        local ip=$(echo "$iface_data" | grep 'inet ' | head -1 | awk '{print $2}')
-        local mask=$(echo "$iface_data" | grep 'inet ' | head -1 | awk '{print $4}')
-        local media=$(echo "$iface_data" | grep 'media:' | head -1 | sed 's/.*media: //' | awk '{print $1}')
-        [ -z "$media" ] && media="none"
-
-        # Get gateway if this is the default route interface
-        local gw=""
-        local def_iface=$(netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $NF}')
-        [ "$iface" = "$def_iface" ] && gw=$(netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $2}')
-
-        # Traffic counters from netstat -ibn
-        local link_stats=$(netstat -ibn 2>/dev/null | grep "^${iface}" | grep '<Link' | head -1)
-        local rx_packets=0 rx_errors=0 rx_bytes=0 tx_packets=0 tx_errors=0 tx_bytes=0
-        if [ -n "$link_stats" ]; then
-            rx_packets=$(echo "$link_stats" | awk '{print $5}')
-            rx_errors=$(echo "$link_stats" | awk '{print $6}')
-            rx_bytes=$(echo "$link_stats" | awk '{print $8}')
-            tx_packets=$(echo "$link_stats" | awk '{print $9}')
-            tx_errors=$(echo "$link_stats" | awk '{print $10}')
-            tx_bytes=$(echo "$link_stats" | awk '{print $11}')
+        # Check if Link counters are frozen (virtio_net bug) - use pf counters instead
+        local link_check_file="/tmp/opnmanager_link_counter_${iface}"
+        if [ -f "$link_check_file" ]; then
+            local prev_link_val=$(cat "$link_check_file" 2>/dev/null)
+            local ip_stats_line=$(netstat -ibn 2>/dev/null | grep "^${iface}" | grep -v '<Link' | grep -v '^\s' | head -1)
+            local ip_rx=$(echo "$ip_stats_line" | awk '{print $8}')
+            case "$ip_rx" in ''|*[!0-9]*) ip_rx=0 ;; esac
+            if [ "$rx_bytes" = "$prev_link_val" ] && [ "$ip_rx" -gt "$rx_bytes" ] 2>/dev/null; then
+                # Link frozen - use pf interface counters
+                local pf_data=$(pfctl -vvsI -i "$iface" 2>/dev/null)
+                local pf_rx=$(echo "$pf_data" | grep 'In4/Pass' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+                local pf_tx=$(echo "$pf_data" | grep 'Out4/Pass' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+                local pf_rx_blk=$(echo "$pf_data" | grep 'In4/Block' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+                local pf_tx_blk=$(echo "$pf_data" | grep 'Out4/Block' | awk -F'Bytes:' '{print $2}' | awk '{print $1}')
+                local pf_rx_pkts=$(echo "$pf_data" | grep 'In4/Pass' | awk -F'Packets:' '{print $2}' | awk '{print $1}')
+                local pf_tx_pkts=$(echo "$pf_data" | grep 'Out4/Pass' | awk -F'Packets:' '{print $2}' | awk '{print $1}')
+                case "$pf_rx" in ''|*[!0-9]*) pf_rx=0 ;; esac
+                case "$pf_tx" in ''|*[!0-9]*) pf_tx=0 ;; esac
+                case "$pf_rx_blk" in ''|*[!0-9]*) pf_rx_blk=0 ;; esac
+                case "$pf_tx_blk" in ''|*[!0-9]*) pf_tx_blk=0 ;; esac
+                case "$pf_rx_pkts" in ''|*[!0-9]*) pf_rx_pkts=0 ;; esac
+                case "$pf_tx_pkts" in ''|*[!0-9]*) pf_tx_pkts=0 ;; esac
+                if [ "$pf_rx" -gt 0 ] 2>/dev/null; then
+                    rx_bytes=$((pf_rx + pf_rx_blk))
+                    tx_bytes=$((pf_tx + pf_tx_blk))
+                    rx_packets=$pf_rx_pkts
+                    tx_packets=$pf_tx_pkts
+                fi
+            fi
         fi
 
-        [ $first -eq 0 ] && echo -n ","
+        # Build JSON for this interface
+        [ "$first" -eq 0 ] && stats_json="${stats_json},"
         first=0
-        echo -n "{\"interface\":\"$iface\",\"status\":\"$status\",\"ip\":\"${ip:-}\",\"netmask\":\"${mask:-}\",\"gateway\":\"${gw:-}\",\"media\":\"${media:-}\",\"rx_packets\":${rx_packets:-0},\"rx_errors\":${rx_errors:-0},\"rx_bytes\":${rx_bytes:-0},\"tx_packets\":${tx_packets:-0},\"tx_errors\":${tx_errors:-0},\"tx_bytes\":${tx_bytes:-0}}"
+
+        stats_json="${stats_json}{\"interface\":\"$iface\",\"status\":\"$status\",\"ip_address\":\"$ip_address\",\"netmask\":\"$netmask\",\"gateway\":\"$gateway\",\"media\":\"$media\",\"rx_packets\":${rx_packets:-0},\"rx_bytes\":${rx_bytes:-0},\"rx_errors\":${rx_errors:-0},\"tx_packets\":${tx_packets:-0},\"tx_bytes\":${tx_bytes:-0},\"tx_errors\":${tx_errors:-0}}"
     done
-    echo "]"
+
+    stats_json="${stats_json}]"
+    echo "$stats_json"
 }
 
 # Get system information
@@ -472,18 +622,55 @@ get_system_info() {
     # Get LAN IP (first RFC1918 private IP: 10.x, 172.16-31.x, 192.168.x)
     lan_ip=$(ifconfig | grep 'inet ' | awk '{print $2}' | grep -E '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -1)
 
-    # Get network config details
-    local net_config=$(get_network_config)
-    local wan_netmask=$(echo "$net_config" | cut -d'|' -f1)
-    local wan_gateway=$(echo "$net_config" | cut -d'|' -f2)
-    local wan_dns_primary=$(echo "$net_config" | cut -d'|' -f3)
-    local wan_dns_secondary=$(echo "$net_config" | cut -d'|' -f4)
-    local lan_netmask=$(echo "$net_config" | cut -d'|' -f5)
-    local lan_network=$(echo "$net_config" | cut -d'|' -f6)
-    local wan_interfaces=$(echo "$net_config" | cut -d'|' -f7)
+    # Detect WAN interfaces and groups (v1.5.0 feature)
+    local wan_interfaces=$(detect_wan_interfaces)
+    local wan_groups=$(detect_wan_groups)
+
+    # Network config details (v1.5.4 feature)
+    local wan_iface=$(netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $NF}')
+    [ -z "$wan_iface" ] && wan_iface="em0"
+
+    local wan_netmask=$(ifconfig "$wan_iface" 2>/dev/null | grep 'inet ' | head -1 | awk '{print $4}')
+    # Convert hex netmask to dotted decimal
+    if echo "$wan_netmask" | grep -q '^0x'; then
+        wan_netmask=$(printf "%d.%d.%d.%d" \
+            $(( $(printf '%d' "$wan_netmask") >> 24 & 255 )) \
+            $(( $(printf '%d' "$wan_netmask") >> 16 & 255 )) \
+            $(( $(printf '%d' "$wan_netmask") >> 8 & 255 )) \
+            $(( $(printf '%d' "$wan_netmask") & 255 )))
+    fi
+
+    local wan_gateway=$(netstat -rn 2>/dev/null | grep '^default' | head -1 | awk '{print $2}')
+    local wan_dns_primary=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null)
+    local wan_dns_secondary=$(awk '/^nameserver/{n++; if(n==2) print $2}' /etc/resolv.conf 2>/dev/null)
+
+    # LAN network config
+    local lan_netmask=""
+    local lan_network=""
+    if [ -n "$lan_ip" ]; then
+        local lan_iface=$(ifconfig | grep -B5 "inet $lan_ip " | grep '^[a-z]' | awk -F: '{print $1}' | tail -1)
+        if [ -n "$lan_iface" ]; then
+            lan_netmask=$(ifconfig "$lan_iface" 2>/dev/null | grep "inet $lan_ip " | awk '{print $4}')
+            if echo "$lan_netmask" | grep -q '^0x'; then
+                lan_netmask=$(printf "%d.%d.%d.%d" \
+                    $(( $(printf '%d' "$lan_netmask") >> 24 & 255 )) \
+                    $(( $(printf '%d' "$lan_netmask") >> 16 & 255 )) \
+                    $(( $(printf '%d' "$lan_netmask") >> 8 & 255 )) \
+                    $(( $(printf '%d' "$lan_netmask") & 255 )))
+            fi
+            # Calculate network address
+            if [ -n "$lan_netmask" ] && [ -n "$lan_ip" ]; then
+                local oIFS="$IFS"; IFS='.'
+                set -- $lan_ip; local ip1=$1 ip2=$2 ip3=$3 ip4=$4
+                set -- $lan_netmask; local nm1=$1 nm2=$2 nm3=$3 nm4=$4
+                IFS="$oIFS"
+                lan_network="$((ip1 & nm1)).$((ip2 & nm2)).$((ip3 & nm3)).$((ip4 & nm4))"
+            fi
+        fi
+    fi
 
     cat <<EOF
-{"hardware_id":"$HARDWARE_ID","agent_version":"$AGENT_VERSION","wan_ip":"$wan_ip","lan_ip":"$lan_ip","ipv6_address":"$ipv6_address","opnsense_version":"$version","uptime":"$uptime_info","hostname":"$hostname","wan_netmask":"$wan_netmask","wan_gateway":"$wan_gateway","wan_dns_primary":"$wan_dns_primary","wan_dns_secondary":"$wan_dns_secondary","lan_netmask":"$lan_netmask","lan_network":"$lan_network","wan_interfaces":"$wan_interfaces"}
+{"hardware_id":"$HARDWARE_ID","agent_version":"$AGENT_VERSION","wan_ip":"$wan_ip","lan_ip":"$lan_ip","ipv6_address":"$ipv6_address","opnsense_version":"$version","uptime":"$uptime_info","hostname":"$hostname","wan_interfaces":"$wan_interfaces","wan_groups":"$wan_groups","wan_netmask":"${wan_netmask:-}","wan_gateway":"${wan_gateway:-}","wan_dns_primary":"${wan_dns_primary:-}","wan_dns_secondary":"${wan_dns_secondary:-}","lan_netmask":"${lan_netmask:-}","lan_network":"${lan_network:-}"}
 EOF
 }
 
@@ -492,14 +679,13 @@ check_updates() {
     local updates_available="false"
     local new_version=""
 
-    # Method 1: Use opnsense-update -c (most reliable for OPNsense updates)
+    # Method 1: opnsense-update -c (most reliable for OPNsense updates)
     if command -v opnsense-update >/dev/null 2>&1; then
         local update_output=$(opnsense-update -c 2>&1)
         local update_exit=$?
-        # Exit code 0 means updates available, non-zero means up to date
+        # Exit code 0 means updates available
         if [ $update_exit -eq 0 ] && [ -n "$update_output" ]; then
             updates_available="true"
-            # Try to extract version from output
             new_version=$(echo "$update_output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[_0-9]*' | tail -1)
         fi
     fi
@@ -543,6 +729,42 @@ except:
 
         log_message "Executing update command: $update_cmd"
         nohup sh -c "$update_cmd >> $LOG_FILE 2>&1" > /dev/null 2>&1 &
+    fi
+
+    # Check for agent update notification
+    local agent_update_available=$(echo "$response" | /usr/local/bin/python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print('true' if data.get('agent_update_available', False) else 'false')
+except:
+    print('false')
+" 2>/dev/null)
+
+    if [ "$agent_update_available" = "true" ]; then
+        local new_version=$(echo "$response" | /usr/local/bin/python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('latest_version', ''))
+except:
+    print('')
+" 2>/dev/null)
+
+        local update_cmd=$(echo "$response" | /usr/local/bin/python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('update_command', ''))
+except:
+    print('')
+" 2>/dev/null)
+
+        if [ -n "$update_cmd" ]; then
+            log_message "Agent update available: v$new_version (current: $AGENT_VERSION)"
+            log_message "Executing agent update command..."
+            nohup sh -c "$update_cmd" > /dev/null 2>&1 &
+        fi
     fi
 
     # Check for SSH key deployment
@@ -605,32 +827,116 @@ except:
                 log_message "Executing command $cmd_id: $cmd_data"
 
                 # Check for special commands
-                if [ "$cmd_data" = "run_speedtest" ]; then
-                    log_message "Running speedtest as requested"
-                    result=$(run_speedtest)
+                # Execute command with error handling and timeout
+                result=""
+                cmd_status="completed"
 
-                    # Send speedtest results to server
-                    $CURL_CMD -s -m 10 -X POST \
-                        -H "Content-Type: application/json" \
-                        -d "{\"hardware_id\":\"$HARDWARE_ID\",\"agent_version\":\"$AGENT_VERSION\",\"speedtest_result\":$result}" \
-                        "${SERVER_URL}/agent_checkin.php" > /dev/null 2>&1
+                # Use a subshell with timeout to prevent agent crashes
+                (
+                    if [ "$cmd_data" = "run_speedtest" ]; then
+                        log_message "Running speedtest as requested"
+                        result=$(run_speedtest 2>&1)
+                        echo "$result" > /tmp/cmd_${cmd_id}_result.txt
+
+                        # Send speedtest results to server
+                        $CURL_CMD -s -m 10 -X POST \
+                            -H "Content-Type: application/json" \
+                            -d "{\"hardware_id\":\"$HARDWARE_ID\",\"agent_version\":\"$AGENT_VERSION\",\"speedtest_result\":$result}" \
+                            "${SERVER_URL}/agent_checkin.php" > /dev/null 2>&1
+                    else
+                        # Execute regular shell command with timeout
+                        # Limit output and execution time to prevent hangs
+                        timeout 300 sh -c "$cmd_data" 2>&1 | head -1000 > /tmp/cmd_${cmd_id}_result.txt || echo "Command timed out or failed" >> /tmp/cmd_${cmd_id}_result.txt
+                    fi
+                ) &
+
+                cmd_pid=$!
+
+                # Wait up to 310 seconds for command to complete
+                wait_count=0
+                while kill -0 $cmd_pid 2>/dev/null && [ $wait_count -lt 310 ]; do
+                    sleep 1
+                    wait_count=$((wait_count + 1))
+                done
+
+                # If still running, kill it
+                if kill -0 $cmd_pid 2>/dev/null; then
+                    log_message "Command $cmd_id exceeded timeout, killing..."
+                    kill -9 $cmd_pid 2>/dev/null
+                    result="Command execution timeout exceeded (310s)"
+                    cmd_status="failed"
                 else
-                    # Execute regular shell command
-                    result=$(eval "$cmd_data" 2>&1 | head -1000)
+                    # Read result from temp file
+                    if [ -f /tmp/cmd_${cmd_id}_result.txt ]; then
+                        result=$(cat /tmp/cmd_${cmd_id}_result.txt)
+                        rm -f /tmp/cmd_${cmd_id}_result.txt
+                    fi
                 fi
 
-                result_b64=$(echo "$result" | base64 2>/dev/null)
+                # Base64 encode result and remove newlines to prevent JSON breakage
+                result_b64=$(echo "$result" | base64 2>/dev/null | tr -d '\n')
 
                 # Report result back to server
                 $CURL_CMD -s -m 10 -X POST \
                     -H "Content-Type: application/json" \
-                    -d "{\"hardware_id\":\"$HARDWARE_ID\",\"command_id\":$cmd_id,\"status\":\"completed\",\"result\":\"$result_b64\"}" \
+                    -d "{\"hardware_id\":\"$HARDWARE_ID\",\"command_id\":$cmd_id,\"status\":\"$cmd_status\",\"result\":\"$result_b64\"}" \
                     "${SERVER_URL}/agent_checkin.php" > /dev/null 2>&1
 
-                log_message "Command $cmd_id completed"
+                log_message "Command $cmd_id $cmd_status"
             fi
         fi
     done
+}
+
+# Configure alternate hostname for HTTP_REFERER check (one-time configuration)
+configure_alternate_hostnames() {
+    local config_marker="/tmp/.opnmanager_althostnames_configured"
+
+    # Skip if already configured
+    if [ -f "$config_marker" ]; then
+        return 0
+    fi
+
+    # Extract server hostname from SERVER_URL
+    local server_hostname=$(echo "$SERVER_URL" | sed 's|https\?://||' | sed 's|/.*||')
+
+    if [ -z "$server_hostname" ]; then
+        log_message "WARNING: Could not extract server hostname from $SERVER_URL"
+        return 1
+    fi
+
+    log_message "Configuring alternate hostname: $server_hostname"
+
+    # Check if already configured
+    if grep -q "<althostnames>.*$server_hostname" /conf/config.xml 2>/dev/null; then
+        log_message "Alternate hostname already configured"
+        touch "$config_marker"
+        return 0
+    fi
+
+    # Backup config
+    cp /conf/config.xml /conf/config.xml.bak_althost 2>/dev/null
+
+    # Add or update alternate hostnames
+    if grep -q "<webgui>" /conf/config.xml; then
+        if grep -q "<althostnames>" /conf/config.xml; then
+            # Append to existing
+            sed -i '' "s|<althostnames>\(.*\)</althostnames>|<althostnames>\1 $server_hostname</althostnames>|" /conf/config.xml
+        else
+            # Add new tag
+            sed -i '' "s|<webgui>|<webgui><althostnames>$server_hostname</althostnames>|" /conf/config.xml
+        fi
+
+        # Restart webgui to apply
+        /usr/local/etc/rc.restart_webgui >/dev/null 2>&1 &
+
+        log_message "Alternate hostname configured: $server_hostname"
+        touch "$config_marker"
+        return 0
+    else
+        log_message "WARNING: Could not find <webgui> section in config.xml"
+        return 1
+    fi
 }
 
 # Main entry point
@@ -666,6 +972,9 @@ main() {
     log_message "Hardware ID: $HARDWARE_ID"
     log_message "Check-in interval: ${CHECKIN_INTERVAL}s"
 
+    # One-time configuration: Add alternate hostname for HTTP_REFERER check
+    configure_alternate_hostnames
+
     # Main loop
     ERROR_COUNT=0
     MAX_ERRORS=10
@@ -679,8 +988,10 @@ main() {
             if [ -n "$INSTALLED_VERSION" ] && [ "$INSTALLED_VERSION" != "$AGENT_VERSION" ]; then
                 log_message "New agent version detected: $INSTALLED_VERSION (current: $AGENT_VERSION)"
                 log_message "Restarting to use new version..."
-                # Use service restart to ensure clean restart
-                /usr/sbin/service opnmanager_agent restart >/dev/null 2>&1 &
+                # Clean up PID file and exit - let rc.d restart us
+                rm -f "$PID_FILE"
+                # Kill this process and all children
+                kill -TERM $$ 2>/dev/null
                 exit 0
             fi
         fi
@@ -716,21 +1027,30 @@ main() {
         PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
         PAYLOAD="${PAYLOAD},\"latency_stats\":$LATENCY_STATS}"
 
-        # Add update status - send both nested and top-level for compatibility
+        # Add update status
         UPDATE_INFO=$(check_updates)
-        PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
-        PAYLOAD="${PAYLOAD},\"opnsense_updates\":$UPDATE_INFO}"
+        # Extract values from UPDATE_INFO and add as flat fields for backend compatibility
+        UPDATES_AVAIL=$(echo "$UPDATE_INFO" | grep -o '"updates_available":[^,}]*' | sed 's/"updates_available"://' | sed 's/"//g')
+        NEW_VERSION=$(echo "$UPDATE_INFO" | grep -o '"new_version":"[^"]*"' | sed 's/"new_version":"//' | sed 's/"$//')
 
-        # Extract update fields to top level for server compatibility
-        local upd_avail=$(echo "$UPDATE_INFO" | /usr/local/bin/python3 -c "import json,sys; d=json.load(sys.stdin); print(1 if d.get('updates_available') else 0)" 2>/dev/null || echo 0)
-        local upd_ver=$(echo "$UPDATE_INFO" | /usr/local/bin/python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('new_version',''))" 2>/dev/null || echo "")
-        PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
-        PAYLOAD="${PAYLOAD},\"updates_available\":$upd_avail,\"available_version\":\"$upd_ver\"}"
+        # Convert true/false to 1/0 for updates_available
+        if [ "$UPDATES_AVAIL" = "true" ]; then
+            UPDATES_AVAIL=1
+        else
+            UPDATES_AVAIL=0
+        fi
 
-        # Add WAN interface stats
-        WAN_IFACE_STATS=$(get_wan_interface_stats)
         PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
-        PAYLOAD="${PAYLOAD},\"wan_interface_stats\":$WAN_IFACE_STATS}"
+        PAYLOAD="${PAYLOAD},\"updates_available\":$UPDATES_AVAIL,\"available_version\":\"$NEW_VERSION\"}"
+
+        # Add WAN interface statistics (v1.5.0 feature)
+        # Extract wan_interfaces from PAYLOAD to pass to stats function
+        WAN_IFACES=$(echo "$PAYLOAD" | grep -o '"wan_interfaces":"[^"]*"' | sed 's/"wan_interfaces":"//' | sed 's/"$//')
+        if [ -n "$WAN_IFACES" ]; then
+            WAN_STATS=$(get_wan_interface_stats "$WAN_IFACES")
+            PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
+            PAYLOAD="${PAYLOAD},\"wan_interface_stats\":$WAN_STATS}"
+        fi
 
         # Perform check-in
         RESPONSE=$($CURL_CMD -s -m 30 -X POST \

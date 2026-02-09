@@ -2,13 +2,9 @@
 
 ## Supported Versions
 
-We release security updates for the following versions:
-
 | Version | Supported          |
 | ------- | ------------------ |
-| 3.0.x   | :white_check_mark: |
-| 2.x.x   | :x:                |
-| 1.x.x   | :x:                |
+| Latest  | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -16,14 +12,12 @@ We release security updates for the following versions:
 
 ### How to Report
 
-1. **Email**: Send details to **security@yourdomain.com**
-2. **Subject**: "Security Vulnerability Report - [Brief Description]"
-3. **Include**:
+1. **GitHub Private Vulnerability Reporting**: Use [GitHub's security advisory feature](https://github.com/agit8or1/OPNMGR/security/advisories/new)
+2. **Include**:
    - Detailed description of the vulnerability
    - Steps to reproduce
    - Potential impact
    - Suggested fix (if available)
-   - Your contact information
 
 ### What to Expect
 
@@ -36,7 +30,6 @@ We release security updates for the following versions:
 - We follow **responsible disclosure** principles
 - We request a **90-day embargo** before public disclosure
 - We will credit researchers (unless anonymity is requested)
-- We may offer rewards for significant vulnerabilities
 
 ---
 
@@ -44,16 +37,9 @@ We release security updates for the following versions:
 
 ### Authentication & Access Control
 
-- **Brute Force Protection**: Automatic account lockout after 5 failed attempts
 - **Session Management**: Secure session handling with regeneration after login
-- **Two-Factor Authentication**: TOTP-based 2FA support
-- **Role-Based Access Control**: Admin and user roles with different privileges
-
-### Data Protection
-
-- **Environment-Based Configuration**: No hardcoded credentials
-- **Encrypted Passwords**: Password hashing using PHP's `password_hash()`
-- **Secure Session Cookies**: HttpOnly, Secure, and SameSite flags
+- **Role-Based Access Control**: Admin and viewer roles with different privileges
+- **Password Hashing**: Secure hashing using PHP's `password_hash()`
 - **CSRF Protection**: CSRF tokens on all state-changing operations
 
 ### Input Validation
@@ -61,21 +47,19 @@ We release security updates for the following versions:
 - **SQL Injection Protection**: Prepared statements throughout
 - **XSS Protection**: Input sanitization and output encoding
 - **Command Injection Protection**: Proper escaping of shell commands
-- **Path Traversal Protection**: Validated file paths
 
 ### Network Security
 
-- **HTTPS Required**: SSL/TLS encryption for all communication
-- **Secure Headers**: X-Frame-Options, CSP, X-Content-Type-Options
-- **API Authentication**: Required authentication for API endpoints
-- **Rate Limiting**: Protection against brute force and DoS attacks
+- **HTTPS Agent Communication**: SSL/TLS encryption for all agent check-ins
+- **Hardware ID Authentication**: Firewalls identified by unique hardware ID
+- **On-Demand SSH Tunnels**: Dynamic reverse tunnels with no exposed firewall ports
+- **Automatic Tunnel Cleanup**: Sessions timeout and clean up automatically
 
 ### Monitoring & Logging
 
 - **Audit Logging**: All administrative actions logged
 - **Failed Login Tracking**: Security event logging
 - **Snyk Integration**: Continuous vulnerability scanning
-- **Health Monitoring**: System health and security status dashboard
 
 ---
 
@@ -83,146 +67,38 @@ We release security updates for the following versions:
 
 ### For Administrators
 
-1. **Keep Software Updated**
-   ```bash
-   # Check for updates regularly
-   sudo ./update.sh --check
-   ```
-
-2. **Use Strong Passwords**
-   - Minimum 12 characters
-   - Mix of uppercase, lowercase, numbers, and symbols
-   - Use a password manager
-
-3. **Enable Two-Factor Authentication**
-   - Navigate to User Settings → 2FA Setup
-   - Use an authenticator app (Google Authenticator, Authy, etc.)
-
-4. **Review Logs Regularly**
-   - Check Administration → System Logs
-   - Monitor failed login attempts
-   - Review API access logs
-
-5. **Limit Network Access**
-   - Use firewall rules to restrict access
-   - Consider VPN for remote access
-   - Implement IP whitelisting if possible
-
-6. **Regular Backups**
-   - Configure automated backups
-   - Test backup restoration regularly
-   - Store backups securely off-site
-
-7. **Security Scanning**
-   - Run regular Snyk scans (Administration → Security Scanner)
-   - Review and address vulnerabilities
-   - Keep dependencies updated
+1. **Change Default Password**: Change the default `admin`/`admin123` credentials immediately after installation
+2. **Use Strong Passwords**: Minimum 12 characters with a mix of character types
+3. **Enable HTTPS**: Configure SSL/TLS on the manager server
+4. **Limit Network Access**: Use firewall rules to restrict access to the management interface
+5. **Review Logs Regularly**: Check the Logs page for suspicious activity
+6. **Regular Backups**: Configure automated backups and test restoration
 
 ### For Developers
 
-1. **Follow Secure Coding Practices**
-   - Always use prepared statements for SQL
-   - Escape output with `htmlspecialchars()`
-   - Use `escapeshellarg()` for shell commands
-   - Validate all user input
-
-2. **Authentication Required**
-   ```php
-   // Always require authentication on sensitive endpoints
-   require_once 'inc/api_auth.php';
-   requireApiAuth();  // Or requireApiAdmin()
-   ```
-
-3. **CSRF Protection**
-   ```php
-   // Add CSRF tokens to forms
-   <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
-
-   // Verify on submission
-   if (!csrf_verify($_POST['csrf'])) {
-       die('CSRF validation failed');
-   }
-   ```
-
-4. **Environment Variables**
-   ```php
-   // Never hardcode credentials
-   $password = env('DB_PASS');  // Good
-   $password = 'hardcoded123';  // Bad
-   ```
-
-5. **Security Testing**
-   ```bash
-   # Run before committing
-   snyk test
-   snyk code test
-   ```
+1. **Always use prepared statements for SQL queries**
+2. **Escape output with `htmlspecialchars()`**
+3. **Use `escapeshellarg()` for shell commands**
+4. **Add CSRF tokens to all forms**
+5. **Require authentication on all sensitive endpoints**
 
 ---
 
 ## Known Security Considerations
 
-### Current Status
+1. **Agent Command Execution**: The agent system executes queued commands on managed firewalls. Commands are stored in the database and picked up on the next agent check-in.
 
-This software has undergone security review and implements industry-standard security practices. However, no software is completely secure.
+2. **SSH Key Management**: SSH keys are used for on-demand tunnel connections. Keys are stored in the database (base64-encoded) and on disk.
 
-### Areas of Focus
-
-1. **Agent System**: The agent system executes commands on managed firewalls
-   - Commands are queued in database
-   - Consider implementing command whitelisting for additional security
-
-2. **SSH Key Management**: SSH keys are used for firewall communication
-   - Keys should be properly secured
-   - Implement key rotation policies
-
-3. **Database Access**: Database contains sensitive information
-   - Restrict database network access
-   - Use strong database passwords
-   - Consider database encryption at rest
-
-### Ongoing Improvements
-
-We continuously improve security through:
-- Regular dependency updates
-- Security audits
-- Penetration testing
-- Community feedback
-- Automated scanning (Snyk)
+3. **Database Access**: The database contains firewall configurations and SSH keys. Restrict database network access and use strong passwords.
 
 ---
 
 ## Security Compliance
 
-### Standards
-
-OPNsense Manager follows security best practices from:
+OPNManager follows security best practices from:
 - **OWASP Top 10**: Protection against common web vulnerabilities
 - **CWE Top 25**: Mitigation of dangerous software weaknesses
-- **NIST Guidelines**: Security configuration recommendations
-
-### Certifications
-
-- Security scanned with Snyk
-- Code analysis (SAST) performed
-- Dependency vulnerability checking enabled
-
----
-
-## Security Contact
-
-- **Email**: security@yourdomain.com
-- **PGP Key**: [Download PGP Key](https://yourdomain.com/pgp.asc)
-- **Response Time**: 48 hours
-
----
-
-## Hall of Fame
-
-We recognize security researchers who responsibly disclose vulnerabilities:
-
-- [Researcher Name] - [Vulnerability Description] - [Date]
-- [Researcher Name] - [Vulnerability Description] - [Date]
 
 ---
 
@@ -231,12 +107,7 @@ We recognize security researchers who responsibly disclose vulnerabilities:
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [CWE Top 25](https://cwe.mitre.org/top25/)
 - [PHP Security Guide](https://www.php.net/manual/en/security.php)
-- [Snyk Security](https://snyk.io/learn/)
 
 ---
 
-## Updates
-
-This security policy is reviewed and updated regularly. Last updated: February 2026
-
-For the latest version, visit: [https://github.com/YOUR_USERNAME/opnsense-manager/blob/main/SECURITY.md](https://github.com/YOUR_USERNAME/opnsense-manager/blob/main/SECURITY.md)
+For the latest version of this policy, visit: [SECURITY.md on GitHub](https://github.com/agit8or1/OPNMGR/blob/main/SECURITY.md)

@@ -2,7 +2,7 @@
 // OPNManager Agent Version Configuration
 // Update this when releasing a new agent version
 
-define('LATEST_AGENT_VERSION', '1.5.5');
+define('LATEST_AGENT_VERSION', '1.5.6');
 define('AGENT_DOWNLOAD_URL', 'https://opn.agit8or.net/downloads/plugins/install_opnmanager_agent.sh');
 
 /**
