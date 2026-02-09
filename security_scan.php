@@ -41,29 +41,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'install_snyk':
-            // Check if npm is installed, if not install it first
+            // Check if npm is installed
             exec('which npm 2>&1', $npm_check_output, $npm_check_code);
             if ($npm_check_code !== 0) {
-                // Install nodejs and npm
-                exec('curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - 2>&1', $nodejs_output, $nodejs_return);
-                exec('sudo apt-get install -y nodejs 2>&1', $npm_output, $npm_return);
-
-                if ($npm_return !== 0) {
-                    $config_message = 'Failed to install Node.js/npm automatically. Please install manually: sudo apt-get install nodejs npm';
-                    $config_status = 'danger';
-                    break;
-                }
-                $config_message = 'Node.js and npm installed successfully! Now installing Snyk...<br>';
-                $config_status = 'success';
+                // npm is not installed - provide manual installation instructions
+                $config_message = '<strong>Node.js and npm are not installed.</strong><br><br>';
+                $config_message .= 'Please run these commands on the server:<br>';
+                $config_message .= '<div class="bg-dark p-3 mt-2 mb-2" style="font-family: monospace; border-radius: 5px;">';
+                $config_message .= '# Install Node.js and npm<br>';
+                $config_message .= 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -<br>';
+                $config_message .= 'sudo apt-get install -y nodejs<br><br>';
+                $config_message .= '# Install Snyk<br>';
+                $config_message .= 'sudo npm install -g snyk<br><br>';
+                $config_message .= '# Verify installation<br>';
+                $config_message .= 'node --version<br>';
+                $config_message .= 'npm --version<br>';
+                $config_message .= 'snyk --version';
+                $config_message .= '</div>';
+                $config_message .= 'After installation, refresh this page to configure Snyk.';
+                $config_status = 'warning';
+                break;
             }
 
-            exec('npm install -g snyk 2>&1', $output, $return_code);
+            // npm is installed, try to install Snyk
+            exec('sudo npm install -g snyk 2>&1', $output, $return_code);
             if ($return_code === 0) {
-                $config_message .= 'Snyk installed successfully! Please configure your API key below.';
+                $config_message = 'Snyk installed successfully! Please configure your API key below.';
                 $config_status = 'success';
             } else {
-                $config_message .= 'Failed to install Snyk. Error: ' . implode("\n", $output);
-                $config_status = 'danger';
+                // Failed with sudo, try without sudo (might work if user permissions are set)
+                exec('npm install -g snyk 2>&1', $output2, $return_code2);
+                if ($return_code2 === 0) {
+                    $config_message = 'Snyk installed successfully! Please configure your API key below.';
+                    $config_status = 'success';
+                } else {
+                    $config_message = '<strong>Failed to install Snyk automatically.</strong><br><br>';
+                    $config_message .= 'Please run this command on the server:<br>';
+                    $config_message .= '<div class="bg-dark p-3 mt-2 mb-2" style="font-family: monospace; border-radius: 5px;">';
+                    $config_message .= 'sudo npm install -g snyk';
+                    $config_message .= '</div>';
+                    $config_message .= 'Error: ' . htmlspecialchars(implode("\n", $output));
+                    $config_status = 'danger';
+                }
             }
             break;
 
