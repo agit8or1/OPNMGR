@@ -19,9 +19,7 @@ define('SESSION_TIMEOUT', 3600); // 1 hour
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOGIN_LOCKOUT_TIME', 900); // 15 minutes
 
-// Application configuration
-define('APP_NAME', $_ENV['APP_NAME'] ?? 'OPNsense Manager');
-define('APP_VERSION', '1.0.0');
+// Application configuration (version info is in inc/version.php)
 define('UPLOAD_MAX_SIZE', 5 * 1024 * 1024); // 5MB
 define('ALLOWED_IMAGE_TYPES', ['image/png', 'image/jpeg', 'image/svg+xml']);
 

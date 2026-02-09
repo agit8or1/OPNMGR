@@ -4,7 +4,6 @@ require_once __DIR__ . '/inc/auth.php';
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/version.php';
 require_once __DIR__ . "/inc/csrf.php";
-require_once __DIR__ . "/inc/timezone_selector.php";
 requireLogin();
 
 // Health calculation function
@@ -244,7 +243,6 @@ include __DIR__ . '/inc/header.php';
                 <small class="text-light fw-bold mb-0">
                     <i class="fas fa-network-wired me-1"></i>Firewall Management
                 </small>
-                <?php renderTimezoneSelector(); ?>
             </div>
 
             <!-- Search and Filters -->
@@ -1537,5 +1535,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<?php addTimezoneJS(); ?>
 <?php include __DIR__ . '/inc/footer.php'; ?>
