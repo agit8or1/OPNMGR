@@ -35,6 +35,12 @@ updateProgress($progress_file, 'running', 'Initializing scan...', 10);
 // Prepare scan command
 $base_dir = __DIR__;
 switch ($scan_type) {
+    case 'all':
+        // Run comprehensive scan (dependencies + code)
+        $cmd = "cd $base_dir && SNYK_TOKEN=" . escapeshellarg($snyk_token) . " snyk test 2>&1 && SNYK_TOKEN=" . escapeshellarg($snyk_token) . " snyk code test 2>&1";
+        $scan_name = "Comprehensive Security Scan";
+        break;
+
     case 'dependencies':
         $cmd = "cd $base_dir/scripts 2>/dev/null || cd $base_dir && SNYK_TOKEN=" . escapeshellarg($snyk_token) . " snyk test 2>&1";
         $scan_name = "Dependency Scan";

@@ -157,6 +157,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
 
+        case 'scan_all':
+            // Launch comprehensive scan (dependencies + code)
+            $scan_id = uniqid('scan_');
+
+            // Start background scan runner for comprehensive scan
+            $runner = __DIR__ . '/snyk_scan_runner.php';
+            exec("php $runner all $scan_id > /dev/null 2>&1 &");
+
+            // Redirect to monitor scan progress in real-time
+            header("Location: security_scan.php?monitoring=$scan_id&type=all");
+            exit;
+            break;
+
         case 'scan_dependencies':
         case 'scan_code':
         case 'monitor':
@@ -429,9 +442,12 @@ include __DIR__ . '/inc/header.php';
                             </p>
                         </div>
                         <div class="col-md-3 text-end">
-                            <button class="btn btn-primary" onclick="document.getElementById('scan-controls').scrollIntoView({behavior: 'smooth'})">
-                                <i class="fas fa-play me-1"></i>Run New Scan
-                            </button>
+                            <form method="post" class="d-inline">
+                                <input type="hidden" name="action" value="scan_all">
+                                <button type="submit" class="btn btn-primary" <?php echo (!$snyk_available || !$snyk_authenticated) ? 'disabled' : ''; ?>>
+                                    <i class="fas fa-play me-1"></i>Run New Scan
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -573,61 +589,43 @@ include __DIR__ . '/inc/header.php';
     <?php endif; ?>
 
     <div class="row mb-4" id="scan-controls">
-        <div class="col-12 mb-3">
-            <h4 class="text-light"><i class="fas fa-cog me-2"></i>Scan Controls</h4>
-            <p class="text-muted">Run vulnerability scans on your codebase</p>
-        </div>
-        <div class="col-md-4">
-            <div class="security-card">
-                <div class="text-center mb-3">
-                    <i class="fas fa-box fa-3x text-primary"></i>
-                </div>
-                <h5 class="text-center mb-3">Dependency Scan</h5>
-                <p class="text-center small">
-                    Scan Node.js dependencies for known vulnerabilities (CVEs)
-                </p>
-                <form method="post" class="text-center">
-                    <input type="hidden" name="action" value="scan_dependencies">
-                    <button type="submit" class="btn btn-primary" <?php echo (!$snyk_available || !$snyk_authenticated) ? 'disabled' : ''; ?>>
-                        <i class="fas fa-search me-2"></i>Scan Dependencies
-                    </button>
-                </form>
-            </div>
+        <div class="col-12 mb-4">
+            <h4 class="text-light"><i class="fas fa-cog me-2"></i>Security Scan</h4>
+            <p class="text-muted">Comprehensive vulnerability scanning with real-time progress</p>
         </div>
 
-        <div class="col-md-4">
-            <div class="security-card">
-                <div class="text-center mb-3">
-                    <i class="fas fa-code fa-3x text-success"></i>
+        <!-- Unified Scan Button -->
+        <div class="col-12">
+            <div class="security-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="text-white mb-2">
+                            <i class="fas fa-shield-alt me-2"></i>Comprehensive Security Scan
+                        </h4>
+                        <p class="text-white mb-3" style="opacity: 0.9;">
+                            Scans dependencies and source code for vulnerabilities, security issues, and CVEs.
+                            Real-time progress updates with detailed results.
+                        </p>
+                        <?php if (!$snyk_available || !$snyk_authenticated): ?>
+                            <div class="alert alert-warning mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <?php if (!$snyk_available): ?>
+                                    <strong>Snyk not installed.</strong> Install Snyk using the configuration section above.
+                                <?php else: ?>
+                                    <strong>Not authenticated.</strong> Configure your Snyk API key in the configuration section above.
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <form method="post">
+                            <input type="hidden" name="action" value="scan_all">
+                            <button type="submit" class="btn btn-light btn-lg" style="min-width: 200px;" <?php echo (!$snyk_available || !$snyk_authenticated) ? 'disabled' : ''; ?>>
+                                <i class="fas fa-play-circle me-2"></i>Run Security Scan
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <h5 class="text-center mb-3">Code Analysis</h5>
-                <p class="text-center small">
-                    Static analysis to find security issues in your source code
-                </p>
-                <form method="post" class="text-center">
-                    <input type="hidden" name="action" value="scan_code">
-                    <button type="submit" class="btn btn-success" <?php echo (!$snyk_available || !$snyk_authenticated) ? 'disabled' : ''; ?>>
-                        <i class="fas fa-search me-2"></i>Scan Code
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="security-card">
-                <div class="text-center mb-3">
-                    <i class="fas fa-bell fa-3x text-warning"></i>
-                </div>
-                <h5 class="text-center mb-3">Continuous Monitoring</h5>
-                <p class="text-center small">
-                    Monitor project for new vulnerabilities over time
-                </p>
-                <form method="post" class="text-center">
-                    <input type="hidden" name="action" value="monitor">
-                    <button type="submit" class="btn btn-warning" <?php echo (!$snyk_available || !$snyk_authenticated) ? 'disabled' : ''; ?>>
-                        <i class="fas fa-bell me-2"></i>Enable Monitoring
-                    </button>
-                </form>
             </div>
         </div>
     </div>
