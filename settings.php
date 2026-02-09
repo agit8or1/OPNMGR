@@ -8,8 +8,13 @@ require_once __DIR__ . '/inc/csrf.php';
 $notice = '';
 $logoUrl = '/assets/img/logo.png';
 
+// Check for notice in URL parameter (from redirects)
+if (!empty($_GET['notice'])) {
+  $notice = $_GET['notice'];
+}
+
 // load settings
-$rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = $DB->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
 $acme_domain = $rows['acme_domain'] ?? '';
 $acme_email = $rows['acme_email'] ?? '';
@@ -21,6 +26,9 @@ $smtp_encryption = $rows['smtp_encryption'] ?? 'tls';
 $proxy_port_start = $rows['proxy_port_start'] ?? '8100';
 $proxy_port_end = $rows['proxy_port_end'] ?? '8199';
 $backup_retention_months = $rows['backup_retention_months'] ?? '2';
+$backup_retention_type = $rows['backup_retention_type'] ?? 'count';
+$backup_min_keep = $rows['backup_min_keep'] ?? '30';
+$backup_max_keep = $rows['backup_max_keep'] ?? '90';
 
 // helpers
 function save_setting($DB,$k,$v){
@@ -31,6 +39,17 @@ function save_setting($DB,$k,$v){
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_verify($_POST['csrf'] ?? '')) { $notice = 'Bad CSRF'; }
   else {
+    // General Settings (Timezone)
+    if (!empty($_POST['save_general'])) {
+      $timezone = trim($_POST['timezone'] ?? 'UTC');
+      if (in_array($timezone, timezone_identifiers_list())) {
+        $_SESSION['display_timezone'] = $timezone;
+        save_setting($DB, 'system_timezone', $timezone);
+        $notice = 'General settings saved.';
+      } else {
+        $notice = 'Invalid timezone selected.';
+      }
+    }
     // Branding save
     if (!empty($_POST['save_brand'])) {
       $brand = trim($_POST['brand'] ?? $brand);
@@ -92,15 +111,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Backup retention settings actions
     if (!empty($_POST['save_backup_retention'])) {
-      $backup_retention_months_input = (int)trim($_POST['backup_retention_months'] ?? '2');
+      error_log("BACKUP RETENTION SAVE: POST data: " . json_encode($_POST));
+      $retention_type = trim($_POST['backup_retention_type'] ?? 'count');
+      error_log("BACKUP RETENTION: type=$retention_type");
       
-      // Validate: between 1 and 6 months
-      if ($backup_retention_months_input < 1 || $backup_retention_months_input > 6) {
-        $notice = 'Backup retention must be between 1 and 6 months.';
+      if ($retention_type === 'time') {
+        $backup_retention_months_input = (int)trim($_POST['backup_retention_months'] ?? '2');
+        
+        // Validate: between 1 and 6 months
+        if ($backup_retention_months_input < 1 || $backup_retention_months_input > 6) {
+          $notice = 'Backup retention must be between 1 and 6 months.';
+        } else {
+          save_setting($DB,'backup_retention_type', 'time');
+          save_setting($DB,'backup_retention_months', $backup_retention_months_input);
+          $backup_retention_type = 'time';
+          $backup_retention_months = $backup_retention_months_input;
+          header('Location: /settings.php?notice=' . urlencode("Backup retention set to $backup_retention_months_input months."));
+          exit;
+        }
       } else {
-        save_setting($DB,'backup_retention_months', $backup_retention_months_input);
-        $backup_retention_months = $backup_retention_months_input; // Update the variable
-        $notice = "Backup retention set to $backup_retention_months months.";
+        // Count-based retention
+        $min_keep = (int)trim($_POST['backup_min_keep'] ?? '30');
+        $max_keep = (int)trim($_POST['backup_max_keep'] ?? '90');
+        
+        // Validate
+        if ($min_keep < 10 || $min_keep > 100) {
+          $notice = 'Minimum backups must be between 10 and 100.';
+        } elseif ($max_keep < 20 || $max_keep > 200) {
+          $notice = 'Maximum backups must be between 20 and 200.';
+        } elseif ($min_keep >= $max_keep) {
+          $notice = 'Minimum must be less than maximum.';
+        } else {
+          save_setting($DB,'backup_retention_type', 'count');
+          save_setting($DB,'backup_min_keep', $min_keep);
+          save_setting($DB,'backup_max_keep', $max_keep);
+          $backup_retention_type = 'count';
+          $backup_min_keep = $min_keep;
+          $backup_max_keep = $max_keep;
+          header('Location: /settings.php?notice=' . urlencode("Backup retention set to keep last $min_keep-$max_keep backups per firewall."));
+          exit;
+        }
       }
     }
     
@@ -179,182 +229,194 @@ if (!empty($fbin)) {
 include __DIR__ . '/inc/header.php';
 ?>
 <h4>Settings</h4>
-<div class="row g-4">
-  <div class="col-md-4">
+<div class="row g-2">
+  <!-- ACME / Certificates -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-palette fa-3x text-primary"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-certificate fa-2x text-success"></i>
         </div>
-        <h5 class="card-title">Branding</h5>
-        <p class="card-text text-muted">Customize brand name, colors, and logo</p>
-        <a href="branding.php" class="btn btn-primary">
-          <i class="fas fa-arrow-right me-2"></i>Configure
-        </a>
-      </div>
-    </div>
-  </div>
-  
-  <div class="col-md-4">
-    <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-certificate fa-3x text-success"></i>
-        </div>
-        <h5 class="card-title">ACME / Certificates</h5>
-        <p class="card-text text-muted">Manage SSL certificates with Let's Encrypt</p>
-        <a href="acme.php" class="btn btn-success">
-          <i class="fas fa-arrow-right me-2"></i>Configure
-        </a>
-      </div>
-    </div>
-  </div>
-  
-    <div class="col-md-4">
-    <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-envelope fa-3x text-info"></i>
-        </div>
-        <h5 class="card-title">SMTP Settings</h5>
-        <p class="card-text text-light">Configure email server settings</p>
-        <a href="smtp_settings.php" class="btn btn-info">
-          <i class="fas fa-arrow-right me-2"></i>Configure
-        </a>
-      </div>
-    </div>
-  </div>
-  
-  <div class="col-md-4">
-    <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-bell fa-3x text-warning"></i>
-        </div>
-        <h5 class="card-title">Alert Settings</h5>
-        <p class="card-text text-light">Configure email and Pushover alerts</p>
-        <a href="alerts.php" class="btn btn-warning">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">ACME / Certificates</h6>
+        <p class="card-text text-muted small">SSL certificates</p>
+        <a href="acme.php" class="btn btn-success btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- Alert Settings -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-shield-alt fa-3x text-danger"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-bell fa-2x text-warning"></i>
         </div>
-        <h5 class="card-title">Fail2Ban</h5>
-        <p class="card-text text-muted">Configure brute-force protection and IP blocking</p>
-        <a href="fail2ban.php" class="btn btn-danger">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">Alert Settings</h6>
+        <p class="card-text text-muted small">Email alerts</p>
+        <a href="alerts.php" class="btn btn-warning btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
-  
-  <div class="col-md-4">
+
+  <!-- Backup Retention -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-database fa-3x text-primary"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-database fa-2x text-primary"></i>
         </div>
-        <h5 class="card-title">Backup Retention</h5>
-        <p class="card-text text-light">Manage automated backup retention</p>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#backupRetentionModal">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">Backup Retention</h6>
+        <p class="card-text text-muted small">Backup settings</p>
+        <button class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#backupRetentionModal">
+          <i class="fas fa-cog me-1"></i>Configure
         </button>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- Branding -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-shield-alt fa-3x text-danger"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-palette fa-2x text-info"></i>
         </div>
-        <h5 class="card-title">Security Scanner</h5>
-        <p class="card-text text-light">Snyk vulnerability scanning and code analysis</p>
-        <a href="security_scan.php" class="btn btn-danger">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">Branding</h6>
+        <p class="card-text text-muted small">Colors & logo</p>
+        <a href="branding.php" class="btn btn-info btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- Fail2Ban -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-globe fa-3x text-info"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-shield-alt fa-2x text-danger"></i>
         </div>
-        <h5 class="card-title">GeoIP Blocking</h5>
-        <p class="card-text text-muted">Block traffic from specific countries</p>
-        <a href="geoip.php" class="btn btn-info">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">Fail2Ban</h6>
+        <p class="card-text text-muted small">IP blocking</p>
+        <a href="fail2ban.php" class="btn btn-danger btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- GeoIP Blocking -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-key fa-3x text-warning"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-globe fa-2x text-danger"></i>
         </div>
-        <h5 class="card-title">License Management</h5>
-        <p class="card-text text-muted">View and manage software licenses</p>
-        <a href="license.php" class="btn btn-warning">
-          <i class="fas fa-arrow-right me-2"></i>View License
+        <h6 class="card-title">GeoIP Blocking</h6>
+        <p class="card-text text-muted small">Country-based blocking</p>
+        <a href="geoip_blocking.php" class="btn btn-danger btn-sm w-100">
+          <i class="fas fa-ban me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- General Settings -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-network-wired fa-3x text-success"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-cog fa-2x text-secondary"></i>
         </div>
-        <h5 class="card-title">Tunnel Management</h5>
-        <p class="card-text text-muted">Manage SSH tunnels and proxy connections</p>
-        <a href="proxy_settings.php" class="btn btn-success">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">General Settings</h6>
+        <p class="card-text text-muted small">Timezone & preferences</p>
+        <a href="#generalSettings" data-bs-toggle="modal" class="btn btn-secondary btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- License Management -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-clock fa-3x text-primary"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-key fa-2x text-warning"></i>
         </div>
-        <h5 class="card-title">General Settings</h5>
-        <p class="card-text text-muted">Timezone, preferences, and system settings</p>
-        <a href="branding.php" class="btn btn-primary">
-          <i class="fas fa-arrow-right me-2"></i>Configure
+        <h6 class="card-title">License Management</h6>
+        <p class="card-text text-muted small">View installed license</p>
+        <button class="btn btn-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#licenseManagementModal" onclick="loadLicenseData()">
+          <i class="fas fa-info-circle me-1"></i>View License
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SMTP Settings -->
+  <div class="col-md-3">
+    <div class="card card-dark h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-envelope fa-2x text-info"></i>
+        </div>
+        <h6 class="card-title">SMTP Settings</h6>
+        <p class="card-text text-muted small">Email server</p>
+        <a href="smtp_settings.php" class="btn btn-info btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
         </a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-4">
+  <!-- System Backup & Restore -->
+  <div class="col-md-3">
     <div class="card card-dark h-100">
-      <div class="card-body text-center">
-        <div class="mb-3">
-          <i class="fas fa-database fa-3x text-info"></i>
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-archive fa-2x text-success"></i>
         </div>
-        <h5 class="card-title">System Backup</h5>
-        <p class="card-text text-muted">Backup and restore system configuration</p>
-        <a href="backups.php" class="btn btn-info">
-          <i class="fas fa-arrow-right me-2"></i>Manage Backups
+        <h6 class="card-title">System Backup</h6>
+        <p class="card-text text-muted small">Backup & restore</p>
+        <a href="system_backup.php" class="btn btn-success btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tunnel Management -->
+  <div class="col-md-3">
+    <div class="card card-dark h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-network-wired fa-2x text-info"></i>
+        </div>
+        <h6 class="card-title">Tunnel Management</h6>
+        <p class="card-text text-muted small">SSH tunnels</p>
+        <button class="btn btn-info btn-sm w-100" data-bs-toggle="modal" data-bs-target="#tunnelManagementModal" onclick="loadTunnelData()">
+          <i class="fas fa-network-wired me-1"></i>Manage
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security Scanner (Snyk) -->
+  <div class="col-md-3">
+    <div class="card card-dark h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-shield-alt fa-2x text-danger"></i>
+        </div>
+        <h6 class="card-title">Security Scanner</h6>
+        <p class="card-text text-muted small">Snyk vulnerability scanning</p>
+        <a href="security_scan.php" class="btn btn-danger btn-sm w-100">
+          <i class="fas fa-shield-alt me-1"></i>Open Dashboard
         </a>
       </div>
     </div>
@@ -378,16 +440,56 @@ include __DIR__ . '/inc/header.php';
 .card-title {
   color: #fff;
   margin-bottom: 0.5rem;
+  font-size: 0.95rem;
 }
 
 .card-text {
   color: #adb5bd;
+  font-size: 0.85rem;
+}
+
+.card-dark .btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.card-dark .btn-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.card-dark .btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.card-dark .btn-success:hover {
+  background-color: #00c853 !important;
+}
+
+.card-dark .btn-warning:hover {
+  background-color: #ffb300 !important;
+}
+
+.card-dark .btn-primary:hover {
+  background-color: #00d4d4 !important;
+}
+
+.card-dark .btn-info:hover {
+  background-color: #00bcd4 !important;
+}
+
+.card-dark .btn-danger:hover {
+  background-color: #ff5252 !important;
 }
 
 .btn-primary {
   background-color: #00d4c4;
   border-color: #00d4c4;
 }
+</style>
 
 .btn-primary:hover {
   background-color: #00b8a6;
@@ -416,6 +518,48 @@ include __DIR__ . '/inc/header.php';
   color: #212529;
 }
 </style>
+
+<!-- General Settings Modal -->
+<div class="modal fade" id="generalSettings" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark border-secondary">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title text-light">
+          <i class="fas fa-cog me-2 text-info"></i>General Settings
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        <div class="modal-body">
+          <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
+          <div class="mb-4">
+            <label for="timezone" class="form-label text-light fw-bold">
+              <i class="fas fa-globe me-2 text-info"></i>Display Timezone
+            </label>
+            <select id="timezone" name="timezone" class="form-select bg-secondary text-light border-secondary" style="color: #fff !important;">
+              <?php
+              $current_tz = $_SESSION['display_timezone'] ?? 'America/New_York';
+              foreach (timezone_identifiers_list() as $tz) {
+                $selected = ($tz === $current_tz) ? 'selected' : '';
+                echo "<option value=\"$tz\" $selected>$tz</option>";
+              }
+              ?>
+            </select>
+            <small class="form-text text-muted d-block mt-2">Select your timezone for displaying times throughout the system</small>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">
+            <i class="fas fa-times me-2"></i>Cancel
+          </button>
+          <button type="submit" name="save_general" class="btn btn-info">
+            <i class="fas fa-save me-2"></i>Save Settings
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <!-- SMTP Configuration Modal -->
 <div class="modal fade" id="smtpModal" tabindex="-1">
@@ -481,18 +625,47 @@ include __DIR__ . '/inc/header.php';
           <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
           <div class="alert alert-info bg-opacity-25">
             <i class="fas fa-info-circle me-2"></i>
-            Configure how long to keep firewall configuration backups. Older backups will be automatically deleted during the nightly backup process.
+            Configure backup retention policy. Choose between time-based (keep for X months) or count-based (keep last N backups per firewall).
           </div>
+          
           <div class="mb-3">
-            <label for="backup_retention_months" class="form-label">Retention Period (Months)</label>
-            <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_retention_months" name="backup_retention_months"
-                   value="<?php echo htmlspecialchars($backup_retention_months); ?>"
-                   min="1" max="6" step="1" required>
-            <div class="form-text text-light-emphasis">Keep backups for 1-6 months (default: 2 months)</div>
+            <label class="form-label">Retention Type</label>
+            <select class="form-control bg-dark text-light border-secondary" name="backup_retention_type" id="backup_retention_type" onchange="toggleRetentionType()">
+              <option value="count" <?php echo $backup_retention_type === 'count' ? 'selected' : ''; ?>>Count-Based (Keep Last N Backups)</option>
+              <option value="time" <?php echo $backup_retention_type === 'time' ? 'selected' : ''; ?>>Time-Based (Keep for X Months)</option>
+            </select>
           </div>
+          
+          <div id="count_retention" style="display: <?php echo $backup_retention_type === 'count' ? 'block' : 'none'; ?>;">
+            <div class="mb-3">
+              <label for="backup_min_keep" class="form-label">Minimum Backups to Keep</label>
+              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_min_keep" name="backup_min_keep"
+                     value="<?php echo htmlspecialchars($backup_min_keep); ?>"
+                     min="10" max="100" step="1">
+              <div class="form-text text-light-emphasis">Always keep at least this many backups per firewall (10-100)</div>
+            </div>
+            <div class="mb-3">
+              <label for="backup_max_keep" class="form-label">Maximum Backups to Keep</label>
+              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_max_keep" name="backup_max_keep"
+                     value="<?php echo htmlspecialchars($backup_max_keep); ?>"
+                     min="20" max="200" step="1">
+              <div class="form-text text-light-emphasis">Delete oldest backups when count exceeds this (20-200)</div>
+            </div>
+          </div>
+          
+          <div id="time_retention" style="display: <?php echo $backup_retention_type === 'time' ? 'block' : 'none'; ?>;">
+            <div class="mb-3">
+              <label for="backup_retention_months" class="form-label">Retention Period (Months)</label>
+              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_retention_months" name="backup_retention_months"
+                     value="<?php echo htmlspecialchars($backup_retention_months); ?>"
+                     min="1" max="6" step="1">
+              <div class="form-text text-light-emphasis">Keep backups for 1-6 months</div>
+            </div>
+          </div>
+          
           <div class="alert alert-warning bg-opacity-25">
             <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>Note:</strong> Backups older than the retention period will be permanently deleted. This helps manage disk space.
+            <strong>Note:</strong> Old backups will be permanently deleted during nightly cleanup. This helps manage disk space.
           </div>
         </div>
         <div class="modal-footer border-secondary">
@@ -503,6 +676,24 @@ include __DIR__ . '/inc/header.php';
     </div>
   </div>
 </div>
+
+<script>
+function toggleRetentionType() {
+  const type = document.getElementById('backup_retention_type').value;
+  document.getElementById('count_retention').style.display = type === 'count' ? 'block' : 'none';
+  document.getElementById('time_retention').style.display = type === 'time' ? 'block' : 'none';
+}
+
+// Ensure correct fields are shown when modal opens
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('backupRetentionModal');
+  if (modal) {
+    modal.addEventListener('shown.bs.modal', function() {
+      toggleRetentionType();
+    });
+  }
+});
+</script>
 
 <script>
 // Debug: Test Bootstrap modal functionality
@@ -529,6 +720,518 @@ include __DIR__ . '/inc/header.php';
     z-index: 1061 !important;
 }
 </style>
+
+<!-- Tunnel Management Modal -->
+<div class="modal fade" id="tunnelManagementModal" tabindex="-1" aria-labelledby="tunnelManagementModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="tunnelManagementModalLabel">
+          <i class="fas fa-network-wired me-2"></i>Tunnel Management
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info bg-opacity-25 mb-3">
+          <i class="fas fa-info-circle me-2"></i>
+          <strong>Tunnel System Status:</strong> This interface shows all SSH tunnels (active and zombie) and their nginx HTTPS proxy configurations.
+          Use the Master Reset to clean up everything if tunnels get stuck.
+        </div>
+        
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card bg-secondary">
+              <div class="card-body text-center">
+                <h3 id="summary-total" class="mb-0">-</h3>
+                <small class="text-muted">Total Sessions</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-success">
+              <div class="card-body text-center">
+                <h3 id="summary-active" class="mb-0">-</h3>
+                <small>Active Tunnels</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-danger">
+              <div class="card-body text-center">
+                <h3 id="summary-zombies" class="mb-0">-</h3>
+                <small>Zombie Tunnels</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-warning">
+              <div class="card-body text-center">
+                <h3 id="summary-incomplete" class="mb-0">-</h3>
+                <small>Incomplete</small>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="d-flex gap-2 mb-3">
+          <button class="btn btn-danger" onclick="resetAllTunnels()">
+            <i class="fas fa-power-off me-2"></i>Master Reset (Kill All)
+          </button>
+          <button class="btn btn-warning" onclick="cleanupZombies()">
+            <i class="fas fa-broom me-2"></i>Cleanup Zombies Only
+          </button>
+          <button class="btn btn-primary" onclick="loadTunnelData()">
+            <i class="fas fa-sync me-2"></i>Refresh
+          </button>
+        </div>
+        
+        <!-- Tunnels Table -->
+        <div class="table-responsive">
+          <table class="table table-dark table-striped table-hover">
+            <thead>
+              <tr>
+                <th>Session</th>
+                <th>Firewall</th>
+                <th>Ports</th>
+                <th>Status</th>
+                <th>Age</th>
+                <th>SSH</th>
+                <th>Nginx</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tunnels-table-body">
+              <tr>
+                <td colspan="8" class="text-center">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- License Management Modal -->
+<div class="modal fade" id="licenseManagementModal" tabindex="-1" aria-labelledby="licenseManagementModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title" id="licenseManagementModalLabel">
+          <i class="fas fa-certificate me-2"></i>License Management
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="licenseContent">
+          <div class="text-center">
+            <div class="spinner-border text-warning" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading license information...</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let tunnelRefreshInterval;
+
+function loadTunnelData() {
+    fetch('/api/tunnel_reset.php?action=status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateTunnelDisplay(data.data);
+            } else {
+                console.error('Error loading tunnel data:', data.error);
+                showError('Failed to load tunnel data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Network error loading tunnel data');
+        });
+}
+
+function updateTunnelDisplay(data) {
+    // Update summary cards
+    const total = data.ssh_tunnels.length + data.db_sessions.filter(s => {
+        return !data.ssh_tunnels.find(t => t.session_id === s.id);
+    }).length;
+    
+    document.getElementById('summary-total').textContent = total;
+    document.getElementById('summary-active').textContent = data.db_sessions.length;
+    document.getElementById('summary-zombies').textContent = data.zombie_count;
+    document.getElementById('summary-incomplete').textContent = 
+        data.ssh_tunnels.filter(t => !t.is_zombie && !data.nginx_listening.includes(String(parseInt(t.port) - 1))).length;
+    
+    // Build combined tunnel list
+    const tbody = document.getElementById('tunnels-table-body');
+    
+    if (data.ssh_tunnels.length === 0 && data.db_sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted"><i class="fas fa-check-circle text-success me-2"></i>No active tunnels - system clean</td></tr>';
+        return;
+    }
+    
+    // Create map of session IDs to data
+    const sessionMap = new Map();
+    
+    // Add SSH tunnels
+    data.ssh_tunnels.forEach(tunnel => {
+        const sessionId = tunnel.session_id || 'unknown';
+        const httpsPort = parseInt(tunnel.port) - 1;
+        const hasNginx = data.nginx_listening.includes(String(httpsPort));
+        
+        if (!sessionMap.has(sessionId)) {
+            sessionMap.set(sessionId, {
+                session_id: sessionId,
+                firewall_id: tunnel.firewall_id,
+                tunnel_port: tunnel.port,
+                https_port: httpsPort,
+                status: tunnel.status,
+                created_at: tunnel.created_at,
+                is_zombie: tunnel.is_zombie,
+                has_ssh: true,
+                has_nginx: hasNginx,
+                ssh_pid: tunnel.pid
+            });
+        }
+    });
+    
+    // Add DB sessions without SSH tunnels
+    data.db_sessions.forEach(session => {
+        if (!sessionMap.has(session.id)) {
+            const httpsPort = parseInt(session.tunnel_port) - 1;
+            const hasNginx = data.nginx_listening.includes(String(httpsPort));
+            
+            sessionMap.set(session.id, {
+                session_id: session.id,
+                firewall_id: session.firewall_id,
+                tunnel_port: session.tunnel_port,
+                https_port: httpsPort,
+                status: session.status,
+                created_at: session.created_at,
+                is_zombie: false,
+                has_ssh: false,
+                has_nginx: hasNginx,
+                ssh_pid: null
+            });
+        }
+    });
+    
+    // Convert to array and sort
+    const tunnels = Array.from(sessionMap.values()).sort((a, b) => b.session_id - a.session_id);
+    
+    tbody.innerHTML = tunnels.map(tunnel => {
+        // Calculate age
+        const age = tunnel.created_at ? 
+            Math.round((new Date() - new Date(tunnel.created_at)) / 60000) : '?';
+        
+        // Status badge
+        let statusBadge;
+        if (tunnel.is_zombie) {
+            statusBadge = '<span class="badge bg-danger"><i class="fas fa-skull me-1"></i>ZOMBIE</span>';
+        } else if (tunnel.status === 'active') {
+            if (!tunnel.has_ssh || !tunnel.has_nginx) {
+                statusBadge = '<span class="badge bg-warning"><i class="fas fa-exclamation-triangle me-1"></i>INCOMPLETE</span>';
+            } else {
+                statusBadge = '<span class="badge bg-success"><i class="fas fa-check me-1"></i>ACTIVE</span>';
+            }
+        } else {
+            statusBadge = '<span class="badge bg-secondary">CLOSED</span>';
+        }
+        
+        // SSH indicator
+        const sshIcon = tunnel.has_ssh
+            ? `<span class="text-success" title="PID: ${tunnel.ssh_pid}"><i class="fas fa-check-circle"></i></span>` 
+            : '<span class="text-danger"><i class="fas fa-times-circle"></i></span>';
+        
+        // Nginx indicator  
+        const nginxIcon = tunnel.has_nginx
+            ? '<span class="text-success"><i class="fas fa-check-circle"></i></span>' 
+            : '<span class="text-danger"><i class="fas fa-times-circle"></i></span>';
+        
+        // Action button
+        let actions = '';
+        if (tunnel.has_ssh) {
+            actions += `<button class="btn btn-sm btn-danger me-1" onclick="killTunnel(${tunnel.ssh_pid})" title="Kill SSH tunnel">
+                         <i class="fas fa-skull-crossbones"></i>
+                       </button>`;
+        }
+        
+        const rowClass = tunnel.is_zombie ? 'table-danger' : 
+                        (!tunnel.has_ssh || !tunnel.has_nginx) && tunnel.status === 'active' ? 'table-warning' : '';
+        
+        return `
+            <tr class="${rowClass}">
+                <td><span class="badge bg-secondary">#${tunnel.session_id}</span></td>
+                <td>
+                    <div class="fw-bold">FW ${tunnel.firewall_id || '?'}</div>
+                </td>
+                <td>
+                    <div><span class="badge bg-info">SSH: ${tunnel.tunnel_port}</span></div>
+                    <div><span class="badge bg-primary">HTTPS: ${tunnel.https_port}</span></div>
+                </td>
+                <td>${statusBadge}</td>
+                <td>${age} min</td>
+                <td class="text-center">${sshIcon}</td>
+                <td class="text-center">${nginxIcon}</td>
+                <td>${actions || '<span class="text-muted">-</span>'}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function resetAllTunnels() {
+    if (!confirm('⚠️ MASTER RESET - This will:\n\n' +
+                 '• Kill ALL SSH tunnels (via kill -9)\n' +
+                 '• Remove ALL nginx tunnel configs\n' +
+                 '• Close ALL sessions in database\n' +
+                 '• Clear firewall tunnel ports\n\n' +
+                 '⚠️ Users will be disconnected from firewall UIs!\n\n' +
+                 'Continue?')) {
+        return;
+    }
+    
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Resetting...';
+    
+    fetch('/api/tunnel_reset.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'action=reset_all'
+    })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            
+            if (data.success) {
+                const log = data.log.join('\n');
+                alert('✓ MASTER RESET COMPLETE\n\n' + log);
+                loadTunnelData();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to reset tunnels');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
+}
+
+function cleanupZombies() {
+    if (!confirm('Clean up zombie tunnels only?\n\n' +
+                 'This will kill SSH tunnels that have no active session in the database.')) {
+        return;
+    }
+    
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cleaning...';
+    
+    // Get current status first
+    fetch('/api/tunnel_reset.php?action=status')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error('Failed to get tunnel status');
+            }
+            
+            const zombies = data.data.ssh_tunnels.filter(t => t.is_zombie);
+            if (zombies.length === 0) {
+                alert('✓ No zombie tunnels found! System is clean.');
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+                return;
+            }
+            
+            // Kill each zombie
+            let killed = 0;
+            const promises = zombies.map(tunnel => 
+                fetch('/api/tunnel_reset.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `action=kill_tunnel&pid=${tunnel.pid}`
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) killed++;
+                    return result;
+                })
+            );
+            
+            Promise.all(promises).then(() => {
+                alert(`✓ Zombie Cleanup Complete\n\nKilled ${killed} of ${zombies.length} zombie tunnels`);
+                loadTunnelData();
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to cleanup zombies: ' + error.message);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
+}
+
+function killTunnel(pid) {
+    if (!confirm(`Kill SSH tunnel (PID ${pid})?`)) {
+        return;
+    }
+    
+    fetch('/api/tunnel_reset.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `action=kill_tunnel&pid=${pid}`
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess('Tunnel killed successfully');
+                loadTunnelData();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Network error');
+        });
+}
+
+function showSuccess(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function showError(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function loadLicenseData() {
+    fetch('/api/check_license_status.php')
+        .then(response => response.json())
+        .then(data => {
+            let html = '';
+            
+            if (data.success && data.licenses && data.licenses.length > 0) {
+                html = '<div class="alert alert-info bg-opacity-25 mb-3">';
+                html += '<i class="fas fa-info-circle me-2"></i>';
+                html += 'Active deployment licenses: ' + data.licenses.length;
+                html += '</div>';
+                
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm table-dark">';
+                html += '<thead><tr>';
+                html += '<th>Instance Name</th>';
+                html += '<th>Tier</th>';
+                html += '<th>Max Firewalls</th>';
+                html += '<th>Status</th>';
+                html += '<th>Expires</th>';
+                html += '</tr></thead>';
+                html += '<tbody>';
+                
+                data.licenses.forEach(license => {
+                    const statusColor = license.status === 'active' ? 'success' : (license.status === 'trial' ? 'warning' : 'danger');
+                    const expiryDate = new Date(license.license_expires);
+                    const isExpired = expiryDate < new Date();
+                    const expiryColor = isExpired ? 'danger' : (expiryDate < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'warning' : 'success');
+                    
+                    html += '<tr>';
+                    html += '<td><strong>' + license.instance_name + '</strong></td>';
+                    html += '<td><span class="badge bg-info">' + license.license_tier + '</span></td>';
+                    html += '<td>' + license.max_firewalls + '</td>';
+                    html += '<td><span class="badge bg-' + statusColor + '">' + license.status.toUpperCase() + '</span></td>';
+                    html += '<td><span class="badge bg-' + expiryColor + '">' + expiryDate.toLocaleDateString() + '</span></td>';
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table></div>';
+            } else {
+                html = '<div class="alert alert-warning">';
+                html += '<i class="fas fa-exclamation-triangle me-2"></i>';
+                html += 'No active licenses found. Visit License Management to create one.';
+                html += '</div>';
+            }
+            
+            document.getElementById('licenseContent').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading license data:', error);
+            document.getElementById('licenseContent').innerHTML = '<div class="alert alert-danger">Failed to load license data</div>';
+        });
+}
+
+// Auto-refresh when modal is open
+document.getElementById('tunnelManagementModal')?.addEventListener('shown.bs.modal', function() {
+    loadTunnelData();
+    tunnelRefreshInterval = setInterval(loadTunnelData, 5000);
+});
+
+document.getElementById('tunnelManagementModal')?.addEventListener('hidden.bs.modal', function() {
+    if (tunnelRefreshInterval) {
+        clearInterval(tunnelRefreshInterval);
+        tunnelRefreshInterval = null;
+    }
+});
+
+function killTunnel(sessionId) {
+    if (!confirm(`Kill tunnel for session ${sessionId}?`)) {
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('session_id', sessionId);
+    
+    fetch('/api/tunnel_management.php?action=kill_tunnel', {
+        method: 'POST',
+        body: formData
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadTunnelData();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to kill tunnel');
+        });
+}
+</script>
 
 <?php include __DIR__ . "/inc/footer.php"; ?>
 
