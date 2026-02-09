@@ -140,37 +140,44 @@ if ($DB) {
 </div>
 
 <style>
-/* Fix Leaflet map container to prevent layout issues */
+/* Fix Leaflet map container to prevent tile fragmentation */
 #networkMap {
     overflow: hidden !important;
     position: relative !important;
     width: 100% !important;
     height: 400px !important;
+    clip-path: inset(0) !important;
+}
+#networkMap * {
+    box-sizing: border-box !important;
 }
 #networkMap .leaflet-container {
     background: #1a1f2e !important;
     width: 100% !important;
     height: 100% !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
+    overflow: hidden !important;
 }
-#networkMap .leaflet-tile-container,
 #networkMap .leaflet-pane,
-#networkMap .leaflet-map-pane {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
-    max-height: 400px !important;
+#networkMap .leaflet-map-pane,
+#networkMap .leaflet-tile-pane,
+#networkMap .leaflet-overlay-pane,
+#networkMap .leaflet-marker-pane {
+    clip-path: inset(0) !important;
+    overflow: hidden !important;
+}
+#networkMap .leaflet-tile-container {
+    overflow: hidden !important;
+    transform: none !important;
 }
 #networkMap .leaflet-tile {
-    max-width: 256px !important;
-    max-height: 256px !important;
+    image-rendering: auto !important;
+    display: block !important;
 }
 /* Ensure card-body contains the map properly */
 .card-body:has(#networkMap) {
     padding: 0 !important;
     overflow: hidden !important;
+    position: relative !important;
 }
 </style>
 
@@ -229,17 +236,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Initialize Network Map
-    const map = L.map('networkMap').setView([39.0997, -94.5786], 4);
+    // Initialize Network Map with delay to ensure container is ready
+    setTimeout(function() {
+        const map = L.map('networkMap', {
+            zoomControl: true,
+            attributionControl: true,
+            scrollWheelZoom: true,
+            dragging: true,
+            touchZoom: true,
+            doubleClickZoom: true,
+            boxZoom: true,
+            tap: true,
+            keyboard: true,
+            zoomAnimation: true,
+            fadeAnimation: true,
+            markerZoomAnimation: true
+        }).setView([39.0997, -94.5786], 4);
 
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18
-    }).addTo(map);
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            minZoom: 2,
+            tileSize: 256,
+            updateWhenIdle: false,
+            updateWhenZooming: false,
+            keepBuffer: 2
+        }).addTo(map);
 
-    // Define custom icons
-    const serverIcon = L.divIcon({
+        // Force map to invalidate size after render
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 100);
+
+        // Define custom icons
+        const serverIcon = L.divIcon({
         className: 'custom-div-icon',
         html: '<div style="background-color: #3b82f6; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center;"><i class="fas fa-server" style="color: white; font-size: 14px;"></i></div>',
         iconSize: [30, 30],
@@ -326,6 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error loading map data:', error);
         });
+    }, 250); // End setTimeout for map initialization
 });
 
 // Auto-refresh functionality
