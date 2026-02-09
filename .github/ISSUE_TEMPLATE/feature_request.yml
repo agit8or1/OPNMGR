@@ -1,0 +1,87 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Your ideas help make OPNsense Manager better.
+
+        **💡 Mockups and visual examples are very helpful!**
+        - Drag and drop mockup images or screenshots from similar apps
+        - Show us what you're envisioning!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem would this feature solve? Is your feature request related to a problem?
+      placeholder: |
+        Example: "I'm always frustrated when I need to..."
+        Example: "It's difficult to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: A clear and concise description of what you want to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups / Screenshots
+      description: |
+        **Drag and drop mockups, wireframes, or reference screenshots here!**
+
+        Visual examples help us understand your vision. You can:
+        - Upload hand-drawn sketches
+        - Share screenshots from similar features in other apps
+        - Create mockups using design tools
+      placeholder: Drag and drop mockups/screenshots here
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or features?
+      placeholder: Describe any alternative solutions or features you've considered
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would be useful
+        - Important
+        - Critical
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / User Story
+      description: Describe how you would use this feature
+      placeholder: |
+        Example: "As an admin, I want to bulk edit firewall tags so that I can organize 100+ firewalls efficiently"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information about the feature request
+      placeholder: Add any other context, links, or references here

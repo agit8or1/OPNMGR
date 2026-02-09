@@ -1,0 +1,149 @@
+name: Bug Report
+description: Report a bug or issue with OPNsense Manager
+title: "[BUG] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+        **📸 Screenshots and Console Output are extremely helpful!**
+        - Drag and drop screenshots directly into the text areas below
+        - Copy/paste browser console output (F12 → Console tab)
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Tell us what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what should happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: |
+        **Drag and drop screenshots here!**
+
+        Screenshots are incredibly helpful for diagnosing issues. You can paste images directly into this text area or drag and drop multiple screenshots.
+      placeholder: Drag and drop screenshots here, or click to upload
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser Console Output
+      description: |
+        **Please paste any errors from the browser console!**
+
+        To get console output:
+        1. Press F12 to open Developer Tools
+        2. Click the "Console" tab
+        3. Look for red error messages
+        4. Copy and paste them here
+      placeholder: |
+        Paste console errors here. For example:
+
+        Uncaught TypeError: Cannot read property 'xyz' of undefined
+            at main.js:123
+
+        Failed to load resource: the server responded with a status of 500
+      render: javascript
+    validations:
+      required: false
+
+  - type: textarea
+    id: network
+    attributes:
+      label: Network Errors (Optional)
+      description: |
+        **If there are failed API calls, paste them here!**
+
+        To get network errors:
+        1. Press F12 to open Developer Tools
+        2. Click the "Network" tab
+        3. Look for red/failed requests
+        4. Click on them and copy the details
+      placeholder: |
+        Paste failed network requests here. For example:
+
+        Request URL: https://opn.example.com/api/firewalls
+        Status Code: 500 Internal Server Error
+        Response: {"error": "Database connection failed"}
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: OPNsense Manager Version
+      description: What version are you running? (Check "About" page)
+      placeholder: "e.g., 3.2.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: Which browser are you using?
+      options:
+        - Chrome
+        - Firefox
+        - Safari
+        - Edge
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser Version
+      description: What browser version? (Help → About)
+      placeholder: "e.g., Chrome 120.0.6099.109"
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: User Role
+      description: What role is your account?
+      options:
+        - Admin
+        - User
+        - Not logged in
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful
+      placeholder: Add any other context about the problem here

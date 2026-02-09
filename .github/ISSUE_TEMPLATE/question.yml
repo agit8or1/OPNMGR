@@ -1,0 +1,73 @@
+name: Question / Help
+description: Ask a question or get help with OPNsense Manager
+title: "[QUESTION] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help or have a question? We're here to help!
+
+        **📸 Screenshots help us answer your question faster!**
+        - Show us what you're seeing
+        - Include any error messages
+        - Paste browser console output if relevant
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What do you need help with?
+      placeholder: Ask your question here
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to accomplish?
+      placeholder: Describe what you're trying to do and what you've tried so far
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: |
+        **Drag and drop screenshots here!**
+
+        Screenshots help us understand your question better.
+      placeholder: Drag and drop screenshots here
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Browser Console Output (if applicable)
+      description: |
+        If you're seeing errors, paste console output here.
+
+        Press F12 → Console tab → Copy any red error messages
+      placeholder: Paste console errors here
+      render: javascript
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: OPNsense Manager Version
+      description: What version are you running? (Check "About" page)
+      placeholder: "e.g., 3.2.3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Anything else we should know?
+      placeholder: Add any other relevant information here
