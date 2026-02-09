@@ -21,36 +21,35 @@ include __DIR__ . '/inc/header.php';
 ?>
 
 <style>
-/* Force dark text on light backgrounds */
+/* Dark theme text colors */
 h4, h3, h1, h2, h5, h6 {
-    color: #1e293b !important;
+    color: #e2e8f0 !important;
 }
 
 p, td, th, span, strong, small, li {
-    color: #475569 !important;
+    color: #cbd5e1 !important;
 }
 
 .text-muted {
-    color: #64748b !important;
+    color: #94a3b8 !important;
 }
 
 .card-body p {
-    color: #475569 !important;
+    color: #cbd5e1 !important;
 }
 
 .card {
-    color: #1e293b !important;
+    color: #e2e8f0 !important;
 }
 
-/* Stat cards should keep their colored backgrounds with white text */
-.card.bg-primary h1,
-.card.bg-success h1,
-.card.bg-info h1,
-.card.bg-secondary h1,
-.card.bg-primary p,
-.card.bg-success p,
-.card.bg-info p,
-.card.bg-secondary p {
+.card-header {
+    color: #e2e8f0 !important;
+}
+
+.card.bg-primary h1, .card.bg-primary p,
+.card.bg-success h1, .card.bg-success p,
+.card.bg-info h1, .card.bg-info p,
+.card.bg-secondary h1, .card.bg-secondary p {
     color: #ffffff !important;
 }
 </style>

@@ -4,6 +4,7 @@ requireLogin();
 requireAdmin();
 require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/env.php';
+require_once __DIR__ . '/inc/csrf.php';
 
 $page_title = "System Update";
 
