@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
     } else {
         $checkin_interval = (int)($_POST['checkin_interval'] ?? 180);
         $checkin_interval = max(30, min(3600, $checkin_interval));
+        $customer_name = trim($_POST['customer_name'] ?? '');
         $customer_group = trim($_POST['customer_group'] ?? '');
 
         // Handle tags array from multi-select dropdown
@@ -132,8 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 
         try {
             // Update firewall basic fields
-            $stmt = $DB->prepare('UPDATE firewalls SET checkin_interval = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
-            $stmt->execute([$checkin_interval, $customer_group, $allowed_webgui_ips, $id]);
+            $stmt = $DB->prepare('UPDATE firewalls SET checkin_interval = ?, customer_name = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
+            $stmt->execute([$checkin_interval, $customer_name, $customer_group, $allowed_webgui_ips, $id]);
 
             // Handle tags - clear existing and insert new ones
             $stmt = $DB->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
@@ -660,6 +661,14 @@ include __DIR__ . '/inc/header.php';
                                                        value="<?php echo htmlspecialchars($firewall['checkin_interval'] ?? 180); ?>"
                                                        min="30" max="3600">
                                                 <small class="text-light">How often this firewall should check in (30 seconds to 1 hour)</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="customer_name" class="form-label text-white fw-bold">Customer Name</label>
+                                                <input type="text" name="customer_name" id="customer_name" class="form-control"
+                                                       value="<?php echo htmlspecialchars($firewall['customer_name'] ?? ''); ?>"
+                                                       placeholder="Enter customer name">
                                             </div>
                                         </div>
                                         <div class="col-md-4">
