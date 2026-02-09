@@ -183,6 +183,67 @@ p, td, th, span, strong, small, li {
                         </div>
                     </div>
 
+                    <!-- Key Features -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h4><i class="fas fa-star me-2"></i>Key Features</h4>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-brain text-primary me-2"></i>AI-Powered Configuration Analysis
+                                            </h5>
+                                            <p class="card-text">
+                                                Intelligent AI-driven analysis of firewall configurations with automated security recommendations,
+                                                risk assessment, and actionable insights for improving your security posture.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-lock text-danger me-2"></i>One-Click Emergency Lockdown
+                                            </h5>
+                                            <p class="card-text">
+                                                Instantly secure your network with emergency lockdown mode. Blocks all non-essential traffic
+                                                with a single click, perfect for responding to security incidents or threats.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-shield-alt text-success me-2"></i>Security Scanner (Snyk Integration)
+                                            </h5>
+                                            <p class="card-text">
+                                                Continuous vulnerability scanning powered by Snyk. Track and remediate security issues
+                                                with detailed reports showing critical, high, medium, and low severity vulnerabilities.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                <i class="fas fa-network-wired text-info me-2"></i>Centralized Firewall Management
+                                            </h5>
+                                            <p class="card-text">
+                                                Monitor and manage all your OPNsense firewalls from a single interface. Real-time status,
+                                                remote command execution, automated backups, and secure on-demand tunneling.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Recent Changes -->
                     <div class="row">
                         <div class="col-md-12">
