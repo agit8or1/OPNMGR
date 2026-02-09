@@ -345,6 +345,23 @@ include __DIR__ . '/inc/header.php';
     </div>
 
     <!-- Scan Actions -->
+    <?php if (!$snyk_available || !$snyk_authenticated): ?>
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-warning" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Scan buttons are disabled:</strong>
+                    <?php if (!$snyk_available): ?>
+                        Please install Snyk using the "Install Snyk Now" button above.
+                    <?php elseif (!$snyk_authenticated): ?>
+                        Please configure your Snyk API key in the Configuration section above.
+                        <br><small>Don't have a Snyk API key? Get one free at <a href="https://snyk.io/signup" target="_blank" style="color: #856404; text-decoration: underline;">snyk.io/signup</a></small>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="security-card">
