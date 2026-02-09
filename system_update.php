@@ -18,7 +18,7 @@ $local_commit = 'unknown';
 // GitHub configuration
 $github_repo = env('GITHUB_REPO', 'OPNMGR');
 $github_username = env('GITHUB_USERNAME', 'agit8or1');
-$github_token = env('GITHUB_PAT', '');
+// REMOVED: GITHUB_PAT - No longer needed for public repo checks
 
 // Auto-check for updates on page load (not on POST requests)
 $should_check_updates = ($_SERVER['REQUEST_METHOD'] !== 'POST');
@@ -32,12 +32,10 @@ if (isset($_POST['check_updates']) || $should_check_updates) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_USERAGENT, 'OPNsense-Manager');
 
-    if (!empty($github_token)) {
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: token {$github_token}",
-            "Accept: application/vnd.github.v3+json"
-        ]);
-    }
+    // No authentication needed for public repos
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Accept: application/vnd.github.v3+json"
+    ]);
 
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -127,13 +125,8 @@ if (isset($_POST['perform_update'])) {
             $update_log[] = "✓ Stashed local changes";
         }
 
-        // Pull from GitHub
+        // Pull from GitHub (public repo, no auth needed)
         $git_command = 'cd ' . escapeshellarg(__DIR__) . ' && git pull origin main 2>&1';
-
-        if (!empty($github_token)) {
-            $git_command = 'cd ' . escapeshellarg(__DIR__) . ' && git pull https://' . escapeshellarg($github_token) . '@github.com/' . escapeshellarg($github_username) . '/' . escapeshellarg($github_repo) . '.git main 2>&1';
-        }
-
         exec($git_command, $output, $return_code);
 
         if ($return_code === 0) {
@@ -305,10 +298,10 @@ include __DIR__ . '/inc/header.php';
         </div>
     <?php endif; ?>
 
-    <?php if (empty($github_token)): ?>
-        <div class="alert alert-warning">
+    <?php if (false): // Token no longer needed for public repos ?>
+        <div class="alert alert-warning" style="display: none;">
             <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>GitHub Token Not Configured:</strong> Updates from private repositories require a GitHub Personal Access Token.
+            <strong>REMOVED:</strong> GitHub token no longer required.
             Configure <code>GITHUB_PAT</code> in your .env file.
         </div>
     <?php endif; ?>
@@ -350,11 +343,11 @@ include __DIR__ . '/inc/header.php';
                         <span class="badge bg-secondary">main</span>
                     </dd>
 
-                    <dt class="col-sm-4">Token Status:</dt>
+                    <dt class="col-sm-4">Repository:</dt>
                     <dd class="col-sm-8">
-                        <span class="badge bg-<?php echo empty($github_token) ? 'warning' : 'success'; ?>">
-                            <?php echo empty($github_token) ? 'Not Configured' : 'Configured'; ?>
-                        </span>
+                        <a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>" target="_blank">
+                            <?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>
+                        </a>
                     </dd>
                 </dl>
             </div>

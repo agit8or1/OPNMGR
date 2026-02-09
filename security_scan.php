@@ -125,6 +125,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
 
+        case 'update_snyk':
+            // Update Snyk to latest version
+            exec('sudo npm update -g snyk 2>&1', $output, $return_code);
+
+            if ($return_code === 0) {
+                $config_message = '<strong>Snyk updated successfully!</strong><br><br>';
+                $config_message .= 'Snyk has been updated to the latest version.<br>';
+                $config_message .= 'Update output:<br>';
+                $config_message .= '<div class="alert alert-info" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">';
+                $config_message .= htmlspecialchars(implode("\n", $output));
+                $config_message .= '</div>';
+                $config_status = 'success';
+            } else {
+                $config_message = '<strong>Snyk update failed.</strong><br><br>';
+                $config_message .= 'Error output:<br>';
+                $config_message .= '<div class="alert alert-danger" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">';
+                $config_message .= htmlspecialchars(implode("\n", $output));
+                $config_message .= '</div>';
+                $config_message .= 'You can try manually running:<br>';
+                $config_message .= '<code>sudo npm update -g snyk</code>';
+                $config_status = 'danger';
+            }
+            break;
+
         case 'scan_dependencies':
             exec('cd ' . __DIR__ . '/scripts && snyk test --json 2>&1', $output, $return_code);
             $scan_output = implode("\n", $output);
@@ -162,9 +186,27 @@ exec('which snyk 2>&1', $snyk_check, $snyk_installed);
 $snyk_available = ($snyk_installed === 0);
 
 $snyk_authenticated = false;
+$snyk_version = 'Not Installed';
+$snyk_update_available = false;
 if ($snyk_available) {
     exec('snyk config get api 2>&1', $auth_check);
     $snyk_authenticated = !empty($auth_check[0]) && $auth_check[0] !== '';
+
+    // Get current Snyk version
+    exec('snyk --version 2>&1', $version_output);
+    if (!empty($version_output[0])) {
+        $snyk_version = trim($version_output[0]);
+    }
+
+    // Check for Snyk updates
+    exec('npm outdated -g snyk --json 2>&1', $outdated_output);
+    $outdated_json = implode("\n", $outdated_output);
+    if (!empty($outdated_json) && $outdated_json !== '{}') {
+        $outdated_data = json_decode($outdated_json, true);
+        if (isset($outdated_data['snyk'])) {
+            $snyk_update_available = true;
+        }
+    }
 }
 
 // Check if npm is available for installation
@@ -415,7 +457,26 @@ include __DIR__ . '/inc/header.php';
                                             <?php echo $npm_available ? 'Yes' : 'No'; ?>
                                         </span>
                                     </dd>
+
+                                    <?php if ($snyk_available): ?>
+                                        <dt class="col-sm-5">Snyk Version:</dt>
+                                        <dd class="col-sm-7">
+                                            <code class="text-light"><?php echo htmlspecialchars($snyk_version); ?></code>
+                                            <?php if ($snyk_update_available): ?>
+                                                <span class="badge bg-warning ms-2">Update Available</span>
+                                            <?php endif; ?>
+                                        </dd>
+                                    <?php endif; ?>
                                 </dl>
+
+                                <?php if ($snyk_update_available): ?>
+                                    <form method="post" class="mt-3">
+                                        <input type="hidden" name="action" value="update_snyk">
+                                        <button type="submit" class="btn btn-warning btn-sm w-100">
+                                            <i class="fas fa-arrow-up me-2"></i>Update Snyk to Latest Version
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

@@ -12,100 +12,10 @@ $message_type = '';
 // GitHub configuration
 $github_repo = env('GITHUB_REPO', 'OPNMGR');
 $github_username = env('GITHUB_USERNAME', 'agit8or1');
-$github_token = env('GITHUB_PAT', '');
+// REMOVED: GitHub PAT - users should use their own GitHub accounts
 
-// Handle issue creation
-if (isset($_POST['create_issue'])) {
-    $title = trim($_POST['issue_title'] ?? '');
-    $description = trim($_POST['issue_description'] ?? '');
-    $category = $_POST['issue_category'] ?? 'bug';
-
-    if (empty($title) || empty($description)) {
-        $message = 'Title and description are required.';
-        $message_type = 'danger';
-    } else {
-        // Add labels based on category
-        $labels = [$category];
-
-        // Build issue body
-        $issue_body = $description . "\n\n";
-        $issue_body .= "---\n";
-        $issue_body .= "**Environment:**\n";
-        $issue_body .= "- Version: " . (file_exists(__DIR__ . '/VERSION') ? trim(file_get_contents(__DIR__ . '/VERSION')) : 'Unknown') . "\n";
-        $issue_body .= "- PHP Version: " . phpversion() . "\n";
-        $issue_body .= "- OS: " . php_uname('s') . " " . php_uname('r') . "\n";
-        $issue_body .= "- Reported by: " . ($_SESSION['username'] ?? 'Unknown') . "\n";
-
-        // Create GitHub issue via API
-        $api_url = "https://api.github.com/repos/{$github_username}/{$github_repo}/issues";
-
-        $data = [
-            'title' => $title,
-            'body' => $issue_body,
-            'labels' => $labels
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_USERAGENT, 'OPNsense-Manager');
-
-        $headers = [
-            "Accept: application/vnd.github.v3+json",
-            "Content-Type: application/json"
-        ];
-
-        if (!empty($github_token)) {
-            $headers[] = "Authorization: token {$github_token}";
-        }
-
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($http_code === 201) {
-            $issue_data = json_decode($response, true);
-            $issue_url = $issue_data['html_url'];
-            $message = "Issue created successfully! <a href='{$issue_url}' target='_blank'>View issue #{$issue_data['number']}</a>";
-            $message_type = 'success';
-
-            // Clear form
-            $_POST = [];
-        } else {
-            $error_data = json_decode($response, true);
-            $error_message = $error_data['message'] ?? 'Unknown error';
-            $message = "Failed to create issue: {$error_message} (HTTP {$http_code})";
-            $message_type = 'danger';
-        }
-    }
-}
-
-// Get recent issues
-$recent_issues = [];
-if (!empty($github_token)) {
-    $api_url = "https://api.github.com/repos/{$github_username}/{$github_repo}/issues?state=all&per_page=10";
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $api_url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'OPNsense-Manager');
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: token {$github_token}",
-        "Accept: application/vnd.github.v3+json"
-    ]);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($http_code === 200) {
-        $recent_issues = json_decode($response, true);
-    }
-}
+// REMOVED: All PAT-based GitHub integration
+// Users should create issues directly on GitHub with their own accounts
 
 include __DIR__ . '/inc/header.php';
 ?>
@@ -260,22 +170,47 @@ include __DIR__ . '/inc/header.php';
         </div>
     <?php endif; ?>
 
-    <?php if (empty($github_token)): ?>
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>GitHub Token Not Configured:</strong> Creating issues requires a GitHub Personal Access Token with 'repo' scope.
-            Configure <code>GITHUB_PAT</code> in your .env file. You can still browse issues on GitHub manually.
-        </div>
-    <?php endif; ?>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Create Issues on GitHub:</strong> Use your own GitHub account to create and track issues. This ensures your issues are directly associated with your account and you'll receive notifications.
+    </div>
 
     <div class="row">
-        <!-- Create Issue Form -->
+        <!-- Create Issue on GitHub -->
         <div class="col-lg-6 mb-4">
             <div class="support-card">
                 <h5 class="text-dark mb-3"><i class="fas fa-plus-circle me-2"></i>Create Support Issue</h5>
 
-                <?php if (!empty($github_token)): ?>
-                    <form method="post">
+                <div class="help-section">
+                    <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>Create an Issue on GitHub</h6>
+                    <p class="mb-3">Report bugs, request features, or ask questions using your GitHub account:</p>
+                    <ol class="mb-3">
+                        <li>Click the button below to open GitHub Issues</li>
+                        <li>Sign in to your GitHub account (if not already signed in)</li>
+                        <li>Click "New Issue" and select a template</li>
+                        <li>Fill in the details and submit</li>
+                    </ol>
+
+                    <div class="alert alert-secondary small mb-3">
+                        <strong>System Information (include in your issue):</strong><br>
+                        Version: <?php echo htmlspecialchars(file_exists(__DIR__ . '/VERSION') ? trim(file_get_contents(__DIR__ . '/VERSION')) : 'Unknown'); ?><br>
+                        PHP: <?php echo phpversion(); ?><br>
+                        OS: <?php echo php_uname('s') . ' ' . php_uname('r'); ?>
+                    </div>
+
+                    <a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>/issues/new/choose" target="_blank" class="btn btn-primary w-100">
+                        <i class="fas fa-external-link-alt me-2"></i>Open GitHub Issues
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Browse Issues (no longer needs PAT) -->
+        <div class="col-lg-6 mb-4" style="display: none;">
+            <div class="support-card">
+                <h5 class="text-dark mb-3"><i class="fas fa-plus-circle me-2"></i>REMOVED - No longer shown</h5>
+
+                <form method="post" style="display: none;">
                         <div class="mb-3">
                             <label class="form-label text-dark"><strong>Category</strong></label>
                             <select name="issue_category" class="form-select form-control-custom" required>
@@ -313,25 +248,7 @@ include __DIR__ . '/inc/header.php';
                             <small class="text-muted">System information will be automatically added to your issue.</small>
                         </div>
 
-                        <button type="submit" name="create_issue" class="btn btn-primary">
-                            <i class="fas fa-paper-plane me-2"></i>Submit Issue
-                        </button>
                     </form>
-                <?php else: ?>
-                    <div class="help-section">
-                        <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>Manual Issue Creation</h6>
-                        <p class="mb-2">To create an issue without a token configured:</p>
-                        <ol class="mb-2">
-                            <li>Visit the <a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>/issues/new" target="_blank">GitHub Issues page</a></li>
-                            <li>Sign in to your GitHub account</li>
-                            <li>Click "New Issue"</li>
-                            <li>Fill in the details and submit</li>
-                        </ol>
-                        <a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>/issues/new" target="_blank" class="btn btn-primary btn-sm">
-                            <i class="fas fa-external-link-alt me-2"></i>Open GitHub Issues
-                        </a>
-                    </div>
-                <?php endif; ?>
             </div>
         </div>
 
@@ -394,48 +311,7 @@ include __DIR__ . '/inc/header.php';
         </div>
     </div>
 
-    <?php if (!empty($recent_issues)): ?>
-        <div class="row">
-            <div class="col-12">
-                <div class="support-card">
-                    <h5 class="text-dark mb-3"><i class="fas fa-list me-2"></i>Recent Issues</h5>
-                    <?php foreach ($recent_issues as $issue): ?>
-                        <?php if (isset($issue['pull_request'])) continue; // Skip pull requests ?>
-                        <div class="issue-item <?php echo $issue['state'] === 'closed' ? 'closed' : ''; ?>">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                    <span class="issue-number">#<?php echo $issue['number']; ?></span>
-                                    <span class="badge bg-<?php echo $issue['state'] === 'open' ? 'success' : 'secondary'; ?> ms-2">
-                                        <?php echo ucfirst($issue['state']); ?>
-                                    </span>
-                                    <?php foreach ($issue['labels'] as $label): ?>
-                                        <span class="badge ms-1" style="background-color: #<?php echo $label['color']; ?>">
-                                            <?php echo htmlspecialchars($label['name']); ?>
-                                        </span>
-                                    <?php endforeach; ?>
-                                </div>
-                                <small class="text-muted">
-                                    <?php
-                                    $date = new DateTime($issue['created_at']);
-                                    echo $date->format('M d, Y');
-                                    ?>
-                                </small>
-                            </div>
-                            <a href="<?php echo htmlspecialchars($issue['html_url']); ?>" target="_blank" class="text-decoration-none">
-                                <h6 class="text-dark mb-0"><?php echo htmlspecialchars($issue['title']); ?></h6>
-                            </a>
-                            <small class="text-muted">
-                                by <?php echo htmlspecialchars($issue['user']['login']); ?>
-                                <?php if ($issue['comments'] > 0): ?>
-                                    • <i class="fas fa-comment"></i> <?php echo $issue['comments']; ?> comments
-                                <?php endif; ?>
-                            </small>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
+    <!-- Recent Issues removed - users can view directly on GitHub -->
 </div>
 
 <?php include __DIR__ . '/inc/footer.php'; ?>
