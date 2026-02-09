@@ -16,6 +16,7 @@ if (!empty($_GET['notice'])) {
 // load settings
 $rows = $DB->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
+$manager_fqdn = $rows['manager_fqdn'] ?? 'opn.agit8or.net';
 $acme_domain = $rows['acme_domain'] ?? '';
 $acme_email = $rows['acme_email'] ?? '';
 $smtp_host = $rows['smtp_host'] ?? '';
@@ -39,15 +40,37 @@ function save_setting($DB,$k,$v){
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_verify($_POST['csrf'] ?? '')) { $notice = 'Bad CSRF'; }
   else {
-    // General Settings (Timezone)
+    // General Settings (Timezone and FQDN)
     if (!empty($_POST['save_general'])) {
       $timezone = trim($_POST['timezone'] ?? 'UTC');
-      if (in_array($timezone, timezone_identifiers_list())) {
+      $manager_fqdn_input = trim($_POST['manager_fqdn'] ?? '');
+
+      $errors = [];
+
+      // Validate timezone
+      if (!in_array($timezone, timezone_identifiers_list())) {
+        $errors[] = 'Invalid timezone selected.';
+      }
+
+      // Validate FQDN (basic validation)
+      if (!empty($manager_fqdn_input)) {
+        if (!preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/', $manager_fqdn_input)) {
+          $errors[] = 'Invalid FQDN format.';
+        }
+      }
+
+      if (empty($errors)) {
         $_SESSION['display_timezone'] = $timezone;
         save_setting($DB, 'system_timezone', $timezone);
+
+        if (!empty($manager_fqdn_input)) {
+          save_setting($DB, 'manager_fqdn', $manager_fqdn_input);
+          $manager_fqdn = $manager_fqdn_input;
+        }
+
         $notice = 'General settings saved.';
       } else {
-        $notice = 'Invalid timezone selected.';
+        $notice = implode(' ', $errors);
       }
     }
     // Branding save
@@ -529,6 +552,18 @@ include __DIR__ . '/inc/header.php';
               ?>
             </select>
             <small class="form-text text-muted d-block mt-2">Select your timezone for displaying times throughout the system</small>
+          </div>
+          <div class="mb-4">
+            <label for="manager_fqdn" class="form-label text-light fw-bold">
+              <i class="fas fa-server me-2 text-info"></i>Manager FQDN
+            </label>
+            <input type="text" id="manager_fqdn" name="manager_fqdn" class="form-control bg-secondary text-light border-secondary"
+                   value="<?php echo htmlspecialchars($manager_fqdn); ?>"
+                   placeholder="opn.agit8or.net">
+            <small class="form-text text-muted d-block mt-2">
+              Fully Qualified Domain Name for this manager. Used in agent install commands:<br>
+              <code class="text-light bg-dark px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | sh</code>
+            </small>
           </div>
         </div>
         <div class="modal-footer border-secondary">
