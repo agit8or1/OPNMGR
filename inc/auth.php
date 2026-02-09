@@ -64,7 +64,7 @@ function login($username, $password) {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password_hash'])) {
+    if ($user && password_verify($password, $user['password'])) {
         // Regenerate session ID to prevent session fixation
         session_regenerate_id(true);
 
