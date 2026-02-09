@@ -30,6 +30,27 @@ try {
     exit;
 }
 
+// Validate agent identity
+$firewall_id = (int)($_POST['firewall_id'] ?? 0);
+$hardware_id = trim($_POST['hardware_id'] ?? '');
+
+if (!$firewall_id || empty($hardware_id)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing authentication']);
+    exit;
+}
+
+$auth_stmt = $pdo->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt->execute([$firewall_id]);
+$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$auth_fw || (
+    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Authentication failed']);
+    exit;
+}
+
 // Get POST data
 $hostname = $_POST['hostname'] ?? '';
 $status = $_POST['status'] ?? '';

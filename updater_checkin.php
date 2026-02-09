@@ -19,10 +19,29 @@ if (!$input) {
 }
 
 $firewall_id = (int)($input['firewall_id'] ?? 0);
+$hardware_id = trim($input['hardware_id'] ?? '');
 $updater_version = trim($input['updater_version'] ?? '');
 
+// Validate agent identity
+if (!$firewall_id || empty($hardware_id)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Missing authentication']);
+    exit;
+}
+
+$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt->execute([$firewall_id]);
+$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$auth_fw || (
+    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Authentication failed']);
+    exit;
+}
+
 // Validate inputs
-if (!$firewall_id || empty($updater_version)) {
+if (empty($updater_version)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Missing required fields']);
     exit;
@@ -101,7 +120,8 @@ try {
     echo json_encode($response);
 
 } catch (Exception $e) {
+    error_log("updater_checkin.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

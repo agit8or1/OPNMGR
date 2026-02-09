@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // If no input or missing firewall_id, try to identify by IP address
 $firewall_id = (int)($input['firewall_id'] ?? 0);
+$hardware_id = trim($input['hardware_id'] ?? '');
 $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 // If no firewall_id provided, try to find it by WAN IP
@@ -34,9 +35,21 @@ if (!$firewall_id && $client_ip !== 'unknown') {
     }
 }
 
-if (!$firewall_id) {
+if (!$firewall_id || empty($hardware_id)) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => "No firewall ID provided and couldn't identify by IP: $client_ip"]);
+    echo json_encode(['success' => false, 'message' => 'Missing authentication']);
+    exit;
+}
+
+// Validate agent identity
+$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt->execute([$firewall_id]);
+$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$auth_fw || (
+    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Authentication failed']);
     exit;
 }
 
@@ -93,8 +106,10 @@ try {
         'tunnel_type' => $tunnel_type,
         'firewall_id' => $firewall_id,
         'client_ip' => $client_ip
-    ]);} catch (Exception $e) {
+    ]);
+} catch (Exception $e) {
+    error_log("tunnel_connect.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

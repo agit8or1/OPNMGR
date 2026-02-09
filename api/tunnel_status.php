@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+requireLogin();
+
 // Tunnel status API
 require_once __DIR__ . '/../inc/db.php';
 

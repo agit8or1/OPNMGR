@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+requireLogin();
+
 /**
  * Create Backup API
  * Queues a backup command for the specified firewall
@@ -97,7 +100,8 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log("create_backup.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Failed to create backup: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Failed to create backup']);
 }
 ?>

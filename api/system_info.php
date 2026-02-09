@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+requireLogin();
 require_once __DIR__ . '/../inc/db.php';
 
 header('Content-Type: application/json');
@@ -47,7 +49,8 @@ try {
     echo json_encode($info);
     
 } catch (Exception $e) {
+    error_log("system_info.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'Internal server error']);
 }
 ?>

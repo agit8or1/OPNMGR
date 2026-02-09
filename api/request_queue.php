@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+requireLogin();
+
 /**
  * HTTP Request Queue System
  * Handles proxying HTTP requests through firewall agent polling
@@ -63,10 +66,11 @@ function queueRequest() {
             'request_id' => $request_id,
             'client_id' => $client_id
         ]);
-        
+
     } catch (Exception $e) {
+        error_log("request_queue.php queueRequest error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to queue request']);
     }
 }
 
@@ -102,10 +106,11 @@ function pollRequests() {
             'success' => true,
             'requests' => $requests
         ]);
-        
+
     } catch (Exception $e) {
+        error_log("request_queue.php pollRequests error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to poll requests']);
     }
 }
 
@@ -137,10 +142,11 @@ function submitResponse() {
         $stmt->execute([$response_status, $response_headers, $response_body, $request_id]);
         
         echo json_encode(['success' => true]);
-        
+
     } catch (Exception $e) {
+        error_log("request_queue.php submitResponse error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to submit response']);
     }
 }
 
@@ -180,8 +186,9 @@ function getResponse() {
         ]);
         
     } catch (Exception $e) {
+        error_log("request_queue.php getResponse error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['error' => 'Failed to get response']);
     }
 }
 ?>

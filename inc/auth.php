@@ -29,7 +29,21 @@ try {
 }
 
 function isLoggedIn() {
-    return isset($_SESSION['user_id']);
+    if (!isset($_SESSION['user_id'])) {
+        return false;
+    }
+
+    // Enforce session timeout
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > SESSION_TIMEOUT) {
+        $_SESSION = array();
+        session_destroy();
+        return false;
+    }
+
+    // Update last activity
+    $_SESSION['last_activity'] = time();
+
+    return true;
 }
 
 function isAdmin() {
@@ -38,6 +52,14 @@ function isAdmin() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
+        // Return JSON 401 for API requests, redirect for page requests
+        if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false ||
+            (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+            exit;
+        }
         header('Location: /login.php');
         exit;
     }

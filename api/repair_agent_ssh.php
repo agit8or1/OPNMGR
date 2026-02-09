@@ -6,6 +6,7 @@
 
 session_start();
 require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/csrf.php';
 
 header('Content-Type: application/json');
 
@@ -13,6 +14,12 @@ header('Content-Type: application/json');
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
+    exit;
+}
+
+if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
     exit;
 }
 
@@ -138,7 +145,7 @@ fi
 rm -f /tmp/remote_repair_${FIREWALL_ID}.sh
 
 exit 0
-SCRIPT
+SCRIPT;
 
 // Write repair script to temp file
 $script_file = "/tmp/repair_script_{$session_id}.sh";

@@ -3,9 +3,6 @@ require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/logging.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -23,6 +20,27 @@ try {
         exit;
     }
     
+    // Validate agent identity
+    $firewall_id = (int)($input['firewall_id'] ?? 0);
+    $hardware_id = trim($input['hardware_id'] ?? '');
+
+    if (!$firewall_id || empty($hardware_id)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Missing authentication']);
+        exit;
+    }
+
+    $auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt->execute([$firewall_id]);
+    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$auth_fw || (
+        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+    )) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
+        exit;
+    }
+
     $command_id = $input['command_id'] ?? '';
     $result = $input['result'] ?? '';
     $output = $input['output'] ?? '';
@@ -86,7 +104,8 @@ try {
     }
     
 } catch (Exception $e) {
+    error_log("command_result.php error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 ?>

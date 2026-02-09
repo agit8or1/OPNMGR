@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+requireLogin();
+
 /**
  * Health Monitoring API
  * Provides comprehensive system health and status information
@@ -135,7 +138,8 @@ function getSystemHealth() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get system health: ' . $e->getMessage()]);
+        error_log("health_monitor.php getSystemHealth error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get system health']);
     }
 }
 
@@ -167,7 +171,8 @@ function getFirewallStatus() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get firewall status: ' . $e->getMessage()]);
+        error_log("health_monitor.php getFirewallStatus error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get firewall status']);
     }
 }
 
@@ -216,7 +221,8 @@ function getServiceStatus() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get service status: ' . $e->getMessage()]);
+        error_log("health_monitor.php getServiceStatus error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get service status']);
     }
 }
 
@@ -271,7 +277,8 @@ function getPerformanceMetrics() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get performance metrics: ' . $e->getMessage()]);
+        error_log("health_monitor.php getPerformanceMetrics error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get performance metrics']);
     }
 }
 
@@ -344,7 +351,8 @@ function getRecentAlerts() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get recent alerts: ' . $e->getMessage()]);
+        error_log("health_monitor.php getRecentAlerts error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get recent alerts']);
     }
 }
 
@@ -374,7 +382,8 @@ function getSystemInfo() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Failed to get system info: ' . $e->getMessage()]);
+        error_log("health_monitor.php getSystemInfo error: " . $e->getMessage());
+        echo json_encode(['error' => 'Failed to get system info']);
     }
 }
 ?>
