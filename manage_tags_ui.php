@@ -27,7 +27,7 @@ try {
             <div class="card-body">
                 <!-- Add Tag Form -->
                 <div class="mb-4">
-                    <h6>Add New Tag</h6>
+                    <h6 style="color: #e2e8f0;">Add New Tag</h6>
                     <div class="row g-3">
                         <div class="col-md-4">
                             <input type="text" id="newTagName" class="form-control" placeholder="Tag name" required>
@@ -51,7 +51,7 @@ try {
                             <span class="badge me-3" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>; color: white; font-size: 14px; padding: 6px 12px;">
                                 <?php echo htmlspecialchars($tag['name']); ?>
                             </span>
-                            <small class="text-muted me-3">
+                            <small class="me-3" style="color: #94a3b8;">
                                 <?php echo $tag['firewall_count']; ?> firewall<?php echo $tag['firewall_count'] != 1 ? 's' : ''; ?>
                             </small>
                             <div class="btn-group btn-group-sm">

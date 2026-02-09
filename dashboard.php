@@ -128,7 +128,7 @@ if ($DB) {
                                     <h6 class="mb-0 text-light">Network Locations</h6>
                                 </div>
                                 <div class="card-body">
-                                    <div id="networkMap" style="height: 400px; border-radius: 4px;"></div>
+                                    <div id="networkMap" style="height: 400px; border-radius: 4px; overflow: hidden; position: relative;"></div>
                                 </div>
                             </div>
                         </div>
@@ -138,6 +138,23 @@ if ($DB) {
         </div>
     </div>
 </div>
+
+<style>
+/* Fix Leaflet map container issues */
+#networkMap {
+    overflow: hidden !important;
+}
+#networkMap .leaflet-container {
+    background: #1a1f2e !important;
+}
+#networkMap .leaflet-tile-container {
+    max-width: 100% !important;
+    max-height: 400px !important;
+}
+#networkMap .leaflet-pane {
+    max-width: 100% !important;
+}
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
