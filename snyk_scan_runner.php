@@ -112,10 +112,49 @@ if ($vuln_count > 0) {
     $summary .= "No vulnerabilities found! ✓\n";
 }
 
-// Determine final status
-$final_status = ($return_code === 0) ? 'success' : (($vuln_count > 0) ? 'warning' : 'error');
+// Determine final status based on vulnerabilities found
+if ($vuln_count === 0) {
+    // No vulnerabilities = success (green)
+    $final_status = 'success';
+} elseif ($vuln_count > 0) {
+    // Vulnerabilities found = warning (yellow)
+    $final_status = 'warning';
+} else {
+    // Scan error = error (red)
+    $final_status = 'error';
+}
+
 $final_message = $summary;
 
 updateProgress($progress_file, $final_status, $final_message, 100, $output_text);
+
+// Save scan results to database
+require_once __DIR__ . '/inc/db.php';
+if (isset($DB)) {
+    try {
+        // Map scan type to database enum values
+        $db_scan_type = 'full';
+        if ($scan_type === 'dependencies') {
+            $db_scan_type = 'dependencies';
+        } elseif ($scan_type === 'code') {
+            $db_scan_type = 'code';
+        }
+
+        $stmt = $DB->prepare('INSERT INTO snyk_scan_results (scan_type, status, total_vulnerabilities, critical_count, high_count, medium_count, low_count, duration_seconds, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+        $stmt->execute([
+            $db_scan_type,
+            'completed',
+            $vuln_count,
+            $critical,
+            $high,
+            $medium,
+            $low,
+            $duration
+        ]);
+    } catch (Exception $e) {
+        // Log error but don't fail the scan
+        error_log("Failed to save scan results: " . $e->getMessage());
+    }
+}
 
 exit(0);
