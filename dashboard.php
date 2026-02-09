@@ -125,23 +125,10 @@ if ($DB) {
                         <div class="col-md-6">
                             <div class="card card-ghost">
                                 <div class="card-header">
-                                    <h6 class="mb-0 text-light">Quick Actions</h6>
+                                    <h6 class="mb-0 text-light">Network Locations</h6>
                                 </div>
                                 <div class="card-body">
-                                    <div class="d-grid gap-2">
-                                        <a href="/firewall_add.php" class="btn btn-primary">
-                                            <i class="fas fa-plus-circle me-2"></i>Add New Firewall
-                                        </a>
-                                        <a href="/customers.php" class="btn btn-outline-primary">
-                                            <i class="fas fa-users me-2"></i>Manage Customers
-                                        </a>
-                                        <a href="/manage_tags_ui.php" class="btn btn-outline-primary">
-                                            <i class="fas fa-tags me-2"></i>Manage Tags
-                                        </a>
-                                        <a href="/settings.php" class="btn btn-outline-secondary">
-                                            <i class="fas fa-cog me-2"></i>System Settings
-                                        </a>
-                                    </div>
+                                    <div id="networkMap" style="height: 400px; border-radius: 4px; overflow: hidden; position: relative;"></div>
                                 </div>
                             </div>
                         </div>
@@ -152,6 +139,42 @@ if ($DB) {
     </div>
 </div>
 
+<style>
+/* Fix Leaflet map container to prevent layout issues */
+#networkMap {
+    overflow: hidden !important;
+    position: relative !important;
+    width: 100% !important;
+    height: 400px !important;
+}
+#networkMap .leaflet-container {
+    background: #1a1f2e !important;
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+#networkMap .leaflet-tile-container,
+#networkMap .leaflet-pane,
+#networkMap .leaflet-map-pane {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 400px !important;
+}
+#networkMap .leaflet-tile {
+    max-width: 256px !important;
+    max-height: 256px !important;
+}
+/* Ensure card-body contains the map properly */
+.card-body:has(#networkMap) {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -205,6 +228,104 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Initialize Network Map
+    const map = L.map('networkMap').setView([39.0997, -94.5786], 4);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    // Define custom icons
+    const serverIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div style="background-color: #3b82f6; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center;"><i class="fas fa-server" style="color: white; font-size: 14px;"></i></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+
+    const firewallOnlineIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div style="background-color: #10b981; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center;"><i class="fas fa-network-wired" style="color: white; font-size: 10px;"></i></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    const firewallOfflineIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: '<div style="background-color: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center;"><i class="fas fa-network-wired" style="color: white; font-size: 10px;"></i></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    // Fetch location data and add markers
+    fetch('/api/get_map_locations.php')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Add server marker
+                if (data.server) {
+                    const serverMarker = L.marker([data.server.latitude, data.server.longitude], {
+                        icon: serverIcon
+                    }).addTo(map);
+
+                    const serverLocation = data.server.city && data.server.country
+                        ? `<small>${data.server.city}, ${data.server.country}</small><br>`
+                        : '';
+                    const serverIp = data.server.ip ? `<small>IP: ${data.server.ip}</small><br>` : '';
+
+                    serverMarker.bindPopup(`
+                        <div style="color: #000;">
+                            <strong>${data.server.name}</strong><br>
+                            <small>${data.server.hostname}</small><br>
+                            ${serverLocation}
+                            ${serverIp}
+                            <span class="badge bg-success">Online</span>
+                        </div>
+                    `);
+                }
+
+                // Add firewall markers
+                const bounds = [[data.server.latitude, data.server.longitude]];
+                data.firewalls.forEach(fw => {
+                    const icon = fw.status === 'online' ? firewallOnlineIcon : firewallOfflineIcon;
+                    const statusBadge = fw.status === 'online'
+                        ? '<span class="badge bg-success">Online</span>'
+                        : '<span class="badge bg-danger">Offline</span>';
+
+                    const marker = L.marker([fw.latitude, fw.longitude], {
+                        icon: icon
+                    }).addTo(map);
+
+                    const fwLocation = fw.city && fw.country
+                        ? `<small>${fw.city}, ${fw.country}</small><br>`
+                        : '';
+
+                    marker.bindPopup(`
+                        <div style="color: #000;">
+                            <strong>${fw.name}</strong><br>
+                            <small>${fw.hostname}</small><br>
+                            ${fwLocation}
+                            ${fw.wan_ip ? '<small>IP: ' + fw.wan_ip + '</small><br>' : ''}
+                            ${statusBadge}
+                            <br><a href="/firewall_details.php?id=${fw.id}" class="btn btn-sm btn-primary mt-2">View Details</a>
+                        </div>
+                    `);
+
+                    bounds.push([fw.latitude, fw.longitude]);
+                });
+
+                // Fit map to show all markers if there are multiple locations
+                if (bounds.length > 1) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading map data:', error);
+        });
 });
 
 // Auto-refresh functionality
