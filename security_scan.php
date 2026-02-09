@@ -48,6 +48,12 @@ if ($DB) {
 $config_message = '';
 $config_status = '';
 
+// Show success message after API key save redirect
+if (isset($_GET['saved']) && $_GET['saved'] == '1') {
+    $config_message = 'Snyk API key saved and configured successfully!';
+    $config_status = 'success';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -69,8 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Also configure Snyk CLI
                 exec('snyk config set api=' . escapeshellarg($api_key) . ' 2>&1', $output, $return_code);
 
-                $config_message = 'Snyk API key saved and configured successfully!';
-                $config_status = 'success';
+                if ($return_code === 0) {
+                    // Redirect to reload page and show updated auth status
+                    header('Location: security_scan.php?saved=1');
+                    exit;
+                } else {
+                    $config_message = 'Failed to configure Snyk CLI: ' . implode("\n", $output);
+                    $config_status = 'danger';
+                }
             } else {
                 $config_message = 'API key cannot be empty.';
                 $config_status = 'danger';
@@ -181,13 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Check if Snyk is installed and authenticated
+// Check if Snyk is installed and authenticated (fast checks only on page load)
 exec('which snyk 2>&1', $snyk_check, $snyk_installed);
 $snyk_available = ($snyk_installed === 0);
 
 $snyk_authenticated = false;
 $snyk_version = 'Not Installed';
 $snyk_update_available = false;
+
 if ($snyk_available) {
     exec('snyk config get api 2>&1', $auth_check);
     $snyk_authenticated = !empty($auth_check[0]) && $auth_check[0] !== '';
@@ -198,13 +211,15 @@ if ($snyk_available) {
         $snyk_version = trim($version_output[0]);
     }
 
-    // Check for Snyk updates
-    exec('npm outdated -g snyk --json 2>&1', $outdated_output);
-    $outdated_json = implode("\n", $outdated_output);
-    if (!empty($outdated_json) && $outdated_json !== '{}') {
-        $outdated_data = json_decode($outdated_json, true);
-        if (isset($outdated_data['snyk'])) {
-            $snyk_update_available = true;
+    // Only check for updates if explicitly requested (this check is SLOW - 2-5 seconds)
+    if (isset($_GET['check_updates'])) {
+        exec('npm outdated -g snyk --json 2>&1', $outdated_output);
+        $outdated_json = implode("\n", $outdated_output);
+        if (!empty($outdated_json) && $outdated_json !== '{}') {
+            $outdated_data = json_decode($outdated_json, true);
+            if (isset($outdated_data['snyk'])) {
+                $snyk_update_available = true;
+            }
         }
     }
 }
@@ -464,6 +479,10 @@ include __DIR__ . '/inc/header.php';
                                             <code class="text-light"><?php echo htmlspecialchars($snyk_version); ?></code>
                                             <?php if ($snyk_update_available): ?>
                                                 <span class="badge bg-warning ms-2">Update Available</span>
+                                            <?php elseif (!isset($_GET['check_updates'])): ?>
+                                                <a href="?check_updates=1" class="btn btn-sm btn-outline-secondary ms-2" style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">
+                                                    <i class="fas fa-sync-alt"></i> Check for Updates
+                                                </a>
                                             <?php endif; ?>
                                         </dd>
                                     <?php endif; ?>
@@ -505,11 +524,16 @@ include __DIR__ . '/inc/header.php';
                                                 <small class="text-muted d-block">Get your token from <a href="https://app.snyk.io/account" target="_blank">snyk.io/account</a></small>
                                             </label>
                                             <input type="text" name="snyk_api_key" class="form-control form-control-custom"
-                                                   placeholder="Enter your Snyk API token"
-                                                   value="<?php echo $snyk_authenticated ? '••••••••••••' : ''; ?>">
+                                                   placeholder="<?php echo $snyk_authenticated ? 'Enter new token to update' : 'Enter your Snyk API token'; ?>"
+                                                   required>
+                                            <?php if ($snyk_authenticated): ?>
+                                                <small class="text-success d-block mt-1">
+                                                    <i class="fas fa-check-circle me-1"></i>Currently authenticated - enter new token to update
+                                                </small>
+                                            <?php endif; ?>
                                         </div>
                                         <button type="submit" class="btn btn-success">
-                                            <i class="fas fa-save me-2"></i>Save API Key
+                                            <i class="fas fa-save me-2"></i><?php echo $snyk_authenticated ? 'Update' : 'Save'; ?> API Key
                                         </button>
                                     </form>
                                 <?php endif; ?>
