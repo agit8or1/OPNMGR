@@ -135,7 +135,7 @@ $themes = [
 $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
 ?>
 <!doctype html>
-<html>
+<html data-bs-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">

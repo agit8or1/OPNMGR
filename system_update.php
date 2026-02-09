@@ -95,77 +95,8 @@ if (isset($_POST['check_updates']) || $should_check_updates) {
     }
 }
 
-// Perform update
-if (isset($_POST['perform_update'])) {
-    $update_log = [];
-
-    // Create backup first
-    $backup_dir = __DIR__ . '/backups/pre-update-' . date('Y-m-d_H-i-s');
-    exec('mkdir -p ' . escapeshellarg($backup_dir) . ' 2>&1', $output, $return_code);
-
-    if ($return_code === 0) {
-        $update_log[] = "✓ Created backup directory: {$backup_dir}";
-
-        // Backup database
-        $db_backup = $backup_dir . '/database.sql';
-        $db_host = env('DB_HOST', 'localhost');
-        $db_name = env('DB_NAME', 'opnsense_fw');
-        $db_user = env('DB_USER', 'opnsense_user');
-        $db_pass = env('DB_PASS', '');
-
-        exec("mysqldump -h " . escapeshellarg($db_host) . " -u " . escapeshellarg($db_user) . " -p" . escapeshellarg($db_pass) . " " . escapeshellarg($db_name) . " > " . escapeshellarg($db_backup) . " 2>&1", $output, $return_code);
-
-        if ($return_code === 0) {
-            $update_log[] = "✓ Database backed up successfully";
-        } else {
-            $update_log[] = "✗ Database backup failed: " . implode("\n", $output);
-        }
-
-        // Stash local changes
-        exec('cd ' . escapeshellarg(__DIR__) . ' && git stash 2>&1', $output, $return_code);
-        if ($return_code === 0) {
-            $update_log[] = "✓ Stashed local changes";
-        }
-
-        // Pull from GitHub (public repo, no auth needed)
-        $git_command = 'cd ' . escapeshellarg(__DIR__) . ' && git pull origin main 2>&1';
-        exec($git_command, $output, $return_code);
-
-        if ($return_code === 0) {
-            $update_log[] = "✓ Successfully pulled updates from GitHub";
-            $update_log[] = "Output: " . implode("\n", $output);
-
-            // Run any post-update scripts if they exist
-            if (file_exists(__DIR__ . '/scripts/post_update.sh')) {
-                exec('bash ' . escapeshellarg(__DIR__ . '/scripts/post_update.sh') . ' 2>&1', $output, $return_code);
-                if ($return_code === 0) {
-                    $update_log[] = "✓ Post-update script executed successfully";
-                } else {
-                    $update_log[] = "⚠ Post-update script had issues: " . implode("\n", $output);
-                }
-            }
-
-            // Update version and commit files
-            exec('cd ' . escapeshellarg(__DIR__) . ' && git rev-parse --short HEAD 2>&1', $new_commit_output, $return_code);
-            if ($return_code === 0 && !empty($new_commit_output)) {
-                $new_commit = trim($new_commit_output[0]);
-                file_put_contents(__DIR__ . '/COMMIT', $new_commit . "\n");
-                $update_log[] = "✓ Commit updated to {$new_commit}";
-            }
-
-            $message = "Update completed successfully! Please review the log below.";
-            $message_type = 'success';
-        } else {
-            $update_log[] = "✗ Failed to pull updates: " . implode("\n", $output);
-            $message = "Update failed. Check the log below for details.";
-            $message_type = 'danger';
-        }
-    } else {
-        $update_log[] = "✗ Failed to create backup directory";
-        $message = "Update aborted: Could not create backup directory";
-        $message_type = 'danger';
-    }
-}
+// Update is now handled via SSE stream (api/system_update_stream.php)
+$update_log = [];
 
 include __DIR__ . '/inc/header.php';
 ?>
@@ -282,6 +213,42 @@ include __DIR__ . '/inc/header.php';
     padding: 1rem;
     margin-bottom: 1rem;
 }
+
+.progress-step {
+    padding: 0.6rem 0.8rem;
+    border-left: 3px solid #334155;
+    margin-left: 0.5rem;
+    margin-bottom: 0.25rem;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active {
+    border-left-color: #3b82f6;
+    color: #e2e8f0;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.progress-step.completed {
+    border-left-color: #22c55e;
+    color: #e2e8f0;
+}
+
+.progress-step.failed {
+    border-left-color: #ef4444;
+    color: #fca5a5;
+}
+
+.progress-step.warned {
+    border-left-color: #f59e0b;
+    color: #fde68a;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.fa-spinner { animation: spin 1s linear infinite; }
 </style>
 
 <div class="container-fluid">
@@ -345,11 +312,9 @@ include __DIR__ . '/inc/header.php';
                         <span class="badge bg-secondary">main</span>
                     </dd>
 
-                    <dt class="col-sm-4">Repository:</dt>
+                    <dt class="col-sm-4">Commit:</dt>
                     <dd class="col-sm-8">
-                        <a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>" target="_blank">
-                            <?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>
-                        </a>
+                        <code style="color: #60a5fa;"><?php echo htmlspecialchars($local_commit); ?></code>
                     </dd>
                 </dl>
             </div>
@@ -357,7 +322,7 @@ include __DIR__ . '/inc/header.php';
     </div>
 
     <?php if ($update_available): ?>
-        <div class="warning-box">
+        <div class="warning-box" id="update-prompt">
             <h5 class="text-warning mb-2"><i class="fas fa-exclamation-triangle me-2"></i>Update Available</h5>
             <p class="mb-3">A new version is available. Before updating:</p>
             <ul class="mb-3">
@@ -366,26 +331,64 @@ include __DIR__ . '/inc/header.php';
                 <li>The application will pull the latest code from GitHub</li>
                 <li>You can rollback using the backup if needed</li>
             </ul>
-            <form method="post" onsubmit="return confirm('Are you sure you want to update? This will pull the latest code from GitHub.');">
-                <button type="submit" name="perform_update" class="btn btn-warning">
-                    <i class="fas fa-download me-2"></i>Update Now
-                </button>
-            </form>
+            <button type="button" class="btn btn-warning" id="btn-update" onclick="startUpdate()">
+                <i class="fas fa-download me-2"></i>Update Now
+            </button>
         </div>
     <?php endif; ?>
 
-    <?php if (!empty($update_log)): ?>
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="update-card">
-                    <h5 class="text-white mb-3"><i class="fas fa-terminal me-2"></i>Update Log</h5>
-                    <div class="update-log">
-                        <?php echo implode("\n", array_map('htmlspecialchars', $update_log)); ?>
+    <!-- Real-time Update Progress -->
+    <div class="row mb-4" id="update-progress" style="display: none;">
+        <div class="col-12">
+            <div class="update-card">
+                <h5 class="text-white mb-3"><i class="fas fa-terminal me-2"></i>Update Progress</h5>
+                <div id="progress-steps">
+                    <div class="progress-step" id="step-backup_dir">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Create backup directory</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-db_backup">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Backup database</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-git_stash">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Stash local changes</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-git_pull">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Pull latest code from GitHub</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-sync">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Sync to production</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-post_update">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Run post-update scripts</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-version">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Update version info</span>
+                        <span class="step-status ms-2"></span>
                     </div>
                 </div>
+                <div class="mt-3" id="progress-bar-container">
+                    <div class="progress" style="height: 8px; background: #334155;">
+                        <div class="progress-bar bg-primary" id="update-progress-bar" role="progressbar" style="width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                    <small id="progress-text" style="color: #94a3b8;" class="mt-1 d-block">Starting update...</small>
+                </div>
+                <div class="mt-3" id="update-result" style="display: none;"></div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
     <?php if (!empty($commit_log)): ?>
         <div class="row mb-4">
@@ -442,5 +445,88 @@ git pull https://YOUR_TOKEN@github.com/<?php echo htmlspecialchars($github_usern
         </div>
     </div>
 </div>
+
+<script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+const totalSteps = 7;
+let completedSteps = 0;
+
+function startUpdate() {
+    if (!confirm('Are you sure you want to update? This will pull the latest code from GitHub.')) return;
+
+    document.getElementById('btn-update').disabled = true;
+    document.getElementById('btn-update').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+    document.getElementById('update-progress').style.display = '';
+    document.getElementById('update-prompt').style.display = 'none';
+
+    const evtSource = new EventSource('/api/system_update_stream.php?csrf_token=' + encodeURIComponent(csrfToken));
+
+    evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        const step = data.step;
+        const message = data.message;
+        const status = data.status;
+
+        if (step === 'done') {
+            evtSource.close();
+            document.getElementById('update-progress-bar').style.width = '100%';
+            document.getElementById('update-progress-bar').className = status === 'done'
+                ? 'progress-bar bg-success' : 'progress-bar bg-danger';
+            document.getElementById('progress-text').textContent = message;
+
+            const result = document.getElementById('update-result');
+            result.style.display = '';
+            if (status === 'done') {
+                result.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-2"></i>' + message + ' <a href="javascript:location.reload()" class="ms-2 text-white"><strong>Reload page</strong></a></div>';
+            } else {
+                result.innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-2"></i>' + message + '</div>';
+            }
+            return;
+        }
+
+        const el = document.getElementById('step-' + step);
+        if (!el) return;
+
+        const icon = el.querySelector('.step-icon');
+        const statusSpan = el.querySelector('.step-status');
+
+        if (status === 'running') {
+            el.className = 'progress-step active';
+            icon.className = 'fas fa-spinner me-2 step-icon';
+            icon.style.color = '#3b82f6';
+            statusSpan.textContent = '';
+            document.getElementById('progress-text').textContent = message;
+        } else if (status === 'done') {
+            el.className = 'progress-step completed';
+            icon.className = 'fas fa-check-circle me-2 step-icon';
+            icon.style.color = '#22c55e';
+            statusSpan.textContent = message;
+            statusSpan.style.color = '#94a3b8';
+            completedSteps++;
+            document.getElementById('update-progress-bar').style.width = Math.round((completedSteps / totalSteps) * 100) + '%';
+        } else if (status === 'warn') {
+            el.className = 'progress-step warned';
+            icon.className = 'fas fa-exclamation-triangle me-2 step-icon';
+            icon.style.color = '#f59e0b';
+            statusSpan.textContent = message;
+            statusSpan.style.color = '#fde68a';
+            completedSteps++;
+            document.getElementById('update-progress-bar').style.width = Math.round((completedSteps / totalSteps) * 100) + '%';
+        } else if (status === 'error') {
+            el.className = 'progress-step failed';
+            icon.className = 'fas fa-times-circle me-2 step-icon';
+            icon.style.color = '#ef4444';
+            statusSpan.textContent = message;
+            statusSpan.style.color = '#fca5a5';
+        }
+    };
+
+    evtSource.onerror = function() {
+        evtSource.close();
+        document.getElementById('progress-text').textContent = 'Connection lost';
+        document.getElementById('update-progress-bar').className = 'progress-bar bg-danger';
+    };
+}
+</script>
 
 <?php include __DIR__ . '/inc/footer.php'; ?>

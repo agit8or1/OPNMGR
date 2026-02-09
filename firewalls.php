@@ -968,10 +968,10 @@ include __DIR__ . '/inc/header.php';
                                         $health_tooltip .= "\n💡 Tip: Address issues above to improve health score";
                                     }
                                     ?>
-                                    <span class="badge <?php echo $health_color; ?> hover-tooltip" data-tooltip="<?php echo htmlspecialchars(trim($health_tooltip)); ?>">
+                                    <span class="badge <?php echo $health_color; ?> hover-tooltip" style="color: #fff !important;" data-tooltip="<?php echo htmlspecialchars(trim($health_tooltip)); ?>">
                                         <i class="<?php echo $health_icon; ?> me-1"></i><?php echo $health_grade; ?>
                                     </span>
-                                    <br><small class="text-muted" style="font-size: 0.7rem;"><?php echo $health_score; ?>/100</small>
+                                    <br><small style="font-size: 0.7rem; color: #94a3b8;"><?php echo $health_score; ?>/100</small>
                                 </td>
                                 <!-- Updates Column -->
                                 <td>
