@@ -50,7 +50,7 @@ $config_status = '';
 
 // Show success message after API key save redirect
 if (isset($_GET['saved']) && $_GET['saved'] == '1') {
-    $config_message = 'Snyk API key saved and configured successfully!';
+    $config_message = 'Snyk API key saved successfully! You can now run security scans.';
     $config_status = 'success';
 }
 
@@ -72,17 +72,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $env_content = trim($env_content) . "\nSNYK_TOKEN=" . $api_key . "\n";
                 file_put_contents($env_file, $env_content);
 
-                // Also configure Snyk CLI
-                exec('snyk config set api=' . escapeshellarg($api_key) . ' 2>&1', $output, $return_code);
+                // Try to configure Snyk CLI for the administrator user (optional)
+                // Snyk will use SNYK_TOKEN environment variable from .env
+                exec('sudo -u administrator snyk config set api=' . escapeshellarg($api_key) . ' 2>&1', $output, $return_code);
 
-                if ($return_code === 0) {
-                    // Redirect to reload page and show updated auth status
-                    header('Location: security_scan.php?saved=1');
-                    exit;
-                } else {
-                    $config_message = 'Failed to configure Snyk CLI: ' . implode("\n", $output);
-                    $config_status = 'danger';
-                }
+                // Always redirect - .env file has the token which Snyk will use
+                header('Location: security_scan.php?saved=1');
+                exit;
             } else {
                 $config_message = 'API key cannot be empty.';
                 $config_status = 'danger';
@@ -162,19 +158,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'scan_dependencies':
-            exec('cd ' . __DIR__ . '/scripts && snyk test --json 2>&1', $output, $return_code);
+            // Load SNYK_TOKEN from .env and pass as environment variable
+            $snyk_token = env('SNYK_TOKEN', '');
+            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
+            exec('cd ' . __DIR__ . '/scripts && ' . $env_vars . 'snyk test --json 2>&1', $output, $return_code);
             $scan_output = implode("\n", $output);
             $scan_status = ($return_code === 0) ? 'success' : 'warning';
             break;
 
         case 'scan_code':
-            exec('cd ' . __DIR__ . ' && snyk code test --json 2>&1', $output, $return_code);
+            // Load SNYK_TOKEN from .env and pass as environment variable
+            $snyk_token = env('SNYK_TOKEN', '');
+            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
+            exec('cd ' . __DIR__ . ' && ' . $env_vars . 'snyk code test --json 2>&1', $output, $return_code);
             $scan_output = implode("\n", $output);
             $scan_status = ($return_code === 0) ? 'success' : 'warning';
             break;
 
         case 'monitor':
-            exec('cd ' . __DIR__ . ' && snyk monitor 2>&1', $output, $return_code);
+            // Load SNYK_TOKEN from .env and pass as environment variable
+            $snyk_token = env('SNYK_TOKEN', '');
+            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
+            exec('cd ' . __DIR__ . ' && ' . $env_vars . 'snyk monitor 2>&1', $output, $return_code);
             $scan_output = implode("\n", $output);
             $scan_status = 'info';
             break;
@@ -202,8 +207,23 @@ $snyk_version = 'Not Installed';
 $snyk_update_available = false;
 
 if ($snyk_available) {
-    exec('snyk config get api 2>&1', $auth_check);
-    $snyk_authenticated = !empty($auth_check[0]) && $auth_check[0] !== '';
+    // Check if SNYK_TOKEN is set in .env file (most reliable method)
+    $env_file = __DIR__ . '/.env';
+    if (file_exists($env_file)) {
+        $env_content = file_get_contents($env_file);
+        if (preg_match('/^SNYK_TOKEN=(.+)$/m', $env_content, $matches)) {
+            $token = trim($matches[1]);
+            if (!empty($token) && $token !== '') {
+                $snyk_authenticated = true;
+            }
+        }
+    }
+
+    // Fallback: check CLI config (might not be set for web user)
+    if (!$snyk_authenticated) {
+        exec('snyk config get api 2>&1', $auth_check);
+        $snyk_authenticated = !empty($auth_check[0]) && $auth_check[0] !== '';
+    }
 
     // Get current Snyk version
     exec('snyk --version 2>&1', $version_output);
