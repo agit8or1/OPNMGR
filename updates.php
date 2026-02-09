@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/inc/auth.php';
 require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/version.php';
 requireLogin();
 requireAdmin();
 
@@ -50,9 +51,7 @@ if ($_POST) {
     }
 }
 
-// Get current version
-$stmt = $DB->query("SELECT version FROM platform_versions WHERE status = 'released' ORDER BY created_at DESC LIMIT 1");
-$current_version = $stmt->fetchColumn() ?: '1.0.0';
+$current_version = APP_VERSION;
 
 // Get available updates
 $available_updates = [];
@@ -65,14 +64,6 @@ try {
     // Silently handle connection errors
 }
 
-// Get update history
-$stmt = $DB->query("
-    SELECT * FROM change_log 
-    WHERE change_type = 'update_applied' 
-    ORDER BY created_at DESC 
-    LIMIT 10
-");
-$update_history = $stmt->fetchAll();
 
 include __DIR__ . '/inc/header.php';
 include __DIR__ . '/inc/navigation.php';
@@ -342,7 +333,7 @@ function get_current_version() {
                                             <td>
                                                 <strong><?php echo htmlspecialchars($update['version']); ?></strong>
                                                 <?php if ($index === 0): ?>
-                                                <span class="badge bg-warning text-dark ms-1">Next</span>
+                                                <span class="badge bg-warning text-white ms-1">Next</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($update['description']); ?></td>
@@ -378,43 +369,6 @@ function get_current_version() {
                     </div>
                     <?php endif; ?>
 
-                    <!-- Update History -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">
-                                <i class="fas fa-history me-2"></i>Update History
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <?php if (!empty($update_history)): ?>
-                            <div class="table-responsive">
-                                <table class="table table-dark table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Version</th>
-                                            <th>Description</th>
-                                            <th>Applied Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($update_history as $history): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($history['version']); ?></td>
-                                            <td><?php echo htmlspecialchars($history['description']); ?></td>
-                                            <td><?php echo date('M j, Y H:i', strtotime($history['created_at'])); ?></td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <?php else: ?>
-                            <p class="text-muted">No updates have been applied yet.</p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- Instance Configuration -->
-                    <div class="row mt-4">
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header">

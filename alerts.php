@@ -254,7 +254,7 @@ include __DIR__ . '/inc/header.php';
                                     <input type="checkbox" class="form-check-input" id="alerts_warning_enabled" name="alerts_warning_enabled" 
                                            <?php echo $settings['alerts_warning_enabled'] ? 'checked' : ''; ?>>
                                     <label class="form-check-label text-light" for="alerts_warning_enabled">
-                                        <span class="badge bg-warning text-dark me-2">WARNING</span>
+                                        <span class="badge bg-warning text-white me-2">WARNING</span>
                                         Warning Alerts
                                     </label>
                                     <small class="d-block text-muted ms-4">Backup failures, delayed check-ins, certificate expiring</small>
@@ -401,7 +401,7 @@ include __DIR__ . '/inc/header.php';
                                                         <?php
                                                         $badge_class = [
                                                             'info' => 'bg-info',
-                                                            'warning' => 'bg-warning text-dark',
+                                                            'warning' => 'bg-warning text-white',
                                                             'critical' => 'bg-danger'
                                                         ][$alert['alert_level']];
                                                         ?>

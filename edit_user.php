@@ -62,7 +62,7 @@ include __DIR__ . '/inc/header.php';
           <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" name="alert_levels[]" value="warning" id="alert_warning" <?php echo in_array('warning', $user_levels) ? 'checked' : ''; ?>>
             <label class="form-check-label" for="alert_warning">
-              <span class="badge bg-warning text-dark me-2"><i class="fas fa-exclamation-triangle me-1"></i>WARNING</span> 
+              <span class="badge bg-warning text-white me-2"><i class="fas fa-exclamation-triangle me-1"></i>WARNING</span> 
               <strong>Important issues that need attention</strong>
             </label>
           </div>

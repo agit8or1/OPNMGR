@@ -45,15 +45,17 @@ if (isset($_POST['check_updates']) || $should_check_updates) {
         $commit_data = json_decode($response, true);
         $latest_commit = substr($commit_data['sha'], 0, 7);
 
-        // Get local commit - try both /var/www/opnsense and the symlinked directory
-        exec('git -C /var/www/opnsense rev-parse --short HEAD 2>&1', $local_commit_output, $return_code);
-
-        if ($return_code !== 0 || empty($local_commit_output)) {
-            // Try alternative path
-            exec('git -C /home/administrator/opnsense rev-parse --short HEAD 2>&1', $local_commit_output, $return_code);
+        // Get local commit from COMMIT file (www-data can't access the git repo directly)
+        $commit_file = __DIR__ . '/COMMIT';
+        if (file_exists($commit_file)) {
+            $local_commit = trim(file_get_contents($commit_file));
+        } else {
+            // Fallback: try git directly in case we have access
+            $local_commit_output = [];
+            $return_code = 1;
+            exec('git -C /home/administrator/opnsense rev-parse --short HEAD 2>/dev/null', $local_commit_output, $return_code);
+            $local_commit = ($return_code === 0 && !empty($local_commit_output)) ? trim($local_commit_output[0]) : 'unknown';
         }
-
-        $local_commit = ($return_code === 0 && !empty($local_commit_output)) ? trim($local_commit_output[0]) : 'unknown';
 
         if ($local_commit !== 'unknown' && $local_commit !== $latest_commit) {
             $update_available = true;
@@ -143,12 +145,12 @@ if (isset($_POST['perform_update'])) {
                 }
             }
 
-            // Update version file
+            // Update version and commit files
             exec('cd ' . escapeshellarg(__DIR__) . ' && git rev-parse --short HEAD 2>&1', $new_commit_output, $return_code);
             if ($return_code === 0 && !empty($new_commit_output)) {
                 $new_commit = trim($new_commit_output[0]);
-                file_put_contents(__DIR__ . '/VERSION', "3.0.0-{$new_commit}\n");
-                $update_log[] = "✓ Version updated to 3.0.0-{$new_commit}";
+                file_put_contents(__DIR__ . '/COMMIT', $new_commit . "\n");
+                $update_log[] = "✓ Commit updated to {$new_commit}";
             }
 
             $message = "Update completed successfully! Please review the log below.";
@@ -207,7 +209,7 @@ include __DIR__ . '/inc/header.php';
     color: #e2e8f0;
 }
 
-.text-dark, h2.text-dark, h4.text-dark, h5.text-dark {
+.text-white, h2.text-white, h4.text-white, h5.text-white {
     color: #e2e8f0 !important;
 }
 
@@ -223,7 +225,7 @@ include __DIR__ . '/inc/header.php';
     color: #cbd5e1;
 }
 
-.commit-item .text-dark {
+.commit-item .text-white {
     color: #e2e8f0 !important;
 }
 
@@ -285,7 +287,7 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <h2 class="text-dark"><i class="fas fa-sync-alt me-2 text-primary"></i>System Update</h2>
+            <h2 class="text-white"><i class="fas fa-sync-alt me-2 text-primary"></i>System Update</h2>
             <p class="text-muted">Update OPNsense Manager from GitHub repository</p>
         </div>
     </div>
@@ -310,7 +312,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="update-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-code-branch me-2"></i>Current Version</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-code-branch me-2"></i>Current Version</h5>
                 <div class="text-center">
                     <span class="version-badge bg-primary text-white">
                         <?php echo htmlspecialchars($current_version); ?>
@@ -328,7 +330,7 @@ include __DIR__ . '/inc/header.php';
 
         <div class="col-md-6">
             <div class="update-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-info-circle me-2"></i>Repository Info</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-info-circle me-2"></i>Repository Info</h5>
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Repository:</dt>
                     <dd class="col-sm-8">
@@ -376,7 +378,7 @@ include __DIR__ . '/inc/header.php';
         <div class="row mb-4">
             <div class="col-12">
                 <div class="update-card">
-                    <h5 class="text-dark mb-3"><i class="fas fa-terminal me-2"></i>Update Log</h5>
+                    <h5 class="text-white mb-3"><i class="fas fa-terminal me-2"></i>Update Log</h5>
                     <div class="update-log">
                         <?php echo implode("\n", array_map('htmlspecialchars', $update_log)); ?>
                     </div>
@@ -389,7 +391,7 @@ include __DIR__ . '/inc/header.php';
         <div class="row mb-4">
             <div class="col-12">
                 <div class="update-card">
-                    <h5 class="text-dark mb-3"><i class="fas fa-list me-2"></i>Recent Changes</h5>
+                    <h5 class="text-white mb-3"><i class="fas fa-list me-2"></i>Recent Changes</h5>
                     <?php foreach (array_slice($commit_log, 0, 10) as $commit): ?>
                         <div class="commit-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -404,7 +406,7 @@ include __DIR__ . '/inc/header.php';
                                     ?>
                                 </small>
                             </div>
-                            <div class="text-dark">
+                            <div class="text-white">
                                 <?php
                                 $message_lines = explode("\n", $commit['commit']['message']);
                                 echo htmlspecialchars($message_lines[0]);
@@ -421,7 +423,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row">
         <div class="col-12">
             <div class="update-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-question-circle me-2"></i>Manual Update</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-question-circle me-2"></i>Manual Update</h5>
                 <p>If the automatic update fails, you can update manually:</p>
                 <div class="update-log">
 cd <?php echo htmlspecialchars(__DIR__); ?>

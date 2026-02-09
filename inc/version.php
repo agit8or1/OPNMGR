@@ -2,22 +2,25 @@
 /**
  * OPNManager Version Management
  * Single source of truth for all version information
+ * Version is read from VERSION file to avoid hardcoding
  */
 
-define('APP_NAME', 'OPNManager');
-define('APP_VERSION', '2.2.0');
-define('APP_VERSION_DATE', '2026-01-08');
-define('APP_VERSION_NAME', 'v2.2 - WAN Auto-Detection');
+// Read version from VERSION file
+$version_file = __DIR__ . '/../VERSION';
+$app_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '2.2.3';
 
-define('AGENT_VERSION', '3.4.0');
-define('AGENT_VERSION_DATE', '2026-01-08');
-define('AGENT_MIN_VERSION', '3.2.0'); // Minimum supported agent version
+if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
+if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-09'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Dark theme fixes, health score improvements'); }
 
-define('UPDATE_AGENT_VERSION', '1.1.0');
-define('UPDATE_AGENT_STATUS', 'Active - 5min intervals');
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
+if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
-define('DATABASE_VERSION', '1.4.0'); // Added WAN interface tracking
-define('API_VERSION', '1.0.0');
+if (!defined('DATABASE_VERSION')) { define('DATABASE_VERSION', '1.4.0'); }
+if (!defined('API_VERSION')) { define('API_VERSION', '1.1.0'); }
+if (!defined('TUNNEL_PROXY_VERSION')) { define('TUNNEL_PROXY_VERSION', '2.0.2'); }
 
 // System information
 define('PHP_MIN_VERSION', '8.0');
@@ -28,64 +31,95 @@ define('JQUERY_VERSION', '3.7.0');
 function getChangelogEntries($limit = 10) {
     return [
         [
-            'version' => '2.2.0',
-            'date' => '2026-01-08',
-            'type' => 'minor',
-            'title' => 'WAN Auto-Detection & Interface Monitoring',
+            'version' => '2.2.3',
+            'date' => '2025-12-11',
+            'type' => 'patch',
+            'title' => 'Tunnel Proxy HTTPS Protocol Fixes',
             'changes' => [
-                'NEW: Agent v3.4.0 with automatic WAN interface detection',
-                'NEW: WAN gateway group detection (load balancing/failover)',
-                'NEW: Real-time interface monitoring (status, bandwidth, errors)',
-                'NEW: firewall_wan_interfaces table for detailed interface tracking',
-                'NEW: v_firewall_wan_status view for easy WAN status queries',
-                'NEW: Per-interface statistics (packets, bytes, errors, media type)',
-                'IMPROVED: Agent check-in protocol includes WAN interface data',
-                'IMPROVED: download_tunnel_agent.php now serves v3.4.0 by default',
-                'IMPROVED: Version-aware agent download with fallback support',
-                'Database Schema v1.4.0: Added wan_interfaces, wan_groups, wan_interface_stats columns',
-                'Agent auto-detects WAN interfaces from /conf/config.xml (zero config)',
-                'Supports multi-WAN setups automatically',
-                'Comprehensive monitoring: status (up/down), IP, speed, RX/TX stats'
+                'FIXED: Tunnel proxy "Empty reply from server" errors after login',
+                'FIXED: tunnel_proxy.php now uses HTTPS for port 443 connections',
+                'FIXED: Redirect handler (line 414) now uses correct protocol',
+                'FIXED: Initial curl_init (line 122) protocol detection',
+                'FIXED: Duplicate SSH tunnel process prevention',
+                'FIXED: Agent stability on home.agit8or.net (FW 48)',
+                'UPDATED: tunnel_proxy.php to v2.0.2',
+                'UPDATED: Version management - APP_VERSION now reads from VERSION file',
+                'IMPROVED: All version numbers now centralized and non-hardcoded'
+            ]
+        ],
+        [
+            'version' => '2.3.1',
+            'date' => '2025-11-01',
+            'type' => 'patch',
+            'title' => 'Architecture Simplification & 2FA Improvements',
+            'changes' => [
+                'REMOVED: Separate update agent - simplified to single unified agent architecture',
+                'UPDATED: Agent version to 3.7.3 with improved uptime parsing',
+                'FIXED: 2FA QR code generation - now uses proper Base32 encoding (TOTP standard)',
+                'FIXED: 2FA issuer name changed from "OPNsense" to "OPNmgr"',
+                'FIXED: Content Security Policy to allow QR code API (api.qrserver.com)',
+                'FIXED: About page contrast issues - changed text-muted to text-secondary',
+                'FIXED: Timezone selector session conflicts - removed duplicate session_start()',
+                'FIXED: Uptime display for multi-day uptimes (agent regex bug fixed)',
+                'IMPROVED: Simplified version management - removed unused update agent constants',
+                'IMPROVED: Documentation updated to reflect single agent architecture'
+            ]
+        ],
+        [
+            'version' => '2.3.0',
+            'date' => '2025-10-30',
+            'type' => 'minor',
+            'title' => 'Advanced Monitoring & Graph Infrastructure',
+            'changes' => [
+                'NEW: Latency monitoring system with database storage',
+                'NEW: SpeedTest infrastructure with scheduled/on-demand testing',
+                'NEW: Real-time graph endpoints for latency and speedtest data',
+                'NEW: System statistics graphs (CPU, Memory, Disk usage)',
+                'NEW: Traffic statistics with proper rate calculation',
+                'FIXED: API authentication - endpoints now return JSON errors instead of redirects',
+                'FIXED: JavaScript fetch() calls now include credentials for session cookies',
+                'FIXED: Graph data loading - all endpoints properly authenticated',
+                'IMPROVED: Consistent API error handling across all endpoints',
+                'Database Schema v1.4.0: Added firewall_latency and firewall_speedtest tables'
             ]
         ],
         [
             'version' => '2.1.0',
-            'date' => '2025-10-12',
+            'date' => '2025-10-24',
             'type' => 'minor',
-            'title' => 'Data Accuracy & UI Polish',
+            'title' => 'Security Features & Bug Fixes',
             'changes' => [
-                'FIXED: System uptime calculation (was hardcoded "12 days, 4 hours")',
-                'FIXED: Uptime display format parsing ("X hours, Y minutes")',
-                'FIXED: Network data persistence (agent was overwriting with empty values)',
-                'FIXED: Update detection logic (removed hardcoded version 25.7.4)',
-                'FIXED: Update tooltip showing "Available" when up-to-date',
-                'FIXED: Tag edit modal contrast (white on white - completely unreadable)',
-                'IMPROVED: Form input contrast across entire app (3x more visible)',
-                'IMPROVED: Network tooltips changed "REAL DATA" to "CURRENT DATA"',
-                'NEW: Complete network configuration display in firewall details',
-                'NEW: Database columns for WAN/LAN subnet, gateway, DNS (7 new columns)',
-                'NEW: Agent-determined update detection (no hardcoded versions)',
-                'REFACTOR: Conditional network data updates preserve existing values',
-                'Database Schema v1.3.0: Added network configuration columns'
+                'NEW: Secure Outbound Lockdown feature - restrict all outbound to HTTP/HTTPS only',
+                'NEW: Forced DNS through Unbound with logging',
+                'NEW: Comprehensive secure lockdown documentation with 6+ use cases',
+                'FIXED: Critical tunnel URL bug - missing / in path construction',
+                'FIXED: Backup upload field name mismatch (backup vs backup_file)',
+                'FIXED: Backup command path (opnsense-backup → /conf/config.xml)',
+                'FIXED: Cookie aggressive auto-deletion preventing login',
+                'FIXED: Tunnel speed - removed 2s blocking wait, now 2-3 seconds',
+                'FIXED: Orphaned SSH tunnel cleanup with kill -9',
+                'FIXED: Network Tools HTML formatting and card nesting',
+                'FIXED: Deployment package delete button functionality',
+                'NEW: Settings page for housekeeping/scheduled tasks management',
+                'NEW: AI reports grade explanations and full report display',
+                'IMPROVED: All cron tasks visible in Administration settings',
+                'Database Schema v1.3.0: Added secure_outbound_lockdown column'
             ]
         ],
         [
             'version' => '2.0.0',
             'date' => '2025-10-10',
             'type' => 'major',
-            'title' => 'Dual Agent System & Enhanced Command Execution',
+            'title' => 'Enhanced Command Execution & Base64 Encoding',
             'changes' => [
-                'MILESTONE: v2.0 with separate Primary and Update agents',
-                'NEW: Update Agent v1.1.0 (5-minute check-ins for system updates)',
-                'NEW: Primary Agent v3.2.0 with base64 command encoding',
+                'MILESTONE: v2.0 production release',
+                'NOTE: Dual-agent system (v2.0-2.3.0) was deprecated in v2.3.1',
+                'NEW: Agent v3.2.0 with base64 command encoding',
                 'FIXED: Multi-line command execution (base64 encoding prevents pipe parsing issues)',
-                'FIXED: Agent intervals (Primary: 2min, Update: 5min)',
                 'FIXED: Version display parsing JSON correctly (shows "25.7.4" not raw JSON)',
-                'FIXED: UI duplicate firewall display (JOIN filtered to primary agent only)',
-                'FIXED: Backup retention modal HTML structure',
-                'IMPROVED: Separate agent tracking (firewall_agents table with composite key)',
-                'IMPROVED: Command queue now supports complex multi-line scripts',
-                'DOCS: Comprehensive screenshot package for website/documentation'
+                'FIXED: UI firewall display improvements',
+                'IMPROVED: Agent tracking with firewall_agents table',
+                'IMPROVED: Command queue now supports complex multi-line scripts'
             ]
         ],
         [
@@ -99,36 +133,7 @@ function getChangelogEntries($limit = 10) {
                 'FIXED: Edit Firewall - variable name bugs ($hostname not $name)',
                 'FIXED: Add Firewall page - brightness/contrast issues (dark theme)',
                 'IMPROVED: Centralized version management system',
-                'IMPROVED: Tag management using proper many-to-many relationships',
-                'DOCS: Comprehensive CHANGELOG, QUICK_REFERENCE, SESSION_SUMMARY',
-                'DOCS: Internal KNOWLEDGE_BASE.md for troubleshooting',
-                'Agent v3.1.0: Stable and reliable check-ins'
-            ]
-        ],
-        [
-            'version' => '3.1.0 (Agent)',
-            'date' => '2025-10-09',
-            'type' => 'major',
-            'title' => 'Agent v3.1 - Complete Overhaul',
-            'changes' => [
-                'FIXED: Agent background execution issues (curl failing silently)',
-                'FIXED: 782 duplicate check-ins / 39-41 concurrent agents',
-                'FIXED: PID locking now built-in from line 1',
-                'FIXED: Heredoc JSON replaced with inline printf-style',
-                'REMOVED: Rate limiting (proper PID locking now used)',
-                'UI: Backup retention modal, dropdown z-index, "Awaiting Data" styling',
-                'UI: Customer/Tag dropdowns, firewall details JavaScript fixes'
-            ]
-        ],
-        [
-            'version' => '3.0.0 (Agent)',
-            'date' => '2025-10-08',
-            'type' => 'major',
-            'title' => 'PID Locking Implementation',
-            'changes' => [
-                'ADDED: PID file locking to prevent duplicate agents',
-                'ADDED: Agent version tracking in database',
-                'IMPROVED: Check-in logging and monitoring'
+                'IMPROVED: Tag management using proper many-to-many relationships'
             ]
         ]
     ];
@@ -148,9 +153,8 @@ function getVersionInfo() {
             'date' => AGENT_VERSION_DATE,
             'min_supported' => AGENT_MIN_VERSION
         ],
-        'update_agent' => [
-            'version' => UPDATE_AGENT_VERSION,
-            'status' => UPDATE_AGENT_STATUS
+        'tunnel_proxy' => [
+            'version' => TUNNEL_PROXY_VERSION
         ],
         'database' => [
             'version' => DATABASE_VERSION
@@ -194,11 +198,11 @@ function getSystemHealth() {
         ];
         
         // Check for old agent versions
-        $stmt = $DB->query("SELECT COUNT(*) as count FROM firewalls WHERE agent_version < '" . AGENT_MIN_VERSION . "' AND status = 'online'");
+        $stmt = $DB->query("SELECT COUNT(DISTINCT fa.firewall_id) as count FROM firewall_agents fa WHERE fa.agent_version < '" . AGENT_MIN_VERSION . "' AND fa.status = 'online'");
         $result = $stmt->fetch();
         $health['checks']['agent_versions'] = [
             'status' => $result['count'] == 0 ? 'ok' : 'warning',
-            'message' => $result['count'] == 0 ? 'All agents up to date' : $result['count'] . ' agent(s) need updating'
+            'message' => $result['count'] == 0 ? 'All agents up to date' : $result['count'] . ' firewall(s) with outdated agents'
         ];
         
     } catch (Exception $e) {
@@ -211,3 +215,4 @@ function getSystemHealth() {
     
     return $health;
 }
+?>

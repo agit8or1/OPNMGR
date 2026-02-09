@@ -116,7 +116,7 @@ include __DIR__ . '/inc/header.php';
     color: #f1f5f9;
 }
 
-.text-dark, h2.text-dark, h5.text-dark, h6.text-dark {
+.text-white, h2.text-white, h5.text-white, h6.text-white {
     color: #e2e8f0 !important;
 }
 
@@ -157,7 +157,7 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <h2 class="text-dark"><i class="fas fa-life-ring me-2 text-primary"></i>Support & Help</h2>
+            <h2 class="text-white"><i class="fas fa-life-ring me-2 text-primary"></i>Support & Help</h2>
             <p class="text-muted">Get help or report issues with OPNsense Manager</p>
         </div>
     </div>
@@ -179,7 +179,7 @@ include __DIR__ . '/inc/header.php';
         <!-- Create Issue on GitHub -->
         <div class="col-lg-6 mb-4">
             <div class="support-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-plus-circle me-2"></i>Create Support Issue</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-plus-circle me-2"></i>Create Support Issue</h5>
 
                 <div class="help-section">
                     <h6 class="text-primary mb-2"><i class="fas fa-info-circle me-2"></i>Create an Issue on GitHub</h6>
@@ -208,11 +208,11 @@ include __DIR__ . '/inc/header.php';
         <!-- Browse Issues (no longer needs PAT) -->
         <div class="col-lg-6 mb-4" style="display: none;">
             <div class="support-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-plus-circle me-2"></i>REMOVED - No longer shown</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-plus-circle me-2"></i>REMOVED - No longer shown</h5>
 
                 <form method="post" style="display: none;">
                         <div class="mb-3">
-                            <label class="form-label text-dark"><strong>Category</strong></label>
+                            <label class="form-label text-white"><strong>Category</strong></label>
                             <select name="issue_category" class="form-select form-control-custom" required>
                                 <option value="bug" <?php echo ($_POST['issue_category'] ?? '') === 'bug' ? 'selected' : ''; ?>>
                                     🐛 Bug Report
@@ -233,7 +233,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label text-dark"><strong>Title</strong></label>
+                            <label class="form-label text-white"><strong>Title</strong></label>
                             <input type="text" name="issue_title" class="form-control form-control-custom"
                                    placeholder="Brief description of the issue"
                                    value="<?php echo htmlspecialchars($_POST['issue_title'] ?? ''); ?>"
@@ -241,7 +241,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label text-dark"><strong>Description</strong></label>
+                            <label class="form-label text-white"><strong>Description</strong></label>
                             <textarea name="issue_description" class="form-control form-control-custom" rows="8"
                                       placeholder="Detailed description of the issue. Include steps to reproduce if reporting a bug."
                                       required><?php echo htmlspecialchars($_POST['issue_description'] ?? ''); ?></textarea>
@@ -255,10 +255,10 @@ include __DIR__ . '/inc/header.php';
         <!-- Help & Resources -->
         <div class="col-lg-6 mb-4">
             <div class="support-card">
-                <h5 class="text-dark mb-3"><i class="fas fa-book me-2"></i>Help & Resources</h5>
+                <h5 class="text-white mb-3"><i class="fas fa-book me-2"></i>Help & Resources</h5>
 
                 <div class="mb-3">
-                    <h6 class="text-dark"><i class="fas fa-file-alt me-2 text-primary"></i>Documentation</h6>
+                    <h6 class="text-white"><i class="fas fa-file-alt me-2 text-primary"></i>Documentation</h6>
                     <ul>
                         <li><a href="README_INSTALL.md" target="_blank">Installation Guide</a></li>
                         <li><a href="SECURITY.md" target="_blank">Security Policy</a></li>
@@ -267,7 +267,7 @@ include __DIR__ . '/inc/header.php';
                 </div>
 
                 <div class="mb-3">
-                    <h6 class="text-dark"><i class="fas fa-comments me-2 text-success"></i>Community</h6>
+                    <h6 class="text-white"><i class="fas fa-comments me-2 text-success"></i>Community</h6>
                     <ul>
                         <li><a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>/discussions" target="_blank">GitHub Discussions</a></li>
                         <li><a href="https://github.com/<?php echo htmlspecialchars($github_username . '/' . $github_repo); ?>/issues" target="_blank">Browse Issues</a></li>
@@ -275,7 +275,7 @@ include __DIR__ . '/inc/header.php';
                 </div>
 
                 <div class="mb-3">
-                    <h6 class="text-dark"><i class="fas fa-tools me-2 text-warning"></i>Quick Links</h6>
+                    <h6 class="text-white"><i class="fas fa-tools me-2 text-warning"></i>Quick Links</h6>
                     <div class="d-grid gap-2">
                         <a href="system_update.php" class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-sync-alt me-2"></i>Check for Updates

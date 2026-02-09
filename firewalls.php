@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/inc/auth.php';
 require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/version.php';
 require_once __DIR__ . "/inc/csrf.php";
 require_once __DIR__ . "/inc/timezone_selector.php";
 requireLogin();
@@ -131,8 +132,8 @@ if (!empty($status_filter) && $status_filter !== 'all') {
     } elseif ($status_filter === 'offline') {
         $query .= " AND (fa.last_checkin IS NULL OR fa.last_checkin <= DATE_SUB(NOW(), INTERVAL 10 MINUTE))";
     } elseif ($status_filter === 'need_updates' || $status_filter === 'needs_update') {
-        // Filter for firewalls that need updates (version is not the latest)
-        $query .= " AND (fa.opnsense_version < '25.7.4' OR fa.opnsense_version IS NULL)";
+        // Filter for firewalls that need updates
+        $query .= " AND (f.updates_available = 1 OR f.current_version != f.available_version)";
     }
 }
 
@@ -208,6 +209,21 @@ if ($sort_by === 'health') {
         $firewalls = [];
         $error = 'Database error: ' . $e->getMessage();
     }
+}
+
+// Determine the latest OPNsense major version across all firewalls for upgrade detection
+$latest_major_version = '';
+try {
+    $ver_stmt = $DB->query("SELECT current_version FROM firewalls WHERE current_version IS NOT NULL AND current_version != '' AND current_version != 'Unknown'");
+    $all_versions = $ver_stmt->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($all_versions as $ver) {
+        // Extract major.minor (e.g., "26.1" from "26.1.1")
+        if (version_compare($ver, $latest_major_version, '>')) {
+            $latest_major_version = $ver;
+        }
+    }
+} catch (PDOException $e) {
+    $latest_major_version = '';
 }
 
 // Get all available tags for the filter dropdown
@@ -797,13 +813,13 @@ include __DIR__ . '/inc/header.php';
                                     // Agent Version Score (25 points) - More generous scoring
                                     if (!empty($firewall['agent_version'])) {
                                         $agent_version = $firewall['agent_version'];
-                                        if (version_compare($agent_version, '2.3.0', '>=')) {
+                                        if (version_compare($agent_version, AGENT_VERSION, '>=')) {
                                             $health_score += 25;
                                             $health_details[] = "✓ Agent up to date (v" . $agent_version . ")";
-                                        } elseif (version_compare($agent_version, '2.1.0', '>=')) {
-                                            $health_score += 24; // Almost full score for 2.1.x versions
+                                        } elseif (version_compare($agent_version, AGENT_MIN_VERSION, '>=')) {
+                                            $health_score += 24; // Almost full score for supported versions
                                             $health_details[] = "✓ Agent recent version (v" . $agent_version . ")";
-                                        } elseif (version_compare($agent_version, '2.0.0', '>=')) {
+                                        } elseif (version_compare($agent_version, '1.0.0', '>=')) {
                                             $health_score += 20;
                                             $health_details[] = "⚠ Agent needs update (v" . $agent_version . ")";
                                         } else {
@@ -815,12 +831,27 @@ include __DIR__ . '/inc/header.php';
                                     }
                                     
                                     // System Updates Score (20 points)
-                                    if (isset($firewall['updates_available'])) {
+                                    // Check for major version upgrade available (server-side detection)
+                                    $fw_upgrade_available = false;
+                                    if (!empty($firewall['current_version']) && !empty($latest_major_version) && $firewall['current_version'] !== 'Unknown') {
+                                        $fw_cur_parts = explode('.', $firewall['current_version']);
+                                        $fw_lat_parts = explode('.', $latest_major_version);
+                                        $fw_cur_major = (isset($fw_cur_parts[0]) ? (int)$fw_cur_parts[0] : 0) * 100 + (isset($fw_cur_parts[1]) ? (int)explode('_', $fw_cur_parts[1])[0] : 0);
+                                        $fw_lat_major = (isset($fw_lat_parts[0]) ? (int)$fw_lat_parts[0] : 0) * 100 + (isset($fw_lat_parts[1]) ? (int)explode('_', $fw_lat_parts[1])[0] : 0);
+                                        if ($fw_lat_major > $fw_cur_major) {
+                                            $fw_upgrade_available = true;
+                                        }
+                                    }
+
+                                    if ($fw_upgrade_available) {
+                                        $health_score += 15;
+                                        $health_issues[] = "⚠ Major upgrade available (v" . htmlspecialchars($firewall['current_version']) . " → " . htmlspecialchars($latest_major_version) . ")";
+                                    } elseif (isset($firewall['updates_available'])) {
                                         if ($firewall['updates_available'] == 0) {
                                             $health_score += 20;
                                             $health_details[] = "✓ System up to date";
                                         } elseif ($firewall['updates_available'] == 1) {
-                                            $health_score += 15; // Less penalty for available updates
+                                            $health_score += 15;
                                             $health_details[] = "⚠ System updates available";
                                         } else {
                                             $health_score += 10;
@@ -890,11 +921,11 @@ include __DIR__ . '/inc/header.php';
                                         $health_icon = 'fas fa-check-circle';
                                     } elseif ($health_score >= 50) {
                                         $health_grade = 'C+';
-                                        $health_color = 'bg-warning text-dark';
+                                        $health_color = 'bg-warning text-white';
                                         $health_icon = 'fas fa-exclamation-circle';
                                     } elseif ($health_score >= 40) {
                                         $health_grade = 'C';
-                                        $health_color = 'bg-warning text-dark';
+                                        $health_color = 'bg-warning text-white';
                                         $health_icon = 'fas fa-exclamation-circle';
                                     } else {
                                         $health_grade = 'F';
@@ -983,48 +1014,63 @@ include __DIR__ . '/inc/header.php';
                                         
                                         $update_tooltip .= "🚀 ACTION: Click the sync button below to update";
                                         ?>
-                                        <span class="badge bg-warning text-dark hover-tooltip" data-tooltip="<?php echo htmlspecialchars($update_tooltip); ?>">
+                                        <span class="badge bg-warning text-white hover-tooltip" data-tooltip="<?php echo htmlspecialchars($update_tooltip); ?>">
                                             <i class="fas fa-exclamation-triangle me-1"></i>Available
                                         </span>
                                         <button class="btn btn-sm btn-outline-success mt-1" onclick="updateFirewall(<?php echo $firewall['id']; ?>)" title="Update Firewall">
                                             <i class="fas fa-sync-alt"></i>
                                         </button>
-                                    <?php elseif ($firewall["last_update_check"] && $firewall["updates_available"] === 0): ?>
+                                    <?php elseif ($firewall["last_update_check"] && $firewall["updates_available"] == 0): ?>
                                         <?php
-                                        // Build enhanced up-to-date tooltip
-                                        $uptodate_tooltip = "✅ SYSTEM UP TO DATE\n";
-                                        $uptodate_tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
-                                        
-                                        // Parse current version for better display
-                                        $current_display = 'Unknown';
-                                        if (!empty($firewall['current_version'])) {
-                                            $version_data = json_decode($firewall['current_version'], true);
-                                            if ($version_data && isset($version_data['product_version'])) {
-                                                $current_display = $version_data['product_version'];
-                                                if (isset($version_data['system_version'])) {
-                                                    $current_display .= ' (' . $version_data['system_version'] . ')';
-                                                }
-                                            } else {
-                                                $current_display = htmlspecialchars($firewall['current_version']);
+                                        // Check if a major version upgrade is available
+                                        $current_ver = $firewall['current_version'] ?: '';
+                                        $upgrade_available = false;
+                                        if (!empty($current_ver) && !empty($latest_major_version) && $current_ver !== 'Unknown') {
+                                            // Compare major.minor branches (e.g., 25.7 vs 26.1)
+                                            $cur_parts = explode('.', $current_ver);
+                                            $lat_parts = explode('.', $latest_major_version);
+                                            $cur_major = (isset($cur_parts[0]) ? (int)$cur_parts[0] : 0) * 100 + (isset($cur_parts[1]) ? (int)explode('_', $cur_parts[1])[0] : 0);
+                                            $lat_major = (isset($lat_parts[0]) ? (int)$lat_parts[0] : 0) * 100 + (isset($lat_parts[1]) ? (int)explode('_', $lat_parts[1])[0] : 0);
+                                            if ($lat_major > $cur_major) {
+                                                $upgrade_available = true;
                                             }
                                         }
-                                        
-                                        $uptodate_tooltip .= "📦 CURRENT VERSION:\n";
-                                        $uptodate_tooltip .= "  • OPNsense: " . $current_display . "\n\n";
-                                        
-                                        $uptodate_tooltip .= "🔍 UPDATE STATUS:\n";
-                                        $last_check = date('M j, Y H:i:s', strtotime($firewall['last_update_check']));
-                                        $uptodate_tooltip .= "  • Last Check: " . $last_check . "\n";
-                                        $uptodate_tooltip .= "  • Status: No updates available\n\n";
-                                        
-                                        $uptodate_tooltip .= "🎯 SYSTEM STATE:\n";
-                                        $uptodate_tooltip .= "  • Running latest stable release\n";
-                                        $uptodate_tooltip .= "  • Security patches current\n";
-                                        $uptodate_tooltip .= "  • No action required";
+
+                                        if ($upgrade_available):
+                                            // Major version upgrade available
+                                            $upgrade_tooltip = "⬆️ MAJOR UPGRADE AVAILABLE\n";
+                                            $upgrade_tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+                                            $upgrade_tooltip .= "📦 CURRENT: " . htmlspecialchars($current_ver) . "\n";
+                                            $upgrade_tooltip .= "📦 LATEST: " . htmlspecialchars($latest_major_version) . "\n\n";
+                                            $upgrade_tooltip .= "🔍 STATUS:\n";
+                                            $upgrade_tooltip .= "  • Patches current for " . htmlspecialchars(implode('.', array_slice(explode('.', $current_ver), 0, 2))) . " branch\n";
+                                            $upgrade_tooltip .= "  • Major upgrade to " . htmlspecialchars(implode('.', array_slice(explode('.', $latest_major_version), 0, 2))) . " available\n\n";
+                                            $upgrade_tooltip .= "🚀 ACTION:\n";
+                                            $upgrade_tooltip .= "  • Upgrade via OPNsense web UI\n";
+                                            $upgrade_tooltip .= "  • Firmware > Updates > Upgrade";
                                         ?>
-                                        <span class="badge bg-success hover-tooltip" data-tooltip="<?php echo htmlspecialchars($uptodate_tooltip); ?>">
+                                        <span class="badge bg-info text-white hover-tooltip" data-tooltip="<?php echo htmlspecialchars($upgrade_tooltip); ?>">
+                                            <i class="fas fa-arrow-circle-up me-1"></i>Upgrade
+                                        </span>
+                                        <?php else:
+                                            // Truly up to date
+                                            $current_display = htmlspecialchars($current_ver ?: 'Unknown');
+                                            $uptodate_tooltip = "✅ SYSTEM UP TO DATE\n";
+                                            $uptodate_tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+                                            $uptodate_tooltip .= "📦 CURRENT VERSION:\n";
+                                            $uptodate_tooltip .= "  • OPNsense: " . $current_display . "\n\n";
+                                            $uptodate_tooltip .= "🔍 UPDATE STATUS:\n";
+                                            $last_check = date('M j, Y H:i:s', strtotime($firewall['last_update_check']));
+                                            $uptodate_tooltip .= "  • Last Check: " . $last_check . "\n";
+                                            $uptodate_tooltip .= "  • Status: No updates available\n\n";
+                                            $uptodate_tooltip .= "🎯 SYSTEM STATE:\n";
+                                            $uptodate_tooltip .= "  • Running latest stable release\n";
+                                            $uptodate_tooltip .= "  • No action required";
+                                        ?>
+                                        <span class="badge bg-success text-white hover-tooltip" data-tooltip="<?php echo htmlspecialchars($uptodate_tooltip); ?>">
                                             <i class="fas fa-check me-1"></i>Up to date
                                         </span>
+                                        <?php endif; ?>
                                     <?php else: ?>
                                         <?php
                                         // Build enhanced check needed tooltip
@@ -1058,7 +1104,7 @@ include __DIR__ . '/inc/header.php';
                                         $check_tooltip .= "  • This will query for available versions\n";
                                         $check_tooltip .= "  • Status will update after check completes";
                                         ?>
-                                        <span class="badge bg-warning text-dark hover-tooltip" data-tooltip="<?php echo htmlspecialchars($check_tooltip); ?>">
+                                        <span class="badge bg-warning text-white hover-tooltip" data-tooltip="<?php echo htmlspecialchars($check_tooltip); ?>">
                                             <i class="fas fa-question me-1"></i>Check needed
                                         </span>
                                         <button class="btn btn-sm btn-outline-info mt-1" onclick="checkUpdates(<?php echo $firewall['id']; ?>)" title="Check for Updates">
@@ -1102,15 +1148,15 @@ include __DIR__ . '/inc/header.php';
                                         // Set badge style based on status
                                         switch($status) {
                                             case "online":
-                                                $statusClass = "bg-success";
+                                                $statusClass = "bg-success text-white";
                                                 $statusText = "Online";
                                                 break;
                                             case "offline":
-                                                $statusClass = "bg-danger";
+                                                $statusClass = "bg-danger text-white";
                                                 $statusText = "Offline";
                                                 break;
                                             default:
-                                                $statusClass = "bg-warning";
+                                                $statusClass = "bg-warning text-white";
                                                 $statusText = "Unknown";
                                         }
                                     ?>

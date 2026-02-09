@@ -80,7 +80,6 @@ include __DIR__ . '/inc/header.php';
                     <small class="text-light fw-bold mb-0">
                         <i class="fas fa-list-alt me-1"></i>System Logs
                     </small>
-                    <?php renderTimezoneSelector(); ?>
                     <div class="ms-auto">
                         <button type="button" id="autoRefreshBtn" class="btn btn-outline-info btn-sm me-2" onclick="toggleAutoRefresh()">
                             <i class="fas fa-sync-alt me-1"></i>Auto-Refresh: <span id="refreshStatus">OFF</span>
@@ -227,10 +226,10 @@ include __DIR__ . '/inc/header.php';
                                             <span class="badge <?php 
                                                 echo match($log['level']) {
                                                     'ERROR' => 'bg-danger',
-                                                    'WARNING' => 'bg-warning text-dark',
-                                                    'INFO' => 'bg-info text-dark',
+                                                    'WARNING' => 'bg-warning text-white',
+                                                    'INFO' => 'bg-info text-white',
                                                     'DEBUG' => 'bg-secondary',
-                                                    default => 'bg-light text-dark'
+                                                    default => 'bg-light text-white'
                                                 };
                                             ?>">
                                                 <?php echo htmlspecialchars($log['level']); ?>
