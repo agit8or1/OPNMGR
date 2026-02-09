@@ -63,23 +63,27 @@ A comprehensive web-based management platform for centralized monitoring, config
 ### Dashboard
 ![Dashboard](screenshots/02-dashboard.png)
 
-### Firewall List
-![Firewall List](screenshots/03-firewall-list.png)
+### Firewall Management
+| Firewall List | Firewall Details |
+|---------------|------------------|
+| ![Firewall List](screenshots/03-firewall-list.png) | ![Firewall Details](screenshots/03-firewall-details.png) |
 
-### Settings
-![Settings Page](screenshots/04-settings.png)
+### Add New Firewall
+![Add Firewall](screenshots/04-add-firewall.png)
 
-### Security Scanner
-![Security Scanner](screenshots/05-security-scanner.png)
+### Customer Management
+![Customers](screenshots/05-customers.png)
 
-### System Update
-![System Update](screenshots/06-system-update.png)
+### Tag Management
+![Manage Tags](screenshots/06-manage-tags.png)
 
-### Support
-![Support Page](screenshots/07-support.png)
+### Activity Logs
+![Logs](screenshots/07-logs.png)
 
-### About
-![About Page](screenshots/08-about.png)
+### Settings & Users
+| Settings | User Management |
+|----------|-----------------|
+| ![Settings](screenshots/08-settings.png) | ![Users](screenshots/09-users.png) |
 
 ---
 

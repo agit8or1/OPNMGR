@@ -141,3 +141,9 @@ robots.txt.local
 .claude/
 .claude.json
 .claude.json.backup
+
+# Old screenshot directories
+public_screenshots/
+screenshots_comprehensive/
+screenshots_final/
+screenshot_*.png
