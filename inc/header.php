@@ -357,7 +357,19 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
         <a class="list-group-item list-group-item-action" href="/customers.php"><i class="fa fa-building me-2"></i> Customers</a>
         <a class="list-group-item list-group-item-action" href="/manage_tags_ui.php"><i class="fa fa-tags me-2"></i> Manage Tags</a>
         <a class="list-group-item list-group-item-action" href="/add_firewall_page.php"><i class="fa fa-plus me-2"></i> Add Firewall</a>
-        <a class="list-group-item list-group-item-action" href="/twofactor_setup.php"><i class="fa fa-mobile-alt me-2"></i> 2FA Setup</a>
+
+        <div class="list-group-item border-0 px-0">
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fa fa-user-circle me-2"></i> Profile
+            </button>
+            <ul class="dropdown-menu w-100">
+              <li><a class="dropdown-item" href="/profile.php"><i class="fa fa-user me-2"></i> My Profile</a></li>
+              <li><a class="dropdown-item" href="/twofactor_setup.php"><i class="fa fa-mobile-alt me-2"></i> 2FA Setup</a></li>
+            </ul>
+          </div>
+        </div>
+
         <a class="list-group-item list-group-item-action" href="/documentation.php"><i class="fa fa-book me-2"></i> User Documentation</a>
         <a class="list-group-item list-group-item-action" href="/about.php"><i class="fa fa-info-circle me-2"></i> About</a>
         
