@@ -630,6 +630,140 @@ include __DIR__ . '/inc/header.php';
         </div>
     </div>
 
+    <!-- Real-time Scan Progress Monitor -->
+    <?php if (isset($_GET['monitoring'])): ?>
+        <?php
+        $monitoring_scan_id = $_GET['monitoring'];
+        $monitoring_scan_type = $_GET['type'] ?? 'dependencies';
+        $scan_names = [
+            'all' => 'Comprehensive Security Scan',
+            'dependencies' => 'Dependency Scan',
+            'code' => 'Code Analysis',
+            'monitor' => 'Continuous Monitoring'
+        ];
+        $scan_display_name = $scan_names[$monitoring_scan_type] ?? 'Security Scan';
+        ?>
+        <div class="row mb-4" id="scan-progress-container">
+            <div class="col-12">
+                <div class="card card-dark-custom">
+                    <div class="card-header card-header-custom">
+                        <h5 class="mb-0">
+                            <i class="fas fa-sync fa-spin me-2"></i><?php echo $scan_display_name; ?> In Progress
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="progress" style="height: 30px;">
+                                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%">
+                                    <span id="progress-percent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="progress-message" class="text-center text-light mb-3">
+                            Initializing scan...
+                        </div>
+                        <div id="progress-summary" class="alert" style="display: none; white-space: pre-wrap; font-family: monospace;"></div>
+                        <div class="text-center">
+                            <button id="show-full-output-btn" class="btn btn-sm btn-outline-primary" onclick="toggleFullOutput()" style="display: none;">
+                                <i class="fas fa-list me-2"></i>Show Full Output
+                            </button>
+                            <a href="security_scan.php" class="btn btn-sm btn-secondary" id="back-btn" style="display: none;">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </a>
+                        </div>
+                        <div id="full-output" class="scan-output mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        let scanId = <?php echo json_encode($monitoring_scan_id); ?>;
+        let pollInterval;
+        let fullOutputData = '';
+
+        function updateProgress() {
+            fetch('snyk_scan_progress.php?scan_id=' + encodeURIComponent(scanId))
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('progress-message').textContent = 'Error: ' + data.error;
+                        clearInterval(pollInterval);
+                        return;
+                    }
+
+                    // Update progress bar
+                    document.getElementById('progress-bar').style.width = data.percent + '%';
+                    document.getElementById('progress-percent').textContent = data.percent + '%';
+
+                    // Update status message
+                    document.getElementById('progress-message').textContent = data.message;
+
+                    // Store full output
+                    fullOutputData = data.output || '';
+
+                    // Check if completed
+                    if (data.status === 'success' || data.status === 'warning' || data.status === 'error') {
+                        clearInterval(pollInterval);
+
+                        // Update progress bar color
+                        let progressBar = document.getElementById('progress-bar');
+                        progressBar.classList.remove('progress-bar-animated', 'bg-primary');
+
+                        if (data.status === 'success') {
+                            progressBar.classList.add('bg-success');
+                        } else if (data.status === 'warning') {
+                            progressBar.classList.add('bg-warning');
+                        } else {
+                            progressBar.classList.add('bg-danger');
+                        }
+
+                        // Show summary
+                        let summaryDiv = document.getElementById('progress-summary');
+                        summaryDiv.textContent = data.message;
+                        summaryDiv.className = 'alert alert-' + (data.status === 'success' ? 'success' : (data.status === 'warning' ? 'warning' : 'danger'));
+                        summaryDiv.style.display = 'block';
+
+                        // Show buttons
+                        if (fullOutputData) {
+                            document.getElementById('show-full-output-btn').style.display = 'inline-block';
+                        }
+                        document.getElementById('back-btn').style.display = 'inline-block';
+
+                        // Update header icon
+                        let icon = document.querySelector('#scan-progress-container .fa-spin');
+                        if (icon) {
+                            icon.classList.remove('fa-spin', 'fa-sync');
+                            icon.classList.add(data.status === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Progress check failed:', error);
+                    document.getElementById('progress-message').textContent = 'Error checking progress';
+                });
+        }
+
+        function toggleFullOutput() {
+            let outputDiv = document.getElementById('full-output');
+            let btn = document.getElementById('show-full-output-btn');
+
+            if (outputDiv.style.display === 'none') {
+                outputDiv.textContent = fullOutputData;
+                outputDiv.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-times me-2"></i>Hide Full Output';
+            } else {
+                outputDiv.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-list me-2"></i>Show Full Output';
+            }
+        }
+
+        // Start polling
+        updateProgress();
+        pollInterval = setInterval(updateProgress, 2000); // Poll every 2 seconds
+        </script>
+    <?php endif; ?>
+
     <?php if (isset($scan_output) && $scan_output): ?>
         <div class="row mb-4">
             <div class="col-12">
