@@ -41,48 +41,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'install_snyk':
-            // Check if npm is installed
-            exec('which npm 2>&1', $npm_check_output, $npm_check_code);
-            if ($npm_check_code !== 0) {
-                // npm is not installed - provide manual installation instructions
-                $config_message = '<strong>Node.js and npm are not installed.</strong><br><br>';
-                $config_message .= 'Please run these commands on the server:<br>';
-                $config_message .= '<div class="bg-dark p-3 mt-2 mb-2" style="font-family: monospace; border-radius: 5px;">';
-                $config_message .= '# Install Node.js and npm<br>';
-                $config_message .= 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -<br>';
-                $config_message .= 'sudo apt-get install -y nodejs<br><br>';
-                $config_message .= '# Install Snyk<br>';
-                $config_message .= 'sudo npm install -g snyk<br><br>';
-                $config_message .= '# Verify installation<br>';
-                $config_message .= 'node --version<br>';
-                $config_message .= 'npm --version<br>';
-                $config_message .= 'snyk --version';
-                $config_message .= '</div>';
-                $config_message .= 'After installation, refresh this page to configure Snyk.';
-                $config_status = 'warning';
-                break;
-            }
+            // Run the installation script
+            $install_script = __DIR__ . '/scripts/install_snyk.sh';
+            $log_file = '/tmp/snyk_install.log';
 
-            // npm is installed, try to install Snyk
-            exec('sudo npm install -g snyk 2>&1', $output, $return_code);
+            // Execute the installation script with sudo
+            exec("sudo $install_script 2>&1", $output, $return_code);
+
             if ($return_code === 0) {
-                $config_message = 'Snyk installed successfully! Please configure your API key below.';
+                $config_message = '<strong>Installation successful!</strong><br><br>';
+
+                // Read the log file for details
+                if (file_exists($log_file)) {
+                    $log_content = file_get_contents($log_file);
+                    $config_message .= '<div class="alert alert-info" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">';
+                    $config_message .= htmlspecialchars($log_content);
+                    $config_message .= '</div>';
+                }
+
+                $config_message .= '<strong>Node.js, npm, and Snyk are now installed!</strong><br>';
+                $config_message .= 'Please configure your API key below to start scanning.';
                 $config_status = 'success';
             } else {
-                // Failed with sudo, try without sudo (might work if user permissions are set)
-                exec('npm install -g snyk 2>&1', $output2, $return_code2);
-                if ($return_code2 === 0) {
-                    $config_message = 'Snyk installed successfully! Please configure your API key below.';
-                    $config_status = 'success';
-                } else {
-                    $config_message = '<strong>Failed to install Snyk automatically.</strong><br><br>';
-                    $config_message .= 'Please run this command on the server:<br>';
-                    $config_message .= '<div class="bg-dark p-3 mt-2 mb-2" style="font-family: monospace; border-radius: 5px;">';
-                    $config_message .= 'sudo npm install -g snyk';
+                $config_message = '<strong>Installation failed.</strong><br><br>';
+
+                // Show error output
+                if (!empty($output)) {
+                    $config_message .= 'Error output:<br>';
+                    $config_message .= '<div class="alert alert-danger" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">';
+                    $config_message .= htmlspecialchars(implode("\n", $output));
                     $config_message .= '</div>';
-                    $config_message .= 'Error: ' . htmlspecialchars(implode("\n", $output));
-                    $config_status = 'danger';
                 }
+
+                // Check log file
+                if (file_exists($log_file)) {
+                    $log_content = file_get_contents($log_file);
+                    $config_message .= 'Installation log:<br>';
+                    $config_message .= '<div class="alert alert-warning" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">';
+                    $config_message .= htmlspecialchars($log_content);
+                    $config_message .= '</div>';
+                }
+
+                $config_message .= 'If the issue persists, you can manually run:<br>';
+                $config_message .= '<code>sudo ' . $install_script . '</code>';
+                $config_status = 'danger';
             }
             break;
 
