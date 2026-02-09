@@ -59,31 +59,53 @@ A comprehensive web-based management platform for centralized monitoring, config
 
 ### Login Page
 ![Login Page](screenshots/01-login.png)
+*Secure authentication with optional 2FA support*
 
 ### Dashboard
 ![Dashboard](screenshots/02-dashboard.png)
+*Real-time overview with firewall statistics, status charts, and network map*
 
 ### Firewall Management
 | Firewall List | Firewall Details |
 |---------------|------------------|
 | ![Firewall List](screenshots/03-firewall-list.png) | ![Firewall Details](screenshots/03-firewall-details.png) |
+*Complete firewall inventory with filtering and search (left) • Detailed firewall information with network config and status (right)*
+
+### Firewall Editing
+![Edit Firewall](screenshots/10-firewall-edit.png)
+*Edit firewall configuration including hostname, IP addresses, customer assignment, and tags*
 
 ### Add New Firewall
 ![Add Firewall](screenshots/04-add-firewall.png)
+*Simple firewall enrollment with automatic agent installation script generation*
 
 ### Customer Management
 ![Customers](screenshots/05-customers.png)
+*Multi-tenant customer organization with firewall counts and contact information*
 
 ### Tag Management
 ![Manage Tags](screenshots/06-manage-tags.png)
+*Color-coded tags for organizing firewalls by location, type, or custom categories*
 
 ### Activity Logs
 ![Logs](screenshots/07-logs.png)
+*Complete audit trail of all actions, commands, and system events*
 
-### Settings & Users
-| Settings | User Management |
-|----------|-----------------|
-| ![Settings](screenshots/08-settings.png) | ![Users](screenshots/09-users.png) |
+### System Settings
+![Settings](screenshots/08-settings.png)
+*Complete system configuration: branding, theme customization, GitHub integration, security scanner, and update management*
+
+### User Management
+![Users](screenshots/09-users.png)
+*User access control with role-based permissions*
+
+### User Administration
+![Add User](screenshots/11-add-user.png)
+*Create new users with role-based permissions (admin/viewer)*
+
+### About & System Information
+![About](screenshots/12-about.png)
+*Version information, system statistics, and GitHub integration status*
 
 ---
 

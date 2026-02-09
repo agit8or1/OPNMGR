@@ -48,7 +48,7 @@ take_screenshot() {
         --disable-gpu \
         --no-sandbox \
         --disable-dev-shm-usage \
-        --window-size=1920,1080 \
+        --window-size=1920,2400 \
         --screenshot="$output_file" \
         "${BASE_URL}${page_path}" \
         2>/dev/null
