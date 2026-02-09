@@ -142,8 +142,14 @@ robots.txt.local
 .claude.json
 .claude.json.backup
 
-# Old screenshot directories
+# Screenshots - keep local only, not in repo
+screenshots/
 public_screenshots/
 screenshots_comprehensive/
 screenshots_final/
 screenshot_*.png
+scripts/capture_screenshots.sh
+scripts/capture_authenticated_screenshots.js
+scripts/node_modules/
+scripts/package.json
+scripts/package-lock.json
