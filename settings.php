@@ -342,22 +342,6 @@ include __DIR__ . '/inc/header.php';
     </div>
   </div>
 
-  <!-- License Management -->
-  <div class="col-md-3">
-    <div class="card card-dark h-100">
-      <div class="card-body text-center p-2">
-        <div class="mb-2">
-          <i class="fas fa-key fa-2x text-warning"></i>
-        </div>
-        <h6 class="card-title">License Management</h6>
-        <p class="card-text text-muted small">View installed license</p>
-        <button class="btn btn-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#licenseManagementModal" onclick="loadLicenseData()">
-          <i class="fas fa-info-circle me-1"></i>View License
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- SMTP Settings -->
   <div class="col-md-3">
     <div class="card card-dark h-100">
@@ -818,31 +802,6 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
-<!-- License Management Modal -->
-<div class="modal fade" id="licenseManagementModal" tabindex="-1" aria-labelledby="licenseManagementModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content bg-dark text-light">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title" id="licenseManagementModalLabel">
-          <i class="fas fa-certificate me-2"></i>License Management
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div id="licenseContent">
-          <div class="text-center">
-            <div class="spinner-border text-warning" role="status">
-              <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Loading license information...</p>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -1120,77 +1079,6 @@ function killTunnel(pid) {
         });
 }
 
-function showSuccess(message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-    alertDiv.style.zIndex = '9999';
-    alertDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
-    document.body.appendChild(alertDiv);
-    setTimeout(() => alertDiv.remove(), 3000);
-}
-
-function showError(message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';
-    alertDiv.style.zIndex = '9999';
-    alertDiv.innerHTML = `<i class="fas fa-exclamation-circle me-2"></i>${message}`;
-    document.body.appendChild(alertDiv);
-    setTimeout(() => alertDiv.remove(), 3000);
-}
-
-function loadLicenseData() {
-    fetch('/api/check_license_status.php')
-        .then(response => response.json())
-        .then(data => {
-            let html = '';
-            
-            if (data.success && data.licenses && data.licenses.length > 0) {
-                html = '<div class="alert alert-info bg-opacity-25 mb-3">';
-                html += '<i class="fas fa-info-circle me-2"></i>';
-                html += 'Active deployment licenses: ' + data.licenses.length;
-                html += '</div>';
-                
-                html += '<div class="table-responsive">';
-                html += '<table class="table table-sm table-dark">';
-                html += '<thead><tr>';
-                html += '<th>Instance Name</th>';
-                html += '<th>Tier</th>';
-                html += '<th>Max Firewalls</th>';
-                html += '<th>Status</th>';
-                html += '<th>Expires</th>';
-                html += '</tr></thead>';
-                html += '<tbody>';
-                
-                data.licenses.forEach(license => {
-                    const statusColor = license.status === 'active' ? 'success' : (license.status === 'trial' ? 'warning' : 'danger');
-                    const expiryDate = new Date(license.license_expires);
-                    const isExpired = expiryDate < new Date();
-                    const expiryColor = isExpired ? 'danger' : (expiryDate < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'warning' : 'success');
-                    
-                    html += '<tr>';
-                    html += '<td><strong>' + license.instance_name + '</strong></td>';
-                    html += '<td><span class="badge bg-info">' + license.license_tier + '</span></td>';
-                    html += '<td>' + license.max_firewalls + '</td>';
-                    html += '<td><span class="badge bg-' + statusColor + '">' + license.status.toUpperCase() + '</span></td>';
-                    html += '<td><span class="badge bg-' + expiryColor + '">' + expiryDate.toLocaleDateString() + '</span></td>';
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table></div>';
-            } else {
-                html = '<div class="alert alert-warning">';
-                html += '<i class="fas fa-exclamation-triangle me-2"></i>';
-                html += 'No active licenses found. Visit License Management to create one.';
-                html += '</div>';
-            }
-            
-            document.getElementById('licenseContent').innerHTML = html;
-        })
-        .catch(error => {
-            console.error('Error loading license data:', error);
-            document.getElementById('licenseContent').innerHTML = '<div class="alert alert-danger">Failed to load license data</div>';
-        });
-}
 
 // Auto-refresh when modal is open
 document.getElementById('tunnelManagementModal')?.addEventListener('shown.bs.modal', function() {
@@ -1233,4 +1121,4 @@ function killTunnel(sessionId) {
 </script>
 
 <?php include __DIR__ . "/inc/footer.php"; ?>
-
+                html += 'No active licenses found.';
