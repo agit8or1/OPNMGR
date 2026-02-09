@@ -171,6 +171,66 @@ include __DIR__ . '/inc/header.php';
     margin-bottom: 1rem;
 }
 
+.update-card .card-body,
+.update-card .card-header h5,
+.update-card h5 {
+    color: #e2e8f0;
+}
+
+.update-card .card-header {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-bottom: 2px solid #334155;
+}
+
+.update-card dt {
+    color: #94a3b8;
+}
+
+.update-card dd {
+    color: #cbd5e1;
+}
+
+.config-section,
+.warning-box {
+    color: #cbd5e1;
+}
+
+.config-section h5,
+.warning-box h5 {
+    color: #e2e8f0;
+}
+
+.text-dark, h2.text-dark, h4.text-dark, h5.text-dark {
+    color: #e2e8f0 !important;
+}
+
+.text-muted, small.text-muted {
+    color: #94a3b8 !important;
+}
+
+.text-primary {
+    color: #60a5fa !important;
+}
+
+.commit-item {
+    color: #cbd5e1;
+}
+
+.commit-item .text-dark {
+    color: #e2e8f0 !important;
+}
+
+.warning-box ul,
+.warning-box li,
+.warning-box p {
+    color: #1e293b;
+}
+
+.update-log {
+    color: #e2e8f0;
+}
+
 .version-badge {
     font-size: 1.5rem;
     font-weight: 600;
