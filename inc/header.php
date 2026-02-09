@@ -383,13 +383,6 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
               <li><a class="dropdown-item" href="/admin_queue.php"><i class="fa fa-tasks me-2"></i> Queue Manage</a></li>
               <li><a class="dropdown-item" href="/health_monitor.php"><i class="fa fa-heartbeat me-2"></i> Health Report</a></li>
               <li><hr class="dropdown-divider"></li>
-              <!-- Security & Certificates -->
-              <li><a class="dropdown-item" href="/fail2ban.php"><i class="fa fa-shield-alt me-2"></i> Fail2Ban</a></li>
-              <li><a class="dropdown-item" href="/acme.php"><i class="fa fa-certificate me-2"></i> ACME</a></li>
-              <li><hr class="dropdown-divider"></li>
-              <!-- Security Scanning -->
-              <li><a class="dropdown-item" href="/security_scan.php"><i class="fa fa-bug me-2"></i> Security Scanner</a></li>
-              <li><hr class="dropdown-divider"></li>
               <!-- System & Support -->
               <li><a class="dropdown-item" href="/system_update.php"><i class="fa fa-sync-alt me-2"></i> System Update</a></li>
               <li><a class="dropdown-item" href="/support.php"><i class="fa fa-life-ring me-2"></i> Support</a></li>
