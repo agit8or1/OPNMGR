@@ -158,30 +158,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
 
         case 'scan_dependencies':
-            // Load SNYK_TOKEN from .env and pass as environment variable
-            $snyk_token = env('SNYK_TOKEN', '');
-            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
-            exec('cd ' . __DIR__ . '/scripts && ' . $env_vars . 'snyk test --json 2>&1', $output, $return_code);
-            $scan_output = implode("\n", $output);
-            $scan_status = ($return_code === 0) ? 'success' : 'warning';
-            break;
-
         case 'scan_code':
-            // Load SNYK_TOKEN from .env and pass as environment variable
-            $snyk_token = env('SNYK_TOKEN', '');
-            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
-            exec('cd ' . __DIR__ . ' && ' . $env_vars . 'snyk code test --json 2>&1', $output, $return_code);
-            $scan_output = implode("\n", $output);
-            $scan_status = ($return_code === 0) ? 'success' : 'warning';
-            break;
-
         case 'monitor':
-            // Load SNYK_TOKEN from .env and pass as environment variable
-            $snyk_token = env('SNYK_TOKEN', '');
-            $env_vars = !empty($snyk_token) ? 'SNYK_TOKEN=' . escapeshellarg($snyk_token) . ' ' : '';
-            exec('cd ' . __DIR__ . ' && ' . $env_vars . 'snyk monitor 2>&1', $output, $return_code);
-            $scan_output = implode("\n", $output);
-            $scan_status = 'info';
+            // Launch background scan with real-time progress tracking
+            $scan_type = str_replace('scan_', '', $action);
+            $scan_id = uniqid('scan_');
+
+            // Start background scan runner
+            $runner = __DIR__ . '/snyk_scan_runner.php';
+            exec("php $runner $scan_type $scan_id > /dev/null 2>&1 &");
+
+            // Redirect to monitor scan progress in real-time
+            header("Location: security_scan.php?monitoring=$scan_id&type=$scan_type");
+            exit;
             break;
     }
 
