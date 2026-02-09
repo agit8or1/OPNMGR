@@ -91,9 +91,18 @@ A comprehensive web-based management platform for centralized monitoring, config
 ![Logs](screenshots/07-logs.png)
 *Complete audit trail of all actions, commands, and system events*
 
-### System Settings
+### System Configuration
+
+#### Settings Page
 ![Settings](screenshots/08-settings.png)
-*Complete system configuration: branding, theme customization, GitHub integration, security scanner, and update management*
+*Complete system configuration including:*
+- *Application branding and logo customization*
+- *Dark/light theme selection*
+- *GitHub repository integration for updates*
+- *Security Scanner (Snyk) integration*
+- *System update management*
+- *Backup retention policies*
+- *Custom CSS overrides*
 
 ### User Management
 ![Users](screenshots/09-users.png)

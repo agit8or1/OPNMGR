@@ -210,17 +210,14 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
     /* label.form-label { color: #cbd7e6!important; } */
     .card-ghost { background-color: rgba(255,255,255,0.03)!important; }
     
-    /* Dropdown button hover states - Administration & Development menus - ULTRA SPECIFIC */
+    /* Dropdown button hover states - Administration menu - ULTRA SPECIFIC */
     .sidebar .list-group-item .admin-dropdown-btn:hover,
-    .sidebar .list-group-item .dev-dropdown-btn:hover,
     .sidebar .list-group-item button.dropdown-toggle:hover,
     .sidebar .list-group-item .btn-outline-secondary:hover,
     .sidebar .admin-dropdown-btn:hover,
-    .sidebar .dev-dropdown-btn:hover,
     .sidebar button.dropdown-toggle:hover,
     .sidebar .btn-outline-secondary:hover,
     button.admin-dropdown-btn:hover,
-    button.dev-dropdown-btn:hover,
     .list-group-item .dropdown button:hover {
         background-color: rgba(138,180,248,0.2)!important;
         border-color: rgba(138,180,248,0.6)!important;
@@ -386,18 +383,6 @@ $currentTheme = $themes[$theme] ?? $themes['professional-dark'];
               <!-- System & Support -->
               <li><a class="dropdown-item" href="/system_update.php"><i class="fa fa-sync-alt me-2"></i> System Update</a></li>
               <li><a class="dropdown-item" href="/support.php"><i class="fa fa-life-ring me-2"></i> Support</a></li>
-            </ul>
-          </div>
-        </div>
-        <div class="list-group-item border-0 px-0">
-          <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle w-100 text-start dev-dropdown-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="fa fa-code me-2"></i> Development
-            </button>
-            <ul class="dropdown-menu w-100">
-              <!-- Development Tools -->
-              <li><a class="dropdown-item" href="/version_management.php"><i class="fa fa-code-branch me-2"></i> Version Management</a></li>
-              <li><a class="dropdown-item" href="/changelog.php"><i class="fa fa-history me-2"></i> Change Log</a></li>
             </ul>
           </div>
         </div>
