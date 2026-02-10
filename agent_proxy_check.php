@@ -3,7 +3,7 @@
 // Checks if there are pending proxy requests for this firewall
 // Enhanced with better timeout handling, multiple request support, and health checks
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 header('Content-Type: application/json');
@@ -23,7 +23,7 @@ $include_recent = isset($data['include_recent']) ? (bool)$data['include_recent']
 
 try {
     // Verify firewall exists
-    $fw_stmt = $DB->prepare("SELECT id, hostname, status FROM firewalls WHERE id = ?");
+    $fw_stmt = db()->prepare("SELECT id, hostname, status FROM firewalls WHERE id = ?");
     $fw_stmt->execute([$firewall_id]);
     $firewall = $fw_stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -35,7 +35,7 @@ try {
     
     // Auto-timeout old requests that are stuck in processing
     // If a request has been "processing" for more than 5 minutes, mark it as timeout
-    $timeout_stmt = $DB->prepare("
+    $timeout_stmt = db()->prepare("
         UPDATE request_queue
         SET status = 'timeout',
             updated_at = NOW(),
@@ -52,7 +52,7 @@ try {
     }
     
     // Check for pending or processing proxy requests
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT id, firewall_id, status, tunnel_port, created_at, updated_at, error_message
         FROM request_queue
         WHERE firewall_id = ?
@@ -90,7 +90,7 @@ try {
     
     // Optionally include recently completed/failed requests for debugging
     if ($include_recent) {
-        $recent_stmt = $DB->prepare("
+        $recent_stmt = db()->prepare("
             SELECT id, status, tunnel_port, created_at, updated_at, error_message
             FROM request_queue
             WHERE firewall_id = ?
@@ -114,7 +114,7 @@ try {
     }
     
     // Check for any dead/orphaned tunnels (requests that never completed)
-    $orphan_stmt = $DB->prepare("
+    $orphan_stmt = db()->prepare("
         SELECT COUNT(*) as orphan_count
         FROM request_queue
         WHERE firewall_id = ?

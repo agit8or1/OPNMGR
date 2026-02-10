@@ -4,9 +4,7 @@
  * Runs the feature documentation updater script
  * ONLY accessible from dev_features.php
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 header('Content-Type: application/json');

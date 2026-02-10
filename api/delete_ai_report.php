@@ -3,10 +3,7 @@
  * Delete AI Report API
  * Allows deletion of AI scan reports and related findings
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 requireAdmin();
@@ -29,7 +26,7 @@ if (!$report_id) {
 
 try {
     // Verify report exists
-    $stmt = $DB->prepare("SELECT id FROM ai_scan_reports WHERE id = ?");
+    $stmt = db()->prepare("SELECT id FROM ai_scan_reports WHERE id = ?");
     $stmt->execute([$report_id]);
     $report = $stmt->fetch();
     
@@ -39,15 +36,15 @@ try {
     }
     
     // Delete related findings first
-    $stmt = $DB->prepare("DELETE FROM ai_scan_findings WHERE report_id = ?");
+    $stmt = db()->prepare("DELETE FROM ai_scan_findings WHERE report_id = ?");
     $stmt->execute([$report_id]);
 
     // Delete related log analysis results
-    $stmt = $DB->prepare("DELETE FROM log_analysis_results WHERE report_id = ?");
+    $stmt = db()->prepare("DELETE FROM log_analysis_results WHERE report_id = ?");
     $stmt->execute([$report_id]);
 
     // Delete the report
-    $stmt = $DB->prepare("DELETE FROM ai_scan_reports WHERE id = ?");
+    $stmt = db()->prepare("DELETE FROM ai_scan_reports WHERE id = ?");
     $stmt->execute([$report_id]);
 
     echo json_encode(['success' => true, 'message' => 'Report deleted successfully']);

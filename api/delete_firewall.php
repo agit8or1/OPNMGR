@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -30,32 +28,32 @@ if ($delete_id <= 0) {
 }
 
 try {
-    $DB->beginTransaction();
+    db()->beginTransaction();
     
     // Delete related records first to avoid foreign key constraints
     
     // Delete firewall agents
-    $stmt = $DB->prepare('DELETE FROM firewall_agents WHERE firewall_id = ?');
+    $stmt = db()->prepare('DELETE FROM firewall_agents WHERE firewall_id = ?');
     $stmt->execute([$delete_id]);
     
     // Delete firewall tags
-    $stmt = $DB->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
+    $stmt = db()->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
     $stmt->execute([$delete_id]);
     
     // Finally delete the firewall
-    $stmt = $DB->prepare('DELETE FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('DELETE FROM firewalls WHERE id = ?');
     $stmt->execute([$delete_id]);
     
     if ($stmt->rowCount() > 0) {
-        $DB->commit();
+        db()->commit();
         echo json_encode(['success' => true, 'message' => 'Firewall deleted successfully']);
     } else {
-        $DB->rollback();
+        db()->rollback();
         echo json_encode(['success' => false, 'message' => 'Firewall not found']);
     }
     
 } catch (Exception $e) {
-    $DB->rollback();
+    db()->rollback();
     error_log("delete_firewall.php error: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }

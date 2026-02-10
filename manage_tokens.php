@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/header.php';
 
 // Handle token generation
@@ -9,11 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_token'])) {
     $days = max(1, min(30, $days));
     
     // Clean up expired tokens
-    $DB->prepare("DELETE FROM enrollment_tokens WHERE expires_at < NOW()")->execute();
+    db()->prepare("DELETE FROM enrollment_tokens WHERE expires_at < NOW()")->execute();
     
     // Generate new token
     $token = bin2hex(random_bytes(32));
-    $stmt = $DB->prepare("INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, DATE_ADD(NOW(), INTERVAL ? DAY))");
+    $stmt = db()->prepare("INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, DATE_ADD(NOW(), INTERVAL ? DAY))");
     $stmt->execute([$token, $days]);
     
     $success_message = "New enrollment token generated successfully!";
@@ -23,13 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_token'])) {
 // Handle token deletion
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_token'])) {
     $token_id = intval($_POST['token_id']);
-    $stmt = $DB->prepare("DELETE FROM enrollment_tokens WHERE id = ?");
+    $stmt = db()->prepare("DELETE FROM enrollment_tokens WHERE id = ?");
     $stmt->execute([$token_id]);
     $success_message = "Token deleted successfully!";
 }
 
 // Get all tokens
-$tokens = $DB->query("
+$tokens = db()->query("
     SELECT id, token, created_at, expires_at, used,
            CASE 
                WHEN expires_at < NOW() THEN 'expired'
@@ -42,7 +41,7 @@ $tokens = $DB->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get stats
-$stats = $DB->query("
+$stats = db()->query("
     SELECT 
         COUNT(*) as total_tokens,
         SUM(CASE WHEN used = 1 THEN 1 ELSE 0 END) as used_tokens,

@@ -1,21 +1,19 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 require_once __DIR__ . '/inc/logging.php';
 
 $notice = '';
 
 // Load current settings
-$rows = $DB->query('SELECT `name`,`value` FROM settings WHERE name IN ("proxy_port_start", "proxy_port_end")')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = db()->query('SELECT `name`,`value` FROM settings WHERE name IN ("proxy_port_start", "proxy_port_end")')->fetchAll(PDO::FETCH_KEY_PAIR);
 $proxy_port_start = $rows['proxy_port_start'] ?? '8100';
 $proxy_port_end = $rows['proxy_port_end'] ?? '8199';
 
 // Helper function
-function save_setting($DB, $k, $v) {
-    $s = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
+function save_setting($k, $v) {
+    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
     $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
 }
 
@@ -33,9 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $new_start >= $new_end) {
                 $notice = 'Invalid port range. Start must be >= 1024, end <= 65535, and start < end.';
             } else {
-                save_setting($DB, 'proxy_port_start', $new_start);
-                save_setting($DB, 'proxy_port_end', $new_end);
-                log_action($DB, $_SESSION['user_id'], 'proxy_settings', 'updated', "Port range changed to {$new_start}-{$new_end}");
+                save_setting('proxy_port_start', $new_start);
+                save_setting('proxy_port_end', $new_end);
+                log_event('INFO', 'proxy_settings', "Port range changed to {$new_start}-{$new_end}", $_SESSION['user_id']);
                 $notice = 'Proxy settings saved successfully.';
                 $proxy_port_start = $new_start;
                 $proxy_port_end = $new_end;
@@ -45,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get current proxy assignments
-$proxy_assignments = $DB->query("
+$proxy_assignments = db()->query("
     SELECT 
         id, 
         hostname, 

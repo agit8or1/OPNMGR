@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/header.php';
 
 requireLogin();
@@ -25,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = '<div class="alert alert-danger">Customer name is required.</div>';
         } else {
             try {
-                $stmt = $DB->prepare("INSERT INTO customers (name, contact_person, email, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                $stmt = db()->prepare("INSERT INTO customers (name, contact_person, email, phone, address, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
                 $stmt->execute([$name, $contact_person, $email, $phone, $address, $notes]);
                 $message = '<div class="alert alert-success">Customer added successfully!</div>';
             } catch (PDOException $e) {
@@ -50,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = '<div class="alert alert-danger">Customer name is required.</div>';
         } else {
             try {
-                $stmt = $DB->prepare("UPDATE customers SET name = ?, contact_person = ?, email = ?, phone = ?, address = ?, notes = ? WHERE id = ?");
+                $stmt = db()->prepare("UPDATE customers SET name = ?, contact_person = ?, email = ?, phone = ?, address = ?, notes = ? WHERE id = ?");
                 $stmt->execute([$name, $contact_person, $email, $phone, $address, $notes, $customer_id]);
                 $message = '<div class="alert alert-success">Customer updated successfully!</div>';
             } catch (PDOException $e) {
@@ -67,14 +65,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         try {
             // Check if customer has firewalls
-            $stmt = $DB->prepare("SELECT COUNT(*) FROM firewalls WHERE customer_name = (SELECT name FROM customers WHERE id = ?)");
+            $stmt = db()->prepare("SELECT COUNT(*) FROM firewalls WHERE customer_name = (SELECT name FROM customers WHERE id = ?)");
             $stmt->execute([$customer_id]);
             $firewall_count = $stmt->fetchColumn();
             
             if ($firewall_count > 0) {
                 $message = '<div class="alert alert-danger">Cannot delete customer: ' . $firewall_count . ' firewall(s) are assigned to this customer.</div>';
             } else {
-                $stmt = $DB->prepare("DELETE FROM customers WHERE id = ?");
+                $stmt = db()->prepare("DELETE FROM customers WHERE id = ?");
                 $stmt->execute([$customer_id]);
                 $message = '<div class="alert alert-success">Customer deleted successfully!</div>';
             }
@@ -87,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get all customers
 try {
-    $stmt = $DB->query("SELECT c.*, COUNT(f.id) as firewall_count FROM customers c LEFT JOIN firewalls f ON c.name = f.customer_name GROUP BY c.id ORDER BY c.name");
+    $stmt = db()->query("SELECT c.*, COUNT(f.id) as firewall_count FROM customers c LEFT JOIN firewalls f ON c.name = f.customer_name GROUP BY c.id ORDER BY c.name");
     $customers = $stmt->fetchAll();
 } catch (Exception $e) {
     $customers = [];

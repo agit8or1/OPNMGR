@@ -4,7 +4,7 @@
  * Directly queues backup commands for all active firewalls
  */
 
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 $logfile = '/var/www/opnsense/logs/nightly_backups.log';
 
@@ -19,7 +19,7 @@ log_message("=== Starting Nightly Backup Job (v3 - Direct Command Queue) ===");
 
 try {
     // Get all active firewalls that have checked in recently
-    $stmt = $DB->query("
+    $stmt = db()->query("
         SELECT id, hostname, status, last_checkin
         FROM firewalls
         WHERE status = 'online'
@@ -41,7 +41,7 @@ try {
         log_message("Processing FW #$firewall_id ($hostname)");
         
         // Check if backup command already queued today
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT COUNT(*) as count
             FROM firewall_commands
             WHERE firewall_id = ?
@@ -89,7 +89,7 @@ BACKUP;
         // Replace placeholder with actual firewall ID
         $backup_command = str_replace('FIREWALL_ID', $firewall_id, $backup_command);
         
-        $stmt = $DB->prepare('
+        $stmt = db()->prepare('
             INSERT INTO firewall_commands (firewall_id, command, description, status, created_at)
             VALUES (?, ?, ?, ?, NOW())
         ');
@@ -100,7 +100,7 @@ BACKUP;
             'pending'
         ]);
         
-        log_message("  SUCCESS: Backup command queued (ID: " . $DB->lastInsertId() . ")");
+        log_message("  SUCCESS: Backup command queued (ID: " . db()->lastInsertId() . ")");
         $queued++;
         
         // Small delay between firewalls
@@ -112,7 +112,7 @@ BACKUP;
     
     // Log to system_logs table
     $summary = "Nightly backups: $queued queued, $skipped skipped (Total: $total)";
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (level, category, message, timestamp)
         VALUES ('INFO', 'backup', ?, NOW())
     ");

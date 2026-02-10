@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -31,7 +31,7 @@ $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 // If no firewall_id provided, try to find it by WAN IP
 if (!$firewall_id && $client_ip !== 'unknown') {
-    $stmt = $DB->prepare('SELECT id FROM firewalls WHERE wan_ip = ?');
+    $stmt = db()->prepare('SELECT id FROM firewalls WHERE wan_ip = ?');
     $stmt->execute([$client_ip]);
     $firewall = $stmt->fetch();
     if ($firewall) {
@@ -50,7 +50,7 @@ if (!$firewall_id) {
 
 try {
     // Verify firewall exists and is tunnel-enabled
-    $stmt = $DB->prepare('SELECT id, tunnel_active, agent_version FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, tunnel_active, agent_version FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -66,7 +66,7 @@ try {
     }
 
     // Update last keep-alive time
-    $stmt = $DB->prepare('UPDATE firewalls SET tunnel_established = NOW() WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET tunnel_established = NOW() WHERE id = ?');
     $stmt->execute([$firewall_id]);
 
     // Check if agent needs to be updated (if agent_version is old)

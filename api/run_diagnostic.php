@@ -3,10 +3,7 @@
  * Run Diagnostic Tools API
  * Executes network diagnostic commands via SSH
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -30,7 +27,7 @@ if (!$firewall_id || !$tool) {
 }
 
 // Get firewall details
-$stmt = $DB->prepare("SELECT hostname, ip_address, wan_ip, api_key, api_secret FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT hostname, ip_address, wan_ip, api_key, api_secret FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch();
 

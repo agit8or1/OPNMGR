@@ -7,9 +7,7 @@
  * - firewall_id: ID of the firewall (required)
  * - days: Number of days to look back (default: 7)
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -38,7 +36,7 @@ try {
         ORDER BY created_at DESC
     ';
     
-    $stmt = $DB->prepare($query);
+    $stmt = db()->prepare($query);
     $stmt->execute([$firewall_id, $days]);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

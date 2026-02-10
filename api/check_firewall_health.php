@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
@@ -7,8 +8,6 @@ requireLogin();
  * Monitors firewall checkin status and auto-recovery
  * Called by monitoring system to check if firewalls are responsive
  */
-
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/logging.php';
 
 header('Content-Type: application/json');
@@ -18,7 +17,7 @@ try {
     $alerts = [];
     
     // Get all active firewalls
-    $stmt = $DB->prepare("SELECT id, hostname, ip_address, status, last_checkin, checkin_interval FROM firewalls WHERE status != 'archived'");
+    $stmt = db()->prepare("SELECT id, hostname, ip_address, status, last_checkin, checkin_interval FROM firewalls WHERE status != 'archived'");
     $stmt->execute();
     $firewalls = $stmt->fetchAll();
     
@@ -50,12 +49,12 @@ try {
         
         // If firewall is overdue and still marked as 'online', update to 'offline'
         if ($seconds_since_checkin > $alert_threshold && $fw['status'] === 'online') {
-            $update = $DB->prepare("UPDATE firewalls SET status = 'offline' WHERE id = ?");
+            $update = db()->prepare("UPDATE firewalls SET status = 'offline' WHERE id = ?");
             $update->execute([$fw_id]);
             $fw_result['status_updated'] = 'online -> offline';
             
             // Queue a restart command
-            $insert = $DB->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
+            $insert = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
             $insert->execute([
                 $fw_id,
                 'systemctl restart opnsense-agent || service opnsense-agent restart || /etc/init.d/opnsense-agent restart',

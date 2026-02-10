@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
@@ -7,8 +8,6 @@ requireLogin();
  * Returns server and firewall locations for map display
  * Uses GeoIP lookups for automatic location detection
  */
-
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/geoip.php';
 
 header('Content-Type: application/json');
@@ -30,7 +29,7 @@ try {
     ];
 
     // Get all firewalls with WAN IPs OR stored location (to show offline firewalls)
-    $stmt = $DB->query("
+    $stmt = db()->query("
         SELECT
             id,
             hostname,
@@ -68,7 +67,7 @@ try {
                 $country = $geoip['country'];
 
                 // Store in database for future use
-                $update = $DB->prepare("UPDATE firewalls SET latitude = ?, longitude = ? WHERE id = ?");
+                $update = db()->prepare("UPDATE firewalls SET latitude = ?, longitude = ? WHERE id = ?");
                 $update->execute([$lat, $lon, $fw['id']]);
             }
         } else if ($lat != 0 || $lon != 0) {

@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/logging.php';
 require_once __DIR__ . '/inc/timezone_selector.php';
 requireLogin();
@@ -28,7 +27,7 @@ $offset = ($page - 1) * $per_page;
 $logs = get_logs($filters, $per_page, $offset);
 
 // Get available categories and levels for filters
-$stmt = $DB->query("SELECT DISTINCT category FROM system_logs ORDER BY category");
+$stmt = db()->query("SELECT DISTINCT category FROM system_logs ORDER BY category");
 $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
 // Friendly names for categories
@@ -44,15 +43,15 @@ $category_names = [
     'housekeeping' => 'Maintenance'
 ];
 
-$stmt = $DB->query("SELECT DISTINCT level FROM system_logs ORDER BY level");
+$stmt = db()->query("SELECT DISTINCT level FROM system_logs ORDER BY level");
 $levels = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-$stmt = $DB->query("SELECT id, hostname FROM firewalls ORDER BY hostname");
+$stmt = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname");
 $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get total count for pagination
 $count_filters = $filters;
-$total_logs = $DB->prepare("
+$total_logs = db()->prepare("
     SELECT COUNT(*) FROM system_logs sl 
     WHERE timestamp >= ?
     " . ($level_filter ? " AND level = ?" : "") . "

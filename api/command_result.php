@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 
 header('Content-Type: application/json');
@@ -30,7 +31,7 @@ try {
         exit;
     }
 
-    $auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
     $auth_stmt->execute([$firewall_id]);
     $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$auth_fw || (
@@ -70,12 +71,12 @@ try {
         }
     }
     // Update command status in firewall_commands table
-    $stmt = $DB->prepare("UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ?");
+    $stmt = db()->prepare("UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ?");
     $stmt->execute([$status, $decoded_output ?: $result, $command_id]);
     
     if ($stmt->rowCount() > 0) {
         // Get command details for logging
-        $stmt = $DB->prepare("SELECT fc.*, f.hostname 
+        $stmt = db()->prepare("SELECT fc.*, f.hostname 
                               FROM firewall_commands fc 
                               JOIN firewalls f ON fc.firewall_id = f.id 
                               WHERE fc.id = ?");

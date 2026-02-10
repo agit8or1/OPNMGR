@@ -4,9 +4,9 @@
  * Analyzes firewall configuration and generates security report
  */
 
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 header('Content-Type: application/json');
-require_once '../inc/db.php';
-require_once '../inc/auth.php';
 require_once '../inc/agent_version.php';
 
 
@@ -30,7 +30,7 @@ try {
     $provider = $input['provider'] ?? null;
     
     // Get firewall details
-    $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
 
@@ -39,7 +39,7 @@ try {
     }
 
     // Get agent version
-    $agent_stmt = $DB->prepare("SELECT agent_version FROM firewall_agents WHERE firewall_id = ? AND agent_type = 'primary' LIMIT 1");
+    $agent_stmt = db()->prepare("SELECT agent_version FROM firewall_agents WHERE firewall_id = ? AND agent_type = 'primary' LIMIT 1");
     $agent_stmt->execute([$firewall_id]);
     $agent_data = $agent_stmt->fetch();
     if ($agent_data) {
@@ -48,10 +48,10 @@ try {
     
     // Get AI provider settings
     if ($provider) {
-        $stmt = $DB->prepare("SELECT * FROM ai_settings WHERE provider = ? AND is_active = TRUE");
+        $stmt = db()->prepare("SELECT * FROM ai_settings WHERE provider = ? AND is_active = TRUE");
         $stmt->execute([$provider]);
     } else {
-        $stmt = $DB->query("SELECT * FROM ai_settings WHERE is_active = TRUE LIMIT 1");
+        $stmt = db()->query("SELECT * FROM ai_settings WHERE is_active = TRUE LIMIT 1");
     }
     $ai_settings = $stmt->fetch();
 
@@ -74,7 +74,7 @@ try {
     
     // Create config snapshot
     $config_hash = hash('sha256', json_encode($config_data));
-    $stmt = $DB->prepare("INSERT INTO config_snapshots (firewall_id, config_hash, config_data, rule_count, interface_count) VALUES (?, ?, ?, ?, ?)");
+    $stmt = db()->prepare("INSERT INTO config_snapshots (firewall_id, config_hash, config_data, rule_count, interface_count) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([
         $firewall_id,
         $config_hash,
@@ -82,7 +82,7 @@ try {
         $config_data['rule_count'] ?? 0,
         $config_data['interface_count'] ?? 0
     ]);
-    $snapshot_id = $DB->lastInsertId();
+    $snapshot_id = db()->lastInsertId();
     
     // Perform AI analysis
     $start_time = microtime(true);
@@ -135,7 +135,7 @@ try {
     }
 
     // Save scan report
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO ai_scan_reports (
             firewall_id, config_snapshot_id, scan_type, provider, model,
             overall_grade, security_score, risk_level, summary, 
@@ -158,7 +158,7 @@ try {
         $analysis['full_report'],
         $scan_duration
     ]);
-    $report_id = $DB->lastInsertId();
+    $report_id = db()->lastInsertId();
     
     // Save log analysis results if logs were analyzed
     if ($scan_type === 'config_with_logs' && $log_data) {
@@ -182,7 +182,7 @@ try {
             }
             $suspicious_ips = json_encode($suspicious_ips_data);
             
-            $stmt = $DB->prepare("
+            $stmt = db()->prepare("
                 INSERT INTO log_analysis_results (
                     report_id, log_type, lines_analyzed, active_threats, suspicious_ips,
                     blocked_attempts, failed_auth_attempts, anomaly_score, threat_level
@@ -204,7 +204,7 @@ try {
     
     // Save individual findings
     if (!empty($analysis['findings'])) {
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             INSERT INTO ai_scan_findings (report_id, source, category, severity, title, description, recommendation, affected_rules)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
@@ -223,7 +223,7 @@ try {
     }
     
     // Update firewall AI settings
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_ai_settings (firewall_id, last_scan_at)
         VALUES (?, NOW())
         ON DUPLICATE KEY UPDATE last_scan_at = NOW()

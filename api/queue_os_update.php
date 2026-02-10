@@ -1,9 +1,8 @@
 <?php
 // Enhanced OS Update Command Generator
 // Creates comprehensive OS update commands for execution via agent command queue
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
 requireLogin();
 requireAdmin();
 
@@ -25,7 +24,7 @@ if (!$firewall_id) {
 }
 
 // Get firewall details
-$stmt = $DB->prepare("SELECT hostname, ip_address FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT hostname, ip_address FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch();
 
@@ -78,17 +77,17 @@ switch ($update_type) {
 $queued_commands = [];
 try {
     foreach ($commands as $cmd) {
-        $stmt = $DB->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
+        $stmt = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
         $stmt->execute([$firewall_id, $cmd['command'], $cmd['description']]);
         $queued_commands[] = [
-            'id' => $DB->lastInsertId(),
+            'id' => db()->lastInsertId(),
             'command' => $cmd['command'],
             'description' => $cmd['description']
         ];
     }
     
     // Update firewall status
-    $stmt = $DB->prepare("UPDATE firewalls SET 
+    $stmt = db()->prepare("UPDATE firewalls SET 
         update_requested = 1,
         update_requested_at = NOW(),
         update_type = ?,

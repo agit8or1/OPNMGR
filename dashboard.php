@@ -1,7 +1,6 @@
 <?php
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once 'inc/db.php';
 require_once 'inc/header.php';
 
 // Get firewall statistics
@@ -11,20 +10,20 @@ $offline_firewalls = 0;
 $need_updates = 0;
 $recent_checkins = 0;
 
-if ($DB) {
+if (db()) {
     try {
-        $stmt = $DB->query('SELECT COUNT(*) as total FROM firewalls');
+        $stmt = db()->query('SELECT COUNT(*) as total FROM firewalls');
         $total_firewalls = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
         
-        $stmt = $DB->query('SELECT COUNT(*) as online FROM firewalls WHERE status = "online"');
+        $stmt = db()->query('SELECT COUNT(*) as online FROM firewalls WHERE status = "online"');
         $online_firewalls = $stmt->fetch(PDO::FETCH_ASSOC)['online'];
         
         // Count firewalls that haven't checked in recently (last 24 hours)
-        $stmt = $DB->query('SELECT COUNT(*) as recent FROM firewalls WHERE last_checkin > DATE_SUB(NOW(), INTERVAL 24 HOUR)');
+        $stmt = db()->query('SELECT COUNT(*) as recent FROM firewalls WHERE last_checkin > DATE_SUB(NOW(), INTERVAL 24 HOUR)');
         $recent_checkins = $stmt->fetch(PDO::FETCH_ASSOC)['recent'];
         
         // Count firewalls that need updates (no version or old version)
-        $stmt = $DB->query('SELECT COUNT(*) as updates FROM firewalls WHERE version IS NULL OR version < "24.7"');
+        $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE version IS NULL OR version < "24.7"');
         $need_updates = $stmt->fetch(PDO::FETCH_ASSOC)['updates'];
         
         $offline_firewalls = $total_firewalls - $online_firewalls;

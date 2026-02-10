@@ -3,10 +3,7 @@
  * Delete Backup API
  * Deletes specified backup file and database record
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 requireAdmin();
@@ -55,7 +52,7 @@ if (!$backup_id) {
 
 try {
     // Get backup info
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT b.*, f.hostname 
         FROM backups b 
         JOIN firewalls f ON b.firewall_id = f.id 
@@ -82,11 +79,11 @@ try {
     }
     
     // Delete database record (even if file doesn't exist)
-    $stmt = $DB->prepare("DELETE FROM backups WHERE id = ?");
+    $stmt = db()->prepare("DELETE FROM backups WHERE id = ?");
     $stmt->execute([$backup_id]);
     
     // Log the deletion
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
         VALUES (?, 'backup', ?, 'INFO', NOW())
     ");

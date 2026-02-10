@@ -4,12 +4,11 @@
  * Checks for existing active sessions before creating new one
  */
 
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/scripts/manage_ssh_tunnel.php';
 
-// Use $DB connection from db.php
-$pdo = $DB;
+// Use db() connection from bootstrap
+$pdo = db();
 
 requireLogin();
 requireAdmin();

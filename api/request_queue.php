@@ -1,14 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
  * HTTP Request Queue System
  * Handles proxying HTTP requests through firewall agent polling
  */
-
-require_once __DIR__ . '/../inc/db.php';
-
 header('Content-Type: application/json');
 
 // Handle different request methods
@@ -34,8 +32,6 @@ switch ($action) {
 }
 
 function queueRequest() {
-    global $DB;
-    
     $firewall_id = (int)($_POST['firewall_id'] ?? 0);
     $request_method = $_POST['method'] ?? 'GET';
     $request_path = $_POST['path'] ?? '/';
@@ -50,7 +46,7 @@ function queueRequest() {
     }
     
     try {
-        $stmt = $DB->prepare("INSERT INTO request_queue 
+        $stmt = db()->prepare("INSERT INTO request_queue 
             (firewall_id, client_id, method, path, headers, body, status, created_at) 
             VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())");
         
@@ -59,7 +55,7 @@ function queueRequest() {
             $request_path, $request_headers, $request_body
         ]);
         
-        $request_id = $DB->lastInsertId();
+        $request_id = db()->lastInsertId();
         
         echo json_encode([
             'success' => true,
@@ -75,8 +71,6 @@ function queueRequest() {
 }
 
 function pollRequests() {
-    global $DB;
-    
     $firewall_id = (int)($_GET['firewall_id'] ?? 0);
     
     if (!$firewall_id) {
@@ -86,7 +80,7 @@ function pollRequests() {
     }
     
     try {
-        $stmt = $DB->prepare("SELECT id, client_id, method, path, headers, body 
+        $stmt = db()->prepare("SELECT id, client_id, method, path, headers, body 
             FROM request_queue 
             WHERE firewall_id = ? AND status = 'pending' 
             ORDER BY created_at ASC LIMIT 10");
@@ -98,7 +92,7 @@ function pollRequests() {
         if (!empty($requests)) {
             $request_ids = array_column($requests, 'id');
             $placeholders = str_repeat('?,', count($request_ids) - 1) . '?';
-            $update_stmt = $DB->prepare("UPDATE request_queue SET status = 'processing' WHERE id IN ($placeholders)");
+            $update_stmt = db()->prepare("UPDATE request_queue SET status = 'processing' WHERE id IN ($placeholders)");
             $update_stmt->execute($request_ids);
         }
         
@@ -115,8 +109,6 @@ function pollRequests() {
 }
 
 function submitResponse() {
-    global $DB;
-    
     $input = json_decode(file_get_contents('php://input'), true);
     
     $request_id = (int)($input['request_id'] ?? 0);
@@ -131,7 +123,7 @@ function submitResponse() {
     }
     
     try {
-        $stmt = $DB->prepare("UPDATE request_queue SET 
+        $stmt = db()->prepare("UPDATE request_queue SET 
             status = 'completed',
             response_status = ?,
             response_headers = ?,
@@ -151,8 +143,6 @@ function submitResponse() {
 }
 
 function getResponse() {
-    global $DB;
-    
     $client_id = $_GET['client_id'] ?? '';
     
     if (!$client_id) {
@@ -162,7 +152,7 @@ function getResponse() {
     }
     
     try {
-        $stmt = $DB->prepare("SELECT response_status, response_headers, response_body, status 
+        $stmt = db()->prepare("SELECT response_status, response_headers, response_body, status 
             FROM request_queue WHERE client_id = ? ORDER BY created_at DESC LIMIT 1");
         
         $stmt->execute([$client_id]);

@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
@@ -14,8 +15,6 @@ requireLogin();
  */
 
 header('Content-Type: application/json');
-require_once __DIR__ . '/../inc/db.php';
-
 $response = ['success' => false, 'error' => null, 'data' => null];
 
 try {
@@ -24,7 +23,7 @@ try {
     switch ($action) {
         case 'list':
             // Get all blocks
-            $stmt = $DB->query('SELECT * FROM geoip_blocks ORDER BY country_name ASC');
+            $stmt = db()->query('SELECT * FROM geoip_blocks ORDER BY country_name ASC');
             $blocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $response['success'] = true;
             $response['data'] = $blocks;
@@ -32,7 +31,7 @@ try {
 
         case 'enabled':
             // Get only enabled blocks
-            $stmt = $DB->query('SELECT * FROM geoip_blocks WHERE enabled = 1 ORDER BY country_name ASC');
+            $stmt = db()->query('SELECT * FROM geoip_blocks WHERE enabled = 1 ORDER BY country_name ASC');
             $blocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $response['success'] = true;
             $response['data'] = $blocks;
@@ -44,7 +43,7 @@ try {
             $firewall_id = (int)($_GET['firewall_id'] ?? $_POST['firewall_id'] ?? 0);
 
             if ($firewall_id > 0) {
-                $stmt = $DB->query('SELECT country_code, country_name, action FROM geoip_blocks WHERE enabled = 1');
+                $stmt = db()->query('SELECT country_code, country_name, action FROM geoip_blocks WHERE enabled = 1');
                 $blocks = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 $response['success'] = true;
                 $response['data'] = $blocks;
@@ -76,10 +75,10 @@ try {
             }
 
             try {
-                $stmt = $DB->prepare('INSERT INTO geoip_blocks (country_code, country_name, action, description, enabled) VALUES (?, ?, ?, ?, 1)');
+                $stmt = db()->prepare('INSERT INTO geoip_blocks (country_code, country_name, action, description, enabled) VALUES (?, ?, ?, ?, 1)');
                 $stmt->execute([$country_code, $country_name, $action_type, $description]);
                 $response['success'] = true;
-                $response['data'] = ['id' => $DB->lastInsertId()];
+                $response['data'] = ['id' => db()->lastInsertId()];
             } catch (PDOException $e) {
                 if ($e->getCode() == 23000) {
                     $response['error'] = 'Country already exists';
@@ -99,7 +98,7 @@ try {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $stmt = $DB->prepare('UPDATE geoip_blocks SET enabled = NOT enabled WHERE id = ?');
+                $stmt = db()->prepare('UPDATE geoip_blocks SET enabled = NOT enabled WHERE id = ?');
                 $stmt->execute([$id]);
                 $response['success'] = true;
                 $response['data'] = ['affected_rows' => $stmt->rowCount()];
@@ -117,7 +116,7 @@ try {
 
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $stmt = $DB->prepare('DELETE FROM geoip_blocks WHERE id = ?');
+                $stmt = db()->prepare('DELETE FROM geoip_blocks WHERE id = ?');
                 $stmt->execute([$id]);
                 $response['success'] = true;
                 $response['data'] = ['affected_rows' => $stmt->rowCount()];
@@ -128,7 +127,7 @@ try {
 
         case 'stats':
             // Get statistics
-            $stmt = $DB->query('SELECT
+            $stmt = db()->query('SELECT
                 COUNT(*) as total_blocks,
                 SUM(enabled) as enabled_blocks,
                 SUM(action = "block") as block_rules,

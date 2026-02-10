@@ -1,0 +1,34 @@
+<model>
+    <mount>//OPNsense/opnmanageragent</mount>
+    <description>OPNManager Agent Settings</description>
+    <version>1.1.7</version>
+    <items>
+        <general>
+            <enabled type="BooleanField">
+                <Default>0</Default>
+                <Required>Y</Required>
+            </enabled>
+            <serverUrl type="TextField">
+                <Default></Default>
+                <Required>N</Required>
+            </serverUrl>
+            <hardwareId type="TextField">
+                <Default></Default>
+                <Required>N</Required>
+            </hardwareId>
+            <checkinInterval type="IntegerField">
+                <Default>120</Default>
+                <MinimumValue>60</MinimumValue>
+                <MaximumValue>3600</MaximumValue>
+            </checkinInterval>
+            <sshKeyManagement type="BooleanField">
+                <Default>1</Default>
+                <Required>N</Required>
+            </sshKeyManagement>
+            <verifySSL type="BooleanField">
+                <Default>1</Default>
+                <Required>N</Required>
+            </verifySSL>
+        </general>
+    </items>
+</model>

@@ -1,0 +1,44 @@
+<form>
+    <field>
+        <id>general.enabled</id>
+        <label>Enable Agent</label>
+        <type>checkbox</type>
+        <help>Enable the OPNManager agent service.</help>
+    </field>
+    <field>
+        <id>general.serverUrl</id>
+        <label>Server URL</label>
+        <type>text</type>
+        <readonly>1</readonly>
+        <help>OPNManager server URL. Configured via enrollment key.</help>
+    </field>
+    <field>
+        <id>general.hardwareId</id>
+        <label>Hardware ID</label>
+        <type>text</type>
+        <style>tokenizer</style>
+        <readonly>1</readonly>
+        <help>Unique hardware identifier for this firewall. Auto-generated.</help>
+    </field>
+    <field>
+        <id>general.checkinInterval</id>
+        <label>Check-in Interval (seconds)</label>
+        <type>text</type>
+        <readonly>1</readonly>
+        <help>How often the agent checks in with the server. Configured via enrollment key.</help>
+    </field>
+    <field>
+        <id>general.sshKeyManagement</id>
+        <label>SSH Key Management</label>
+        <type>checkbox</type>
+        <readonly>1</readonly>
+        <help>Whether OPNManager can deploy SSH keys. Configured via enrollment key.</help>
+    </field>
+    <field>
+        <id>general.verifySSL</id>
+        <label>Verify SSL Certificate</label>
+        <type>checkbox</type>
+        <readonly>1</readonly>
+        <help>SSL certificate verification setting. Configured via enrollment key.</help>
+    </field>
+</form>

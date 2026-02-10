@@ -2,13 +2,11 @@
 /**
  * System Update - Server-Sent Events stream for real-time progress
  */
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/env.php';
-require_once __DIR__ . '/../inc/csrf.php';
-
 // Validate CSRF token
 $token = $_GET['csrf_token'] ?? '';
 if (!csrf_verify($token)) {

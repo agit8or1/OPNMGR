@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -9,7 +8,7 @@ include __DIR__ . '/inc/header.php';
 // Generate a unique enrollment token
 $enrollment_token = bin2hex(random_bytes(32));
 // Store token in database
-$stmt = $DB->prepare('INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, DATE_ADD(NOW(), INTERVAL 24 HOUR))');
+$stmt = db()->prepare('INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, DATE_ADD(NOW(), INTERVAL 24 HOUR))');
 $stmt->execute([$enrollment_token]);
 
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';

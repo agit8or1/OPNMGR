@@ -1,8 +1,6 @@
 <?php
 // System Backup & Restore
-require_once 'inc/auth.php';
-require_once 'inc/csrf.php';
-require_once 'inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireAdmin();
 
 $message = '';
@@ -32,7 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             }
             
             // Export database
-            require_once __DIR__ . '/config.php';
             $dbName = DB_NAME;
             $dbUser = DB_USER;
             $dbPass = DB_PASS;
@@ -272,7 +269,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_backup']) && 
                 // Restore database
                 $sqlFile = "{$extractedDir}/database.sql";
                 if (file_exists($sqlFile)) {
-                    require_once __DIR__ . '/config.php';
                     $dbName = DB_NAME;
                     $dbUser = DB_USER;
                     $dbPass = DB_PASS;

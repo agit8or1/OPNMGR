@@ -1,9 +1,7 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 $logoUrl = '/assets/img/logo.png';
@@ -14,7 +12,7 @@ if (!empty($_GET['notice'])) {
 }
 
 // load settings
-$rows = $DB->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = db()->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
 $manager_fqdn = $rows['manager_fqdn'] ?? 'opn.agit8or.net';
 $acme_domain = $rows['acme_domain'] ?? '';
@@ -32,8 +30,8 @@ $backup_min_keep = $rows['backup_min_keep'] ?? '30';
 $backup_max_keep = $rows['backup_max_keep'] ?? '90';
 
 // helpers
-function save_setting($DB,$k,$v){
-    $s = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
+function save_setting($k,$v){
+    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
     $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
 }
 
@@ -61,10 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       if (empty($errors)) {
         $_SESSION['display_timezone'] = $timezone;
-        save_setting($DB, 'system_timezone', $timezone);
+        save_setting( 'system_timezone', $timezone);
 
         if (!empty($manager_fqdn_input)) {
-          save_setting($DB, 'manager_fqdn', $manager_fqdn_input);
+          save_setting( 'manager_fqdn', $manager_fqdn_input);
           $manager_fqdn = $manager_fqdn_input;
         }
 
@@ -76,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Branding save
     if (!empty($_POST['save_brand'])) {
       $brand = trim($_POST['brand'] ?? $brand);
-      save_setting($DB,'brand_name',$brand);
+      save_setting('brand_name',$brand);
       // logo upload
       if (!empty($_FILES['logo']['tmp_name'])) {
         $allowed = ['image/png','image/jpeg','image/svg+xml'];
@@ -94,8 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['save_acme'])) {
       $acme_domain = trim($_POST['acme_domain'] ?? '');
       $acme_email = trim($_POST['acme_email'] ?? '');
-      save_setting($DB,'acme_domain',$acme_domain);
-      save_setting($DB,'acme_email',$acme_email);
+      save_setting('acme_domain',$acme_domain);
+      save_setting('acme_email',$acme_email);
       $notice = 'ACME settings saved.';
     }
 
@@ -107,11 +105,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $smtp_password = trim($_POST['smtp_password'] ?? '');
       $smtp_encryption = trim($_POST['smtp_encryption'] ?? 'tls');
       
-      save_setting($DB,'smtp_host',$smtp_host);
-      save_setting($DB,'smtp_port',$smtp_port);
-      save_setting($DB,'smtp_username',$smtp_username);
-      save_setting($DB,'smtp_password',$smtp_password);
-      save_setting($DB,'smtp_encryption',$smtp_encryption);
+      save_setting('smtp_host',$smtp_host);
+      save_setting('smtp_port',$smtp_port);
+      save_setting('smtp_username',$smtp_username);
+      save_setting('smtp_password',$smtp_password);
+      save_setting('smtp_encryption',$smtp_encryption);
       $notice = 'SMTP settings saved.';
     }
 
@@ -126,8 +124,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           $proxy_port_start >= $proxy_port_end) {
         $notice = 'Invalid port range. Start must be >= 1024, end <= 65535, and start < end.';
       } else {
-        save_setting($DB,'proxy_port_start',$proxy_port_start);
-        save_setting($DB,'proxy_port_end',$proxy_port_end);
+        save_setting('proxy_port_start',$proxy_port_start);
+        save_setting('proxy_port_end',$proxy_port_end);
         $notice = 'Proxy settings saved.';
       }
     }
@@ -145,8 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($backup_retention_months_input < 1 || $backup_retention_months_input > 6) {
           $notice = 'Backup retention must be between 1 and 6 months.';
         } else {
-          save_setting($DB,'backup_retention_type', 'time');
-          save_setting($DB,'backup_retention_months', $backup_retention_months_input);
+          save_setting('backup_retention_type', 'time');
+          save_setting('backup_retention_months', $backup_retention_months_input);
           $backup_retention_type = 'time';
           $backup_retention_months = $backup_retention_months_input;
           header('Location: /settings.php?notice=' . urlencode("Backup retention set to $backup_retention_months_input months."));
@@ -165,9 +163,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($min_keep >= $max_keep) {
           $notice = 'Minimum must be less than maximum.';
         } else {
-          save_setting($DB,'backup_retention_type', 'count');
-          save_setting($DB,'backup_min_keep', $min_keep);
-          save_setting($DB,'backup_max_keep', $max_keep);
+          save_setting('backup_retention_type', 'count');
+          save_setting('backup_min_keep', $min_keep);
+          save_setting('backup_max_keep', $max_keep);
           $backup_retention_type = 'count';
           $backup_min_keep = $min_keep;
           $backup_max_keep = $max_keep;
@@ -183,8 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($acme_domain === '' || $acme_email === '') { $notice = 'Domain and email required'; }
       else {
         // persist acme settings before attempting certbot
-        save_setting($DB,'acme_domain',$acme_domain);
-        save_setting($DB,'acme_email',$acme_email);
+        save_setting('acme_domain',$acme_domain);
+        save_setting('acme_email',$acme_email);
         // attempt certbot via restricted wrapper (uses sudo)
         $wrapper = '/usr/local/sbin/opnmgr-certbot-wrapper';
         if (!is_executable($wrapper)) { $notice = 'Certbot wrapper not available'; }

@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 requireLogin();
 requireAdmin();
@@ -50,7 +49,7 @@ if (!preg_match('/^\d+\.\d+$/', $target_track)) {
 
 try {
     // Get firewall details
-    $stmt = $DB->prepare("SELECT hostname, current_version FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT hostname, current_version FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
 
@@ -76,12 +75,12 @@ try {
 
     // Check if the database schema supports track change fields
     // First, try to check if columns exist
-    $columns_check = $DB->query("SHOW COLUMNS FROM firewalls LIKE 'track_change_requested'");
+    $columns_check = db()->query("SHOW COLUMNS FROM firewalls LIKE 'track_change_requested'");
     $has_track_change_columns = $columns_check && $columns_check->rowCount() > 0;
 
     if (!$has_track_change_columns) {
         // Create the columns if they don't exist
-        $DB->exec("ALTER TABLE firewalls
+        db()->exec("ALTER TABLE firewalls
             ADD COLUMN IF NOT EXISTS track_change_requested TINYINT(1) DEFAULT 0,
             ADD COLUMN IF NOT EXISTS track_change_requested_at DATETIME DEFAULT NULL,
             ADD COLUMN IF NOT EXISTS track_change_target VARCHAR(20) DEFAULT NULL,
@@ -91,7 +90,7 @@ try {
     }
 
     // Flag the firewall for track change
-    $stmt = $DB->prepare("UPDATE firewalls SET
+    $stmt = db()->prepare("UPDATE firewalls SET
         track_change_requested = 1,
         track_change_requested_at = NOW(),
         track_change_target = ?,

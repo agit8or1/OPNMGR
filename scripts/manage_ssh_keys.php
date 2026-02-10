@@ -4,40 +4,36 @@
  * Automatically generates, deploys, and manages SSH keys for firewall access
  */
 
-require_once(__DIR__ . '/../inc/db.php');
+require_once(__DIR__ . '/../inc/bootstrap_agent.php');
 require_once(__DIR__ . '/../inc/logging.php');
 
 if (!function_exists('get_firewall_by_id')) {
     function get_firewall_by_id($firewall_id) {
-        global $DB;
-        $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+                $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
         $stmt->execute([$firewall_id]);
         return $stmt->fetch();
     }
 }
 
 function update_firewall_ssh_key($firewall_id, $private_key_base64, $public_key) {
-    global $DB;
-    $stmt = $DB->prepare("UPDATE firewalls SET ssh_private_key = ?, ssh_public_key = ? WHERE id = ?");
+        $stmt = db()->prepare("UPDATE firewalls SET ssh_private_key = ?, ssh_public_key = ? WHERE id = ?");
     return $stmt->execute([$private_key_base64, $public_key, $firewall_id]);
 }
 
 if (!function_exists('queue_command')) {
 function queue_command($firewall_id, $command, $description) {
-    global $DB;
-    $stmt = $DB->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
+        $stmt = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, status) VALUES (?, ?, ?, 'pending')");
     $stmt->execute([$firewall_id, $command, $description]);
-    return $DB->lastInsertId();
+    return db()->lastInsertId();
 }
 }
 
 if (!function_exists('wait_for_command')) {
 function wait_for_command($command_id, $timeout = 120) {
-    global $DB;
-    $start = time();
+        $start = time();
     
     while (time() - $start < $timeout) {
-        $stmt = $DB->prepare("SELECT status, result FROM firewall_commands WHERE id = ?");
+        $stmt = db()->prepare("SELECT status, result FROM firewall_commands WHERE id = ?");
         $stmt->execute([$command_id]);
         $result = $stmt->fetch();
         

@@ -7,8 +7,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-require_once 'inc/db.php';
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 $page_title = "Log Analysis";
@@ -66,7 +65,7 @@ if ($threat_level) {
 
 $query .= " ORDER BY asr.created_at DESC";
 
-$stmt = $DB->prepare($query);
+$stmt = db()->prepare($query);
 $stmt->execute($params);
 $analyses = $stmt->fetchAll();
 
@@ -82,12 +81,12 @@ FROM log_analysis_results lar
 JOIN ai_scan_reports asr ON lar.report_id = asr.id
 WHERE asr.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
 
-$stats_stmt = $DB->prepare($stats_query);
+$stats_stmt = db()->prepare($stats_query);
 $stats_stmt->execute([$date_range]);
 $stats = $stats_stmt->fetch();
 
 // Get threat level breakdown
-$threat_breakdown = $DB->prepare("
+$threat_breakdown = db()->prepare("
     SELECT threat_level, COUNT(*) as count
     FROM log_analysis_results lar
     JOIN ai_scan_reports asr ON lar.report_id = asr.id
@@ -98,7 +97,7 @@ $threat_breakdown->execute([$date_range]);
 $threat_levels = $threat_breakdown->fetchAll();
 
 // Get firewall list for filter
-$firewalls = $DB->query("SELECT id, hostname FROM firewalls ORDER BY hostname")->fetchAll();
+$firewalls = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname")->fetchAll();
 ?>
 
 <div class="container-fluid mt-4">

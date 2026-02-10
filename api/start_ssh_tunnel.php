@@ -1,7 +1,5 @@
 <?php
-session_start();
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -26,7 +24,7 @@ if ($firewall_id <= 0) {
 
 try {
     // Get firewall details
-    $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     

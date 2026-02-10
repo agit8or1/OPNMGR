@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 $logoUrl = '/assets/img/logo.png';
@@ -36,7 +34,7 @@ $themes = [
 ];
 
 // Load settings
-$rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
 $theme = $rows['theme'] ?? 'professional-dark';
 $login_bg = $rows['login_background'] ?? '';
@@ -46,8 +44,8 @@ if (!isset($themes[$theme])) {
 }
 $logo = $rows['logo'] ?? '';
 
-function save_setting($DB, $k, $v) {
-    $s = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
+function save_setting($k, $v) {
+    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
     $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
 }
 
@@ -59,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $brand = trim($_POST['brand'] ?? $brand);
             $theme = trim($_POST['theme'] ?? $theme);
 
-            save_setting($DB, 'brand_name', $brand);
-            save_setting($DB, 'theme', $theme);
+            save_setting('brand_name', $brand);
+            save_setting('theme', $theme);
 
             if (!empty($_FILES['logo']['tmp_name'])) {
                 $allowed = ['image/png','image/jpeg','image/svg+xml'];
@@ -71,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     chown($logo_path, 'www-data');
                     chmod($logo_path, 0644);
                     $logo = '/assets/img/logo.png';
-                    save_setting($DB, 'logo', $logo);
+                    save_setting('logo', $logo);
                 } else {
                     $notice = 'Logo must be PNG/JPG/SVG and <2MB';
                 }

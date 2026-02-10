@@ -3,8 +3,7 @@
  * Upload Backup API
  * Receives backup files from firewalls
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -23,7 +22,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -54,7 +53,7 @@ try {
     if (move_uploaded_file($uploaded_file['tmp_name'], $target_path)) {
         // Update backup record with file size
         $file_size = filesize($target_path);
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             UPDATE backups 
             SET file_size = ? 
             WHERE firewall_id = ? AND backup_file = ?

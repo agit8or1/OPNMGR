@@ -1,21 +1,21 @@
 <?php
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 try {
     // Get firewall agent status
-    $stmt = $DB->prepare('SELECT id, hostname, last_checkin, agent_version, status FROM firewalls WHERE hostname = ?');
+    $stmt = db()->prepare('SELECT id, hostname, last_checkin, agent_version, status FROM firewalls WHERE hostname = ?');
     $stmt->execute(['home.agit8or.net']);
     $agent_status = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get updater status
-    $stmt = $DB->prepare('SELECT u.*, f.hostname FROM firewall_updaters u JOIN firewalls f ON u.firewall_id = f.id WHERE f.hostname = ?');
+    $stmt = db()->prepare('SELECT u.*, f.hostname FROM firewall_updaters u JOIN firewalls f ON u.firewall_id = f.id WHERE f.hostname = ?');
     $stmt->execute(['home.agit8or.net']);
     $updater_status = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get recent commands
-    $stmt = $DB->prepare('SELECT id, command, status, sent_at, completed_at, result FROM firewall_commands WHERE firewall_id = ? ORDER BY created_at DESC LIMIT 5');
+    $stmt = db()->prepare('SELECT id, command, status, sent_at, completed_at, result FROM firewall_commands WHERE firewall_id = ? ORDER BY created_at DESC LIMIT 5');
     $stmt->execute([$agent_status['id']]);
     $recent_commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

@@ -3,8 +3,7 @@
  * Check Update Request API
  * Separate service checks if firewall update is requested
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -24,7 +23,7 @@ if (!$firewall_id) {
 }
 
 try {
-    $stmt = $DB->prepare('SELECT update_requested FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT update_requested FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     

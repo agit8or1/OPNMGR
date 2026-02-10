@@ -1,0 +1,7 @@
+<menu>
+   <Services>
+      <OPNManagerAgent VisibleName="OPNManager Agent" url="/ui/opnmanageragent" cssClass="fa fa-cloud fa-fw">
+         <Settings VisibleName="Settings" url="/ui/opnmanageragent"/>
+      </OPNManagerAgent>
+   </Services>
+</menu>

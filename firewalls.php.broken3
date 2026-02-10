@@ -1,0 +1,641 @@
+<?php
+require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/csrf.php';
+requireLogin();
+requireAdmin();
+
+// Handle delete request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_id'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $notice = 'CSRF verification failed.';
+    } else {
+        $delete_id = (int)$_POST['delete_id'];
+        try {
+    
+            $stmt = $DB->prepare('DELETE FROM firewall_agents WHERE firewall_id = ?');
+            $stmt->execute([$delete_id]);
+            $stmt = $DB->prepare('DELETE FROM firewalls WHERE id = ?');
+            $stmt->execute([$delete_id]);
+            $notice = 'Firewall deleted successfully.';
+        } catch (Exception $e) {
+            $notice = 'Error deleting firewall: ' . $e->getMessage();
+        }
+    }
+}
+// Handle search and sorting
+
+$search = $_GET['search'] ?? '';
+$sort_by = $_GET['sort'] ?? 'hostname';
+$sort_order = $_GET['order'] ?? 'ASC';
+$tag_filter = $_GET['tag'] ?? '';
+$page = (int)($_GET['page'] ?? 1);
+$per_page = 50;
+$offset = ($page - 1) * $per_page;
+$firewalls = [];
+$total_pages = 0;
+$tags = [];
+$groups = [];
+
+// Get tags from database
+if (isset($DB) && $DB) {
+    try {
+        $stmt = $DB->query('SELECT id, name, color FROM tags ORDER BY name');
+        $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        $tags = array();
+    }
+}
+// Get groups from database
+try {
+    $stmt = $DB->query("SELECT DISTINCT customer_name FROM firewalls WHERE customer_name IS NOT NULL AND customer_name != '' ORDER BY customer_name");
+    $groups = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    $groups = array();
+}
+// Build query for firewalls
+// Build query for firewalls
+$query = 'SELECT f.*, t.name as tag_name, t.color as tag_color, ft.tag_id, fa.agent_version as version, fa.status as agent_status, fa.last_checkin as agent_last_checkin, fa.wan_ip, fa.ipv6_address FROM firewalls f LEFT JOIN firewall_agents fa ON f.id = fa.firewall_id LEFT JOIN firewall_tags ft ON f.id = ft.firewall_id LEFT JOIN tags t ON ft.tag_id = t.id WHERE 1=1';
+$params = array();
+
+if (!empty($search)) {
+    $query .= " AND (f.hostname LIKE ? OR f.ip_address LIKE ? OR f.customer_name LIKE ?)";
+    $params[] = "%" . $search . "%";
+    $params[] = "%" . $search . "%";
+    $params[] = "%" . $search . "%";
+}
+if (!empty($tag_filter)) {
+    $query .= " AND ft.tag_id = ?";
+    $params[] = $tag_filter;
+}
+$query .= " ORDER BY f." . $sort_by . " " . $sort_order;
+$query .= " LIMIT " . $per_page . " OFFSET " . $offset;
+
+// Get total count for pagination
+$count_query = 'SELECT COUNT(*) as total FROM firewalls f LEFT JOIN firewall_agents fa ON f.id = fa.firewall_id WHERE 1=1';
+$count_params = array();
+
+if (!empty($search)) {
+    $count_query .= ' AND (f.hostname LIKE ? OR f.ip_address LIKE ? OR f.customer_name LIKE ?)';
+    $count_params[] = '%' . $search . '%';
+    $count_params[] = '%' . $search . '%';
+    $count_params[] = '%' . $search . '%';
+}
+
+if (!empty($tag_filter)) {
+    $count_query .= ' AND ft.tag_id = ?';
+    $count_params[] = $tag_filter;
+}
+
+try {
+    $stmt = $DB->prepare($count_query);
+    $stmt->execute($count_params);
+    $total_count = $stmt->fetchColumn();
+    $total_pages = ceil($total_count / $per_page);
+
+    $stmt = $DB->prepare($query);
+    $stmt->execute($params);
+    $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $firewalls = array();
+    $total_pages = 0;
+}
+
+
+try {
+    $stmt = $DB->prepare($count_query);
+    $stmt->execute($count_params);
+    $total_count = $stmt->fetchColumn();
+    $total_pages = ceil($total_count / $per_page);
+
+    $stmt = $DB->prepare($query);
+    $stmt->execute($params);
+    $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $firewalls = array();
+    $total_pages = 0;
+}
+?>
+
+<?php include __DIR__ . '/inc/header.php'; ?>
+
+<?php include __DIR__ . '/inc/navigation.php'; ?>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Administration Sidebar -->
+        <div class="col-md-3">
+            <?php include __DIR__ . '/inc/sidebar.php'; ?>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9">
+            <style>
+            .card-ghost { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; }
+            </style>
+
+            <div class="row">
+                <div class="col-md-12">
+        <div class="card card-dark">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <small class="text-light fw-bold mb-0">
+                        <i class="fas fa-network-wired me-1"></i>Firewall Management
+                    </small>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search firewalls..." value="<?php echo htmlspecialchars($search); ?>">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="tagFilter">
+                            <option value="">All Tags</option>
+                            <?php foreach ($tags as $tag): ?>
+                                <option value="<?php echo htmlspecialchars($tag['id']); ?>" <?php echo (isset($_GET['tag']) && $_GET['tag'] === $tag['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select form-select-sm" id="sortBy">
+                            <option value="hostname" <?php echo ($sort_by === 'hostname') ? 'selected' : ''; ?>>Sort by Name</option>
+                            <option value="ip_address" <?php echo ($sort_by === 'ip_address') ? 'selected' : ''; ?>>Sort by IP</option>
+                            <option value="status" <?php echo ($sort_by === 'status') ? 'selected' : ''; ?>>Sort by Status</option>
+                            <option value="customer_name" <?php echo ($sort_by === 'customer_name') ? 'selected' : ''; ?>>Sort by Customer</option>
+                        </select>
+                    </div>
+    $stmt = $DB->query('SELECT DISTINCT customer_name FROM firewalls WHERE customer_name IS NOT NULL AND customer_name != ''
+                    <div class="col-md-3">
+                        <button class="btn btn-primary btn-sm w-100" onclick="applyFilters()">
+                            <i class="fas fa-search me-1"></i>Search
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Firewall List -->
+                <div class="row g-2">
+                    <?php foreach ($firewalls as $firewall): ?>
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card card-ghost p-3" id="firewall-card-<?php echo $firewall['id']; ?>">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="flex-grow-1">
+                                        <div id="view-mode-<?php echo $firewall['id']; ?>">
+                                            <h6 class="text-light mb-1" style="font-size: 0.9rem;">
+                                                <?php echo htmlspecialchars($firewall['hostname']); ?>
+                                            </h6>
+                                            <small class="text-muted" style="font-size: 0.75rem;">
+                                                <?php echo htmlspecialchars($firewall['ip_address']); ?>
+                                                <?php if (!empty($firewall['wan_ip'])): ?>
+                                                    <br>WAN: <?php echo htmlspecialchars($firewall['wan_ip']); ?>
+                                                <?php endif; ?>
+                                            </small>
+                                        </div>
+                                        <div id="edit-mode-<?php echo $firewall['id']; ?>" style="display: none;">
+                                            <input type="text" class="form-control form-control-sm mb-1" id="edit-hostname-<?php echo $firewall['id']; ?>" value="<?php echo htmlspecialchars($firewall['hostname']); ?>" placeholder="Hostname">
+                                            <input type="text" class="form-control form-control-sm mb-1" id="edit-ip-<?php echo $firewall['id']; ?>" value="<?php echo htmlspecialchars($firewall['ip_address']); ?>" placeholder="IP Address">
+                                            <input type="text" class="form-control form-control-sm" id="edit-wan-ip-<?php echo $firewall['id']; ?>" value="<?php echo htmlspecialchars($firewall['wan_ip'] ?? ''); ?>" placeholder="WAN IP Address">
+                                        </div>
+                                    </div>
+                                    <span class="badge <?php echo $firewall['status'] === 'online' ? 'bg-success' : 'bg-danger'; ?> badge-sm">
+                                        <?php echo htmlspecialchars($firewall['status'] ?? 'unknown'); ?>
+                                    </span>
+                                </div>
+                                
+                                <?php if (!empty($firewall['customer_name'])): ?>
+                                    <div class="mb-2">
+                                        <div id="view-customer-<?php echo $firewall['id']; ?>">
+                                            <small class="text-light" style="font-size: 0.75rem;">
+                                                <i class="fas fa-building me-1"></i><?php echo htmlspecialchars($firewall['customer_name']); ?>
+                                            </small>
+                                        </div>
+                                        <div id="edit-customer-<?php echo $firewall['id']; ?>" style="display: none;">
+                                            <input type="text" class="form-control form-control-sm" id="edit-customer-name-<?php echo $firewall['id']; ?>" value="<?php echo htmlspecialchars($firewall['customer_name']); ?>" placeholder="Customer Name">
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($firewall['tags'])): ?>
+                                    <div class="mb-2">
+                                        <div id="view-tags-<?php echo $firewall['id']; ?>">
+                                            <?php 
+                                            $tag_names = explode(',', $firewall['tags']);
+                                            $tag_colors = explode(',', $firewall['tag_colors']);
+                                            foreach ($tag_names as $index => $tag_name): 
+                                                $color = $tag_colors[$index] ?? '#3b82f6';
+                                            ?>
+                                                <span class="badge" style="background-color: <?php echo htmlspecialchars($color); ?>; color: white; font-size: 0.7rem; margin-right: 2px;">
+                                                    <?php echo htmlspecialchars($tag_name); ?>
+                                                </span>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <div id="edit-tags-<?php echo $firewall['id']; ?>" style="display: none;">
+                                            <select multiple class="form-select form-select-sm" id="edit-tags-select-<?php echo $firewall['id']; ?>">
+                                                <?php foreach ($tags as $tag): ?>
+                                                    <option value="<?php echo $tag['id']; ?>" 
+                                                            style="background-color: <?php echo htmlspecialchars($tag['color']); ?>; color: white;">
+                                                        <?php echo htmlspecialchars($tag['name']); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="d-flex gap-1" id="view-buttons-<?php echo $firewall['id']; ?>">
+                                    <button class="btn btn-outline-light btn-xs flex-fill" onclick="viewFirewall(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-xs flex-fill" onclick="startEdit(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="d-flex gap-1" id="edit-buttons-<?php echo $firewall['id']; ?>" style="display: none;">
+                                    <button class="btn btn-success btn-xs flex-fill" onclick="saveEdit(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-save"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-xs flex-fill" onclick="cancelEdit(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="d-flex gap-1" id="delete-buttons-<?php echo $firewall['id']; ?>" style="display: none;">
+                                    <button class="btn btn-outline-danger btn-xs flex-fill" onclick="deleteFirewall(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-xs flex-fill" onclick="cancelDelete(<?php echo $firewall['id']; ?>)">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Pagination -->
+                <?php if ($total_pages > 1): ?>
+                <div class="d-flex justify-content-center mt-3">
+                    <nav>
+                        <ul class="pagination pagination-sm">
+                            <?php if ($page > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&tag=<?php echo urlencode($tag_filter); ?>&sort=<?php echo urlencode($sort_by); ?>&order=<?php echo urlencode($sort_order); ?>">&laquo; Previous</a>
+                                </li>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
+                                <li class="page-item <?php echo ($i === $page) ? 'active' : ''; ?>">
+                                    <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&tag=<?php echo urlencode($tag_filter); ?>&sort=<?php echo urlencode($sort_by); ?>&order=<?php echo urlencode($sort_order); ?>"><?php echo $i; ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $total_pages): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&tag=<?php echo urlencode($tag_filter); ?>&sort=<?php echo urlencode($sort_by); ?>&order=<?php echo urlencode($sort_order); ?>">Next &raquo;</a>
+                                </li>
+                            <?php endif; ?>
+                        </ul>
+                    </nav>
+                </div>
+                <?php endif; ?>
+
+                <?php if (empty($firewalls)): ?>
+                    <div class="text-center mt-4">
+                        <p class="text-muted">No firewalls found matching your criteria.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Firewall Modal -->
+<div class="modal fade" id="addFirewallModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Firewall</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addFirewallForm">
+                <div class="modal-body">
+                    <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
+                    <div class="mb-3">
+                        <label class="form-label">Hostname</label>
+                        <input type="text" name="hostname" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">IP Address</label>
+                        <input type="text" name="ip_address" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">WAN IP Address</label>
+                        <input type="text" name="wan_ip" class="form-control" placeholder="External/WAN IP (optional)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Customer Name</label>
+                        <input type="text" name="customer_name" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tags</label>
+                        <select multiple name="tags[]" class="form-select">
+                            <?php foreach ($tags as $tag): ?>
+                                <option value="<?php echo $tag['id']; ?>" 
+                                        style="background-color: <?php echo htmlspecialchars($tag['color']); ?>; color: white;">
+                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select multiple tags</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Firewall</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Groups Modal -->
+<div class="modal fade" id="manageGroupsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Customer Groups</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="groupsList">
+                    <?php foreach ($groups as $group): ?>
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded" id="group-<?php echo md5($group); ?>">
+                            <span><?php echo htmlspecialchars($group); ?></span>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteGroup('<?php echo htmlspecialchars($group); ?>')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label">Add New Group</label>
+                    <div class="input-group">
+                        <input type="text" id="newGroupName" class="form-control" placeholder="Group name">
+                        <button class="btn btn-primary" onclick="addGroup()">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function applyFilters() {
+    const search = document.getElementById('searchInput').value;
+    const group = document.getElementById('groupFilter').value;
+    const sortBy = document.getElementById('sortBy').value;
+    
+    let url = window.location.pathname + '?';
+    if (search) url += 'search=' + encodeURIComponent(search) + '&';
+    if (group) url += 'group=' + encodeURIComponent(group) + '&';
+    if (sortBy) url += 'sort=' + encodeURIComponent(sortBy) + '&';
+    
+    window.location.href = url.slice(0, -1);
+}
+
+function showAddFirewallModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addFirewallModal'));
+    modal.show();
+}
+
+function showManageGroupsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('manageGroupsModal'));
+    modal.show();
+}
+
+function viewFirewall(id) {
+    window.location.href = '/firewall_details.php?id=' + id;
+}
+
+function startEdit(id) {
+    // Hide view mode, show edit mode
+    document.getElementById('view-mode-' + id).style.display = 'none';
+    document.getElementById('edit-mode-' + id).style.display = 'block';
+    
+    // Show customer edit fields if they exist
+    const customerView = document.getElementById('view-customer-' + id);
+    const customerEdit = document.getElementById('edit-customer-' + id);
+    if (customerView && customerEdit) {
+        customerView.style.display = 'none';
+        customerEdit.style.display = 'block';
+    }
+    
+    const groupView = document.getElementById('view-group-' + id);
+    const groupEdit = document.getElementById('edit-group-' + id);
+    if (groupView && groupEdit) {
+        groupView.style.display = 'none';
+        groupEdit.style.display = 'block';
+    }
+    
+    // Show tags edit fields if they exist
+    const tagsView = document.getElementById('view-tags-' + id);
+    const tagsEdit = document.getElementById('edit-tags-' + id);
+    if (tagsView && tagsEdit) {
+        tagsView.style.display = 'none';
+        tagsEdit.style.display = 'block';
+    }
+    
+    // Switch button modes
+    document.getElementById('view-buttons-' + id).style.display = 'none';
+    document.getElementById('edit-buttons-' + id).style.display = 'flex';
+    
+    // Show delete button in corner
+    const card = document.getElementById('firewall-card-' + id);
+    let deleteBtn = document.getElementById('corner-delete-' + id);
+    if (!deleteBtn) {
+        deleteBtn = document.createElement('button');
+        deleteBtn.id = 'corner-delete-' + id;
+        deleteBtn.className = 'btn btn-outline-danger btn-xs position-absolute';
+        deleteBtn.style.cssText = 'top: 5px; right: 5px; z-index: 10;';
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.onclick = function() { showDeleteConfirm(id); };
+        card.style.position = 'relative';
+        card.appendChild(deleteBtn);
+    }
+    deleteBtn.style.display = 'block';
+}
+
+function cancelEdit(id) {
+    // Show view mode, hide edit mode
+    document.getElementById('view-mode-' + id).style.display = 'block';
+    document.getElementById('edit-mode-' + id).style.display = 'none';
+    
+    // Hide customer edit fields if they exist
+    const customerView = document.getElementById('view-customer-' + id);
+    const customerEdit = document.getElementById('edit-customer-' + id);
+    if (customerView && customerEdit) {
+        customerView.style.display = 'block';
+        customerEdit.style.display = 'none';
+    }
+    
+    const groupView = document.getElementById('view-group-' + id);
+    const groupEdit = document.getElementById('edit-group-' + id);
+    if (groupView && groupEdit) {
+        groupView.style.display = 'block';
+        groupEdit.style.display = 'none';
+    }
+    
+    // Hide tags edit fields if they exist
+    const tagsView = document.getElementById('view-tags-' + id);
+    const tagsEdit = document.getElementById('edit-tags-' + id);
+    if (tagsView && tagsEdit) {
+        tagsView.style.display = 'block';
+        tagsEdit.style.display = 'none';
+    }
+    
+    // Switch button modes
+    document.getElementById('view-buttons-' + id).style.display = 'flex';
+    document.getElementById('edit-buttons-' + id).style.display = 'none';
+    
+    // Hide delete button
+    const deleteBtn = document.getElementById('corner-delete-' + id);
+    if (deleteBtn) {
+        deleteBtn.style.display = 'none';
+    }
+    
+    // Hide delete confirmation if shown
+    document.getElementById('delete-buttons-' + id).style.display = 'none';
+}
+
+function showDeleteConfirm(id) {
+    // Hide edit buttons, show delete confirmation
+    document.getElementById('edit-buttons-' + id).style.display = 'none';
+    document.getElementById('delete-buttons-' + id).style.display = 'flex';
+}
+
+function cancelDelete(id) {
+    // Show edit buttons, hide delete confirmation
+    document.getElementById('edit-buttons-' + id).style.display = 'flex';
+    document.getElementById('delete-buttons-' + id).style.display = 'none';
+}
+
+function saveEdit(id) {
+    const hostname = document.getElementById('edit-hostname-' + id).value;
+    const ipAddress = document.getElementById('edit-ip-' + id).value;
+    const wanIp = document.getElementById('edit-wan-ip-' + id)?.value || '';
+    const customerName = document.getElementById('edit-customer-name-' + id)?.value || '';
+    
+    // Get selected tags
+    const tagsSelect = document.getElementById('edit-tags-select-' + id);
+    const selectedTags = Array.from(tagsSelect?.selectedOptions || []).map(option => option.value);
+    
+    // Create form data for AJAX request
+    const formData = new FormData();
+    formData.append('edit_id', id);
+    formData.append('hostname', hostname);
+    formData.append('ip_address', ipAddress);
+    formData.append('wan_ip', wanIp);
+    formData.append('customer_name', customerName);
+    formData.append('tags', JSON.stringify(selectedTags));
+    formData.append('csrf', '<?php echo csrf_token(); ?>');
+    
+    fetch('/firewalls.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => {
+        if (data.includes('success')) {
+            // Reload the page to show updated data
+            window.location.reload();
+        } else {
+            alert('Error saving changes: ' + data);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
+
+function deleteFirewall(id) {
+    if (confirm('Are you sure you want to delete this firewall? This action cannot be undone.')) {
+        const formData = new FormData();
+        formData.append('delete_id', id);
+        formData.append('csrf', '<?php echo csrf_token(); ?>');
+        
+        fetch('/firewalls.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(data => {
+            if (data.includes('success')) {
+                // Remove the card from DOM
+                document.getElementById('firewall-card-' + id).remove();
+            } else {
+                alert('Error deleting firewall: ' + data);
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error);
+        });
+    }
+}
+
+// Auto-search on enter
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+    }
+});
+
+    // Handle add firewall form submission
+    const addForm = document.getElementById('addFirewallForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Handle tags
+            const selectedTags = Array.from(document.querySelectorAll('select[name="tags[]"] option:checked')).map(option => option.value);
+            formData.append('tags', JSON.stringify(selectedTags));
+            
+            fetch('/add_firewall.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data.includes('success')) {
+                    // Close modal and reload page
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addFirewallModal'));
+                    if (modal) modal.hide();
+                    window.location.reload();
+                } else {
+                    alert('Error adding firewall: ' + data);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        });
+    }
+});
+</script>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include __DIR__ . '/inc/footer.php'; ?>

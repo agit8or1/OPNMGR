@@ -1,5 +1,5 @@
 <?php
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once 'inc/header.php';
 
 // Require admin access
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO users (username, password, first_name, last_name, email, role) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt = db()->prepare("INSERT INTO users (username, password, first_name, last_name, email, role) VALUES (?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$username, $hashedPassword, $firstName, $lastName, $email, $role]);
                 $message = '<div class="alert alert-success">User added successfully!</div>';
             } catch (PDOException $e) {
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['delete_user'])) {
         $userId = $_POST['user_id'];
         if ($userId != $_SESSION['user_id']) { // Prevent self-deletion
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt = db()->prepare("DELETE FROM users WHERE id = ?");
             $stmt->execute([$userId]);
             $message = '<div class="alert alert-success">User deleted successfully!</div>';
         } else {
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $stmt = db()->prepare("UPDATE users SET password = ? WHERE id = ?");
                 $stmt->execute([$hashedPassword, $_SESSION['user_id']]);
                 $message = '<div class="alert alert-success">Password changed successfully!</div>';
             } catch (PDOException $e) {
@@ -72,10 +72,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 if (!empty($password)) {
                     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ?, password = ? WHERE id = ?");
+                    $stmt = db()->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ?, password = ? WHERE id = ?");
                     $stmt->execute([$firstName, $lastName, $username, $email, $role, $hashedPassword, $userId]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ? WHERE id = ?");
+                    $stmt = db()->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ? WHERE id = ?");
                     $stmt->execute([$firstName, $lastName, $username, $email, $role, $userId]);
                 }
                 $message = '<div class="alert alert-success">User updated successfully!</div>';
@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get all users
-$stmt = $pdo->query("SELECT id, username, first_name, last_name, email, role, created_at FROM users ORDER BY username");
+$stmt = db()->query("SELECT id, username, first_name, last_name, email, role, created_at FROM users ORDER BY username");
 $users = $stmt->fetchAll();
 ?>
 

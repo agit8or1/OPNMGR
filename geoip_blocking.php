@@ -1,9 +1,7 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 
@@ -21,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (strlen($country_code) === 2 && !empty($country_name)) {
                 try {
-                    $stmt = $DB->prepare('INSERT INTO geoip_blocks (country_code, country_name, action, description, enabled) VALUES (?, ?, ?, ?, 1)');
+                    $stmt = db()->prepare('INSERT INTO geoip_blocks (country_code, country_name, action, description, enabled) VALUES (?, ?, ?, ?, 1)');
                     $stmt->execute([$country_code, $country_name, $action, $description]);
                     $notice = 'Country block added successfully.';
                 } catch (PDOException $e) {
@@ -40,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Toggle enabled status
         if (!empty($_POST['toggle_block'])) {
             $id = (int)$_POST['block_id'];
-            $stmt = $DB->prepare('UPDATE geoip_blocks SET enabled = NOT enabled WHERE id = ?');
+            $stmt = db()->prepare('UPDATE geoip_blocks SET enabled = NOT enabled WHERE id = ?');
             $stmt->execute([$id]);
             $notice = 'Block status updated.';
         }
@@ -48,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Delete block
         if (!empty($_POST['delete_block'])) {
             $id = (int)$_POST['block_id'];
-            $stmt = $DB->prepare('DELETE FROM geoip_blocks WHERE id = ?');
+            $stmt = db()->prepare('DELETE FROM geoip_blocks WHERE id = ?');
             $stmt->execute([$id]);
             $notice = 'Country block removed.';
         }
@@ -56,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Load existing blocks
-$blocks = $DB->query('SELECT * FROM geoip_blocks ORDER BY country_name ASC')->fetchAll(PDO::FETCH_ASSOC);
+$blocks = db()->query('SELECT * FROM geoip_blocks ORDER BY country_name ASC')->fetchAll(PDO::FETCH_ASSOC);
 
 // Common countries list
 $common_countries = [

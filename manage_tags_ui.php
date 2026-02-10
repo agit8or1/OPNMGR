@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -9,7 +7,7 @@ include __DIR__ . '/inc/header.php';
 
 // Get all tags
 try {
-    $stmt = $DB->query('SELECT t.*, COUNT(ft.firewall_id) as firewall_count FROM tags t LEFT JOIN firewall_tags ft ON t.id = ft.tag_id GROUP BY t.id ORDER BY t.name');
+    $stmt = db()->query('SELECT t.*, COUNT(ft.firewall_id) as firewall_count FROM tags t LEFT JOIN firewall_tags ft ON t.id = ft.tag_id GROUP BY t.id ORDER BY t.name');
     $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     $tags = [];

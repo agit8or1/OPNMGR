@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 $firewall_id = (int)($_GET['id'] ?? 0);
@@ -12,7 +10,7 @@ if (!$firewall_id) {
 }
 
 // Get firewall details
-$stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch();
 

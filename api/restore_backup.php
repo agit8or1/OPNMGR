@@ -3,9 +3,7 @@
  * Restore Backup API
  * Queues a restore command for the specified backup
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -42,7 +40,7 @@ if (!$backup_id) {
 
 try {
     // Get backup info
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT b.*, f.hostname 
         FROM backups b 
         JOIN firewalls f ON b.firewall_id = f.id 
@@ -62,14 +60,14 @@ try {
                       "configctl firmware restore /tmp/restore_config.xml && " .
                       "rm /tmp/restore_config.xml";
     
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, status, created_at) 
         VALUES (?, ?, 'Restore configuration backup', 'pending', NOW())
     ");
     $stmt->execute([$backup['firewall_id'], $restore_command]);
     
     // Log the restore request
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
         VALUES (?, 'backup', ?, 'WARNING', NOW())
     ");

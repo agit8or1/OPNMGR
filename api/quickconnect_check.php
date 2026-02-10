@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
@@ -20,11 +21,9 @@ if (!$firewall_id) {
 }
 
 // Only connect to DB if we have a valid firewall ID
-require_once __DIR__ . '/../inc/db.php';
-
 try {
     // Super fast query - just check if ANY pending requests exist
-    $stmt = $DB->prepare('SELECT 1 FROM request_queue WHERE firewall_id = ? AND status = "pending" LIMIT 1');
+    $stmt = db()->prepare('SELECT 1 FROM request_queue WHERE firewall_id = ? AND status = "pending" LIMIT 1');
     $stmt->execute([$firewall_id]);
     $has_requests = (bool)$stmt->fetch();
     

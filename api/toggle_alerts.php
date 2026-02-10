@@ -1,7 +1,5 @@
 <?php
-session_start();
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -41,7 +39,7 @@ if ($alerts_enabled !== 0 && $alerts_enabled !== 1) {
 
 try {
     // Update the firewall's alerts_enabled setting
-    $stmt = $DB->prepare('UPDATE firewalls SET alerts_enabled = ? WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET alerts_enabled = ? WHERE id = ?');
     $result = $stmt->execute([$alerts_enabled, $firewall_id]);
     
     if ($result) {

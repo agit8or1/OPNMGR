@@ -1,9 +1,9 @@
 <?php
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once 'inc/brute_force_protection.php';
 
 $message = '';
-$bfp = new BruteForceProtection($pdo);
+$bfp = new BruteForceProtection(db());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
@@ -46,14 +46,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Check for custom login background
 $customBg = '';
-if (file_exists(__DIR__ . '/inc/db.php')) {
-    require_once __DIR__ . '/inc/db.php';
-    if (isset($DB)) {
-        $rows = $DB->query('SELECT `name`,`value` FROM settings WHERE name = "login_background"')->fetch(PDO::FETCH_ASSOC);
-        if ($rows && file_exists(__DIR__ . $rows['value'])) {
-            $customBg = $rows['value'];
-        }
+try {
+    $rows = db()->query('SELECT `name`,`value` FROM settings WHERE name = "login_background"')->fetch(PDO::FETCH_ASSOC);
+    if ($rows && file_exists(__DIR__ . $rows['value'])) {
+        $customBg = $rows['value'];
     }
+} catch (Exception $e) {
+    // DB not available yet, skip custom background
 }
 ?>
 

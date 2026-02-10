@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/version.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -70,13 +68,11 @@ include __DIR__ . '/inc/navigation.php';
 
 // Helper functions
 function check_for_updates($main_server, $instance_id) {
-    global $DB;
-    
     try {
         $current_version = get_current_version();
         
         // Get available updates from database directly (same server)
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT version, description, created_at as release_date 
             FROM platform_versions 
             WHERE status = 'released' 
@@ -117,8 +113,6 @@ function check_for_updates($main_server, $instance_id) {
 }
 
 function apply_update($main_server, $instance_id, $update_id) {
-    global $DB;
-    
     try {
         // Extract version from update_id (format: update_X_Y_Z)
         $version_parts = explode('_', $update_id);
@@ -130,7 +124,7 @@ function apply_update($main_server, $instance_id, $update_id) {
         }
         
         // Get update information from database
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT version, description, changelog 
             FROM platform_versions 
             WHERE version = ? AND status = 'released'
@@ -172,11 +166,9 @@ function apply_update($main_server, $instance_id, $update_id) {
 }
 
 function execute_update($update_data) {
-    global $DB;
-    
     try {
         // Log update start
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             INSERT INTO change_log (version, change_type, component, title, description, author, created_at) 
             VALUES (?, 'update_applied', 'system', ?, ?, 'system', NOW())
         ");
@@ -208,12 +200,12 @@ function execute_update($update_data) {
         // Execute SQL updates if any
         if (isset($update_data['sql']) && !empty($update_data['sql'])) {
             foreach ($update_data['sql'] as $sql_statement) {
-                $DB->exec($sql_statement);
+                db()->exec($sql_statement);
             }
         }
         
         // Update platform version
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             INSERT INTO platform_versions (version, status, description, release_date) 
             VALUES (?, 'released', ?, CURDATE())
             ON DUPLICATE KEY UPDATE description = VALUES(description)
@@ -229,8 +221,7 @@ function execute_update($update_data) {
 }
 
 function get_current_version() {
-    global $DB;
-    $stmt = $DB->query("SELECT version FROM platform_versions WHERE status = 'released' ORDER BY created_at DESC LIMIT 1");
+    $stmt = db()->query("SELECT version FROM platform_versions WHERE status = 'released' ORDER BY created_at DESC LIMIT 1");
     return $stmt->fetchColumn() ?: '1.0.0';
 }
 ?>

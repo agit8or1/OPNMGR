@@ -5,7 +5,7 @@
  */
 
 // Include database connection
-require_once __DIR__ . '/../../inc/db.php';
+require_once __DIR__ . '/../../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -31,7 +31,7 @@ try {
     error_log("Update check from instance: $instance_id, current version: $current_version");
     
     // Get available updates from database
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT version, description, created_at as release_date 
         FROM platform_versions 
         WHERE status = 'released' 

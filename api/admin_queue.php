@@ -3,8 +3,7 @@
  * Administration Queue Management API
  * Manages firewall commands, HTTP requests, and system tasks
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -50,8 +49,6 @@ switch ($action) {
 }
 
 function getCommandQueue() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         $status = $_GET['status'] ?? 'all';
@@ -65,7 +62,7 @@ function getCommandQueue() {
             $params[] = $status;
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT id, command, status, 
                    DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') as created_at,
                    DATE_FORMAT(sent_at, '%Y-%m-%dT%H:%i:%sZ') as sent_at,
@@ -83,7 +80,7 @@ function getCommandQueue() {
         $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get status counts
-        $count_stmt = $DB->prepare("
+        $count_stmt = db()->prepare("
             SELECT status, COUNT(*) as count 
             FROM firewall_commands 
             WHERE firewall_id = ?
@@ -106,8 +103,6 @@ function getCommandQueue() {
 }
 
 function getRequestQueue() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         $status = $_GET['status'] ?? 'all';
@@ -121,7 +116,7 @@ function getRequestQueue() {
             $params[] = $status;
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT id, client_id, method, path, status, response_status, 
                    DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ') as created_at,
                    DATE_FORMAT(completed_at, '%Y-%m-%dT%H:%i:%sZ') as completed_at,
@@ -138,7 +133,7 @@ function getRequestQueue() {
         $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get status counts
-        $count_stmt = $DB->prepare("
+        $count_stmt = db()->prepare("
             SELECT status, COUNT(*) as count 
             FROM request_queue 
             WHERE firewall_id = ?
@@ -161,8 +156,6 @@ function getRequestQueue() {
 }
 
 function cancelCommand() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -173,7 +166,7 @@ function cancelCommand() {
             throw new Exception('Missing command ID');
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             UPDATE firewall_commands 
             SET status = 'cancelled', updated_at = NOW() 
             WHERE id = ? AND firewall_id = ? AND status = 'pending'
@@ -194,8 +187,6 @@ function cancelCommand() {
 }
 
 function cancelRequest() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -206,7 +197,7 @@ function cancelRequest() {
             throw new Exception('Missing request ID');
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             UPDATE request_queue 
             SET status = 'cancelled', updated_at = NOW() 
             WHERE id = ? AND firewall_id = ? AND status = 'pending'
@@ -227,8 +218,6 @@ function cancelRequest() {
 }
 
 function deleteCommand() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -239,7 +228,7 @@ function deleteCommand() {
             throw new Exception('Missing command ID');
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             DELETE FROM firewall_commands 
             WHERE id = ? AND firewall_id = ?
         ");
@@ -259,8 +248,6 @@ function deleteCommand() {
 }
 
 function deleteRequest() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -271,7 +258,7 @@ function deleteRequest() {
             throw new Exception('Missing request ID');
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             DELETE FROM request_queue 
             WHERE id = ? AND firewall_id = ?
         ");
@@ -291,8 +278,6 @@ function deleteRequest() {
 }
 
 function clearCommandQueue() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -300,10 +285,10 @@ function clearCommandQueue() {
         $status = $input['status'] ?? 'all';
         
         if ($status === 'all') {
-            $stmt = $DB->prepare("DELETE FROM firewall_commands WHERE firewall_id = ?");
+            $stmt = db()->prepare("DELETE FROM firewall_commands WHERE firewall_id = ?");
             $stmt->execute([$firewall_id]);
         } else {
-            $stmt = $DB->prepare("DELETE FROM firewall_commands WHERE firewall_id = ? AND status = ?");
+            $stmt = db()->prepare("DELETE FROM firewall_commands WHERE firewall_id = ? AND status = ?");
             $stmt->execute([$firewall_id, $status]);
         }
         
@@ -323,8 +308,6 @@ function clearCommandQueue() {
 }
 
 function clearRequestQueue() {
-    global $DB;
-    
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
@@ -332,10 +315,10 @@ function clearRequestQueue() {
         $status = $input['status'] ?? 'all';
         
         if ($status === 'all') {
-            $stmt = $DB->prepare("DELETE FROM request_queue WHERE firewall_id = ?");
+            $stmt = db()->prepare("DELETE FROM request_queue WHERE firewall_id = ?");
             $stmt->execute([$firewall_id]);
         } else {
-            $stmt = $DB->prepare("DELETE FROM request_queue WHERE firewall_id = ? AND status = ?");
+            $stmt = db()->prepare("DELETE FROM request_queue WHERE firewall_id = ? AND status = ?");
             $stmt->execute([$firewall_id, $status]);
         }
         
@@ -355,8 +338,6 @@ function clearRequestQueue() {
 }
 
 function retryCommand() {
-    global $DB;
-    
     try {
         $command_id = (int)($_POST['command_id'] ?? 0);
         $firewall_id = (int)($_POST['firewall_id'] ?? 21);
@@ -365,7 +346,7 @@ function retryCommand() {
             throw new Exception('Missing command ID');
         }
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             UPDATE firewall_commands 
             SET status = 'pending', sent_at = NULL, completed_at = NULL, result = NULL 
             WHERE id = ? AND firewall_id = ?
@@ -386,13 +367,11 @@ function retryCommand() {
 }
 
 function getQueueSummary() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         
         // Command queue summary
-        $cmd_stmt = $DB->prepare("
+        $cmd_stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_commands,
                 SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_commands,
@@ -408,7 +387,7 @@ function getQueueSummary() {
         $command_summary = $cmd_stmt->fetch(PDO::FETCH_ASSOC);
         
         // Request queue summary
-        $req_stmt = $DB->prepare("
+        $req_stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_requests,
                 SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_requests,
@@ -438,14 +417,12 @@ function getQueueSummary() {
 }
 
 function getRecentActivity() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         $hours = (int)($_GET['hours'] ?? 24);
         
         // Recent commands
-        $cmd_stmt = $DB->prepare("
+        $cmd_stmt = db()->prepare("
             SELECT 'command' as type, id, command as description, status, 
                    created_at, completed_at, result
             FROM firewall_commands 

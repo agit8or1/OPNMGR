@@ -1,9 +1,6 @@
 <?php
 
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/version.php';
-require_once __DIR__ . "/inc/csrf.php";
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . "/inc/timezone_selector.php";
 requireLogin();
 
@@ -171,7 +168,7 @@ if ($sort_by === 'health') {
     }
     
     try {
-        $stmt = $DB->prepare($health_query);
+        $stmt = db()->prepare($health_query);
         $stmt->execute($health_params);
         $all_firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -203,7 +200,7 @@ if ($sort_by === 'health') {
     $query .= " LIMIT " . $per_page . " OFFSET " . $offset;
 
     try {
-        $stmt = $DB->prepare($query);
+        $stmt = db()->prepare($query);
         $stmt->execute($params);
         $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -216,7 +213,7 @@ if ($sort_by === 'health') {
 // Determine the latest OPNsense major version across all firewalls for upgrade detection
 $latest_major_version = '';
 try {
-    $ver_stmt = $DB->query("SELECT current_version FROM firewalls WHERE current_version IS NOT NULL AND current_version != '' AND current_version != 'Unknown'");
+    $ver_stmt = db()->query("SELECT current_version FROM firewalls WHERE current_version IS NOT NULL AND current_version != '' AND current_version != 'Unknown'");
     $all_versions = $ver_stmt->fetchAll(PDO::FETCH_COLUMN);
     foreach ($all_versions as $ver) {
         // Extract major.minor (e.g., "26.1" from "26.1.1")
@@ -231,7 +228,7 @@ try {
 // Get all available tags for the filter dropdown
 $tags = [];
 try {
-    $stmt = $DB->query("SELECT DISTINCT name FROM tags ORDER BY name");
+    $stmt = db()->query("SELECT DISTINCT name FROM tags ORDER BY name");
     $tags = $stmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {
     $tags = [];
@@ -628,7 +625,7 @@ include __DIR__ . '/inc/header.php';
                                 <td>
                                     <?php
                                         // Get tags for this firewall
-                                        $stmt = $DB->prepare("SELECT t.name, t.color FROM tags t JOIN firewall_tags ft ON t.id = ft.tag_id WHERE ft.firewall_id = ?");
+                                        $stmt = db()->prepare("SELECT t.name, t.color FROM tags t JOIN firewall_tags ft ON t.id = ft.tag_id WHERE ft.firewall_id = ?");
                                         $stmt->execute([$firewall["id"]]);
                                         $firewall_tags = $stmt->fetchAll();
                                         
@@ -662,7 +659,7 @@ include __DIR__ . '/inc/header.php';
                                 <td>
                                     <?php 
                                     // Get both agent check-in times
-                                    $agent_stmt = $DB->prepare('SELECT agent_type, last_checkin FROM firewall_agents WHERE firewall_id = ?');
+                                    $agent_stmt = db()->prepare('SELECT agent_type, last_checkin FROM firewall_agents WHERE firewall_id = ?');
                                     $agent_stmt->execute([$firewall['id']]);
                                     $agents = $agent_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     
@@ -1190,7 +1187,7 @@ include __DIR__ . '/inc/header.php';
             <?php
             // Calculate pagination data
             $total_query = str_replace('SELECT f.*, fa.agent_version, fa.status as agent_status, fa.last_checkin as agent_last_checkin, fa.opnsense_version', 'SELECT COUNT(*)', $query);
-            $total_stmt = $DB->prepare($total_query);
+            $total_stmt = db()->prepare($total_query);
             $total_stmt->execute($params);
             $total_firewalls = $total_stmt->fetchColumn();
             $total_pages = ceil($total_firewalls / $per_page);

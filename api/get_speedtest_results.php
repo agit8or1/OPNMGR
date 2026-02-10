@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 // Cache-busting headers to force fresh data
@@ -25,7 +25,7 @@ if ($firewall_id <= 0) {
 
 try {
     // Get iperf3 bandwidth test results with timezone conversion
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT
             CONVERT_TZ(tested_at, '+00:00', '-05:00') as tested_at_local,
             DATE_FORMAT(CONVERT_TZ(tested_at, '+00:00', '-05:00'), '%Y-%m-%d %H:%i') as test_label,

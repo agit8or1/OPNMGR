@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -30,13 +30,13 @@ if (empty($hardware_id) && empty($hostname)) {
 try {
     // Try to find firewall by hardware_id first, then by hostname
     if (!empty($hardware_id)) {
-        $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
+        $stmt = db()->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
         $stmt->execute([$hardware_id]);
         $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     
     if (empty($firewall) && !empty($hostname)) {
-        $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hostname = ?');
+        $stmt = db()->prepare('SELECT id FROM firewalls WHERE hostname = ?');
         $stmt->execute([$hostname]);
         $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     }

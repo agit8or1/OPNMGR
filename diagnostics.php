@@ -1,8 +1,7 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
 
 include __DIR__ . '/inc/header.php';
 ?>
@@ -24,7 +23,7 @@ include __DIR__ . '/inc/header.php';
             </div>
             <div class="card-body">
                 <?php
-                $agents = $DB->query("
+                $agents = db()->query("
                     SELECT 
                         f.id,
                         f.hostname,
@@ -89,7 +88,7 @@ include __DIR__ . '/inc/header.php';
             </div>
             <div class="card-body">
                 <?php
-                $proxies = $DB->query("
+                $proxies = db()->query("
                     SELECT 
                         id,
                         hostname,

@@ -3,9 +3,8 @@
  * Manage Scheduled Tasks API
  * Enables/disables scheduled cron tasks for the OPNsense Manager
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/logging.php';
 
 // Require authentication
@@ -27,10 +26,8 @@ if ($method === 'GET') {
 }
 
 function handle_list_tasks() {
-    global $DB;
-    
     try {
-        $stmt = $DB->query("
+        $stmt = db()->query("
             SELECT id, task_name, schedule, status, enabled, last_run, next_run
             FROM scheduled_tasks
             ORDER BY task_name
@@ -57,8 +54,6 @@ function handle_list_tasks() {
 }
 
 function handle_update_task() {
-    global $DB;
-    
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!isset($input['task_id']) || !isset($input['enabled'])) {
@@ -72,13 +67,13 @@ function handle_update_task() {
     
     try {
         // Check if task exists in DB
-        $stmt = $DB->prepare("SELECT id FROM scheduled_tasks WHERE id = ?");
+        $stmt = db()->prepare("SELECT id FROM scheduled_tasks WHERE id = ?");
         $stmt->execute([$task_id]);
         $task = $stmt->fetch();
         
         if ($task) {
             // Update existing
-            $stmt = $DB->prepare("UPDATE scheduled_tasks SET enabled = ?, updated_at = NOW() WHERE id = ?");
+            $stmt = db()->prepare("UPDATE scheduled_tasks SET enabled = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$enabled ? 1 : 0, $task_id]);
             $message = 'Task ' . ($enabled ? 'enabled' : 'disabled') . ' successfully';
         } else {

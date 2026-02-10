@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -27,7 +27,7 @@ $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 // If no firewall_id provided, try to find it by WAN IP
 if (!$firewall_id && $client_ip !== 'unknown') {
-    $stmt = $DB->prepare('SELECT id FROM firewalls WHERE wan_ip = ?');
+    $stmt = db()->prepare('SELECT id FROM firewalls WHERE wan_ip = ?');
     $stmt->execute([$client_ip]);
     $firewall = $stmt->fetch();
     if ($firewall) {
@@ -42,7 +42,7 @@ if (!$firewall_id || empty($hardware_id)) {
 }
 
 // Validate agent identity
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -66,7 +66,7 @@ if (!$firewall_id || !$tunnel_port) {
 
 try {
     // Verify firewall exists
-    $stmt = $DB->prepare('SELECT id, hostname, ip_address FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, hostname, ip_address FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -82,7 +82,7 @@ try {
         // Find an available port for non-SSH tunnels (starting from 8101)
         $available_port = 8101;
         for ($port = 8101; $port <= 8200; $port++) {
-            $stmt = $DB->prepare('SELECT id FROM firewalls WHERE tunnel_port = ? AND tunnel_active = 1 AND id != ?');
+            $stmt = db()->prepare('SELECT id FROM firewalls WHERE tunnel_port = ? AND tunnel_active = 1 AND id != ?');
             $stmt->execute([$port, $firewall_id]);
             if (!$stmt->fetch()) {
                 $available_port = $port;
@@ -92,7 +92,7 @@ try {
     }
 
     // Update firewall tunnel status
-    $stmt = $DB->prepare('UPDATE firewalls SET tunnel_active = 1, tunnel_port = ?, tunnel_established = NOW(), tunnel_client_ip = ?, tunnel_type = ? WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET tunnel_active = 1, tunnel_port = ?, tunnel_established = NOW(), tunnel_client_ip = ?, tunnel_type = ? WHERE id = ?');
     $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $stmt->execute([$available_port, $client_ip, $tunnel_type, $firewall_id]);
 

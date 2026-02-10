@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 requireLogin();
 requireAdmin();
@@ -31,7 +31,7 @@ function validateCommand($command, $DB) {
     $command = trim($command);
     
     // Check against approved patterns
-    $stmt = $DB->prepare('SELECT * FROM approved_commands WHERE ? LIKE command_pattern ORDER BY risk_level');
+    $stmt = db()->prepare('SELECT * FROM approved_commands WHERE ? LIKE command_pattern ORDER BY risk_level');
     $stmt->execute([$command]);
     $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -58,7 +58,7 @@ function validateCommand($command, $DB) {
 }
 
 try {
-    $validation = validateCommand($command, $DB);
+    $validation = validateCommand($command, db());
     
     if (!$validation['valid']) {
         log_error('security', "Rejected command for firewall $firewall_id: $command", null, $firewall_id);

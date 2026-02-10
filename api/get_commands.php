@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -30,7 +30,7 @@ try {
         exit;
     }
 
-    $auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
     $auth_stmt->execute([$firewall_id]);
     $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$auth_fw || (
@@ -43,10 +43,10 @@ try {
     
     // Get commands for this firewall
     if ($status_filter) {
-        $stmt = $DB->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?");
+        $stmt = db()->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?");
         $stmt->execute([$firewall_id, $status_filter, $limit]);
     } else {
-        $stmt = $DB->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? ORDER BY created_at DESC LIMIT ?");
+        $stmt = db()->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? ORDER BY created_at DESC LIMIT ?");
         $stmt->execute([$firewall_id, $limit]);
     }
     $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);

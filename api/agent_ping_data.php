@@ -15,9 +15,7 @@
  *     ]
  * }
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -55,7 +53,7 @@ try {
     
     // Verify agent token (basic validation - could be expanded with token table)
     // For now, just verify firewall exists and is registered
-    $verify_stmt = $DB->prepare('SELECT id FROM firewalls WHERE id = ?');
+    $verify_stmt = db()->prepare('SELECT id FROM firewalls WHERE id = ?');
     $verify_stmt->execute([$firewall_id]);
     if (!$verify_stmt->fetch()) {
         http_response_code(401);
@@ -77,7 +75,7 @@ try {
     $average_latency = array_sum($latencies) / count($latencies);
     
     // Store each ping result in the database
-    $insert_stmt = $DB->prepare('
+    $insert_stmt = db()->prepare('
         INSERT INTO firewall_agent_pings (firewall_id, latency_ms, ping_number, created_at)
         VALUES (?, ?, ?, NOW())
     ');

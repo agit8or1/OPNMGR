@@ -2,10 +2,7 @@
 /**
  * Save AI scanning settings for a specific firewall
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 header('Content-Type: application/json');
@@ -52,7 +49,7 @@ try {
     }
     
     // Update or insert settings
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         INSERT INTO firewall_ai_settings 
         (firewall_id, auto_scan_enabled, scan_frequency, scan_type, include_logs, preferred_provider, next_scan_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)

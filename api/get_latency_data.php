@@ -3,8 +3,7 @@
  * Get Latency Data API
  * Retrieves latency measurements for chart display
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -32,7 +31,7 @@ switch ($timeframe) {
 }
 
 try {
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT 
             DATE_FORMAT(measured_at, '%Y-%m-%d %H:%i') as time,
             latency_ms,

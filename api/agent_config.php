@@ -6,8 +6,8 @@
  * Example usage:
  * curl https://manager.local/api/agent_config.php?firewall_id=21
  */
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/agent_scheduler.php';
 
 header('Content-Type: application/json');
@@ -30,7 +30,7 @@ try {
     }
 
     // Validate agent identity
-    $auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
     $auth_stmt->execute([$firewall_id]);
     $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$auth_fw || (
@@ -41,7 +41,7 @@ try {
         exit;
     }
     
-    $scheduler = new AgentScheduler($DB);
+    $scheduler = new AgentScheduler(db());
     $config = [];
     
     switch ($config_type) {

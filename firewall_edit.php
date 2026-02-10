@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 // Check if user is logged in
@@ -18,7 +16,7 @@ if (!$firewall_id) {
 }
 
 // Fetch firewall data
-$stmt = $DB->prepare("
+$stmt = db()->prepare("
     SELECT f.*, 
            pa.last_checkin, pa.agent_version, pa.status as agent_status, pa.wan_ip, pa.ipv6_address, pa.opnsense_version,
            ua.agent_version as update_agent_version
@@ -36,13 +34,13 @@ if (!$firewall) {
 }
 
 // Fetch available tags for dropdown
-$available_tags = $DB->query("SELECT id, name, color FROM tags ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$available_tags = db()->query("SELECT id, name, color FROM tags ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch customers for customer group dropdown
-$customers = $DB->query("SELECT id, name FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$customers = db()->query("SELECT id, name FROM customers ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Get current firewall's tags as array from firewall_tags junction table
-$stmt = $DB->prepare("
+$stmt = db()->prepare("
     SELECT t.id, t.name 
     FROM tags t
     INNER JOIN firewall_tags ft ON t.id = ft.tag_id
@@ -70,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             // Update firewall basic info (no tag_names column exists)
-            $stmt = $DB->prepare("
+            $stmt = db()->prepare("
                 UPDATE firewalls
                 SET hostname = ?, notes = ?, customer_group = ?
                 WHERE id = ?
@@ -80,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Handle tags - clear existing tags and insert new ones
             if (!empty($tags)) {
                 // Delete existing tags for this firewall
-                $stmt = $DB->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
+                $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
                 $stmt->execute([$firewall_id]);
 
                 // Insert new tags
@@ -88,20 +86,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($tag_names as $tag_name) {
                     if (!empty($tag_name)) {
                         // Get tag ID from name
-                        $stmt = $DB->prepare("SELECT id FROM tags WHERE name = ?");
+                        $stmt = db()->prepare("SELECT id FROM tags WHERE name = ?");
                         $stmt->execute([$tag_name]);
                         $tag_id = $stmt->fetchColumn();
                         
                         if ($tag_id) {
                             // Insert into firewall_tags junction table
-                            $stmt = $DB->prepare("INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)");
+                            $stmt = db()->prepare("INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)");
                             $stmt->execute([$firewall_id, $tag_id]);
                         }
                     }
                 }
             } else {
                 // If no tags selected, clear all tags for this firewall
-                $stmt = $DB->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
+                $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
                 $stmt->execute([$firewall_id]);
             }
 

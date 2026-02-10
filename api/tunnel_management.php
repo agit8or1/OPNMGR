@@ -3,15 +3,14 @@
  * Tunnel Management API
  * Master reset and management for SSH tunnels and nginx configs
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/functions.php';
 
 header('Content-Type: application/json');
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
 }
 
 // Check authentication
@@ -45,11 +44,9 @@ switch ($action) {
 }
 
 function listActiveTunnels() {
-    global $DB;
-    
     try {
         // Get all sessions from database
-        $stmt = $DB->query("
+        $stmt = db()->query("
             SELECT 
                 s.id,
                 s.firewall_id,
@@ -135,8 +132,6 @@ function listActiveTunnels() {
 }
 
 function resetAllTunnels() {
-    global $DB;
-    
     try {
         $results = [
             'ssh_killed' => 0,
@@ -171,12 +166,12 @@ function resetAllTunnels() {
         }
         
         // 4. Mark all active sessions as closed in database
-        $stmt = $DB->prepare("UPDATE ssh_access_sessions SET status = 'closed' WHERE status = 'active'");
+        $stmt = db()->prepare("UPDATE ssh_access_sessions SET status = 'closed' WHERE status = 'active'");
         $stmt->execute();
         $results['db_updated'] = $stmt->rowCount();
         
         // 5. Reset firewall tunnel ports
-        $stmt = $DB->prepare("UPDATE firewalls SET ssh_tunnel_port = NULL WHERE ssh_tunnel_port IS NOT NULL");
+        $stmt = db()->prepare("UPDATE firewalls SET ssh_tunnel_port = NULL WHERE ssh_tunnel_port IS NOT NULL");
         $stmt->execute();
         
         echo json_encode([
@@ -192,8 +187,6 @@ function resetAllTunnels() {
 }
 
 function killTunnel($session_id) {
-    global $DB;
-    
     if ($session_id <= 0) {
         echo json_encode(['success' => false, 'error' => 'Invalid session ID']);
         return;
@@ -201,7 +194,7 @@ function killTunnel($session_id) {
     
     try {
         // Get session details
-        $stmt = $DB->prepare("SELECT tunnel_port, firewall_id FROM ssh_access_sessions WHERE id = ?");
+        $stmt = db()->prepare("SELECT tunnel_port, firewall_id FROM ssh_access_sessions WHERE id = ?");
         $stmt->execute([$session_id]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -229,12 +222,12 @@ function killTunnel($session_id) {
         $results['nginx_removed'] = true;
         
         // 3. Update database
-        $stmt = $DB->prepare("UPDATE ssh_access_sessions SET status = 'closed' WHERE id = ?");
+        $stmt = db()->prepare("UPDATE ssh_access_sessions SET status = 'closed' WHERE id = ?");
         $stmt->execute([$session_id]);
         $results['db_updated'] = true;
         
         // 4. Clear firewall tunnel port if this was the active tunnel
-        $stmt = $DB->prepare("UPDATE firewalls SET ssh_tunnel_port = NULL WHERE id = ? AND ssh_tunnel_port = ?");
+        $stmt = db()->prepare("UPDATE firewalls SET ssh_tunnel_port = NULL WHERE id = ? AND ssh_tunnel_port = ?");
         $stmt->execute([$session['firewall_id'], $port]);
         
         // Reload nginx
@@ -253,8 +246,6 @@ function killTunnel($session_id) {
 }
 
 function cleanupZombieTunnels() {
-    global $DB;
-    
     try {
         $results = [
             'zombies_killed' => 0,
@@ -262,7 +253,7 @@ function cleanupZombieTunnels() {
         ];
         
         // Get all closed sessions from database
-        $stmt = $DB->query("SELECT id, tunnel_port FROM ssh_access_sessions WHERE status = 'closed'");
+        $stmt = db()->query("SELECT id, tunnel_port FROM ssh_access_sessions WHERE status = 'closed'");
         $closed_sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get running SSH tunnels
@@ -290,7 +281,7 @@ function cleanupZombieTunnels() {
         foreach ($nginx_files as $file) {
             if (preg_match('/tunnel-session-(\d+)$/', $file, $matches)) {
                 $session_id = (int)$matches[1];
-                $stmt = $DB->prepare("SELECT status FROM ssh_access_sessions WHERE id = ?");
+                $stmt = db()->prepare("SELECT status FROM ssh_access_sessions WHERE id = ?");
                 $stmt->execute([$session_id]);
                 $session = $stmt->fetch(PDO::FETCH_ASSOC);
                 

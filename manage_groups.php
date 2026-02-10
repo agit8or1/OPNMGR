@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -25,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Check if group already exists
-            $stmt = $DB->prepare('SELECT COUNT(*) FROM firewalls WHERE customer_group = ?');
+            $stmt = db()->prepare('SELECT COUNT(*) FROM firewalls WHERE customer_group = ?');
             $stmt->execute([$groupName]);
             $count = $stmt->fetchColumn();
             
@@ -35,11 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Add a dummy firewall with this group to create the group
-            $stmt = $DB->prepare('INSERT INTO firewalls (hostname, ip_address, customer_group, status) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id');
+            $stmt = db()->prepare('INSERT INTO firewalls (hostname, ip_address, customer_group, status) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE id=id');
             $stmt->execute(['temp-' . time(), '127.0.0.1', $groupName, 'temp']);
             
             // Delete the temp firewall
-            $stmt = $DB->prepare('DELETE FROM firewalls WHERE hostname LIKE ?');
+            $stmt = db()->prepare('DELETE FROM firewalls WHERE hostname LIKE ?');
             $stmt->execute(['temp-%']);
             
             echo json_encode([
@@ -63,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Check if group has firewalls
-            $stmt = $DB->prepare('SELECT COUNT(*) FROM firewalls WHERE customer_group = ?');
+            $stmt = db()->prepare('SELECT COUNT(*) FROM firewalls WHERE customer_group = ?');
             $stmt->execute([$groupName]);
             $count = $stmt->fetchColumn();
             

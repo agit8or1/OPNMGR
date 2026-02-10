@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
@@ -10,9 +11,6 @@ requireLogin();
 // Set execution timeout to prevent hanging
 set_time_limit(10);
 ini_set('max_execution_time', 10);
-
-require_once __DIR__ . '/../inc/db.php';
-
 header('Content-Type: application/json');
 // Cache-busting headers to force fresh data
 header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -42,8 +40,8 @@ if (!in_array($metric, ['cpu', 'memory', 'disk'])) {
 
 try {
     // Set database timeout
-    $DB->setAttribute(PDO::ATTR_TIMEOUT, 5);
-    $DB->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    db()->setAttribute(PDO::ATTR_TIMEOUT, 5);
+    db()->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // Determine aggregation interval based on days
     $interval = $days == 1 ? 10 : 60; // 10-minute intervals for 1 day, hourly for others
@@ -54,7 +52,7 @@ try {
 
     if ($metric == 'cpu') {
         // CPU load averages - Get MOST RECENT data points, not oldest
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT * FROM (
                 SELECT
                     DATE_FORMAT(recorded_at, ?) as time_label,
@@ -97,7 +95,7 @@ try {
         
     } elseif ($metric == 'memory') {
         // Memory usage percentage - Get MOST RECENT data points, not oldest
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT * FROM (
                 SELECT
                     DATE_FORMAT(recorded_at, ?) as time_label,
@@ -134,7 +132,7 @@ try {
         
     } elseif ($metric == 'disk') {
         // Disk usage percentage - Get MOST RECENT data points, not oldest
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT * FROM (
                 SELECT
                     DATE_FORMAT(recorded_at, ?) as time_label,

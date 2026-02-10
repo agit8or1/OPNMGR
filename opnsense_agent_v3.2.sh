@@ -1,0 +1,432 @@
+#!/bin/sh
+
+# OPNsense Management Agent v2.0
+# Enhanced with command processing and improved version reporting
+
+# Configuration
+MANAGEMENT_SERVER="https://opn.agit8or.net"
+AGENT_VERSION="3.2.2"
+BUILD_DATE="2025-10-10 18:00:00"
+BUILD_FINGERPRINT="fix-crontab-dynamic-reset"
+FIREWALL_ID="21"  # This firewall's ID in the management system
+LOG_FILE="/var/log/opnsense_agent.log"
+
+# Hardware ID generation (persistent)
+HARDWARE_ID_FILE="/tmp/opnsense_hardware_id"
+if [ ! -f "$HARDWARE_ID_FILE" ]; then
+    openssl rand -hex 16 > "$HARDWARE_ID_FILE"
+fi
+HARDWARE_ID=$(cat "$HARDWARE_ID_FILE")
+
+# Get system information
+HOSTNAME=$(hostname)
+WAN_IP=$(curl -s -m 5 https://ipinfo.io/ip 2>/dev/null || echo "unknown")
+LAN_IP=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+IPV6_ADDRESS=$(ifconfig | grep 'inet6' | grep -v '::1' | grep -v 'fe80' | head -1 | awk '{print $2}')
+
+# Get OPNsense version information
+get_opnsense_version() {
+    # Try multiple methods to get version info
+    if [ -f "/usr/local/opnsense/version/core" ]; then
+        CORE_VERSION=$(cat /usr/local/opnsense/version/core 2>/dev/null)
+    else
+        CORE_VERSION="unknown"
+    fi
+    
+    # Get detailed version info
+    if command -v opnsense-version >/dev/null 2>&1; then
+        VERSION_OUTPUT=$(opnsense-version -v 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            FULL_VERSION="$VERSION_OUTPUT"
+        else
+            FULL_VERSION="$CORE_VERSION"
+        fi
+    else
+        FULL_VERSION="$CORE_VERSION"
+    fi
+    
+    # Create JSON version data - handle core version properly
+    if echo "$CORE_VERSION" | grep -q '^{'; then
+        # Core version is already JSON, extract just the version number
+        PRODUCT_VERSION=$(echo "$CORE_VERSION" | python3 -c "import json, sys; data=json.load(sys.stdin); print(data.get('product_version', data.get('CORE_VERSION', 'unknown')))" 2>/dev/null || echo "unknown")
+    else
+        PRODUCT_VERSION="$CORE_VERSION"
+    fi
+    
+    cat << EOF
+{
+    "product_version": "$PRODUCT_VERSION",
+    "firmware_version": "$FULL_VERSION",
+    "system_version": "$(uname -r)",
+    "architecture": "$(uname -m)",
+    "last_updated": "$(date -Iseconds)"
+}
+EOF
+}
+
+# Log function
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+# Execute command function
+execute_command() {
+    local command_type="$1"
+    local command_data="$2"
+    local result="unknown"
+    
+    log_message "Executing command: $command_type"
+    
+    case "$command_type" in
+        "firmware_update")
+            log_message "Starting firmware update process..."
+            # Execute OPNsense firmware update
+            if command -v opnsense-update >/dev/null 2>&1; then
+                # Use opnsense-update for firmware updates
+                opnsense-update -f > /tmp/update_output.log 2>&1
+                if [ $? -eq 0 ]; then
+                    result="success"
+                    log_message "Firmware update completed successfully"
+                else
+                    result="failed"
+                    log_message "Firmware update failed"
+                fi
+            else
+                # Fallback: use pkg for base system updates
+                pkg update > /tmp/update_output.log 2>&1
+                pkg upgrade -y >> /tmp/update_output.log 2>&1
+                if [ $? -eq 0 ]; then
+                    result="success"
+                    log_message "System update completed successfully"
+                else
+                    result="failed"
+                    log_message "System update failed"
+                fi
+            fi
+            ;;
+        "update_agent")
+            log_message "Starting agent update process: $command_data"
+            # Perform system update automatically
+            pkg update > /tmp/update_output.log 2>&1
+            if [ $? -eq 0 ]; then
+                log_message "Repository update completed"
+                # Check for available updates and apply them
+                pkg upgrade -y >> /tmp/update_output.log 2>&1
+                if [ $? -eq 0 ]; then
+                    result="success"
+                    log_message "Agent update completed successfully for $command_data"
+                else
+                    result="partial"
+                    log_message "Agent update completed with warnings for $command_data"
+                fi
+            else
+                result="failed"
+                log_message "Agent update failed - repository update error"
+            fi
+            ;;
+        "shell")
+            log_message "Executing shell command: $command_data"
+            # Execute arbitrary shell command
+            eval "$command_data" > /tmp/shell_output.log 2>&1
+            if [ $? -eq 0 ]; then
+                result="success"
+                log_message "Shell command completed successfully: $command_data"
+            else
+                result="failed"
+                log_message "Shell command failed: $command_data"
+            fi
+            ;;
+        "api_test")
+            log_message "Testing API connectivity..."
+            # Test local API connection
+            if curl -s -k https://localhost/api/core/firmware/status >/dev/null 2>&1; then
+                result="success"
+                log_message "API test successful"
+            else
+                result="failed"
+                log_message "API test failed"
+            fi
+            ;;
+        "speedtest"|"iperf3")
+            log_message "Running network speed test with iperf3..."
+            # Check if iperf3 is installed
+            if ! command -v iperf3 >/dev/null 2>&1; then
+                log_message "iperf3 not installed, attempting to install..."
+                pkg install -y iperf3 > /tmp/iperf3_install.log 2>&1
+                if [ $? -ne 0 ]; then
+                    result="failed:iperf3_not_installed"
+                    log_message "Failed to install iperf3"
+                    echo "$result"
+                    return
+                fi
+            fi
+
+            # Parse server from command_data or use default
+            IPERF_SERVER=$(echo "$command_data" | grep -o 'server=[^;]*' | cut -d= -f2)
+            if [ -z "$IPERF_SERVER" ]; then
+                IPERF_SERVER="iperf.he.net"  # Default public iperf3 server
+            fi
+
+            # Run download test (reverse mode - server sends to client)
+            log_message "Testing download from $IPERF_SERVER..."
+            download_result=$(iperf3 -c "$IPERF_SERVER" -R -J -t 10 2>&1)
+            if [ $? -ne 0 ]; then
+                log_message "Download test failed: $download_result"
+                result="failed:download_error"
+                echo "$result"
+                return
+            fi
+
+            # Run upload test (normal mode - client sends to server)
+            log_message "Testing upload to $IPERF_SERVER..."
+            upload_result=$(iperf3 -c "$IPERF_SERVER" -J -t 10 2>&1)
+            if [ $? -ne 0 ]; then
+                log_message "Upload test failed: $upload_result"
+                result="failed:upload_error"
+                echo "$result"
+                return
+            fi
+
+            # Parse results using Python for JSON
+            download_mbps=$(echo "$download_result" | python3 -c "import json, sys; data=json.load(sys.stdin); print(round(data['end']['sum_received']['bits_per_second'] / 1000000, 2))" 2>/dev/null || echo "0")
+            upload_mbps=$(echo "$upload_result" | python3 -c "import json, sys; data=json.load(sys.stdin); print(round(data['end']['sum_sent']['bits_per_second'] / 1000000, 2))" 2>/dev/null || echo "0")
+
+            # Get average RTT from upload test
+            rtt_ms=$(echo "$upload_result" | python3 -c "import json, sys; data=json.load(sys.stdin); print(round(data['end']['streams'][0].get('sender', {}).get('mean_rtt', 0) / 1000, 2))" 2>/dev/null || echo "0")
+
+            # Format result as JSON
+            result="success:download=${download_mbps},upload=${upload_mbps},latency=${rtt_ms},server=${IPERF_SERVER}"
+            log_message "Speed test completed: Download=${download_mbps}Mbps, Upload=${upload_mbps}Mbps, Latency=${rtt_ms}ms"
+
+            # Save full results to file for reporting
+            echo "$download_result" > /tmp/iperf3_download_result.json
+            echo "$upload_result" > /tmp/iperf3_upload_result.json
+            ;;
+        *)
+            log_message "Unknown command type: $command_type"
+            result="unknown_command"
+            ;;
+    esac
+    
+    echo "$result"
+}
+
+# Report command results
+report_command_result() {
+    local command_id="$1"
+    local result="$2"
+    local output_file="/tmp/update_output.log"
+    
+    # Get command output if available
+    local output=""
+    if [ -f "$output_file" ]; then
+        output=$(tail -20 "$output_file" 2>/dev/null | base64 -w 0)
+    fi
+    
+    # Send result back to management server
+    curl -s -k -X POST "$MANAGEMENT_SERVER/api/command_result.php" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"command_id\": \"$command_id\",
+            \"result\": \"$result\",
+            \"output\": \"$output\",
+            \"timestamp\": \"$(date -Iseconds)\",
+            \"agent_version\": \"$AGENT_VERSION\"
+        }" >/dev/null 2>&1
+}
+
+# Main checkin function
+perform_checkin() {
+    log_message "Starting agent checkin..."
+    
+    # Get OPNsense version data
+    OPNSENSE_VERSION=$(get_opnsense_version)
+    
+    # Prepare checkin data
+    CHECKIN_DATA=$(cat << EOF
+{
+    "firewall_id": $FIREWALL_ID,
+    "hardware_id": "$HARDWARE_ID",
+    "hostname": "$HOSTNAME",
+    "agent_version": "$AGENT_VERSION",
+    "wan_ip": "$WAN_IP",
+    "lan_ip": "$LAN_IP",
+    "ipv6_address": "$IPV6_ADDRESS",
+    "opnsense_version": $OPNSENSE_VERSION
+}
+EOF
+)
+    
+    # Perform checkin
+    RESPONSE=$(curl -s -k -X POST "$MANAGEMENT_SERVER/agent_checkin.php" \
+        -H "Content-Type: application/json" \
+        -d "$CHECKIN_DATA" 2>/dev/null)
+    
+    if [ $? -eq 0 ] && [ -n "$RESPONSE" ]; then
+        log_message "Checkin successful: $RESPONSE"
+        
+        # Check for pending commands
+        COMMANDS=$(echo "$RESPONSE" | python3 -c "
+import json, sys, base64
+try:
+    data = json.load(sys.stdin)
+    if 'commands' in data:
+        for cmd in data['commands']:
+            cmd_data_b64 = base64.b64encode(str(cmd['command_data']).encode()).decode()
+            print(f\"{cmd['command_id']}|{cmd['command_type']}|{cmd_data_b64}\")
+    # Also check for queued_commands (newer format)
+    if 'queued_commands' in data:
+        for cmd in data['queued_commands']:
+            cmd_b64 = base64.b64encode(str(cmd['command']).encode()).decode()
+            print(f\"{cmd['id']}|shell|{cmd_b64}\")
+except:
+    pass
+" 2>/dev/null)
+        
+        # Execute any pending commands
+        if [ -n "$COMMANDS" ]; then
+            # Parse and execute commands
+            echo "$COMMANDS" | while IFS='|' read -r cmd_id cmd_type cmd_data_b64; do
+                if [ -n "$cmd_id" ] && [ -n "$cmd_type" ] && [ -n "$cmd_data_b64" ]; then
+                    # Decode base64 command
+                    cmd_data=$(echo "$cmd_data_b64" | base64 -d 2>/dev/null)
+                    if [ -n "$cmd_data" ]; then
+                        log_message "Processing command: $cmd_id ($cmd_type)"
+                        result=$(execute_command "$cmd_type" "$cmd_data")
+                        log_message "Command $cmd_id completed with result: $result"
+                        report_command_result "$cmd_id" "$result"
+                        log_message "Result reported for command $cmd_id"
+                    else
+                        log_message "Failed to decode command $cmd_id"
+                    fi
+                fi
+            done
+        fi
+        
+        # Check for OPNsense system update request
+        OPNSENSE_UPDATE=$(echo "$RESPONSE" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    if data.get('opnsense_update_requested', False):
+        print(data.get('opnsense_update_command', 'pkg update && pkg upgrade -y'))
+except:
+    pass
+" 2>/dev/null)
+        
+        # Execute OPNsense update if requested
+        if [ -n "$OPNSENSE_UPDATE" ]; then
+            log_message "OPNsense system update requested: $OPNSENSE_UPDATE"
+            
+            # Execute the update command in background
+            nohup sh -c "
+                echo 'Starting OPNsense system update...' >> $LOG_FILE
+                $OPNSENSE_UPDATE >> $LOG_FILE 2>&1
+                if [ \$? -eq 0 ]; then
+                    echo 'OPNsense system update completed successfully' >> $LOG_FILE
+                else
+                    echo 'OPNsense system update failed or completed with warnings' >> $LOG_FILE
+                fi
+            " > /dev/null 2>&1 &
+            
+            log_message "OPNsense update initiated in background"
+        fi
+        
+        # Extract checkin interval
+        INTERVAL=$(echo "$RESPONSE" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('checkin_interval', 300))
+except:
+    print(300)
+" 2>/dev/null)
+        
+        echo "$INTERVAL"
+    else
+        log_message "Checkin failed or no response"
+        echo "300"  # Default interval on failure
+    fi
+}
+
+# Disable marketing website (for managed firewalls)
+disable_marketing_website() {
+    log_message "Disabling marketing website service on managed firewall"
+    
+    # Stop and disable nginx on port 88 if it exists
+    if [ -f "/usr/local/etc/nginx/conf.d/marketing-website.conf" ]; then
+        rm -f /usr/local/etc/nginx/conf.d/marketing-website.conf
+        log_message "Removed marketing website nginx config"
+    fi
+    
+    # Check for FreeBSD nginx service
+    if service nginx status >/dev/null 2>&1; then
+        service nginx reload >/dev/null 2>&1
+        log_message "Reloaded nginx to apply changes"
+    fi
+    
+    # Disable any marketing website processes on port 88
+    if netstat -an | grep ':88 ' >/dev/null 2>&1; then
+        # Kill any process listening on port 88
+        PIDS=$(sockstat -l | grep ':88' | awk '{print $3}' | sort -u)
+        for PID in $PIDS; do
+            if [ -n "$PID" ] && [ "$PID" != "PID" ]; then
+                kill -TERM "$PID" 2>/dev/null
+                log_message "Terminated process $PID listening on port 88"
+            fi
+        done
+    fi
+    
+    # Remove any marketing website files if they exist
+    if [ -d "/usr/local/www/opnmanager-website" ]; then
+        rm -rf /usr/local/www/opnmanager-website
+        log_message "Removed marketing website files"
+    fi
+    
+    log_message "Marketing website disable complete"
+}
+
+# Main execution
+main() {
+    # Create log file if it doesn't exist
+    touch "$LOG_FILE"
+    
+    # Disable marketing website on first run
+    if [ ! -f "/tmp/marketing_disabled" ]; then
+        disable_marketing_website
+        touch /tmp/marketing_disabled
+    fi
+    
+    # Perform checkin and get interval
+    NEXT_INTERVAL=$(perform_checkin)
+    
+    # Validate interval
+    if ! echo "$NEXT_INTERVAL" | grep -q '^[0-9]\+$'; then
+        NEXT_INTERVAL=300
+    fi
+    
+    log_message "Next checkin in $NEXT_INTERVAL seconds"
+    
+    # Schedule next run - convert seconds to cron minutes
+    # For intervals < 60 seconds, default to every minute
+    # For intervals >= 60 seconds, calculate minutes
+    CRON_MINUTES=$(( NEXT_INTERVAL / 60 ))
+    if [ "$CRON_MINUTES" -lt 1 ]; then
+        CRON_MINUTES=1
+    fi
+    
+    # Create cron expression
+    # If interval divides evenly into 60 (2,3,4,5,6,10,12,15,20,30), use */N format
+    # Otherwise, run every N minutes (not as precise but simpler)
+    if [ "$CRON_MINUTES" -le 30 ] && [ $(( 60 % CRON_MINUTES )) -eq 0 ]; then
+        CRON_EXPR="*/$CRON_MINUTES * * * *"
+    else
+        # For longer intervals (30+ minutes), just use the minute value
+        CRON_EXPR="*/$CRON_MINUTES * * * *"
+    fi
+    
+    log_message "Setting cron schedule: $CRON_EXPR"
+}
+
+# Run main function
+main

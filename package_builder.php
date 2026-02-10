@@ -1,11 +1,9 @@
 <?php
 // Development > Package Builder
-require_once 'inc/auth.php';
-require_once 'inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 $page_title = "Deployment Package Builder";
 include 'inc/header.php';
-require_once 'inc/db.php';
 
 // Files and directories to EXCLUDE from deployment package
 $exclude_patterns = [
@@ -118,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_package'])) 
             $package_url = "https://" . $_SERVER['HTTP_HOST'] . "/packages/{$package_filename}";
             
             // Log package creation to system_logs
-            $stmt = $DB->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (NULL, 'deployment', ?, 'INFO', NOW())");
+            $stmt = db()->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (NULL, 'deployment', ?, 'INFO', NOW())");
             $stmt->execute(["Generated deployment package: {$package_filename} (" . round($filesize / 1024 / 1024, 2) . " MB)"]);
             error_log("[PACKAGE_BUILDER] Package created successfully: {$package_filename}");
             

@@ -1,15 +1,13 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 
 // Load SMTP settings
 try {
-    $rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 } catch (Exception $e) {
     $rows = [];
 }
@@ -22,8 +20,8 @@ $smtp_from_email = $rows['smtp_from_email'] ?? '';
 $smtp_from_name = $rows['smtp_from_name'] ?? 'OPNsense Manager';
 
 // Helper function to save settings
-function save_setting($DB, $k, $v) {
-    $s = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
+function save_setting($k, $v) {
+    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
     $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
 }
 
@@ -51,17 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // Save settings
                 try {
-                    save_setting($DB, 'smtp_host', $smtp_host);
-                    save_setting($DB, 'smtp_port', $smtp_port);
-                    save_setting($DB, 'smtp_username', $smtp_username);
-                    save_setting($DB, 'smtp_password', $smtp_password);
-                    save_setting($DB, 'smtp_encryption', $smtp_encryption);
-                    save_setting($DB, 'smtp_from_email', $smtp_from_email);
-                    save_setting($DB, 'smtp_from_name', $smtp_from_name);
+                    save_setting('smtp_host', $smtp_host);
+                    save_setting('smtp_port', $smtp_port);
+                    save_setting('smtp_username', $smtp_username);
+                    save_setting('smtp_password', $smtp_password);
+                    save_setting('smtp_encryption', $smtp_encryption);
+                    save_setting('smtp_from_email', $smtp_from_email);
+                    save_setting('smtp_from_name', $smtp_from_name);
                     
                     $notice = '<div class="alert alert-success">SMTP settings saved successfully!</div>';
                     // Reload settings from database
-                    $rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+                    $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
                     $smtp_host = $rows['smtp_host'] ?? '';
                     $smtp_port = $rows['smtp_port'] ?? '587';
                     $smtp_username = $rows['smtp_username'] ?? '';

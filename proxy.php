@@ -4,7 +4,7 @@
  * Queues requests for firewall and waits for responses
  */
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 $firewall_id = (int)($_GET['fw_id'] ?? 21); // Default to firewall 21

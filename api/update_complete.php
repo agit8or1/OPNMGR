@@ -3,8 +3,7 @@
  * Update Complete API
  * Update service reports completion
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -20,11 +19,11 @@ if (!$firewall_id) {
 
 try {
     // Clear update request flag
-    $stmt = $DB->prepare('UPDATE firewalls SET update_requested = 0, status = ? WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET update_requested = 0, status = ? WHERE id = ?');
     $stmt->execute([$success ? 'online' : 'update_failed', $firewall_id]);
     
     // Log the update
-    $stmt = $DB->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (?, 'system_update', ?, ?, NOW())");
+    $stmt = db()->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (?, 'system_update', ?, ?, NOW())");
     $message = $success ? 'System update completed successfully' : 'System update failed';
     $stmt->execute([$firewall_id, $message, $success ? 'INFO' : 'ERROR']);
     

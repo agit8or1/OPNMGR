@@ -3,9 +3,7 @@
  * SSH-Based Agent Installation API
  * Installs agent on a new firewall via SSH credentials
  */
-
-session_start();
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -132,7 +130,7 @@ if (strpos($install_result, 'Installation complete') !== false) {
     }
 
     // Log activity
-    $stmt = $DB->prepare("INSERT INTO activity_log (user_id, action, details, created_at) VALUES (?, 'ssh_install_agent', ?, NOW())");
+    $stmt = db()->prepare("INSERT INTO activity_log (user_id, action, details, created_at) VALUES (?, 'ssh_install_agent', ?, NOW())");
     $stmt->execute([
         $_SESSION['user_id'],
         "SSH plugin installation completed for {$host}" . ($hw_id ? " (HW ID: {$hw_id})" : "")

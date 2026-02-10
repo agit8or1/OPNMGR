@@ -3,8 +3,7 @@
  * API Endpoint: Get Traffic Statistics
  * Returns traffic data for charting
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 // Cache-busting headers to force fresh data
@@ -30,7 +29,7 @@ if (!in_array($days, [1, 7, 14, 30])) {
 try {
     // Get traffic data calculating the RATE (delta between consecutive samples)
     // Since bytes are cumulative counters, we calculate: (current_bytes - previous_bytes) / time_diff * 8 / 1000000
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         WITH deltas AS (
             SELECT 
                 recorded_at,

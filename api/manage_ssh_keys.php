@@ -3,9 +3,8 @@
  * SSH Key Management API
  * Handles SSH key operations for firewalls
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/logging.php';
 
 // Check authentication (for POST requests require it, GET can have fallback)
@@ -23,8 +22,6 @@ if ($method === 'GET') {
 }
 
 function handle_get_key_status() {
-    global $DB;
-    
     $firewall_id = isset($_GET['firewall_id']) ? (int)$_GET['firewall_id'] : 0;
     
     if (!$firewall_id) {
@@ -35,7 +32,7 @@ function handle_get_key_status() {
     
     try {
         // Get SSH keys from database
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT 
                 id,
                 firewall_id,
@@ -76,7 +73,6 @@ function handle_get_key_status() {
 }
 
 function handle_post_action() {
-    global $DB;
     global $is_authenticated;
     
     // POST requires authentication
@@ -120,8 +116,6 @@ function handle_post_action() {
 }
 
 function handle_regenerate_keys($firewall_id) {
-    global $DB;
-    
     try {
         // Generate new SSH key pair (simulated)
         $key_type = 'RSA';
@@ -130,18 +124,18 @@ function handle_regenerate_keys($firewall_id) {
         $now = date('Y-m-d H:i:s');
         
         // Check if keys already exist
-        $stmt = $DB->prepare("SELECT id FROM firewall_ssh_keys WHERE firewall_id = ? AND is_active = 1");
+        $stmt = db()->prepare("SELECT id FROM firewall_ssh_keys WHERE firewall_id = ? AND is_active = 1");
         $stmt->execute([$firewall_id]);
         $existing = $stmt->fetch();
         
         if ($existing) {
             // Mark old keys as inactive
-            $stmt = $DB->prepare("UPDATE firewall_ssh_keys SET is_active = 0 WHERE firewall_id = ?");
+            $stmt = db()->prepare("UPDATE firewall_ssh_keys SET is_active = 0 WHERE firewall_id = ?");
             $stmt->execute([$firewall_id]);
         }
         
         // Insert new key
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             INSERT INTO firewall_ssh_keys 
             (firewall_id, key_type, fingerprint, key_bits, created_at, is_active)
             VALUES (?, ?, ?, ?, ?, 1)
@@ -168,8 +162,6 @@ function handle_regenerate_keys($firewall_id) {
 }
 
 function handle_delete_key($firewall_id, $key_id) {
-    global $DB;
-    
     if (!$key_id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Missing key_id']);
@@ -177,7 +169,7 @@ function handle_delete_key($firewall_id, $key_id) {
     }
     
     try {
-        $stmt = $DB->prepare("DELETE FROM firewall_ssh_keys WHERE id = ? AND firewall_id = ?");
+        $stmt = db()->prepare("DELETE FROM firewall_ssh_keys WHERE id = ? AND firewall_id = ?");
         $stmt->execute([$key_id, $firewall_id]);
         
         log_info('ssh_keys', "SSH key {$key_id} deleted for firewall {$firewall_id}", null, $firewall_id);

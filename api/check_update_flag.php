@@ -1,7 +1,7 @@
 <?php
-header('Content-Type: text/plain');
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+header('Content-Type: text/plain');
 $firewall_id = $_GET['firewall_id'] ?? null;
 
 if (!$firewall_id) {
@@ -10,7 +10,7 @@ if (!$firewall_id) {
 }
 
 try {
-    $stmt = $DB->prepare("SELECT update_requested FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT update_requested FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     

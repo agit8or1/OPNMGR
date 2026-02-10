@@ -4,8 +4,7 @@
  * Creates proxy request, waits for agent to establish tunnel, routes traffic
  */
 
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -18,7 +17,7 @@ if (!$firewall_id) {
 }
 
 // Verify firewall exists
-$stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -39,12 +38,12 @@ if (!$tunnel_port) {
 }
 
 // Insert proxy request into queue
-$stmt = $DB->prepare('
+$stmt = db()->prepare('
     INSERT INTO request_queue (firewall_id, tunnel_port, client_id, method, path, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, NOW())
 ');
 $stmt->execute([$firewall_id, $tunnel_port, $client_id, 'TUNNEL', '/', 'pending']);
-$request_id = $DB->lastInsertId();
+$request_id = db()->lastInsertId();
 
 // Log request creation
 $details = json_encode([
@@ -52,7 +51,7 @@ $details = json_encode([
     'tunnel_port' => $tunnel_port,
     'client_id' => $client_id
 ]);
-$DB->prepare('INSERT INTO system_logs (category, message, additional_data, firewall_id, level, timestamp) VALUES (?, ?, ?, ?, ?, NOW())')
+db()->prepare('INSERT INTO system_logs (category, message, additional_data, firewall_id, level, timestamp) VALUES (?, ?, ?, ?, ?, NOW())')
    ->execute(['proxy', "On-demand tunnel requested: Port $tunnel_port", $details, $firewall_id, 'INFO']);
 
 // Wait for agent to establish tunnel (max 30 seconds)
@@ -194,12 +193,10 @@ $tunnel_ready = false;
 <?php
 
 function assignTunnelPort() {
-    global $DB;
-    
     // Find an available port in range 8100-8200 (matches firewall rules)
     for ($port = 8100; $port <= 8200; $port++) {
         // Check if port is in use (active within last 5 minutes)
-        $stmt = $DB->prepare('
+        $stmt = db()->prepare('
             SELECT COUNT(*) as count 
             FROM request_queue 
             WHERE tunnel_port = ? 

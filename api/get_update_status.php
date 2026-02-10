@@ -1,10 +1,10 @@
 <?php
-header('Content-Type: application/json');
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+header('Content-Type: application/json');
 try {
     // Get all firewalls with their update status
-    $stmt = $DB->query("
+    $stmt = db()->query("
         SELECT 
             f.id,
             f.hostname,
@@ -27,7 +27,7 @@ try {
     $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Get recent updater command history
-    $history_stmt = $DB->query("
+    $history_stmt = db()->query("
         SELECT 
             uc.id,
             uc.firewall_id,

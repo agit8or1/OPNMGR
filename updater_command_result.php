@@ -4,7 +4,7 @@
  * Receives command execution results from updater services
  */
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -31,7 +31,7 @@ try {
     }
     
     // Validate firewall exists
-    $stmt = $DB->prepare("SELECT id FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT id FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     if (!$stmt->fetch()) {
         http_response_code(404);
@@ -40,7 +40,7 @@ try {
     }
     
     // Validate command exists and belongs to this firewall
-    $stmt = $DB->prepare("SELECT id, command_type, description FROM updater_commands WHERE id = ? AND firewall_id = ?");
+    $stmt = db()->prepare("SELECT id, command_type, description FROM updater_commands WHERE id = ? AND firewall_id = ?");
     $stmt->execute([$command_id, $firewall_id]);
     $command = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -51,7 +51,7 @@ try {
     }
     
     // Update command status
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         UPDATE updater_commands 
         SET status = ?, completed_at = NOW(), result = ? 
         WHERE id = ?
@@ -64,7 +64,7 @@ try {
         $log_message .= ": " . substr($result, 0, 200);
     }
     
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
         VALUES (?, 'updater', ?, ?, NOW())
     ");

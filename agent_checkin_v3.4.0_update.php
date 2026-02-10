@@ -22,7 +22,7 @@ $wan_interface_stats = $input['wan_interface_stats'] ?? null;
 if ($agent_sent_reboot_status) {
     // Agent supports reboot detection - update the flag
     if (!empty($wan_netmask) || !empty($wan_gateway)) {
-        $stmt = $DB->prepare('UPDATE firewalls SET
+        $stmt = db()->prepare('UPDATE firewalls SET
             last_checkin = NOW(),
             agent_version = ?,
             status = ?,
@@ -67,7 +67,7 @@ if ($agent_sent_reboot_status) {
         ]);
     } else {
         // Preserve existing network config but update WAN interface info
-        $stmt = $DB->prepare('UPDATE firewalls SET
+        $stmt = db()->prepare('UPDATE firewalls SET
             last_checkin = NOW(),
             agent_version = ?,
             status = ?,
@@ -108,8 +108,6 @@ if ($agent_sent_reboot_status) {
  * Process and store detailed WAN interface statistics
  */
 function processWANInterfaceStats($firewall_id, $wan_interface_stats) {
-    global $DB;
-
     if (empty($wan_interface_stats) || !is_array($wan_interface_stats)) {
         return;
     }
@@ -133,7 +131,7 @@ function processWANInterfaceStats($firewall_id, $wan_interface_stats) {
             $tx_bytes = (int)($stat['tx_bytes'] ?? 0);
 
             // Insert or update interface stats
-            $stmt = $DB->prepare('
+            $stmt = db()->prepare('
                 INSERT INTO firewall_wan_interfaces
                 (firewall_id, interface_name, status, ip_address, media,
                  rx_packets, rx_errors, rx_bytes, tx_packets, tx_errors, tx_bytes, last_updated)

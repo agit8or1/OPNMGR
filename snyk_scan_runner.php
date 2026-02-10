@@ -376,8 +376,9 @@ updateProgress($progress_file, $final_status, $summary, 100, $all_output, $steps
 // ---------------------------------------------------------------------------
 // Save scan results to database
 // ---------------------------------------------------------------------------
-require_once __DIR__ . '/inc/db.php';
-if (isset($DB)) {
+require_once __DIR__ . '/inc/bootstrap_agent.php';
+try { $dbAvailable = (bool)db(); } catch (Exception $e) { $dbAvailable = false; }
+if ($dbAvailable) {
     try {
         // Determine DB scan type
         if ($scan_type === 'multi') {
@@ -391,7 +392,7 @@ if (isset($DB)) {
             $db_scan_type = $scan_defs[$scan_type]['db_type'] ?? 'full';
         }
 
-        $stmt = $DB->prepare('INSERT INTO snyk_scan_results (scan_type, status, total_vulnerabilities, critical_count, high_count, medium_count, low_count, duration_seconds, scan_output, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+        $stmt = db()->prepare('INSERT INTO snyk_scan_results (scan_type, status, total_vulnerabilities, critical_count, high_count, medium_count, low_count, duration_seconds, scan_output, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
         $stmt->execute([
             $db_scan_type,
             'completed',

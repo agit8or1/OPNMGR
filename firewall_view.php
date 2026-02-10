@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 $message = '';
@@ -20,16 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_firewall'])) {
         
         try {
             // Update firewall basic info
-            $stmt = $DB->prepare('UPDATE firewalls SET hostname = ?, ip_address = ?, wan_ip = ?, customer_name = ? WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET hostname = ?, ip_address = ?, wan_ip = ?, customer_name = ? WHERE id = ?');
             $stmt->execute([$hostname, $ip_address, $wan_ip, $customer_name, $edit_id]);
             
             // Update tags
-            $stmt = $DB->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
+            $stmt = db()->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
             $stmt->execute([$edit_id]);
             
             if (!empty($tags)) {
                 foreach ($tags as $tag_id) {
-                    $stmt = $DB->prepare('INSERT INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
+                    $stmt = db()->prepare('INSERT INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
                     $stmt->execute([$edit_id, $tag_id]);
                 }
             }
@@ -49,7 +47,7 @@ if (!$id) {
 }
 
 try {
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT f.*, 
                GROUP_CONCAT(t.name SEPARATOR ", ") as tag_names, 
                GROUP_CONCAT(t.color SEPARATOR ", ") as tag_colors,
@@ -69,10 +67,10 @@ try {
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get all available tags and customers for dropdowns
-    $stmt = $DB->query('SELECT id, name, color FROM tags ORDER BY name');
+    $stmt = db()->query('SELECT id, name, color FROM tags ORDER BY name');
     $all_tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $stmt = $DB->query('SELECT id, name FROM customers ORDER BY name');
+    $stmt = db()->query('SELECT id, name FROM customers ORDER BY name');
     $all_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch (Exception $e) {

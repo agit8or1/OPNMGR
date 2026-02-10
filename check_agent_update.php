@@ -2,17 +2,17 @@
 /**
  * Monitor agent update status
  */
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 echo "Monitoring agent update status...\n\n";
 
 while (true) {
     // Check agent version
-    $stmt = $DB->query('SELECT agent_version, last_checkin, TIMESTAMPDIFF(SECOND, last_checkin, NOW()) as secs_ago FROM firewall_agents WHERE firewall_id=21');
+    $stmt = db()->query('SELECT agent_version, last_checkin, TIMESTAMPDIFF(SECOND, last_checkin, NOW()) as secs_ago FROM firewall_agents WHERE firewall_id=21');
     $agent = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Check command status
-    $stmt = $DB->query('SELECT id, status FROM firewall_commands WHERE firewall_id=21 AND description LIKE "%v2.4%" ORDER BY created_at DESC LIMIT 1');
+    $stmt = db()->query('SELECT id, status FROM firewall_commands WHERE firewall_id=21 AND description LIKE "%v2.4%" ORDER BY created_at DESC LIMIT 1');
     $cmd = $stmt->fetch(PDO::FETCH_ASSOC);
     
     $timestamp = date('H:i:s');

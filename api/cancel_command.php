@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 header('Content-Type: application/json');
@@ -24,7 +23,7 @@ if (!$command_id) {
 
 try {
     // Verify the command exists and is cancellable (pending or sent status)
-    $stmt = $DB->prepare('SELECT id, firewall_id, status FROM firewall_commands WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, firewall_id, status FROM firewall_commands WHERE id = ?');
     $stmt->execute([$command_id]);
     $command = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -42,7 +41,7 @@ try {
     }
     
     // Update command status to cancelled
-    $stmt = $DB->prepare('UPDATE firewall_commands SET status = ?, completed_at = NOW() WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewall_commands SET status = ?, completed_at = NOW() WHERE id = ?');
     $result = $stmt->execute(['cancelled', $command_id]);
     
     if ($result) {

@@ -3,8 +3,7 @@
  * Request Queue Management System
  * Handles cleanup, logging, and monitoring of HTTP request queues
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -32,8 +31,6 @@ switch ($action) {
 }
 
 function cleanupOldRequests() {
-    global $DB;
-    
     try {
         // Define timeout periods (in minutes)
         $pending_timeout = 15;    // Pending requests timeout after 15 minutes
@@ -41,7 +38,7 @@ function cleanupOldRequests() {
         $failed_timeout = 240;    // Failed requests kept for 4 hours for debugging
         
         // Log failed requests before cleanup
-        $failed_stmt = $DB->prepare("
+        $failed_stmt = db()->prepare("
             SELECT id, firewall_id, client_id, method, path, status, created_at, 
                    TIMESTAMPDIFF(MINUTE, created_at, NOW()) as age_minutes
             FROM request_queue 
@@ -78,7 +75,7 @@ function cleanupOldRequests() {
         }
         
         // Cleanup old pending/processing requests (mark as failed first)
-        $timeout_stmt = $DB->prepare("
+        $timeout_stmt = db()->prepare("
             UPDATE request_queue 
             SET status = 'failed', completed_at = NOW() 
             WHERE (status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL ? MINUTE))
@@ -88,7 +85,7 @@ function cleanupOldRequests() {
         $timed_out = $timeout_stmt->rowCount();
         
         // Remove old completed requests
-        $completed_stmt = $DB->prepare("
+        $completed_stmt = db()->prepare("
             DELETE FROM request_queue 
             WHERE status = 'completed' AND completed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)
         ");
@@ -96,7 +93,7 @@ function cleanupOldRequests() {
         $completed_removed = $completed_stmt->rowCount();
         
         // Remove old failed requests
-        $failed_cleanup_stmt = $DB->prepare("
+        $failed_cleanup_stmt = db()->prepare("
             DELETE FROM request_queue 
             WHERE status = 'failed' AND completed_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)
         ");
@@ -119,11 +116,9 @@ function cleanupOldRequests() {
 }
 
 function getQueueStatus() {
-    global $DB;
-    
     try {
         // Get current queue statistics
-        $stats_stmt = $DB->prepare("
+        $stats_stmt = db()->prepare("
             SELECT 
                 status,
                 COUNT(*) as count,
@@ -140,7 +135,7 @@ function getQueueStatus() {
         $stats = $stats_stmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Get recent requests
-        $recent_stmt = $DB->prepare("
+        $recent_stmt = db()->prepare("
             SELECT id, client_id, method, path, status, created_at, completed_at,
                    TIMESTAMPDIFF(MINUTE, created_at, NOW()) as age_minutes
             FROM request_queue 
@@ -166,13 +161,11 @@ function getQueueStatus() {
 }
 
 function getFailedRequests() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         $limit = (int)($_GET['limit'] ?? 50);
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT id, client_id, method, path, status, created_at, completed_at,
                    TIMESTAMPDIFF(MINUTE, created_at, COALESCE(completed_at, NOW())) as duration_minutes
             FROM request_queue 
@@ -196,11 +189,9 @@ function getFailedRequests() {
 }
 
 function getRequestStats() {
-    global $DB;
-    
     try {
         // Overall statistics for the last 24 hours
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_requests,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -215,7 +206,7 @@ function getRequestStats() {
         $stats = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Hourly breakdown for last 24 hours
-        $hourly_stmt = $DB->prepare("
+        $hourly_stmt = db()->prepare("
             SELECT 
                 DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') as hour,
                 COUNT(*) as requests,
@@ -243,12 +234,10 @@ function getRequestStats() {
 }
 
 function clearCompletedRequests() {
-    global $DB;
-    
     try {
         $firewall_id = (int)($_GET['firewall_id'] ?? 21);
         
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             DELETE FROM request_queue 
             WHERE firewall_id = ? AND status = 'completed'
         ");

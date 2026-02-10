@@ -1,0 +1,13 @@
+OPNManager Agent
+
+This plugin provides centralized management capabilities for OPNsense firewalls
+through OPNManager. Features include:
+
+- Automatic check-in with management server
+- Remote command execution
+- System updates management
+- Configuration backup and restore
+- Real-time status monitoring
+- SSH key management for secure access
+
+WWW: https://opnmanager.com

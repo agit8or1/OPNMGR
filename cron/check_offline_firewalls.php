@@ -5,7 +5,7 @@
  * Run every minute via cron
  */
 
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 require_once __DIR__ . '/../inc/alerts.php';
 
 $log_file = __DIR__ . '/check_offline_firewalls.log';
@@ -20,7 +20,7 @@ log_message("Starting offline firewall check...");
 
 try {
     // Get alert settings
-    $settings_stmt = $DB->query("SELECT setting_name, setting_value FROM alert_settings");
+    $settings_stmt = db()->query("SELECT setting_name, setting_value FROM alert_settings");
     $settings = $settings_stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     
     // Check if email alerts and critical alerts are enabled
@@ -37,7 +37,7 @@ try {
     log_message("Alert settings OK - proceeding with checks");
     
     // Get all firewalls with alerts enabled
-    $stmt = $DB->query("
+    $stmt = db()->query("
         SELECT 
             id,
             hostname,

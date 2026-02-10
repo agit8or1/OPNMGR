@@ -5,9 +5,7 @@
  * Creates a pending firewall record that can be enrolled via the
  * OPNManager Agent plugin using an enrollment key.
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -47,7 +45,7 @@ if (empty($hostname)) {
 
 try {
     // Check if a pending firewall with this hostname already exists
-    $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hostname = ? AND status = "pending"');
+    $stmt = db()->prepare('SELECT id FROM firewalls WHERE hostname = ? AND status = "pending"');
     $stmt->execute([$hostname]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -57,16 +55,16 @@ try {
 
         // Update customer_group if provided
         if ($customer_group) {
-            $stmt = $DB->prepare('UPDATE firewalls SET customer_group = ? WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET customer_group = ? WHERE id = ?');
             $stmt->execute([$customer_group, $firewall_id]);
         }
 
         // Invalidate any old unused tokens for this firewall
-        $stmt = $DB->prepare('UPDATE enrollment_tokens SET used = 1 WHERE firewall_id = ? AND used = 0');
+        $stmt = db()->prepare('UPDATE enrollment_tokens SET used = 1 WHERE firewall_id = ? AND used = 0');
         $stmt->execute([$firewall_id]);
     } else {
         // Create new firewall with pending status
-        $stmt = $DB->prepare('
+        $stmt = db()->prepare('
             INSERT INTO firewalls (hostname, customer_group, ip_address, status)
             VALUES (?, ?, ?, ?)
         ');
@@ -77,7 +75,7 @@ try {
             'pending'
         ]);
 
-        $firewall_id = $DB->lastInsertId();
+        $firewall_id = db()->lastInsertId();
     }
 
     echo json_encode([

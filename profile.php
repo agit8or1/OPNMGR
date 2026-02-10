@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
 
 $page_title = "User Profile";
 $message = '';
@@ -11,8 +10,8 @@ $message_type = '';
 $current_user = $_SESSION['username'] ?? null;
 $user_data = null;
 
-if ($current_user && $DB) {
-    $stmt = $DB->prepare('SELECT * FROM users WHERE username = ?');
+if ($current_user) {
+    $stmt = db()->prepare('SELECT * FROM users WHERE username = ?');
     $stmt->execute([$current_user]);
     $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
 }
@@ -26,15 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email = trim($_POST['email'] ?? '');
             $timezone = trim($_POST['timezone'] ?? 'America/Chicago');
 
-            if ($user_data && $DB) {
+            if ($user_data) {
                 try {
-                    $stmt = $DB->prepare('UPDATE users SET email = ?, timezone = ? WHERE id = ?');
+                    $stmt = db()->prepare('UPDATE users SET email = ?, timezone = ? WHERE id = ?');
                     $stmt->execute([$email, $timezone, $user_data['id']]);
                     $message = 'Profile updated successfully!';
                     $message_type = 'success';
 
                     // Refresh user data
-                    $stmt = $DB->prepare('SELECT * FROM users WHERE username = ?');
+                    $stmt = db()->prepare('SELECT * FROM users WHERE username = ?');
                     $stmt->execute([$current_user]);
                     $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
                 } catch (Exception $e) {
@@ -64,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($user_data && password_verify($current_password, $user_data['password'])) {
                     $new_hash = password_hash($new_password, PASSWORD_DEFAULT);
                     try {
-                        $stmt = $DB->prepare('UPDATE users SET password = ? WHERE id = ?');
+                        $stmt = db()->prepare('UPDATE users SET password = ? WHERE id = ?');
                         $stmt->execute([$new_hash, $user_data['id']]);
                         $message = 'Password changed successfully!';
                         $message_type = 'success';

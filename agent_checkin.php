@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 // Endpoint for firewall agent check-ins
@@ -24,7 +24,7 @@ $hardware_id = trim($input['hardware_id'] ?? '');
 
 // If firewall_id not provided, try to look up by hardware_id
 if (!$firewall_id && !empty($hardware_id)) {
-    $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
+    $stmt = db()->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
     $stmt->execute([$hardware_id]);
     $fw = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($fw) {
@@ -45,7 +45,7 @@ if ($command_id > 0 && !empty($command_status)) {
         echo json_encode(['success' => false, 'message' => 'Missing firewall_id or hardware_id']);
         exit;
     }
-    $auth_stmt = $DB->prepare('SELECT hardware_id, api_key FROM firewalls WHERE id = ?');
+    $auth_stmt = db()->prepare('SELECT hardware_id, api_key FROM firewalls WHERE id = ?');
     $auth_stmt->execute([$firewall_id]);
     $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
     if (!$auth_fw || (
@@ -59,7 +59,7 @@ if ($command_id > 0 && !empty($command_status)) {
 
     try {
         // Verify command belongs to this firewall (prevent cross-firewall command manipulation)
-        $cmd_verify = $DB->prepare('SELECT firewall_id FROM firewall_commands WHERE id = ?');
+        $cmd_verify = db()->prepare('SELECT firewall_id FROM firewall_commands WHERE id = ?');
         $cmd_verify->execute([$command_id]);
         $cmd_owner = $cmd_verify->fetch(PDO::FETCH_ASSOC);
         if (!$cmd_owner || (int)$cmd_owner['firewall_id'] !== $firewall_id) {
@@ -75,21 +75,21 @@ if ($command_id > 0 && !empty($command_status)) {
         }
 
         // Update command status
-        $stmt = $DB->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ? AND firewall_id = ?');
+        $stmt = db()->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ? AND firewall_id = ?');
         $stmt->execute([$command_status, $command_result, $command_id, $firewall_id]);
 
         error_log("Command $command_id completed with status: $command_status");
 
         // Check if this was a speedtest command - parse results into bandwidth_tests
         if ($command_status === 'completed' && !empty($command_result)) {
-            $cmd_stmt = $DB->prepare('SELECT firewall_id, command, command_type FROM firewall_commands WHERE id = ?');
+            $cmd_stmt = db()->prepare('SELECT firewall_id, command, command_type FROM firewall_commands WHERE id = ?');
             $cmd_stmt->execute([$command_id]);
             $cmd_info = $cmd_stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($cmd_info && ($cmd_info['command'] === 'run_speedtest' || $cmd_info['command_type'] === 'speedtest')) {
                 $speedtest_data = json_decode($command_result, true);
                 if ($speedtest_data && isset($speedtest_data['download_mbps']) && !isset($speedtest_data['error'])) {
-                    $bw_stmt = $DB->prepare("INSERT INTO bandwidth_tests (firewall_id, test_type, test_status, download_speed, upload_speed, latency, test_server, tested_at) VALUES (?, 'manual', 'completed', ?, ?, ?, ?, NOW())");
+                    $bw_stmt = db()->prepare("INSERT INTO bandwidth_tests (firewall_id, test_type, test_status, download_speed, upload_speed, latency, test_server, tested_at) VALUES (?, 'manual', 'completed', ?, ?, ?, ?, NOW())");
                     $bw_stmt->execute([
                         $cmd_info['firewall_id'],
                         (float)($speedtest_data['download_mbps'] ?? 0),
@@ -152,7 +152,7 @@ if (!$firewall_id || empty($agent_version)) {
 }
 
 // Verify firewall exists and validate agent identity
-$stmt = $DB->prepare('SELECT id, hostname, hardware_id, api_key FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id, hostname, hardware_id, api_key FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -225,22 +225,22 @@ try {
         // Agent supports reboot detection - update the flag
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
-            $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
             $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
-            $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
             $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     } else {
         // Agent doesn't support reboot detection - preserve existing reboot_required value
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
-            $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
             $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
-            $stmt = $DB->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
             $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     }
@@ -251,7 +251,7 @@ try {
     
     // Also update or insert agent record for historical tracking
     // Support both 'primary' and 'update' agent types
-    $stmt = $DB->prepare('INSERT INTO firewall_agents (firewall_id, agent_version, agent_type, last_checkin, status, wan_ip, lan_ip, ipv6_address, opnsense_version) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE agent_version = VALUES(agent_version), last_checkin = NOW(), status = VALUES(status), wan_ip = VALUES(wan_ip), lan_ip = VALUES(lan_ip), ipv6_address = VALUES(ipv6_address), opnsense_version = VALUES(opnsense_version)');
+    $stmt = db()->prepare('INSERT INTO firewall_agents (firewall_id, agent_version, agent_type, last_checkin, status, wan_ip, lan_ip, ipv6_address, opnsense_version) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE agent_version = VALUES(agent_version), last_checkin = NOW(), status = VALUES(status), wan_ip = VALUES(wan_ip), lan_ip = VALUES(lan_ip), ipv6_address = VALUES(ipv6_address), opnsense_version = VALUES(opnsense_version)');
     $result2 = $stmt->execute([$firewall_id, $agent_version, $agent_type, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version]);
     
     if (!$result2) {
@@ -270,7 +270,7 @@ try {
     if (isset($input['traffic_stats'])) {
         $traffic = $input['traffic_stats'];
         if (isset($traffic['bytes_in']) && $traffic['bytes_in'] > 0) {
-            $stmt = $DB->prepare("
+            $stmt = db()->prepare("
                 INSERT INTO firewall_traffic_stats
                 (firewall_id, wan_interface, bytes_in, bytes_out, packets_in, packets_out, recorded_at)
                 VALUES (?, ?, ?, ?, ?, ?, NOW())
@@ -290,7 +290,7 @@ try {
     if (isset($input['system_stats'])) {
         $system = $input['system_stats'];
         if (isset($system['memory_percent']) || isset($system['cpu_load_1min'])) {
-            $stmt = $DB->prepare("INSERT INTO firewall_system_stats
+            $stmt = db()->prepare("INSERT INTO firewall_system_stats
                 (firewall_id, cpu_load_1min, cpu_load_5min, cpu_load_15min, memory_percent, memory_total_mb, memory_used_mb, disk_percent, disk_total_gb, disk_used_gb, recorded_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
             $stmt->execute([
@@ -316,13 +316,13 @@ try {
         $latency = $input['latency_stats'];
         $avg_latency = (float)($latency['average_latency'] ?? 0);
         if ($avg_latency > 0) {
-            $stmt = $DB->prepare("INSERT INTO firewall_latency (firewall_id, latency_ms, measured_at) VALUES (?, ?, NOW())");
+            $stmt = db()->prepare("INSERT INTO firewall_latency (firewall_id, latency_ms, measured_at) VALUES (?, ?, NOW())");
             $stmt->execute([$firewall_id, $avg_latency]);
         }
     }
 
     // Check if we need to perform update check (every 5 hours)
-    $stmt = $DB->prepare('SELECT last_update_check, status, current_version FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT last_update_check, status, current_version FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall_status = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -355,7 +355,7 @@ try {
         }
         
         // Update the database with check results from agent
-        $stmt = $DB->prepare('UPDATE firewalls SET last_update_check = NOW(), current_version = ?, available_version = ?, updates_available = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET last_update_check = NOW(), current_version = ?, available_version = ?, updates_available = ? WHERE id = ?');
         $stmt->execute([$current_version, $latest_stable_version, $updates_available, $firewall_id]);
         
         // If firewall was marked as 'updating' but reported back with current version,
@@ -363,7 +363,7 @@ try {
         if ($firewall_status['status'] === 'updating') {
             if ($updates_available == 0) {
                 // Update completed successfully - firewall is now up to date
-                $stmt = $DB->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
+                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
                 
                 log_info('firewall', "Update completed for firewall - now running version $current_version", 
@@ -373,7 +373,7 @@ try {
                     ]);
             } elseif (version_compare($current_version, $firewall_status['current_version'] ?: '', '>')) {
                 // Version increased but still not latest - partial update
-                $stmt = $DB->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
+                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
                 
                 log_info('firewall', "Partial update completed for firewall - version upgraded to $current_version", 
@@ -386,7 +386,7 @@ try {
         }
     } else {
         // Even if not doing full update check, update current_version
-        $stmt = $DB->prepare('UPDATE firewalls SET current_version = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET current_version = ? WHERE id = ?');
         $stmt->execute([$current_version, $firewall_id]);
     }
 
@@ -397,7 +397,7 @@ try {
         $checkin_interval = 300; // 5 minutes for update agent
     } else {
         // Check for firewall-specific setting, default to 120 seconds (2 min) for primary agent
-        $stmt = $DB->prepare('SELECT checkin_interval FROM firewalls WHERE id = ?');
+        $stmt = db()->prepare('SELECT checkin_interval FROM firewalls WHERE id = ?');
         $stmt->execute([$firewall_id]);
         $firewall_data = $stmt->fetch();
         $checkin_interval = (int)($firewall_data['checkin_interval'] ?? 120);
@@ -407,7 +407,7 @@ try {
     $agent_update_check = checkAgentUpdate($agent_version, $firewall_id);
 
     // Check for OPNsense update requests
-    $stmt = $DB->prepare('SELECT update_requested, update_requested_at FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT update_requested, update_requested_at FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $update_info = $stmt->fetch();
     
@@ -418,7 +418,7 @@ try {
         // Clear the update request flag and set status to updating
         // Also clear updates_available, reset last_update_check to force a fresh check after reboot
         // Set reboot_required flag (will be cleared when agent reports reboot_required=0 after reboot)
-        $stmt = $DB->prepare('UPDATE firewalls SET update_requested = 0, status = \'updating\', updates_available = 0, last_update_check = NULL, reboot_required = 1 WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET update_requested = 0, status = \'updating\', updates_available = 0, last_update_check = NULL, reboot_required = 1 WHERE id = ?');
         $stmt->execute([$firewall_id]);
     }
 
@@ -457,7 +457,7 @@ try {
     }
     
     // Check for agent cleanup request
-    $stmt = $DB->prepare('SELECT agent_cleanup_requested FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT agent_cleanup_requested FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $cleanup_info = $stmt->fetch();
     
@@ -466,7 +466,7 @@ try {
         $agent_cleanup_requested = true;
         
         // Clear the cleanup request flag
-        $stmt = $DB->prepare('UPDATE firewalls SET agent_cleanup_requested = 0 WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET agent_cleanup_requested = 0 WHERE id = ?');
         $stmt->execute([$firewall_id]);
         
         // Provide the cleanup script URL
@@ -476,21 +476,21 @@ try {
     }
     
     // Auto-setup reverse SSH tunnel if not already established
-    $tunnel_check = $DB->prepare('SELECT tunnel_active, tunnel_established FROM firewalls WHERE id = ?');
+    $tunnel_check = db()->prepare('SELECT tunnel_active, tunnel_established FROM firewalls WHERE id = ?');
     $tunnel_check->execute([$firewall_id]);
     $tunnel_status = $tunnel_check->fetch(PDO::FETCH_ASSOC);
     
     // If tunnel has never been established, queue the setup command
     if ($tunnel_status && !$tunnel_status['tunnel_established']) {
         // Check if setup command already queued
-        $existing_cmd = $DB->prepare('SELECT id FROM firewall_commands WHERE firewall_id = ? AND description = "Auto-setup reverse SSH tunnel" AND status IN ("pending", "sent") LIMIT 1');
+        $existing_cmd = db()->prepare('SELECT id FROM firewall_commands WHERE firewall_id = ? AND description = "Auto-setup reverse SSH tunnel" AND status IN ("pending", "sent") LIMIT 1');
         $existing_cmd->execute([$firewall_id]);
         
         if (!$existing_cmd->fetch()) {
             // Queue the tunnel setup command
             $tunnel_cmd = "fetch -o /tmp/setup_tunnel.sh https://opn.agit8or.net/setup_reverse_proxy.sh || curl -k -o /tmp/setup_tunnel.sh https://opn.agit8or.net/setup_reverse_proxy.sh && chmod +x /tmp/setup_tunnel.sh && /tmp/setup_tunnel.sh {$firewall_id} > /tmp/tunnel_setup.log 2>&1 && echo '=== SSH PUBLIC KEY ===' && cat /home/tunnel/.ssh/id_rsa.pub";
             
-            $ins_cmd = $DB->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
+            $ins_cmd = db()->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
             $ins_cmd->execute([$firewall_id, $tunnel_cmd, 'Auto-setup reverse SSH tunnel']);
             
             error_log("Auto-queued tunnel setup for firewall $firewall_id");
@@ -512,7 +512,7 @@ try {
     }
     
     // Check for pending proxy requests
-    $stmt = $DB->prepare('SELECT id, tunnel_port, client_id, method, path, headers, body FROM request_queue WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 10');
+    $stmt = db()->prepare('SELECT id, tunnel_port, client_id, method, path, headers, body FROM request_queue WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 10');
     $stmt->execute([$firewall_id]);
     $pending_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -536,8 +536,6 @@ try {
  * Check if agent update is available
  */
 function checkAgentUpdate($current_agent_version, $firewall_id) {
-    global $DB;
-
     // Use centralized version constant from inc/agent_version.php
     require_once __DIR__ . '/inc/agent_version.php';
     $latest_agent_version = LATEST_AGENT_VERSION;
@@ -547,7 +545,7 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
     $latest_clean = preg_replace('/[^0-9.]/', '', $latest_agent_version);
     
     // Get firewall hostname for self-healing
-    $stmt = $DB->prepare('SELECT hostname FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT hostname FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     $hostname = $firewall['hostname'] ?? 'unknown';
@@ -601,11 +599,9 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
  * Check for queued commands for this firewall
  */
 function checkQueuedCommands($firewall_id) {
-    global $DB;
-    
     try {
         // Reset commands stuck in 'sent' status for more than 10 minutes back to 'pending'
-        $timeout_stmt = $DB->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
         $timeout_stmt->execute([$firewall_id]);
         $reset_count = $timeout_stmt->rowCount();
         if ($reset_count > 0) {
@@ -613,7 +609,7 @@ function checkQueuedCommands($firewall_id) {
         }
         
         // Get pending commands
-        $stmt = $DB->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
+        $stmt = db()->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
         $stmt->execute([$firewall_id]);
         $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -621,7 +617,7 @@ function checkQueuedCommands($firewall_id) {
             // Mark commands as sent
             $command_ids = array_column($commands, 'id');
             $placeholders = str_repeat('?,', count($command_ids) - 1) . '?';
-            $update_stmt = $DB->prepare("UPDATE firewall_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
+            $update_stmt = db()->prepare("UPDATE firewall_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
             $update_stmt->execute($command_ids);
         }
         
@@ -637,11 +633,9 @@ function checkQueuedCommands($firewall_id) {
  * Update agent only processes commands marked with is_update_command=1
  */
 function checkQueuedCommandsForUpdateAgent($firewall_id) {
-    global $DB;
-    
     try {
         // Reset commands stuck in 'sent' status for more than 10 minutes back to 'pending'
-        $timeout_stmt = $DB->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND is_update_command = 1 AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND is_update_command = 1 AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
         $timeout_stmt->execute([$firewall_id]);
         $reset_count = $timeout_stmt->rowCount();
         if ($reset_count > 0) {
@@ -649,7 +643,7 @@ function checkQueuedCommandsForUpdateAgent($firewall_id) {
         }
         
         // Get pending commands marked for update agent
-        $stmt = $DB->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" AND is_update_command = 1 ORDER BY created_at ASC LIMIT 5');
+        $stmt = db()->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" AND is_update_command = 1 ORDER BY created_at ASC LIMIT 5');
         $stmt->execute([$firewall_id]);
         $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -657,7 +651,7 @@ function checkQueuedCommandsForUpdateAgent($firewall_id) {
             // Mark commands as sent
             $command_ids = array_column($commands, 'id');
             $placeholders = str_repeat('?,', count($command_ids) - 1) . '?';
-            $update_stmt = $DB->prepare("UPDATE firewall_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
+            $update_stmt = db()->prepare("UPDATE firewall_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
             $update_stmt->execute($command_ids);
         }
         
@@ -673,8 +667,6 @@ function checkQueuedCommandsForUpdateAgent($firewall_id) {
  * Updates the firewall_wan_interfaces table with detailed interface stats
  */
 function processWANInterfaceStats($firewall_id, $wan_interface_stats_json) {
-    global $DB;
-
     if (empty($wan_interface_stats_json)) {
         return;
     }
@@ -706,7 +698,7 @@ function processWANInterfaceStats($firewall_id, $wan_interface_stats_json) {
             $tx_errors = (int)($iface_data['tx_errors'] ?? 0);
 
             // Insert or update interface stats
-            $stmt = $DB->prepare('
+            $stmt = db()->prepare('
                 INSERT INTO firewall_wan_interfaces
                 (firewall_id, interface_name, status, ip_address, netmask, gateway, media,
                  rx_packets, rx_bytes, rx_errors, tx_packets, tx_bytes, tx_errors, last_updated)

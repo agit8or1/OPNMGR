@@ -1,7 +1,7 @@
 <?php
-header('Content-Type: text/plain');
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+header('Content-Type: text/plain');
 $firewall_id = $_GET['firewall_id'] ?? null;
 
 if (!$firewall_id) {
@@ -11,7 +11,7 @@ if (!$firewall_id) {
 
 try {
     // Clear update flag and set status back to online
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         UPDATE firewalls 
         SET update_requested = 0, status = 'online' 
         WHERE id = ?

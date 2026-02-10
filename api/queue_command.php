@@ -1,12 +1,10 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
-
 /**
  * Queue a custom command for a firewall to execute on next checkin
  * Requires admin authentication and valid CSRF token.
  */
+
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -51,7 +49,7 @@ if (!$firewall_id || !$command) {
 
 try {
     // Verify firewall exists
-    $stmt = $DB->prepare('SELECT hostname FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT hostname FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
     
@@ -62,7 +60,7 @@ try {
     }
     
     // Create firewall_commands table if it doesn't exist
-    $DB->exec("CREATE TABLE IF NOT EXISTS firewall_commands (
+    db()->exec("CREATE TABLE IF NOT EXISTS firewall_commands (
         id INT AUTO_INCREMENT PRIMARY KEY,
         firewall_id INT NOT NULL,
         command TEXT NOT NULL,
@@ -77,10 +75,10 @@ try {
     )");
     
     // Insert the command
-    $stmt = $DB->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
     $stmt->execute([$firewall_id, $command, $description]);
     
-    $command_id = $DB->lastInsertId();
+    $command_id = db()->lastInsertId();
     
     echo json_encode([
         'success' => true,

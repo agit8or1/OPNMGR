@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 if (!isset($_GET['token'])) {
     header('HTTP/1.1 400 Bad Request');
@@ -8,7 +8,7 @@ if (!isset($_GET['token'])) {
 
 $token = $_GET['token'];
 
-$stmt = $DB->prepare("SELECT * FROM enrollment_tokens WHERE token = ? AND expires_at > NOW()");
+$stmt = db()->prepare("SELECT * FROM enrollment_tokens WHERE token = ? AND expires_at > NOW()");
 $stmt->execute([$token]);
 $tokenData = $stmt->fetch(PDO::FETCH_ASSOC);
 

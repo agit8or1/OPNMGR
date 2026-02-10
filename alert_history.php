@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -31,7 +30,7 @@ $where_sql = $where_clauses ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
 
 // Get total count
 $count_sql = "SELECT COUNT(*) FROM alert_history $where_sql";
-$count_stmt = $DB->prepare($count_sql);
+$count_stmt = db()->prepare($count_sql);
 $count_stmt->execute($params);
 $total_alerts = $count_stmt->fetchColumn();
 $total_pages = ceil($total_alerts / $per_page);
@@ -48,12 +47,12 @@ $sql = "
     LIMIT $per_page OFFSET $offset
 ";
 
-$stmt = $DB->prepare($sql);
+$stmt = db()->prepare($sql);
 $stmt->execute($params);
 $alerts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get firewalls for filter dropdown
-$firewalls = $DB->query("SELECT id, hostname FROM firewalls ORDER BY hostname")->fetchAll(PDO::FETCH_ASSOC);
+$firewalls = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname")->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/inc/header.php';
 ?>
@@ -116,7 +115,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
                         <div class="vr"></div>
                         <?php
-                        $level_counts = $DB->query("
+                        $level_counts = db()->query("
                             SELECT alert_level, COUNT(*) as count 
                             FROM alert_history 
                             GROUP BY alert_level

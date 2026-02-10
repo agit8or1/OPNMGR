@@ -3,10 +3,7 @@
  * Network Diagnostics API
  * Runs ping or traceroute commands from firewall
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 header('Content-Type: application/json');
@@ -44,7 +41,7 @@ if (!filter_var($target, FILTER_VALIDATE_IP) && !filter_var($target, FILTER_VALI
 }
 
 // Verify firewall exists and is online
-$stmt = $DB->prepare("SELECT id, hostname, status FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT id, hostname, status FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -95,13 +92,13 @@ BASH;
     $description = ucfirst($command_type) . " diagnostic to " . $target;
     
     // Queue command for firewall
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, command_type, status)
         VALUES (?, ?, ?, 'shell', 'pending')
     ");
     $stmt->execute([$firewall_id, $command, $description]);
     
-    $command_id = $DB->lastInsertId();
+    $command_id = db()->lastInsertId();
     
     echo json_encode([
         'success' => true,

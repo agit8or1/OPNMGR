@@ -1,7 +1,7 @@
 <?php
 // Simple function to check for pending agent updates
-function checkPendingAgentUpdate($firewall_id, $DB) {
-    $stmt = $DB->prepare('
+function checkPendingAgentUpdate($firewall_id) {
+    $stmt = db()->prepare('
         SELECT id, to_version, update_script
         FROM agent_updates
         WHERE firewall_id = ?
@@ -14,7 +14,7 @@ function checkPendingAgentUpdate($firewall_id, $DB) {
     
     if ($update) {
         // Mark as downloading
-        $DB->prepare('UPDATE agent_updates SET status = ?, started_at = NOW() WHERE id = ?')
+        db()->prepare('UPDATE agent_updates SET status = ?, started_at = NOW() WHERE id = ?')
            ->execute(['downloading', $update['id']]);
            
         return [

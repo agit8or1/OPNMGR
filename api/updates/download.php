@@ -5,7 +5,7 @@
  */
 
 // Include database connection
-require_once __DIR__ . '/../../inc/db.php';
+require_once __DIR__ . '/../../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -40,7 +40,7 @@ try {
     }
     
     // Get update information from database
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT version, description, changelog 
         FROM platform_versions 
         WHERE version = ? AND status = 'released'

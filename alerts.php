@@ -1,11 +1,10 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
 // Get all alert settings
-$stmt = $DB->query("SELECT setting_name, setting_value FROM alert_settings");
+$stmt = db()->query("SELECT setting_name, setting_value FROM alert_settings");
 $settings_raw = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // Parse settings with defaults
@@ -21,7 +20,7 @@ $settings = [
 ];
 
 // Get SMTP settings from existing settings table
-$stmt = $DB->query("SELECT name, value FROM settings WHERE name LIKE 'smtp_%'");
+$stmt = db()->query("SELECT name, value FROM settings WHERE name LIKE 'smtp_%'");
 $smtp_settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // Handle form submissions
@@ -34,9 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email_from = trim($_POST['email_from_address'] ?? '');
         $email_name = trim($_POST['email_from_name'] ?? 'OpnMgr Alert System');
         
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_enabled'")->execute([$email_enabled]);
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_from_address'")->execute([$email_from]);
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_from_name'")->execute([$email_name]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_enabled'")->execute([$email_enabled]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_from_address'")->execute([$email_from]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'email_from_name'")->execute([$email_name]);
         
         $notice = 'Email settings saved successfully.';
         header('Location: /alerts.php?notice=' . urlencode($notice));
@@ -47,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pushover_enabled = isset($_POST['pushover_enabled']) ? 'true' : 'false';
         $pushover_token = trim($_POST['pushover_api_token'] ?? '');
         
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_enabled'")->execute([$pushover_enabled]);
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_api_token'")->execute([$pushover_token]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_enabled'")->execute([$pushover_enabled]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_api_token'")->execute([$pushover_token]);
         
         $notice = 'Pushover settings saved successfully.';
         header('Location: /alerts.php?notice=' . urlencode($notice));
@@ -60,9 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $warning_enabled = isset($_POST['alerts_warning_enabled']) ? 'true' : 'false';
         $critical_enabled = isset($_POST['alerts_critical_enabled']) ? 'true' : 'false';
         
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_info_enabled'")->execute([$info_enabled]);
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_warning_enabled'")->execute([$warning_enabled]);
-        $DB->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_critical_enabled'")->execute([$critical_enabled]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_info_enabled'")->execute([$info_enabled]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_warning_enabled'")->execute([$warning_enabled]);
+        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'alerts_critical_enabled'")->execute([$critical_enabled]);
         
         $notice = 'Alert level settings saved successfully.';
         header('Location: /alerts.php?notice=' . urlencode($notice));
@@ -292,7 +291,7 @@ include __DIR__ . '/inc/header.php';
                             </p>
                             
                             <?php
-                            $stmt = $DB->query("
+                            $stmt = db()->query("
                                 SELECT COUNT(*) as count
                                 FROM users 
                                 WHERE role = 'admin' AND email IS NOT NULL AND email != ''
@@ -307,7 +306,7 @@ include __DIR__ . '/inc/header.php';
                             
                             <div class="list-group list-group-flush">
                                 <?php
-                                $stmt = $DB->query("
+                                $stmt = db()->query("
                                     SELECT username, email, first_name, last_name
                                     FROM users 
                                     WHERE role = 'admin' AND email IS NOT NULL AND email != ''
@@ -368,7 +367,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
                         <div class="card-body">
                             <?php
-                            $stmt = $DB->query("
+                            $stmt = db()->query("
                                 SELECT ah.*, f.hostname 
                                 FROM alert_history ah
                                 LEFT JOIN firewalls f ON ah.firewall_id = f.id

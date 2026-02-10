@@ -1,15 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
  * Create Backup API
  * Queues a backup command for the specified firewall
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
-
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -50,7 +47,7 @@ if (!$firewall_id) {
 
 try {
     // Verify firewall exists
-    $stmt = $DB->prepare("SELECT hostname FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT hostname FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -65,27 +62,27 @@ try {
     $backup_filename = "manual-backup-{$firewall_id}-{$timestamp}.xml";
     
     // Create backup entry in database first
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO backups (firewall_id, backup_file, backup_type, created_at) 
         VALUES (?, ?, 'manual', NOW())
     ");
     $stmt->execute([$firewall_id, $backup_filename]);
-    $backup_id = $DB->lastInsertId();
+    $backup_id = db()->lastInsertId();
     
     // Simple backup command that creates and uploads the backup file
     $backup_command = "cp /conf/config.xml /tmp/{$backup_filename} && curl -F 'backup_file=@/tmp/{$backup_filename}' -F 'firewall_id={$firewall_id}' -F 'backup_id={$backup_id}' https://opn.agit8or.net/api/upload_backup.php && rm -f /tmp/{$backup_filename} && echo 'Manual backup created and uploaded: {$backup_filename}'";
     
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, status, created_at) 
         VALUES (?, ?, 'Create manual configuration backup', 'pending', NOW())
     ");
     $stmt->execute([$firewall_id, $backup_command]);
     
     // Get the command ID for tracking
-    $command_id = $DB->lastInsertId();
+    $command_id = db()->lastInsertId();
     
     // Log the backup request
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
         VALUES (?, 'backup', ?, 'INFO', NOW())
     ");

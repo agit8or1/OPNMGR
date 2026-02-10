@@ -1,19 +1,17 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 
 // load settings
-$rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $acme_domain = $rows['acme_domain'] ?? '';
 $acme_email = $rows['acme_email'] ?? '';
 
 // helpers
-function save_setting($DB,$k,$v){
-    $s = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
+function save_setting($k,$v){
+    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
     $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
 }
 
@@ -24,8 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['save_acme'])) {
       $acme_domain = trim($_POST['acme_domain'] ?? '');
       $acme_email = trim($_POST['acme_email'] ?? '');
-      save_setting($DB,'acme_domain',$acme_domain);
-      save_setting($DB,'acme_email',$acme_email);
+      save_setting('acme_domain',$acme_domain);
+      save_setting('acme_email',$acme_email);
       $notice = 'ACME settings saved.';
     }
     if (!empty($_POST['acme_request'])) {
@@ -34,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($acme_domain === '' || $acme_email === '') { $notice = 'Domain and email required'; }
       else {
         // persist acme settings before attempting certbot
-        save_setting($DB,'acme_domain',$acme_domain);
-        save_setting($DB,'acme_email',$acme_email);
+        save_setting('acme_domain',$acme_domain);
+        save_setting('acme_email',$acme_email);
         // attempt certbot via restricted wrapper (uses sudo)
         $wrapper = '/usr/local/sbin/opnmgr-certbot-wrapper';
         if (!is_executable($wrapper)) { $notice = 'Certbot wrapper not available'; }

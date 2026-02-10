@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $msg = '';
 $id = intval($_GET['id'] ?? 0);
@@ -17,13 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = in_array($_POST['role'] ?? 'user', ['admin','user']) ? $_POST['role'] : 'user';
     $alert_levels = $_POST['alert_levels'] ?? [];
     $alert_levels_value = !empty($alert_levels) ? implode(',', $alert_levels) : 'warning,critical';
-    $stmt = $DB->prepare('UPDATE users SET first_name = :fn, last_name = :ln, email = :em, role = :r, alert_levels = :al WHERE id = :id');
+    $stmt = db()->prepare('UPDATE users SET first_name = :fn, last_name = :ln, email = :em, role = :r, alert_levels = :al WHERE id = :id');
     $stmt->execute([':fn'=>$first_name,':ln'=>$last_name,':em'=>$email,':r'=>$role,':al'=>$alert_levels_value,':id'=>$id]);
     $msg = 'User updated.';
   }
 }
 
-$stmt = $DB->prepare('SELECT id, username, first_name, last_name, email, role, alert_levels FROM users WHERE id = :id LIMIT 1');
+$stmt = db()->prepare('SELECT id, username, first_name, last_name, email, role, alert_levels FROM users WHERE id = :id LIMIT 1');
 $stmt->execute([':id'=>$id]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$user) { header('Location: /users.php'); exit; }

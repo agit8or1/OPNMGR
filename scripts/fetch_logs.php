@@ -4,13 +4,11 @@
  * Fetches logs from firewall via SSH for AI analysis
  */
 
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 function fetchFirewallLogs($firewall_id, $log_types = ['filter', 'dhcp', 'system'], $lines = 1000) {
-    global $DB;
-    
     // Get firewall details
-    $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
     

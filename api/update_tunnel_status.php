@@ -3,8 +3,7 @@
  * Update Tunnel Status API
  * Called by agents to update the status of proxy tunnel requests
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -29,12 +28,12 @@ if (!in_array($status, $allowed_statuses)) {
 
 try {
     // Update request status
-    $stmt = $DB->prepare('UPDATE request_queue SET status = ?, updated_at = NOW() WHERE id = ?');
+    $stmt = db()->prepare('UPDATE request_queue SET status = ?, updated_at = NOW() WHERE id = ?');
     $stmt->execute([$status, $request_id]);
     
     // Log the update
     if ($tunnel_pid > 0) {
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             INSERT INTO system_logs (level, category, message, additional_data, timestamp)
             VALUES ('INFO', 'tunnel', ?, ?, NOW())
         ");

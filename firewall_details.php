@@ -5,9 +5,7 @@ header('Cache-Control: post-check=0, pre-check=0', false);
 header('Pragma: no-cache');
 header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/agent_version.php';
 requireLogin();
 
@@ -18,7 +16,7 @@ if (!$id) {
 }
 
 try {
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT f.*,
                GROUP_CONCAT(t.name SEPARATOR ", ") as tag_names, GROUP_CONCAT(t.color SEPARATOR ", ") as tag_colors
         FROM firewalls f
@@ -31,7 +29,7 @@ try {
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Fetch agent details
-    $agent_stmt = $DB->prepare('SELECT agent_version, status, last_checkin FROM firewall_agents WHERE firewall_id = ? AND agent_type = ? LIMIT 1');
+    $agent_stmt = db()->prepare('SELECT agent_version, status, last_checkin FROM firewall_agents WHERE firewall_id = ? AND agent_type = ? LIMIT 1');
     $agent_stmt->execute([$id, 'primary']);
     $agent = $agent_stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -43,15 +41,15 @@ try {
     }
 
     // Fetch all unique companies for dropdown
-    $companies_stmt = $DB->query('SELECT DISTINCT customer_group FROM firewalls WHERE customer_group IS NOT NULL AND customer_group != "" ORDER BY customer_group');
+    $companies_stmt = db()->query('SELECT DISTINCT customer_group FROM firewalls WHERE customer_group IS NOT NULL AND customer_group != "" ORDER BY customer_group');
     $all_companies = $companies_stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // Fetch all tags for dropdown
-    $tags_stmt = $DB->query('SELECT id, name, color FROM tags ORDER BY name');
+    $tags_stmt = db()->query('SELECT id, name, color FROM tags ORDER BY name');
     $all_tags = $tags_stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Get both agent types separately
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT agent_type, agent_version, last_checkin, status,
                TIMESTAMPDIFF(SECOND, last_checkin, NOW()) as seconds_ago, wan_ip, lan_ip
         FROM firewall_agents
@@ -71,7 +69,7 @@ try {
 // Fetch WAN interface stats
 $wan_stats = [];
 try {
-    $wan_stmt = $DB->prepare('SELECT * FROM firewall_wan_interfaces WHERE firewall_id = ? ORDER BY interface_name');
+    $wan_stmt = db()->prepare('SELECT * FROM firewall_wan_interfaces WHERE firewall_id = ? ORDER BY interface_name');
     $wan_stmt->execute([$id]);
     $wan_stats = $wan_stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
@@ -103,7 +101,7 @@ try {
     LEFT JOIN log_analysis_results lar ON asr.id = lar.report_id
     WHERE asr.firewall_id = ? AND asr.scan_type = 'config_with_logs' AND asr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
 
-    $stats_stmt = $DB->prepare($stats_query);
+    $stats_stmt = db()->prepare($stats_query);
     $stats_stmt->execute([$id]);
     $log_analysis_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC) ?: $log_analysis_stats;
 } catch (Exception $e) {
@@ -133,11 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 
         try {
             // Update firewall basic fields
-            $stmt = $DB->prepare('UPDATE firewalls SET checkin_interval = ?, customer_name = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET checkin_interval = ?, customer_name = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
             $stmt->execute([$checkin_interval, $customer_name, $customer_group, $allowed_webgui_ips, $id]);
 
             // Handle tags - clear existing and insert new ones
-            $stmt = $DB->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
+            $stmt = db()->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
             $stmt->execute([$id]);
 
             if (!empty($tags)) {
@@ -145,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
                 foreach ($tag_names as $tag_name) {
                     if (!empty($tag_name)) {
                         // Get or create tag
-                        $stmt = $DB->prepare('SELECT id FROM tags WHERE name = ?');
+                        $stmt = db()->prepare('SELECT id FROM tags WHERE name = ?');
                         $stmt->execute([$tag_name]);
                         $tag_id = $stmt->fetchColumn();
 
@@ -153,13 +151,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
                             // Create new tag with random color
                             $colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
                             $color = $colors[array_rand($colors)];
-                            $stmt = $DB->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
+                            $stmt = db()->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
                             $stmt->execute([$tag_name, $color]);
-                            $tag_id = $DB->lastInsertId();
+                            $tag_id = db()->lastInsertId();
                         }
 
                         // Link tag to firewall
-                        $stmt = $DB->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
+                        $stmt = db()->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
                         $stmt->execute([$id, $tag_id]);
                     }
                 }

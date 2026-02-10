@@ -1,8 +1,7 @@
 <?php
 // Setup reverse proxy for firewall access
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 
 // Check if user is logged in
@@ -29,7 +28,7 @@ if ($firewall_id <= 0) {
 
 try {
     // Get firewall details
-    $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -40,7 +39,7 @@ try {
     }
     
     // Get proxy port settings
-    $rows = $DB->query('SELECT `name`,`value` FROM settings WHERE name IN ("proxy_port_start", "proxy_port_end")')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $rows = db()->query('SELECT `name`,`value` FROM settings WHERE name IN ("proxy_port_start", "proxy_port_end")')->fetchAll(PDO::FETCH_KEY_PAIR);
     $proxy_port_start = (int)($rows['proxy_port_start'] ?? 8100);
     $proxy_port_end = (int)($rows['proxy_port_end'] ?? 8199);
     
@@ -49,7 +48,7 @@ try {
         $proxy_port = $firewall['proxy_port'];
     } else {
         // Find next available port in range
-        $used_ports = $DB->query("SELECT proxy_port FROM firewalls WHERE proxy_port IS NOT NULL AND proxy_port != 0")->fetchAll(PDO::FETCH_COLUMN);
+        $used_ports = db()->query("SELECT proxy_port FROM firewalls WHERE proxy_port IS NOT NULL AND proxy_port != 0")->fetchAll(PDO::FETCH_COLUMN);
         $proxy_port = null;
         
         for ($port = $proxy_port_start; $port <= $proxy_port_end; $port++) {
@@ -151,7 +150,7 @@ server {
     }
     
     // Update database with proxy information
-    $stmt = $DB->prepare("UPDATE firewalls SET proxy_port = ?, proxy_enabled = 1 WHERE id = ?");
+    $stmt = db()->prepare("UPDATE firewalls SET proxy_port = ?, proxy_enabled = 1 WHERE id = ?");
     $stmt->execute([$proxy_port, $firewall_id]);
     
     // Log the action

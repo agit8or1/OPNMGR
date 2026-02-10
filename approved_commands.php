@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -21,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Command pattern and description are required.';
         } else {
             try {
-                $stmt = $DB->prepare('INSERT INTO approved_commands (command_pattern, description, category, risk_level, requires_confirmation, timeout_seconds) VALUES (?, ?, ?, ?, ?, ?)');
+                $stmt = db()->prepare('INSERT INTO approved_commands (command_pattern, description, category, risk_level, requires_confirmation, timeout_seconds) VALUES (?, ?, ?, ?, ?, ?)');
                 $stmt->execute([$pattern, $description, $category, $risk_level, $requires_confirmation, $timeout]);
                 $success = 'Command added successfully.';
             } catch (Exception $e) {
@@ -33,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['command_id'] ?? 0);
         if ($id > 0) {
             try {
-                $stmt = $DB->prepare('DELETE FROM approved_commands WHERE id = ?');
+                $stmt = db()->prepare('DELETE FROM approved_commands WHERE id = ?');
                 $stmt->execute([$id]);
                 $success = 'Command deleted successfully.';
             } catch (Exception $e) {
@@ -45,11 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get all approved commands
-$stmt = $DB->query('SELECT * FROM approved_commands ORDER BY category, risk_level, command_pattern');
+$stmt = db()->query('SELECT * FROM approved_commands ORDER BY category, risk_level, command_pattern');
 $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get stats
-$stmt = $DB->query('SELECT category, risk_level, COUNT(*) as count FROM approved_commands GROUP BY category, risk_level ORDER BY category, risk_level');
+$stmt = db()->query('SELECT category, risk_level, COUNT(*) as count FROM approved_commands GROUP BY category, risk_level ORDER BY category, risk_level');
 $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/inc/header.php';

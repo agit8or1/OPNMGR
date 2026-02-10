@@ -1,20 +1,18 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/version.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 $versionInfo = getVersionInfo();
 $systemHealth = getSystemHealth();
 
 // Get system stats
-$stmt = $DB->query("SELECT COUNT(*) as total_firewalls FROM firewalls");
+$stmt = db()->query("SELECT COUNT(*) as total_firewalls FROM firewalls");
 $firewall_count = $stmt->fetchColumn();
 
-$stmt = $DB->query("SELECT COUNT(*) as active_agents FROM firewalls WHERE status = 'online' AND last_checkin > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+$stmt = db()->query("SELECT COUNT(*) as active_agents FROM firewalls WHERE status = 'online' AND last_checkin > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
 $active_agents = $stmt->fetchColumn();
 
-$stmt = $DB->query("SELECT COUNT(*) as total_backups FROM backups");
+$stmt = db()->query("SELECT COUNT(*) as total_backups FROM backups");
 $total_backups = $stmt->fetchColumn();
 
 include __DIR__ . '/inc/header.php';
@@ -92,11 +90,8 @@ p, td, th, span, strong, small, li {
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th>Update Agent</th>
-                                    <td>
-                                        <?= $versionInfo['update_agent']['version'] ?>
-                                        <span class="badge bg-warning"><?= $versionInfo['update_agent']['status'] ?></span>
-                                    </td>
+                                    <th>Tunnel Proxy</th>
+                                    <td><?= $versionInfo['tunnel_proxy']['version'] ?></td>
                                 </tr>
                                 <tr>
                                     <th>Database Schema</th>

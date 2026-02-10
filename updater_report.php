@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Endpoint for updater service to report update results
 header('Content-Type: application/json');
@@ -31,7 +31,7 @@ if (!$firewall_id || empty($update_status)) {
 }
 
 // Verify firewall exists
-$stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -62,16 +62,16 @@ try {
     }
     
     // Update firewall status and completion time
-    $stmt = $DB->prepare('UPDATE firewalls SET status = ?, update_completed_at = NOW() WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET status = ?, update_completed_at = NOW() WHERE id = ?');
     $stmt->execute([$new_status, $firewall_id]);
     
     // Update updater status
-    $stmt = $DB->prepare('UPDATE firewall_updaters SET last_update_result = ?, last_update_message = ?, last_update_time = NOW() WHERE firewall_id = ?');
+    $stmt = db()->prepare('UPDATE firewall_updaters SET last_update_result = ?, last_update_message = ?, last_update_time = NOW() WHERE firewall_id = ?');
     $stmt->execute([$update_status, $message, $firewall_id]);
     
     // Log the update result
     $log_level = ($update_status === 'failed') ? 'ERROR' : 'INFO';
-    $stmt = $DB->prepare('INSERT INTO system_logs (timestamp, level, category, message, user_id, ip_address, firewall_id, additional_data) VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO system_logs (timestamp, level, category, message, user_id, ip_address, firewall_id, additional_data) VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)');
     $stmt->execute([
         $log_level,
         'updater',

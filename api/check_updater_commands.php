@@ -1,7 +1,7 @@
 <?php
-header('Content-Type: text/plain');
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+header('Content-Type: text/plain');
 // Get firewall ID
 $firewall_id = $_GET['firewall_id'] ?? null;
 
@@ -13,7 +13,7 @@ if (!$firewall_id) {
 
 try {
     // Check for pending updater commands
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT command_type, command, description, id
         FROM updater_commands 
         WHERE firewall_id = ? AND status = 'pending' 
@@ -25,7 +25,7 @@ try {
     
     if ($command) {
         // Mark command as sent
-        $update_stmt = $DB->prepare("
+        $update_stmt = db()->prepare("
             UPDATE updater_commands 
             SET status = 'sent', sent_at = NOW() 
             WHERE id = ?

@@ -2,9 +2,7 @@
 /**
  * Get recent AI scan reports for a specific firewall
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 header('Content-Type: application/json');
@@ -18,7 +16,7 @@ if (!$firewall_id) {
 }
 
 try {
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT 
             r.*,
             COUNT(f.id) as finding_count

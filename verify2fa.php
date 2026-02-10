@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/src/TwoFactorAuth.php';
 
 if (empty($_SESSION['user_id'])) {
@@ -9,7 +8,7 @@ if (empty($_SESSION['user_id'])) {
 $err = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = trim($_POST['code'] ?? '');
-    $stmt = $DB->prepare('SELECT totp_secret FROM users WHERE id = :id');
+    $stmt = db()->prepare('SELECT totp_secret FROM users WHERE id = :id');
     $stmt->execute([':id'=>$_SESSION['user_id']]);
     $s = $stmt->fetchColumn();
     if ($s && TwoFactorAuth::verify($s, $code)) {

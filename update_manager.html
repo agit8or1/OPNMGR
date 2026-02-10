@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPNmanager - Advanced Update Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card h2 {
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        .firewall-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .firewall-item.offline {
+            border-left-color: #f44336;
+        }
+        
+        .firewall-item.updating {
+            border-left-color: #ff9800;
+        }
+        
+        .firewall-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .firewall-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-online {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-offline {
+            background: #f44336;
+            color: white;
+        }
+        
+        .status-updating {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .firewall-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        
+        .firewall-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .command-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .command-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 3px solid #2196F3;
+        }
+        
+        .command-item.success {
+            border-left-color: #4CAF50;
+        }
+        
+        .command-item.failed {
+            border-left-color: #f44336;
+        }
+        
+        .command-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .command-type {
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .command-time {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-top: 30px;
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .auto-refresh {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.7;
+        }
+        
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .firewall-details {
+                grid-template-columns: 1fr;
+            }
+            
+            .firewall-actions {
+                justify-content: center;
+            }
+            
+            .control-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ OPNmanager Advanced Update Manager</h1>
+            <p>Dual-System Firewall Management with Failsafe Recovery</p>
+        </div>
+        
+        <div class="auto-refresh">
+            <label>
+                <input type="checkbox" id="autoRefresh" checked> Auto-refresh (30s)
+            </label>
+        </div>
+        
+        <div id="errorContainer"></div>
+        
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2>🔥 Firewall Status</h2>
+                <div id="firewallList" class="loading">Loading firewall data...</div>
+            </div>
+            
+            <div class="card">
+                <h2>📋 Command History</h2>
+                <div id="commandHistory" class="command-history loading">Loading command history...</div>
+            </div>
+        </div>
+        
+        <div class="control-panel">
+            <h2>🎛️ Update Control Panel</h2>
+            <div class="control-grid">
+                <button class="btn btn-success" onclick="updateAllFirewalls()">
+                    🚀 Update All Firewalls
+                </button>
+                <button class="btn btn-warning" onclick="updateAllAgents()">
+                    🔄 Update All Agents
+                </button>
+                <button class="btn btn-primary" onclick="refreshData()">
+                    🔃 Refresh Data
+                </button>
+                <button class="btn btn-danger" onclick="emergencyRecovery()">
+                    🆘 Emergency Recovery
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval;
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            setupAutoRefresh();
+        });
+        
+        // Setup auto-refresh
+        function setupAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(loadDashboardData, 30000);
+            }
+            
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    autoRefreshInterval = setInterval(loadDashboardData, 30000);
+                } else {
+                    clearInterval(autoRefreshInterval);
+                }
+            });
+        }
+        
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/get_update_status.php');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayFirewalls(data.firewalls);
+                    displayCommandHistory(data.command_history);
+                    clearError();
+                } else {
+                    showError('Failed to load dashboard data: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error loading dashboard data: ' + error.message);
+            }
+        }
+        
+        // Display firewalls
+        function displayFirewalls(firewalls) {
+            const container = document.getElementById('firewallList');
+            
+            if (firewalls.length === 0) {
+                container.innerHTML = '<p>No firewalls found.</p>';
+                return;
+            }
+            
+            container.innerHTML = firewalls.map(firewall => `
+                <div class="firewall-item ${firewall.status}">
+                    <div class="firewall-header">
+                        <span class="firewall-name">${firewall.hostname}</span>
+                        <span class="status-badge status-${firewall.status}">${firewall.status}</span>
+                    </div>
+                    <div class="firewall-details">
+                        <div><strong>IP:</strong> ${firewall.ip_address}</div>
+                        <div><strong>Last Check-in:</strong> ${formatDateTime(firewall.last_checkin)}</div>
+                        <div><strong>Agent:</strong> v${firewall.agent_version || 'Unknown'}</div>
+                        <div><strong>OPNsense:</strong> ${firewall.current_version || 'Unknown'}</div>
+                        <div><strong>Available:</strong> ${firewall.available_version || 'Unknown'}</div>
+                        <div><strong>Uptime:</strong> ${firewall.uptime || 'Unknown'}</div>
+                    </div>
+                    <div class="firewall-actions">
+                        <button class="btn btn-primary" onclick="updateFirewall(${firewall.id})" 
+                                ${firewall.status !== 'online' ? 'disabled' : ''}>
+                            🔄 Update System
+                        </button>
+                        <button class="btn btn-warning" onclick="updateAgent(${firewall.id})"
+                                ${firewall.status === 'offline' ? 'disabled' : ''}>
+                            🔧 Update Agent
+                        </button>
+                        <button class="btn btn-success" onclick="sendCustomCommand(${firewall.id})"
+                                ${firewall.status !== 'online' ? 'disabled' : ''}>
+                            💻 Custom Command
+                        </button>
+                    </div>
+                    ${firewall.pending_updater_commands > 0 ? 
+                        `<div style="margin-top: 10px; color: #ff9800;">
+                            ⏳ ${firewall.pending_updater_commands} pending command(s)
+                        </div>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Display command history
+        function displayCommandHistory(commands) {
+            const container = document.getElementById('commandHistory');
+            
+            if (commands.length === 0) {
+                container.innerHTML = '<p>No command history found.</p>';
+                return;
+            }
+            
+            container.innerHTML = commands.map(command => `
+                <div class="command-item ${command.status}">
+                    <div class="command-header">
+                        <span class="command-type">${command.command_type}</span>
+                        <span class="command-time">${formatDateTime(command.created_at)}</span>
+                    </div>
+                    <div><strong>Firewall:</strong> ${command.hostname}</div>
+                    <div><strong>Description:</strong> ${command.description}</div>
+                    <div><strong>Status:</strong> ${command.status}</div>
+                    ${command.result ? `<div><strong>Result:</strong> ${command.result}</div>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Update single firewall
+        async function updateFirewall(firewallId) {
+            try {
+                const response = await fetch('/api/trigger_update.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ firewall_id: firewallId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`Update triggered for ${data.hostname || 'firewall'}`);
+                    loadDashboardData();
+                } else {
+                    showError('Failed to trigger update: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error triggering update: ' + error.message);
+            }
+        }
+        
+        // Update agent
+        async function updateAgent(firewallId) {
+            try {
+                const response = await fetch('/api/queue_updater_command.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firewall_id: firewallId,
+                        command_type: 'AGENT_UPDATE',
+                        command: 'fetch -o /tmp/opnsense_agent_v3.sh https://opn.agit8or.net/downloads/opnsense_agent_v3.sh && chmod +x /tmp/opnsense_agent_v3.sh && cp /tmp/opnsense_agent_v3.sh /usr/local/bin/opnsense_agent.sh && service opnsense_agent restart',
+                        description: 'Update agent to v3.0 with improved reliability'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`Agent update queued for ${data.firewall}`);
+                    loadDashboardData();
+                } else {
+                    showError('Failed to queue agent update: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error queuing agent update: ' + error.message);
+            }
+        }
+        
+        // Send custom command
+        function sendCustomCommand(firewallId) {
+            const command = prompt('Enter custom command to execute:');
+            if (!command) return;
+            
+            const description = prompt('Enter description for this command:') || 'Custom command';
+            
+            queueCustomCommand(firewallId, command, description);
+        }
+        
+        // Queue custom command
+        async function queueCustomCommand(firewallId, command, description) {
+            try {
+                const response = await fetch('/api/queue_updater_command.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firewall_id: firewallId,
+                        command_type: 'COMMAND',
+                        command: command,
+                        description: description
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`Custom command queued for ${data.firewall}`);
+                    loadDashboardData();
+                } else {
+                    showError('Failed to queue custom command: ' + data.error);
+                }
+            } catch (error) {
+                showError('Network error queuing custom command: ' + error.message);
+            }
+        }
+        
+        // Update all firewalls
+        function updateAllFirewalls() {
+            if (confirm('Are you sure you want to update ALL firewalls? This may cause temporary service interruption.')) {
+                // Implementation would fetch all online firewalls and trigger updates
+                showInfo('Mass update feature will be implemented based on current firewall list');
+            }
+        }
+        
+        // Update all agents
+        function updateAllAgents() {
+            if (confirm('Are you sure you want to update ALL agents? This will deploy the new v3.0 agent to all firewalls.')) {
+                // Implementation would queue agent updates for all firewalls
+                showInfo('Mass agent update feature will be implemented based on current firewall list');
+            }
+        }
+        
+        // Emergency recovery
+        function emergencyRecovery() {
+            if (confirm('This will attempt to recover broken agents using the failsafe updater. Continue?')) {
+                showInfo('Emergency recovery procedures will be implemented to restore broken agents');
+            }
+        }
+        
+        // Refresh data manually
+        function refreshData() {
+            loadDashboardData();
+            showInfo('Dashboard data refreshed');
+        }
+        
+        // Utility functions
+        function formatDateTime(dateString) {
+            if (!dateString) return 'Never';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+        
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div class="error">❌ ${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 10000);
+        }
+        
+        function showSuccess(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div style="background: rgba(76, 175, 80, 0.2); border: 1px solid #4CAF50; border-radius: 8px; padding: 15px; margin-bottom: 20px;">✅ ${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+        
+        function showInfo(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div style="background: rgba(33, 150, 243, 0.2); border: 1px solid #2196F3; border-radius: 8px; padding: 15px; margin-bottom: 20px;">ℹ️ ${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+        
+        function clearError() {
+            document.getElementById('errorContainer').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

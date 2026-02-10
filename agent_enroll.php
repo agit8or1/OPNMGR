@@ -7,7 +7,7 @@
  * to a pending firewall entry.
  */
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 header('Content-Type: application/json');
@@ -40,7 +40,7 @@ if (empty($token) || empty($hardware_id)) {
 
 try {
     // Look up the enrollment token
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT id, firewall_id, expires_at, used_at, used
         FROM enrollment_tokens
         WHERE token = ?
@@ -71,7 +71,7 @@ try {
     $firewall_id = $enrollment['firewall_id'];
 
     // Update the firewall with the hardware_id and mark it as enrolled
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         UPDATE firewalls
         SET hardware_id = ?,
             hostname = COALESCE(NULLIF(?, ""), hostname),
@@ -84,7 +84,7 @@ try {
     $stmt->execute([$hardware_id, $hostname, $agent_version, $firewall_id]);
 
     // Mark the enrollment token as used
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         UPDATE enrollment_tokens
         SET used = 1,
             used_at = NOW(),

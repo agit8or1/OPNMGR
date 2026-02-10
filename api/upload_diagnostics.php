@@ -3,8 +3,7 @@
  * Upload Diagnostics API
  * Receives diagnostic logs from firewalls
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -23,7 +22,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -53,7 +52,7 @@ try {
     
     if (move_uploaded_file($uploaded_file['tmp_name'], $target_path)) {
         $log_content = file_get_contents($target_path);
-        $stmt = $DB->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (?, 'agent_diagnostics', ?, 'INFO', NOW())");
+        $stmt = db()->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (?, 'agent_diagnostics', ?, 'INFO', NOW())");
         $stmt->execute([$firewall_id, substr($log_content, 0, 5000)]);
         
         echo json_encode(['success' => true, 'message' => 'Diagnostics uploaded', 'file' => basename($target_path)]);

@@ -1,6 +1,6 @@
 <?php
 // Download OPNsense Agent v3.4.0 with WAN interface auto-detection
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Get firewall ID from query parameter
 $firewall_id = $_GET['firewall_id'] ?? '';
@@ -12,7 +12,7 @@ if (empty($firewall_id)) {
 }
 
 // Verify firewall exists
-$stmt = $DB->prepare("SELECT id, hostname FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT id, hostname FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -15,9 +15,7 @@
  *     "timestamp": "2025-10-29T23:15:00Z"
  * }
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -59,7 +57,7 @@ try {
     }
     
     // Verify firewall exists
-    $verify_stmt = $DB->prepare('SELECT id FROM firewalls WHERE id = ?');
+    $verify_stmt = db()->prepare('SELECT id FROM firewalls WHERE id = ?');
     $verify_stmt->execute([$firewall_id]);
     if (!$verify_stmt->fetch()) {
         http_response_code(401);
@@ -68,7 +66,7 @@ try {
     }
     
     // Store speedtest result
-    $insert_stmt = $DB->prepare('
+    $insert_stmt = db()->prepare('
         INSERT INTO firewall_speedtest (firewall_id, download_mbps, upload_mbps, ping_ms, server_location, test_date)
         VALUES (?, ?, ?, ?, ?, NOW())
     ');

@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -26,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Check if tag already exists
-            $stmt = $DB->prepare('SELECT COUNT(*) FROM tags WHERE name = ?');
+            $stmt = db()->prepare('SELECT COUNT(*) FROM tags WHERE name = ?');
             $stmt->execute([$tagName]);
             $count = $stmt->fetchColumn();
             
@@ -36,9 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Add tag
-            $stmt = $DB->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
+            $stmt = db()->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
             $stmt->execute([$tagName, $tagColor]);
-            $tagId = $DB->lastInsertId();
+            $tagId = db()->lastInsertId();
             
             echo json_encode([
                 'success' => true, 
@@ -63,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Check if another tag with this name already exists
-            $stmt = $DB->prepare('SELECT COUNT(*) FROM tags WHERE name = ? AND id != ?');
+            $stmt = db()->prepare('SELECT COUNT(*) FROM tags WHERE name = ? AND id != ?');
             $stmt->execute([$tagName, $tagId]);
             $count = $stmt->fetchColumn();
             
@@ -73,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Update tag
-            $stmt = $DB->prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?');
+            $stmt = db()->prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?');
             $stmt->execute([$tagName, $tagColor, $tagId]);
             
             echo json_encode([
@@ -98,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             // Check if tag has firewalls
-            $stmt = $DB->prepare('SELECT COUNT(*) FROM firewall_tags WHERE tag_id = ?');
+            $stmt = db()->prepare('SELECT COUNT(*) FROM firewall_tags WHERE tag_id = ?');
             $stmt->execute([$tagId]);
             $count = $stmt->fetchColumn();
             
@@ -108,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             // Delete tag
-            $stmt = $DB->prepare('DELETE FROM tags WHERE id = ?');
+            $stmt = db()->prepare('DELETE FROM tags WHERE id = ?');
             $stmt->execute([$tagId]);
             
             echo json_encode([

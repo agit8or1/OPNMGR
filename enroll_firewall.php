@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Handle script download requests
 if (isset($_GET['action']) && $_GET['action'] === 'download' && isset($_GET['token'])) {
@@ -235,7 +235,7 @@ if (!filter_var($ip_address, FILTER_VALIDATE_IP)) {
 }
 
 // Check enrollment token
-$stmt = $DB->prepare("SELECT id, expires_at FROM enrollment_tokens WHERE token = ? AND expires_at > NOW() AND used = FALSE");
+$stmt = db()->prepare("SELECT id, expires_at FROM enrollment_tokens WHERE token = ? AND expires_at > NOW() AND used = FALSE");
 $stmt->execute([$token]);
 $token_record = $stmt->fetch();
 
@@ -249,13 +249,13 @@ try {
     $existing = null;
     
     if (!empty($hardware_id)) {
-        $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
+        $stmt = db()->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
         $stmt->execute([$hardware_id]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     
     if (!$existing) {
-        $stmt = $DB->prepare('SELECT id FROM firewalls WHERE hostname = ? OR ip_address = ?');
+        $stmt = db()->prepare('SELECT id FROM firewalls WHERE hostname = ? OR ip_address = ?');
         $stmt->execute([$hostname, $ip_address]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -263,11 +263,11 @@ try {
     if ($existing) {
         // Update existing firewall instead of failing
         $customer_name = !empty($existing['customer_name']) ? $existing['customer_name'] : 'AGIT8OR';
-        $stmt = $DB->prepare('UPDATE firewalls SET hostname = ?, hardware_id = ?, ip_address = ?, wan_ip = ?, customer_name = ?, last_checkin = NOW(), status = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET hostname = ?, hardware_id = ?, ip_address = ?, wan_ip = ?, customer_name = ?, last_checkin = NOW(), status = ? WHERE id = ?');
         $stmt->execute([$hostname, $hardware_id, $ip_address, $wan_ip, $customer_name, 'online', $existing['id']]);
         
         // Mark the enrollment token as used
-        $stmt = $DB->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
+        $stmt = db()->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
         $stmt->execute([$token]);
         
         echo json_encode([
@@ -278,17 +278,17 @@ try {
     } else {
         // Add new firewall
         $customer_name = 'AGIT8OR'; // Default customer name
-        $stmt = $DB->prepare('INSERT INTO firewalls (hostname, hardware_id, ip_address, wan_ip, customer_name, status, last_checkin) VALUES (?, ?, ?, ?, ?, ?, NOW())');
+        $stmt = db()->prepare('INSERT INTO firewalls (hostname, hardware_id, ip_address, wan_ip, customer_name, status, last_checkin) VALUES (?, ?, ?, ?, ?, ?, NOW())');
         $stmt->execute([$hostname, $hardware_id, $ip_address, $wan_ip, $customer_name, 'online']);
         
         // Mark the enrollment token as used
-        $stmt = $DB->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
+        $stmt = db()->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
         $stmt->execute([$token]);
         
         echo json_encode([
             'success' => true,
             'message' => 'Firewall enrolled successfully',
-            'firewall_id' => $DB->lastInsertId()
+            'firewall_id' => db()->lastInsertId()
         ]);
     }
 

@@ -3,10 +3,8 @@
  * Reset Agent API
  * Forces agent to restart on firewall
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/csrf.php';
 requireLogin();
 requireAdmin();
 
@@ -33,7 +31,7 @@ if (!$firewall_id) {
 
 try {
     // Get firewall details
-    $stmt = $DB->prepare("SELECT id, hostname, ip_address FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT id, hostname, ip_address FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
     
@@ -50,7 +48,7 @@ sleep 2
 /usr/local/bin/opnsense_agent.sh &
 echo 'Agent restarted'";
     
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, command_type, status)
         VALUES (?, ?, ?, 'shell', 'pending')
     ");

@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -17,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') { $msg = 'Username and password required'; }
     else {
       $hash = password_hash($password, PASSWORD_DEFAULT);
-      $stmt = $DB->prepare('INSERT INTO users (username, password, first_name, last_name, email, role) VALUES (:u,:p,:fn,:ln,:em,:r)');
+      $stmt = db()->prepare('INSERT INTO users (username, password, first_name, last_name, email, role) VALUES (:u,:p,:fn,:ln,:em,:r)');
       try {
         $stmt->execute([':u'=>$username,':p'=>$hash,':fn'=>$first,':ln'=>$last,':em'=>$email,':r'=>$role]);
         header('Location: /users.php'); exit;

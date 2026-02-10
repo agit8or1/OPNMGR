@@ -1,5 +1,5 @@
 <?php
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once 'inc/header.php';
 
 // Check if user is logged in
@@ -137,14 +137,12 @@ function verify2FACode($secret, $code) {
 }
 
 function enable2FA($userId, $secret) {
-    global $pdo;
-    $stmt = $pdo->prepare("UPDATE users SET totp_secret = ? WHERE id = ?");
+    $stmt = db()->prepare("UPDATE users SET totp_secret = ? WHERE id = ?");
     $stmt->execute([$secret, $userId]);
 }
 
 function disable2FA($userId) {
-    global $pdo;
-    $stmt = $pdo->prepare("UPDATE users SET totp_secret = NULL WHERE id = ?");
+    $stmt = db()->prepare("UPDATE users SET totp_secret = NULL WHERE id = ?");
     $stmt->execute([$userId]);
 }
 ?>

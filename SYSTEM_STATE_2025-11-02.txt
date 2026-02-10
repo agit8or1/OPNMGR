@@ -1,0 +1,32 @@
+# OPNsense Manager - System State Snapshot
+# Generated: 2025-11-02 12:15:00 EST
+
+=== FIREWALL STATUS ===
+id	hostname	wan_ip	status	agent_version	last_checkin
+21	home.agit8or.net	73.35.46.112	online	3.7.7	2025-11-02 15:16:03
+3	fw01.companyB.com	NULL	archived	NULL	NULL
+
+=== AGENT VERSION ===
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '3.7.7'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-11-02'); }
+
+=== PENDING COMMANDS ===
+pending_count
+3
+
+=== RECENT SPEEDTESTS ===
+firewall_id	test_count	last_test
+21	28	2025-11-02 14:22:00
+
+=== SYSTEM SERVICES ===
+active
+active
+active
+
+=== LOG FILE SIZES ===
+/var/log/nginx/access.log 350K
+/var/log/nginx/error.log 0
+
+=== DATABASE SIZE ===
+Size_MB
+13.17

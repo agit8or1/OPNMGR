@@ -3,9 +3,7 @@
  * Bandwidth Graph API
  * Returns bandwidth statistics and utilization data
  */
-
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 
@@ -21,7 +19,7 @@ if (!$firewall_id) {
 }
 
 // Verify user has access to this firewall
-$stmt = $DB->prepare('SELECT id FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 if (!$stmt->fetch()) {
     http_response_code(403);
@@ -45,7 +43,7 @@ switch ($time_range) {
 
 try {
     // Get traffic stats for the time range
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT 
             recorded_at,
             bytes_in,
@@ -112,7 +110,7 @@ try {
     }
     
     // Get current interface info
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT wan_ip, lan_ip FROM firewalls WHERE id = ?
     ');
     $stmt->execute([$firewall_id]);

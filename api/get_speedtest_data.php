@@ -3,8 +3,8 @@
  * Get SpeedTest Data API
  * Retrieves speedtest results for chart display
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/format_speed.php';
 
 header('Content-Type: application/json');
@@ -33,7 +33,7 @@ switch ($timeframe) {
 }
 
 try {
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT
             DATE_FORMAT(tested_at, '%Y-%m-%d %H:%i') as time,
             download_speed as download_mbps,

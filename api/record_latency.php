@@ -1,7 +1,7 @@
 <?php
 // API endpoint to record latency measurements from firewalls
 // Called by agent v3.6.1+ via POST
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -27,7 +27,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -42,7 +42,7 @@ $latency_ms = floatval($input['latency_ms'] ?? 0);
 
 try {
     // Create table if it doesn't exist
-    $DB->exec("CREATE TABLE IF NOT EXISTS firewall_latency (
+    db()->exec("CREATE TABLE IF NOT EXISTS firewall_latency (
         id BIGINT PRIMARY KEY AUTO_INCREMENT,
         firewall_id INT NOT NULL,
         latency_ms FLOAT DEFAULT 0,
@@ -51,11 +51,11 @@ try {
     )");
 
     // Insert latency record
-    $stmt = $DB->prepare("INSERT INTO firewall_latency (firewall_id, latency_ms) VALUES (?, ?)");
+    $stmt = db()->prepare("INSERT INTO firewall_latency (firewall_id, latency_ms) VALUES (?, ?)");
     $stmt->execute([$firewall_id, $latency_ms]);
 
     // Also update firewall_agents with latest latency
-    $stmt = $DB->prepare("UPDATE firewall_agents SET latency_ms = ? WHERE firewall_id = ? ORDER BY last_checkin DESC LIMIT 1");
+    $stmt = db()->prepare("UPDATE firewall_agents SET latency_ms = ? WHERE firewall_id = ? ORDER BY last_checkin DESC LIMIT 1");
     $stmt->execute([$latency_ms, $firewall_id]);
 
     echo json_encode([

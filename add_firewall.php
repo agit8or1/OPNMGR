@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -26,14 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     try {
-        $stmt = $DB->prepare('INSERT INTO firewalls (hostname, ip_address, wan_ip, customer_name, status) VALUES (?, ?, ?, ?, ?)');
+        $stmt = db()->prepare('INSERT INTO firewalls (hostname, ip_address, wan_ip, customer_name, status) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute([$hostname, $ip_address, $wan_ip, $customer_name, 'unknown']);
-        $firewall_id = $DB->lastInsertId();
+        $firewall_id = db()->lastInsertId();
         
         // Insert tags
         if (!empty($tags)) {
             foreach ($tags as $tag_id) {
-                $stmt = $DB->prepare('INSERT INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
+                $stmt = db()->prepare('INSERT INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
                 $stmt->execute([$firewall_id, $tag_id]);
             }
         }

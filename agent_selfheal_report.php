@@ -2,33 +2,9 @@
 // OPNsense Agent Self-Healing Status Reporter
 // Receives status updates from self-healing scripts on firewalls
 
+require_once __DIR__ . '/inc/bootstrap_agent.php';
+
 header('Content-Type: application/json');
-
-// Load environment variables
-require_once __DIR__ . '/inc/env.php';
-
-// Database connection - use environment variables
-$host = env('DB_HOST', 'localhost');
-$dbname = env('DB_NAME', 'opnsense_fw');
-$username = env('DB_USER', 'opnsense_user');
-$password = env('DB_PASS');
-
-if (empty($password)) {
-    error_log("CRITICAL: DB_PASS not set in environment");
-    http_response_code(500);
-    echo json_encode(['error' => 'Configuration error']);
-    exit;
-}
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    error_log("Database connection failed: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['error' => 'Database connection failed']);
-    exit;
-}
 
 // Validate agent identity
 $firewall_id = (int)($_POST['firewall_id'] ?? 0);
@@ -40,7 +16,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $pdo->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -77,7 +53,7 @@ CREATE TABLE IF NOT EXISTS agent_selfheal_log (
 )";
 
 try {
-    $pdo->exec($createTable);
+    db()->exec($createTable);
 } catch(PDOException $e) {
     error_log("Failed to create table: " . $e->getMessage());
 }
@@ -87,7 +63,7 @@ $insertSql = "INSERT INTO agent_selfheal_log (hostname, status, details, agent_v
               VALUES (?, ?, ?, ?, ?)";
 
 try {
-    $stmt = $pdo->prepare($insertSql);
+    $stmt = db()->prepare($insertSql);
     $stmt->execute([$hostname, $status, $details, $version, $timestamp]);
     
     // Also update the main firewalls table if this is a completion report
@@ -97,7 +73,7 @@ try {
                           last_selfheal = NOW(),
                           selfheal_status = ?
                           WHERE hostname = ?";
-        $updateStmt = $pdo->prepare($updateFirewall);
+        $updateStmt = db()->prepare($updateFirewall);
         $updateStmt->execute([$version, $status, $hostname]);
         
         // Also update firewall_agents table
@@ -105,7 +81,7 @@ try {
                        agent_version = ?,
                        last_update = NOW()
                        WHERE firewall_id = (SELECT id FROM firewalls WHERE hostname = ?)";
-        $updateAgentStmt = $pdo->prepare($updateAgent);
+        $updateAgentStmt = db()->prepare($updateAgent);
         $updateAgentStmt->execute([$version, $hostname]);
     }
     

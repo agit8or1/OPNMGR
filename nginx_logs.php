@@ -1,6 +1,6 @@
 <?php
 // Administration > Nginx Logs
-require_once 'inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireAdmin();
 
 $logType = $_GET['type'] ?? 'error';
@@ -32,7 +32,6 @@ if (isset($_GET['download']) && file_exists($logFile)) {
 
 // Handle clear BEFORE any output (POST only with CSRF token)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear']) && file_exists($logFile)) {
-    require_once __DIR__ . '/inc/csrf.php';
     if (csrf_verify($_POST['csrf_token'] ?? '')) {
         shell_exec('sudo truncate -s 0 ' . escapeshellarg($logFile));
     }
@@ -256,7 +255,7 @@ foreach (array_slice($lines, -200) as $line) {
         
         <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to clear this log file? This cannot be undone!')">
             <input type="hidden" name="clear" value="1">
-            <input type="hidden" name="csrf_token" value="<?php require_once __DIR__ . '/inc/csrf.php'; echo csrf_token(); ?>">
+            <input type="hidden" name="csrf_token" value="<?php echo csrf_token(); ?>">
             <button type="submit" class="btn btn-danger">
                 <i class="fa fa-trash me-2"></i> Clear Log
             </button>

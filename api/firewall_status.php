@@ -3,8 +3,7 @@
  * Firewall Status API
  * Quick status check for connection page
  */
-
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -17,7 +16,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -29,7 +28,7 @@ if (!$auth_fw || (
 }
 
 try {
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT f.status, f.last_checkin, 
                TIMESTAMPDIFF(SECOND, f.last_checkin, NOW()) as seconds_since_checkin,
                fa.agent_version, fa.agent_type

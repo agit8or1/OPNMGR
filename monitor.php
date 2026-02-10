@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 header('Content-Type: text/html; charset=UTF-8');
 ?>
@@ -32,7 +32,7 @@ header('Content-Type: text/html; charset=UTF-8');
 
         <?php
         try {
-            $stmt = $DB->prepare('SELECT id, hostname, wan_ip, lan_ip, agent_version, version, last_checkin, status FROM firewalls ORDER BY hostname');
+            $stmt = db()->prepare('SELECT id, hostname, wan_ip, lan_ip, agent_version, version, last_checkin, status FROM firewalls ORDER BY hostname');
             $stmt->execute();
             $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

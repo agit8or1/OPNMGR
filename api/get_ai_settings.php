@@ -2,9 +2,7 @@
 /**
  * Get AI scanning settings for a specific firewall
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 header('Content-Type: application/json');
@@ -18,7 +16,7 @@ if (!$firewall_id) {
 
 try {
     // Get or create AI settings for this firewall
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT * FROM firewall_ai_settings 
         WHERE firewall_id = ?
     ');
@@ -27,7 +25,7 @@ try {
     
     if (!$settings) {
         // Create default settings
-        $stmt = $DB->prepare('
+        $stmt = db()->prepare('
             INSERT INTO firewall_ai_settings
             (firewall_id, auto_scan_enabled, scan_frequency, scan_type, include_logs)
             VALUES (?, 0, "weekly", "config_with_logs", 1)
@@ -35,7 +33,7 @@ try {
         $stmt->execute([$firewall_id]);
         
         // Fetch the newly created settings
-        $stmt = $DB->prepare('
+        $stmt = db()->prepare('
             SELECT * FROM firewall_ai_settings 
             WHERE firewall_id = ?
         ');

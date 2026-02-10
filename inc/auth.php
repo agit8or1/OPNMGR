@@ -1,32 +1,57 @@
 <?php
-// Configure session security
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', 1);
-ini_set('session.use_strict_mode', 1);
-ini_set('session.cookie_samesite', 'Lax');
+/**
+ * OPNManager Authentication Functions
+ *
+ * When loaded via bootstrap.php the session is already started, db() is
+ * available, and config constants are defined.  When loaded standalone
+ * (legacy path) this file bootstraps the minimum it needs so that existing
+ * pages continue to work without changes.
+ *
+ * @since 1.0.0
+ */
 
-session_start();
+// ── Legacy / standalone mode ───────────────────────────────────────────────
+// If bootstrap has NOT been loaded, set up session + DB ourselves so that
+// pages still doing `require_once 'inc/auth.php'` keep working.
+if (!defined('OPNMGR_BOOTSTRAPPED')) {
+    // Session security
+    if (session_status() === PHP_SESSION_NONE) {
+        ini_set('session.cookie_httponly', 1);
+        ini_set('session.cookie_secure', 1);
+        ini_set('session.use_strict_mode', 1);
+        ini_set('session.cookie_samesite', 'Lax');
+        session_start();
+    }
 
-// Regenerate session ID to prevent session fixation
-if (!isset($_SESSION['initiated'])) {
-    session_regenerate_id(true);
-    $_SESSION['initiated'] = true;
+    // Regenerate session ID once per session
+    if (!isset($_SESSION['initiated'])) {
+        session_regenerate_id(true);
+        $_SESSION['initiated'] = true;
+    }
+
+    // Load config if constants are not yet defined
+    if (!defined('DB_HOST')) {
+        require_once __DIR__ . '/../config.php';
+    }
+
+    // Provide db() if not already defined (e.g. bootstrap not loaded)
+    if (!function_exists('db')) {
+        function db(): PDO {
+            static $pdo = null;
+            if ($pdo === null) {
+                $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', DB_HOST, DB_NAME);
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES   => false,
+                ]);
+            }
+            return $pdo;
+        }
+    }
 }
 
-require_once __DIR__ . '/../config.php';
-
-// Database connection
-try {
-    $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', DB_HOST, DB_NAME);
-    $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false
-    ]);
-} catch (PDOException $e) {
-    error_log('Database connection failed: ' . $e->getMessage());
-    die("Database connection failed. Please contact the administrator.");
-}
+// ── Auth helpers ────────────────────────────────────────────────────────────
 
 function isLoggedIn() {
     if (!isset($_SESSION['user_id'])) {
@@ -34,7 +59,8 @@ function isLoggedIn() {
     }
 
     // Enforce session timeout
-    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > SESSION_TIMEOUT) {
+    $timeout = defined('SESSION_TIMEOUT') ? SESSION_TIMEOUT : 3600;
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $timeout) {
         $_SESSION = array();
         session_destroy();
         return false;
@@ -74,14 +100,14 @@ function requireAdmin() {
 }
 
 function getUserById($userId) {
-    global $pdo;
+    $pdo = db();
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     return $stmt->fetch();
 }
 
 function login($username, $password) {
-    global $pdo;
+    $pdo = db();
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
@@ -119,4 +145,3 @@ function logout() {
     header('Location: /login.php');
     exit;
 }
-?>

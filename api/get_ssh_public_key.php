@@ -4,8 +4,8 @@
  * Returns the OPNManager server's SSH public key for a specific firewall
  * Used by the OPNManager Agent plugin during enrollment to enable SSH management
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../scripts/manage_ssh_keys.php';
 
 header('Content-Type: application/json');
@@ -26,7 +26,7 @@ if (empty($hardware_id)) {
 
 try {
     // Look up firewall by hardware_id
-    $stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE hardware_id = ?');
+    $stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE hardware_id = ?');
     $stmt->execute([$hardware_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 

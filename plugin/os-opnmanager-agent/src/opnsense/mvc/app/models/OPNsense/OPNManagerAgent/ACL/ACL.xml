@@ -1,0 +1,9 @@
+<acl>
+    <page-services-opnmanageragent>
+        <name>Services: OPNManager Agent</name>
+        <patterns>
+            <pattern>ui/opnmanageragent/*</pattern>
+            <pattern>api/opnmanageragent/*</pattern>
+        </patterns>
+    </page-services-opnmanageragent>
+</acl>

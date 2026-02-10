@@ -8,12 +8,9 @@
  * - Add logging rule for blocked traffic
  * - Prevent tunnel/VPN abuse
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/ssh_tunnel.php';
-require_once __DIR__ . '/../inc/csrf.php';
-
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -42,7 +39,7 @@ if (!$firewall_id) {
 
 try {
     // Verify firewall exists and user has access
-    $stmt = $DB->prepare('SELECT * FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT * FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -119,7 +116,7 @@ try {
     }
     
     // Update database configuration
-    $stmt = $DB->prepare('UPDATE firewalls SET secure_outbound_lockdown = ? WHERE id = ?');
+    $stmt = db()->prepare('UPDATE firewalls SET secure_outbound_lockdown = ? WHERE id = ?');
     $stmt->execute([$enable_lockdown, $firewall_id]);
     
     // Log the change

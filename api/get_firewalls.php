@@ -1,13 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-requireLogin();
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+requireLogin();
 header('Content-Type: application/json');
 
 try {
     // Get all firewalls
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT 
             id, 
             hostname, 

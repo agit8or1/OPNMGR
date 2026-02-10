@@ -1,8 +1,7 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
 // require_once __DIR__ . '/../inc/logging.php';  // Temporarily disabled due to syntax error
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 requireAdmin();
 
@@ -34,7 +33,7 @@ if (!csrf_verify($input['csrf'] ?? '')) {
 
 try {
     // Get all online firewalls
-    $stmt = $DB->prepare("SELECT id, hostname FROM firewalls WHERE status = 'online'");
+    $stmt = db()->prepare("SELECT id, hostname FROM firewalls WHERE status = 'online'");
     $stmt->execute();
     $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -42,7 +41,7 @@ try {
     
     foreach ($firewalls as $firewall) {
         // Check if there's already a pending firmware update command
-        $stmt = $DB->prepare("SELECT COUNT(*) FROM agent_commands WHERE firewall_id = ? AND command_type = 'firmware_update' AND status IN ('pending', 'executing') AND created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)");
+        $stmt = db()->prepare("SELECT COUNT(*) FROM agent_commands WHERE firewall_id = ? AND command_type = 'firmware_update' AND status IN ('pending', 'executing') AND created_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)");
         $stmt->execute([$firewall['id']]);
         $pending_updates = $stmt->fetchColumn();
         
@@ -55,7 +54,7 @@ try {
                 'mass_update' => true
             ]);
             
-            $stmt = $DB->prepare("INSERT INTO agent_commands (firewall_id, command_id, command_type, command_data, status, created_at) VALUES (?, ?, 'firmware_update', ?, 'pending', NOW())");
+            $stmt = db()->prepare("INSERT INTO agent_commands (firewall_id, command_id, command_type, command_data, status, created_at) VALUES (?, ?, 'firmware_update', ?, 'pending', NOW())");
             $stmt->execute([$firewall['id'], $command_id, $command_data]);
             
             $queued_count++;

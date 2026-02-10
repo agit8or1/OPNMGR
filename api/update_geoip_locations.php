@@ -3,11 +3,9 @@
  * Update GeoIP Locations API
  * Updates all firewall locations from their WAN IPs
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/geoip.php';
-require_once __DIR__ . '/../inc/auth.php';
-
 requireLogin();
 
 header('Content-Type: application/json');
@@ -20,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    $stats = geoip_update_all_firewalls($DB);
+    $stats = geoip_update_all_firewalls(db());
 
     echo json_encode([
         'success' => true,

@@ -1,0 +1,6 @@
+# Allow downloads but disable directory listing
+Options -Indexes
+<Files *.tar.gz>
+    Header set Content-Type "application/gzip"
+    Header set Content-Disposition "attachment"
+</Files>

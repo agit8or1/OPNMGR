@@ -1,13 +1,11 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/csrf.php';
 
 $notice = '';
 
 // Load settings
-$rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+$rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
 $ban_time_minutes = $rows['fail2ban_ban_time'] ?? '60';
 
 // Fail2Ban status
@@ -59,11 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($_POST['save_fail2ban_settings'])) {
       $ban_time_minutes = trim($_POST['ban_time_minutes'] ?? '60');
       if (is_numeric($ban_time_minutes) && $ban_time_minutes > 0) {
-        $stmt = $DB->prepare('INSERT INTO settings (`name`,`value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?');
+        $stmt = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = ?');
         $stmt->execute(['fail2ban_ban_time', $ban_time_minutes, $ban_time_minutes]);
         $notice = 'Fail2Ban settings saved successfully.';
         // Reload settings
-        $rows = $DB->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+        $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
         $ban_time_minutes = $rows['fail2ban_ban_time'] ?? '60';
       } else {
         $notice = 'Invalid ban time. Must be a positive number.';

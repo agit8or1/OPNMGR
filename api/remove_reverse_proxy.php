@@ -1,8 +1,7 @@
 <?php
 // Remove reverse proxy for firewall access
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 
 // Check if user is logged in
@@ -29,7 +28,7 @@ if ($firewall_id <= 0) {
 
 try {
     // Get firewall details
-    $stmt = $DB->prepare("SELECT hostname, proxy_port FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT hostname, proxy_port FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -54,7 +53,7 @@ try {
     }
     
     // Update database
-    $stmt = $DB->prepare("UPDATE firewalls SET proxy_port = NULL, proxy_enabled = 0 WHERE id = ?");
+    $stmt = db()->prepare("UPDATE firewalls SET proxy_port = NULL, proxy_enabled = 0 WHERE id = ?");
     $stmt->execute([$firewall_id]);
     
     // Log the action

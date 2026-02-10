@@ -6,15 +6,12 @@
  *
  * Usage: POST /api/trigger_speedtest.php?firewall_id=48
  */
-
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
 // Verify the user is logged in
 if (!isset($_SESSION)) {
-    @session_start();
 }
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -38,7 +35,7 @@ try {
     }
 
     // Verify firewall exists and is online
-    $verify_stmt = $DB->prepare('SELECT id, hostname, status, last_checkin FROM firewalls WHERE id = ?');
+    $verify_stmt = db()->prepare('SELECT id, hostname, status, last_checkin FROM firewalls WHERE id = ?');
     $verify_stmt->execute([$firewall_id]);
     $firewall = $verify_stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -54,7 +51,7 @@ try {
     }
 
     // Check if there's already a pending/sent speedtest command (prevent spam)
-    $existing = $DB->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND command = 'run_speedtest' AND status IN ('pending', 'sent') AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+    $existing = db()->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND command = 'run_speedtest' AND status IN ('pending', 'sent') AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
     $existing->execute([$firewall_id]);
     if ($existing->fetch()) {
         echo json_encode(['success' => false, 'error' => 'Speedtest already queued, please wait for it to complete']);
@@ -62,7 +59,7 @@ try {
     }
 
     // Queue the speedtest command for the agent
-    $stmt = $DB->prepare("INSERT INTO firewall_commands (firewall_id, command, description, command_type, status) VALUES (?, 'run_speedtest', 'On-demand bandwidth test via iperf3', 'speedtest', 'pending')");
+    $stmt = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, command_type, status) VALUES (?, 'run_speedtest', 'On-demand bandwidth test via iperf3', 'speedtest', 'pending')");
     $stmt->execute([$firewall_id]);
 
     echo json_encode([

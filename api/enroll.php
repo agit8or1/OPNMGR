@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -33,7 +33,7 @@ if (empty($token) || empty($hostname)) {
 
 try {
     // Verify token is valid
-    $stmt = $DB->prepare("SELECT * FROM enrollment_tokens WHERE token = ? AND expires_at > NOW()");
+    $stmt = db()->prepare("SELECT * FROM enrollment_tokens WHERE token = ? AND expires_at > NOW()");
     $stmt->execute([$token]);
     $tokenData = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -44,7 +44,7 @@ try {
     }
     
     // Check if firewall already exists
-    $stmt = $DB->prepare("SELECT id FROM firewalls WHERE hostname = ?");
+    $stmt = db()->prepare("SELECT id FROM firewalls WHERE hostname = ?");
     $stmt->execute([$hostname]);
     $existingFirewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -52,32 +52,32 @@ try {
         $firewall_id = $existingFirewall['id'];
         
         // Update existing firewall
-        $stmt = $DB->prepare("UPDATE firewalls SET wan_ip = ?, ipv6_address = ?, version = ?, last_checkin = NOW() WHERE id = ?");
+        $stmt = db()->prepare("UPDATE firewalls SET wan_ip = ?, ipv6_address = ?, version = ?, last_checkin = NOW() WHERE id = ?");
         $stmt->execute([$wan_ip, $ipv6_address, $opnsense_version, $firewall_id]);
     } else {
         // Create new firewall
-        $stmt = $DB->prepare("INSERT INTO firewalls (hostname, ip_address, wan_ip, ipv6_address, version, enrolled_at, last_checkin) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+        $stmt = db()->prepare("INSERT INTO firewalls (hostname, ip_address, wan_ip, ipv6_address, version, enrolled_at, last_checkin) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
         $stmt->execute([$hostname, $lan_ip, $wan_ip, $ipv6_address, $opnsense_version]);
-        $firewall_id = $DB->lastInsertId();
+        $firewall_id = db()->lastInsertId();
     }
     
     // Check if agent record exists
-    $stmt = $DB->prepare("SELECT id FROM firewall_agents WHERE firewall_id = ?");
+    $stmt = db()->prepare("SELECT id FROM firewall_agents WHERE firewall_id = ?");
     $stmt->execute([$firewall_id]);
     $existingAgent = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($existingAgent) {
         // Update existing agent
-        $stmt = $DB->prepare("UPDATE firewall_agents SET wan_ip = ?, lan_ip = ?, ipv6_address = ?, opnsense_version = ?, last_checkin = NOW(), status = 'online' WHERE firewall_id = ?");
+        $stmt = db()->prepare("UPDATE firewall_agents SET wan_ip = ?, lan_ip = ?, ipv6_address = ?, opnsense_version = ?, last_checkin = NOW(), status = 'online' WHERE firewall_id = ?");
         $stmt->execute([$wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $firewall_id]);
     } else {
         // Create new agent record
-        $stmt = $DB->prepare("INSERT INTO firewall_agents (firewall_id, agent_version, wan_ip, lan_ip, ipv6_address, opnsense_version, last_checkin, status) VALUES (?, '1.0.7', ?, ?, ?, ?, NOW(), 'online')");
+        $stmt = db()->prepare("INSERT INTO firewall_agents (firewall_id, agent_version, wan_ip, lan_ip, ipv6_address, opnsense_version, last_checkin, status) VALUES (?, '1.0.7', ?, ?, ?, ?, NOW(), 'online')");
         $stmt->execute([$firewall_id, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version]);
     }
     
     // Mark token as used by deleting it
-    $stmt = $DB->prepare("DELETE FROM enrollment_tokens WHERE token = ?");
+    $stmt = db()->prepare("DELETE FROM enrollment_tokens WHERE token = ?");
     $stmt->execute([$token]);
     
     echo json_encode([

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -13,13 +13,13 @@ if (!$firewall_id) {
 
 try {
     // Get pending commands for this firewall
-    $stmt = $DB->prepare('SELECT id, command FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 1');
+    $stmt = db()->prepare('SELECT id, command FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 1');
     $stmt->execute([$firewall_id]);
     $command = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($command) {
         // Mark command as sent (no updated_at column)
-        $update_stmt = $DB->prepare('UPDATE firewall_commands SET status = "sent" WHERE id = ?');
+        $update_stmt = db()->prepare('UPDATE firewall_commands SET status = "sent" WHERE id = ?');
         $update_stmt->execute([$command['id']]);
         
         echo json_encode([

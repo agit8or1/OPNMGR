@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Endpoint for updater service check-ins
 header('Content-Type: application/json');
@@ -29,7 +29,7 @@ if (!$firewall_id || empty($hardware_id)) {
     exit;
 }
 
-$auth_stmt = $DB->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
 $auth_stmt->execute([$firewall_id]);
 $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$auth_fw || (
@@ -48,7 +48,7 @@ if (empty($updater_version)) {
 }
 
 // Verify firewall exists
-$stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -60,16 +60,16 @@ if (!$firewall) {
 
 try {
     // Update or insert updater status
-    $stmt = $DB->prepare('INSERT INTO firewall_updaters (firewall_id, updater_version, last_checkin, status) VALUES (?, ?, NOW(), ?) ON DUPLICATE KEY UPDATE updater_version = VALUES(updater_version), last_checkin = NOW(), status = VALUES(status)');
+    $stmt = db()->prepare('INSERT INTO firewall_updaters (firewall_id, updater_version, last_checkin, status) VALUES (?, ?, NOW(), ?) ON DUPLICATE KEY UPDATE updater_version = VALUES(updater_version), last_checkin = NOW(), status = VALUES(status)');
     $stmt->execute([$firewall_id, $updater_version, 'active']);
 
     // Check for pending update requests
-    $stmt = $DB->prepare('SELECT update_requested, update_type FROM firewalls WHERE id = ?');
+    $stmt = db()->prepare('SELECT update_requested, update_type FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $update_info = $stmt->fetch();
     
     // Check for pending updater commands
-    $stmt = $DB->prepare('SELECT id, command_type, command, description FROM updater_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
+    $stmt = db()->prepare('SELECT id, command_type, command, description FROM updater_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
     $stmt->execute([$firewall_id]);
     $pending_commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
@@ -77,7 +77,7 @@ try {
     if (!empty($pending_commands)) {
         $command_ids = array_column($pending_commands, 'id');
         $placeholders = str_repeat('?,', count($command_ids) - 1) . '?';
-        $stmt = $DB->prepare("UPDATE updater_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
+        $stmt = db()->prepare("UPDATE updater_commands SET status = 'sent', sent_at = NOW() WHERE id IN ($placeholders)");
         $stmt->execute($command_ids);
     }
     
@@ -99,11 +99,11 @@ try {
         $response['update_type'] = $update_info['update_type'] ?: 'full';
         
         // Clear the update request flag and set status to updating
-        $stmt = $DB->prepare('UPDATE firewalls SET update_requested = 0, status = \'updating\', update_started_at = NOW() WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET update_requested = 0, status = \'updating\', update_started_at = NOW() WHERE id = ?');
         $stmt->execute([$firewall_id]);
         
         // Log the update initiation
-        $stmt = $DB->prepare('INSERT INTO system_logs (timestamp, level, category, message, user_id, ip_address, firewall_id, additional_data) VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = db()->prepare('INSERT INTO system_logs (timestamp, level, category, message, user_id, ip_address, firewall_id, additional_data) VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             'INFO',
             'updater',

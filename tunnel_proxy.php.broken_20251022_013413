@@ -1,0 +1,836 @@
+<?php
+/**
+ * SSH Tunnel Reverse Proxy
+ * Proxies requests to localhost tunnel ports based on session ID
+ * Includes automatic timeout and activity tracking
+ * 
+ * VERSION: 2.0.1 - Fixed Content-Type header handling
+ */
+
+require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/logging.php';
+// DO NOT include auth.php - it starts sessions which interferes with OPNManager sessions
+// Tunnel proxy uses session ID in URL for auth, not PHP sessions
+
+// Get session ID from URL first
+$session_id = (int)($_GET['session'] ?? 0);
+
+if (!$session_id) {
+    http_response_code(400);
+    die('Missing session ID. Use: /tunnel_proxy.php?session=X');
+}
+
+// For static resources (CSS, JS, images), skip full auth check
+// Just validate the session exists and is active
+$path = '';
+if (preg_match('/session=\d+&path=(.*)$/', $_SERVER['REQUEST_URI'], $matches)) {
+    $path = urldecode($matches[1]);
+} elseif (preg_match('/session=\d+(.*)$/', $_SERVER['REQUEST_URI'], $matches)) {
+    $path = $matches[1];
+    $path = ltrim($path, '&');
+}
+
+// Normalize path - resolve .. and . references
+// This fixes FontAwesome and other relative paths like ../webfonts/file.woff2
+$path_parts = explode('/', $path);
+$normalized = [];
+foreach ($path_parts as $part) {
+    if ($part === '.' || $part === '') {
+        continue; // Skip current directory and empty parts
+    } elseif ($part === '..') {
+        array_pop($normalized); // Go up one directory
+    } else {
+        $normalized[] = $part; // Add directory/file to path
+    }
+}
+$path = implode('/', $normalized);
+
+$is_static = preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i', $path);
+
+// NOTE: We don't require OPNManager login here because:
+// 1. The session ID itself provides security (unguessable, time-limited)
+// 2. Users need to be logged into OPNManager to CREATE the tunnel
+// 3. But once created, the tunnel should work even if OPNManager session expires
+// 4. This allows the firewall's own auth system to handle access control
+
+// Get session from database (include API credentials for authentication)
+$stmt = $DB->prepare("
+    SELECT s.*, f.hostname as firewall_hostname, f.web_port, f.api_key, f.api_secret
+    FROM ssh_access_sessions s
+    JOIN firewalls f ON s.firewall_id = f.id
+    WHERE s.id = ?
+");
+$stmt->execute([$session_id]);
+$session = $stmt->fetch();
+
+if (!$session) {
+    http_response_code(404);
+    die('Session not found');
+}
+
+// Check if session is still active
+if ($session['status'] !== 'active') {
+    http_response_code(410);
+    die('Session is no longer active (Status: ' . htmlspecialchars($session['status']) . ')');
+}
+
+// Check if session has expired
+if ($session['expires_at'] && strtotime($session['expires_at']) < time()) {
+    // Mark as expired
+    $upd = $DB->prepare("UPDATE ssh_access_sessions SET status = 'expired', closed_reason = 'Timeout' WHERE id = ?");
+    $upd->execute([$session_id]);
+    
+    http_response_code(410);
+    die('Session has expired. Please start a new connection.');
+}
+
+// Update last activity
+$upd = $DB->prepare("UPDATE ssh_access_sessions SET last_activity = NOW() WHERE id = ?");
+$upd->execute([$session_id]);
+
+// Get target URL
+$tunnel_port = $session['tunnel_port'];
+$web_port = $session['web_port'] ?: 80;
+$protocol = ($web_port == 443) ? 'https' : 'http';
+
+// Get the request path (everything after tunnel_proxy.php?session=X)
+$request_uri = $_SERVER['REQUEST_URI'];
+$path = '';
+
+// Extract path after session parameter
+if (preg_match('/session=\d+&path=(.*)$/', $request_uri, $matches)) {
+    // Explicit path parameter (for rewritten URLs)
+    $path = urldecode($matches[1]);
+} elseif (preg_match('/session=\d+(.*)$/', $request_uri, $matches)) {
+    $path = $matches[1];
+    // Remove leading & if present
+    $path = ltrim($path, '&');
+    // Remove fresh parameter (it's for this proxy, not the firewall)
+    $path = preg_replace('/&?fresh=1/', '', $path);
+    $path = ltrim($path, '&');
+}
+
+// Clean up path - ensure it starts with /
+$path = '/' . ltrim($path, '/');
+
+// Sanitize tunnel_port (remove any whitespace/newlines)
+$tunnel_port = trim($tunnel_port);
+$tunnel_port = (int)$tunnel_port;  // Force to integer
+
+// Build target URL
+$target_url = "http://127.0.0.1:" . $tunnel_port . $path;
+error_log("Tunnel proxy session {$session_id}: Target URL = {$target_url}");
+
+// Debug POST requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $post_data = file_get_contents('php://input');
+    error_log("Tunnel proxy session {$session_id}: POST request, data length=" . strlen($post_data) . " bytes");
+}
+
+// Cookie jar for session persistence
+
+// Initialize cURL
+$ch = curl_init($target_url);
+
+// Buffer for content rewriting
+$response_body = '';
+$response_headers = [];
+$content_type = '';
+
+// Cookie jar file - unique per session to isolate different tunnel sessions
+$cookie_jar = sys_get_temp_dir() . "/tunnel_cookies_{$session_id}.txt";
+
+// Check if we should force fresh login (delete cookies)
+// ONLY delete cookies on GET requests with fresh=1, NOT on POST (login submission)
+$force_fresh = isset($_GET['fresh']) && $_GET['fresh'] == '1' && $_SERVER['REQUEST_METHOD'] === 'GET';
+
+// Delete cookie file ONLY if:
+// 1. fresh=1 parameter is present AND it's a GET request (initial page load, not POST login)
+// 2. Cookie is older than the session (left over from previous session with same ID)
+if (file_exists($cookie_jar) && $force_fresh) {
+    // Only delete on explicit fresh=1 parameter on GET requests
+    error_log("Tunnel proxy session {$session_id}: Deleting cookie file (fresh=1 on GET request)");
+    @unlink($cookie_jar);
+} elseif (file_exists($cookie_jar)) {
+    $cookie_age = time() - filemtime($cookie_jar);
+    $session_age_seconds = time() - strtotime($session['created_at']);
+    
+    // Delete if cookie is older than session (orphaned from previous session)
+    if ($cookie_age > $session_age_seconds + 60) {
+        error_log("Tunnel proxy session {$session_id}: Deleting orphaned cookie file (cookie age: {$cookie_age}s, session age: {$session_age_seconds}s)");
+        @unlink($cookie_jar);
+    }
+}
+
+// Set cURL options
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,  // Changed to true for content rewriting
+    CURLOPT_HEADER => false,
+    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_MAXREDIRS => 5,  // Limit redirect hops
+    CURLOPT_ENCODING => '',
+    CURLOPT_TIMEOUT => 1800,  // 30 minutes for streaming endpoints
+    CURLOPT_CONNECTTIMEOUT => 30,  // Increased from 10 to 30 seconds
+    CURLOPT_BUFFERSIZE => 131072,  // 128KB buffer to prevent transfer interruptions
+    CURLOPT_TCP_NODELAY => true,   // Disable Nagle's algorithm for faster small transfers
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_SSL_VERIFYHOST => false,
+    // NOTE: NOT using CURLOPT_COOKIEJAR/CURLOPT_COOKIEFILE because of domain mismatch
+    // We manually handle cookies in headers to avoid domain issues (127.0.0.1 vs home.agit8or.net)
+    
+    // Forward request method (but convert HEAD to GET since we need to process the body)
+    CURLOPT_CUSTOMREQUEST => ($_SERVER['REQUEST_METHOD'] === 'HEAD' ? 'GET' : $_SERVER['REQUEST_METHOD']),
+    
+    // Forward POST/PUT data
+    CURLOPT_POSTFIELDS => ($post_data = file_get_contents('php://input')),
+    
+    // Capture and forward headers
+    CURLOPT_HEADERFUNCTION => function($ch, $header) use (&$response_headers, &$content_type, $session_id, $cookie_jar) {
+        $len = strlen($header);
+        $header = trim($header);
+        
+        if (empty($header)) {
+            return $len;
+        }
+        
+        // Debug: Log all headers
+        if (strpos(strtolower($header), 'cookie') !== false) {
+            error_log("Tunnel proxy session {$session_id}: Header: {$header}");
+        }
+        
+        // Capture content-type (but we'll validate it later based on file extension)
+        if (stripos($header, 'content-type:') === 0) {
+            $content_type = trim(substr($header, 13));
+        }
+        
+        // Manually save Set-Cookie headers to cookie jar
+        // This fixes the domain mismatch issue with curl's automatic cookie handling
+        if (stripos($header, 'set-cookie:') === 0) {
+            $cookie = trim(substr($header, 11));
+            error_log("Tunnel proxy session {$session_id}: Received Set-Cookie: {$cookie}");
+            // Parse cookie: "name=value; path=/; HttpOnly"
+            $parts = explode(';', $cookie);
+            $name_value = explode('=', $parts[0], 2);
+            if (count($name_value) == 2) {
+                $name = trim($name_value[0]);
+                $value = trim($name_value[1]);
+                
+                // Read existing cookies to avoid duplicates
+                $existing_cookies = [];
+                if (file_exists($cookie_jar)) {
+                    $cookie_lines = file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                    foreach ($cookie_lines as $line) {
+                        if (empty($line) || $line[0] === '#') continue;
+                        $cookie_parts = preg_split('/\s+/', $line);
+                        if (count($cookie_parts) >= 7) {
+                            $existing_name = $cookie_parts[5];
+                            // Skip this cookie if we're about to replace it
+                            if ($existing_name !== $name) {
+                                $existing_cookies[] = $line;
+                            }
+                        }
+                    }
+                }
+                
+                // Add new/updated cookie
+                $cookie_line = "127.0.0.1\tFALSE\t/\tFALSE\t0\t{$name}\t{$value}";
+                $existing_cookies[] = $cookie_line;
+                
+                // Write all cookies back to file
+                file_put_contents($cookie_jar, implode("\n", $existing_cookies) . "\n");
+                error_log("Tunnel proxy session {$session_id}: Saved cookie {$name}={$value}");
+            }
+        }
+        
+        // Skip certain headers
+        $skip_headers = ['transfer-encoding', 'connection', 'content-length'];
+        $header_lower = strtolower($header);
+        
+        foreach ($skip_headers as $skip) {
+            if (strpos($header_lower, $skip . ':') === 0) {
+                return $len;
+            }
+        }
+        
+        // Store headers to forward later
+        if (strpos($header, ':') !== false) {
+            $response_headers[] = $header;
+        } elseif (strpos($header, 'HTTP/') === 0) {
+            // Store HTTP status line
+            $parts = explode(' ', $header, 3);
+            if (count($parts) >= 2) {
+                http_response_code((int)$parts[1]);
+            }
+        }
+        
+        return $len;
+    }
+]);
+
+// Forward request headers
+$forward_headers = [];
+foreach ($_SERVER as $key => $value) {
+    if (strpos($key, 'HTTP_') === 0) {
+        $header_name = str_replace('_', '-', substr($key, 5));
+        
+        // Skip certain headers that we'll set manually
+        $skip_headers = ['host', 'connection', 'accept-encoding', 'referer'];
+        if (in_array(strtolower($header_name), $skip_headers)) {
+            continue;
+        }
+        
+        $forward_headers[] = "{$header_name}: {$value}";
+    }
+}
+
+// Set Host header to the firewall's actual hostname/IP
+// This makes the firewall think the request came directly to it
+$forward_headers[] = "Host: " . ($session['firewall_hostname'] ?? '127.0.0.1');
+
+// Don't send Referer header (or set it to the firewall itself)
+// This prevents the HTTP_REFERER security check error
+$forward_headers[] = "Referer: http://127.0.0.1:{$tunnel_port}/";
+
+// Add X-Forwarded headers for logging purposes
+$forward_headers[] = "X-Forwarded-For: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+$forward_headers[] = "X-Forwarded-Proto: https";
+$forward_headers[] = "X-Real-IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+
+// Preserve User-Agent to prevent session regeneration
+if (isset($_SERVER['HTTP_USER_AGENT'])) {
+    $forward_headers[] = "User-Agent: " . $_SERVER['HTTP_USER_AGENT'];
+}
+
+// Forward X-Requested-With header (required for AJAX requests)
+if (isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+    $forward_headers[] = "X-Requested-With: " . $_SERVER['HTTP_X_REQUESTED_WITH'];
+}
+
+// Manually read and forward cookies from cookie jar
+// This fixes the domain mismatch issue where cookies are for "home.agit8or.net"
+// but curl connects to "127.0.0.1" and won't send them automatically
+if (file_exists($cookie_jar)) {
+    $cookie_lines = file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $cookies = [];
+    foreach ($cookie_lines as $line) {
+        // Skip comments and empty lines
+        if (empty($line) || $line[0] === '#') {
+            continue;
+        }
+        // Parse Netscape cookie format: domain, flag, path, secure, expiration, name, value
+        $parts = preg_split('/\s+/', $line);
+        if (count($parts) >= 7) {
+            $name = $parts[5];
+            $value = $parts[6];
+            $cookies[] = "{$name}={$value}";
+        }
+    }
+    if (!empty($cookies)) {
+        $cookie_header = "Cookie: " . implode('; ', $cookies);
+        $forward_headers[] = $cookie_header;
+        error_log("Tunnel proxy session {$session_id}: Sending cookies: {$cookie_header}");
+    }
+}
+
+curl_setopt($ch, CURLOPT_HTTPHEADER, $forward_headers);
+
+// Debug POST data for troubleshooting
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($post_data)) {
+    error_log("Tunnel proxy session {$session_id}: POST data length=" . strlen($post_data) . " bytes, Content-Type=" . ($_SERVER['CONTENT_TYPE'] ?? 'none'));
+}
+
+// Execute request
+$response_body = curl_exec($ch);
+
+// Follow redirects internally to preserve session continuity
+// This is critical for login flow: POST / → 302 /index.php → 302 /ui/core/dashboard
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$redirect_count = 0;
+$max_redirects = 3;
+
+while ($redirect_count < $max_redirects && in_array($http_code, [301, 302, 303, 307, 308])) {
+    // Find Location header
+    $redirect_location = null;
+    foreach ($response_headers as $hdr) {
+        if (stripos($hdr, 'location:') === 0) {
+            $redirect_location = trim(substr($hdr, 9));
+            break;
+        }
+    }
+    
+    if (!$redirect_location || $redirect_location[0] !== '/') {
+        // No location or absolute URL - stop following
+        break;
+    }
+    
+    $redirect_count++;
+    error_log("Tunnel proxy session {$session_id}: Auto-following redirect #{$redirect_count} to {$redirect_location}");
+    
+    // Reset response variables
+    $response_headers = [];
+    $content_type = '';
+    $path = $redirect_location; // Update path for next request
+    
+    // Re-init curl for redirect
+    curl_close($ch);
+    $ch = curl_init("http://127.0.0.1:{$tunnel_port}{$path}");
+    
+    // Copy curl options but change POST to GET for 303 redirects
+    $is_get_redirect = ($http_code == 303) || ($_SERVER['REQUEST_METHOD'] !== 'POST');
+    
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HEADER => false,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_MAXREDIRS => 5,
+        CURLOPT_ENCODING => '',
+        CURLOPT_TIMEOUT => 1800,
+        CURLOPT_CONNECTTIMEOUT => 30,
+        CURLOPT_BUFFERSIZE => 131072,
+        CURLOPT_TCP_NODELAY => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_HEADERFUNCTION => function($ch, $header) use (&$response_headers, &$content_type, $session_id, $cookie_jar) {
+            $len = strlen($header);
+            $header = trim($header);
+            if (empty($header)) return $len;
+            
+            if (stripos($header, 'content-type:') === 0) {
+                $content_type = trim(substr($header, 13));
+            }
+            
+            if (stripos($header, 'set-cookie:') === 0) {
+                $cookie = trim(substr($header, 11));
+                $parts = explode(';', $cookie);
+                $name_value = explode('=', $parts[0], 2);
+                if (count($name_value) == 2) {
+                    $name = trim($name_value[0]);
+                    $value = trim($name_value[1]);
+                    $existing_cookies = [];
+                    if (file_exists($cookie_jar)) {
+                        foreach (file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                            if (empty($line) || $line[0] === '#') continue;
+                            $cookie_parts = preg_split('/\s+/', $line);
+                            if (count($cookie_parts) >= 7 && $cookie_parts[5] !== $name) {
+                                $existing_cookies[] = $line;
+                            }
+                        }
+                    }
+                    $existing_cookies[] = "127.0.0.1\tFALSE\t/\tFALSE\t0\t{$name}\t{$value}";
+                    file_put_contents($cookie_jar, implode("\n", $existing_cookies) . "\n");
+                }
+            }
+            
+            $skip = ['transfer-encoding', 'connection', 'content-length'];
+            $hl = strtolower($header);
+            foreach ($skip as $s) {
+                if (strpos($hl, $s.':') === 0) return $len;
+            }
+            
+            if (strpos($header, ':') !== false) {
+                $response_headers[] = $header;
+            } elseif (strpos($header, 'HTTP/') === 0) {
+                $parts = explode(' ', $header, 3);
+                if (count($parts) >= 2) http_response_code((int)$parts[1]);
+            }
+            return $len;
+        }
+    ]);
+    
+    // Re-send cookies from jar
+    if (file_exists($cookie_jar)) {
+        $cookies = [];
+        foreach (file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+            if (empty($line) || $line[0] === '#') continue;
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) >= 7) {
+                $cookies[] = "{$parts[5]}={$parts[6]}";
+            }
+        }
+        if (!empty($cookies)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Cookie: " . implode('; ', $cookies)]);
+        }
+    }
+    
+    // Execute redirect
+    $response_body = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+}
+
+if ($redirect_count > 0) {
+    error_log("Tunnel proxy session {$session_id}: Completed {$redirect_count} internal redirects, final HTTP {$http_code}");
+}
+
+// Check for errors
+if ($response_body === false) {
+    $error = curl_error($ch);
+    $info = curl_getinfo($ch);
+    
+    // Debug to file FIRST before any output
+    $debug_msg = date('[Y-m-d H:i:s] ') . "Session {$session_id} ERROR:\n";
+    $debug_msg .= "  Error: {$error}\n";
+    $debug_msg .= "  tunnel_port: [{$tunnel_port}]\n";
+    $debug_msg .= "  path: [{$path}]\n";
+    $debug_msg .= "  target_url: [http://127.0.0.1:{$tunnel_port}{$path}]\n";
+    $debug_msg .= "  EFFECTIVE_URL: " . curl_getinfo($ch, CURLINFO_EFFECTIVE_URL) . "\n";
+    $debug_msg .= "  curl_getinfo: " . print_r($info, true) . "\n\n";
+    file_put_contents('/tmp/tunnel_debug.log', $debug_msg, FILE_APPEND);
+    
+    http_response_code(502);
+    echo "Proxy Error: Unable to connect to tunnel. ";
+    echo "The SSH tunnel may have closed or the firewall may be unreachable.\n\n";
+    echo "Technical details: " . htmlspecialchars($error);
+    
+    // Enhanced logging
+    write_log("TUNNEL", "Proxy error on session #{$session_id}: {$error}");
+    
+    // Mark session as closed with error reason
+    $upd = $DB->prepare("UPDATE ssh_access_sessions SET status = 'closed', closed_reason = ? WHERE id = ?");
+    $upd->execute(['Connection failed: ' . $error, $session_id]);
+    curl_close($ch);
+    exit;
+}
+
+curl_close($ch);
+
+// Fix Content-Type based on file extension BEFORE processing
+// (OPNsense sometimes sends wrong MIME types, especially for .js files)
+$path_lower = strtolower($path);
+$correct_type = null;
+
+if (preg_match('/\.js($|\?)/', $path_lower)) {
+    $correct_type = 'application/javascript; charset=utf-8';
+} elseif (preg_match('/\.css($|\?)/', $path_lower)) {
+    $correct_type = 'text/css; charset=utf-8';
+} elseif (preg_match('/\.json($|\?)/', $path_lower)) {
+    $correct_type = 'application/json; charset=utf-8';
+} elseif (preg_match('/\.(png|jpg|jpeg|gif|svg|ico|webp)($|\?)/', $path_lower)) {
+    $ext = preg_replace('/\?.*$/', '', pathinfo($path_lower, PATHINFO_EXTENSION));
+    // SVG requires special mime type
+    if ($ext === 'svg') {
+        $correct_type = 'image/svg+xml';
+    } else {
+        $correct_type = 'image/' . $ext;
+    }
+} elseif (preg_match('/\.(woff|woff2|ttf|eot)($|\?)/', $path_lower)) {
+    $ext = preg_replace('/\?.*$/', '', pathinfo($path_lower, PATHINFO_EXTENSION));
+    $correct_type = 'font/' . $ext;
+}
+
+// Use correct type if detected, override server's incorrect Content-Type
+if ($correct_type) {
+    $content_type = $correct_type;
+} elseif (empty($content_type)) {
+    $content_type = 'text/html; charset=utf-8';
+}
+
+// Rewrite content if HTML/CSS/JavaScript
+$is_html = stripos($content_type, 'text/html') !== false;
+$is_css = stripos($content_type, 'text/css') !== false;
+$is_js = stripos($content_type, 'javascript') !== false;
+
+// Force HTML rewriting if no specific content type
+if (empty($content_type) && strlen($response_body) > 100 && stripos($response_body, '<html') !== false) {
+    $is_html = true;
+}
+
+if ($is_html || $is_css || $is_js) {
+    // Rewrite URLs to go through proxy
+    $proxy_url = "https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&path=";
+    
+    // Replace various URL patterns (href, src, action attributes)
+    // ONLY for HTML - do NOT run on JavaScript as it corrupts template literals
+    if ($is_html) {
+        $response_body = preg_replace_callback(
+            '/(href|src|action)=["\'](?!http|\/\/|data:|#)([^"\']+)["\']/i',
+            function($matches) use ($proxy_url) {
+                $attr = $matches[1];
+                $url = ltrim($matches[2], '/');
+                
+                // For form actions, NEVER include fresh=1 parameter
+                // This prevents cookies from being deleted on POST submissions
+                if (strtolower($attr) === 'action') {
+                    return "{$attr}=\"{$proxy_url}{$url}\"";
+                }
+                
+                return "{$attr}=\"{$proxy_url}{$url}\"";
+            },
+            $response_body
+        );
+    }
+    
+    // Fix CSS url() references
+    if ($is_css) {
+        $response_body = preg_replace_callback(
+            '/url\(["\']?(?!http|\/\/|data:)([^)"\'"]+)["\']?\)/i',
+            function($matches) use ($proxy_url, $path) {
+                $url = $matches[1];
+                
+                // If it's a relative path (starts with ../), resolve it relative to the CSS file
+                if (strpos($url, '../') === 0 || strpos($url, './') === 0) {
+                    // Get the directory of the current CSS file
+                    $css_dir = dirname($path);
+                    // Resolve the relative path
+                    $resolved_parts = explode('/', $css_dir);
+                    $url_parts = explode('/', $url);
+                    
+                    foreach ($url_parts as $part) {
+                        if ($part === '..') {
+                            array_pop($resolved_parts);
+                        } elseif ($part !== '.' && $part !== '') {
+                            $resolved_parts[] = $part;
+                        }
+                    }
+                    $url = implode('/', $resolved_parts);
+                } else {
+                    $url = ltrim($url, '/');
+                }
+                
+                return "url('{$proxy_url}{$url}')";
+            },
+            $response_body
+        );
+    }
+    
+    // Fix JavaScript location references and AJAX calls
+    // ONLY rewrite in HTML, NOT in .js files (they have template literals that break)
+    if ($is_html) {
+        // Rewrite <script src="..."> and <link href="..."> tags
+        $response_body = preg_replace_callback(
+            '/<(script|link)\s+([^>]*?)(src|href)=["\'](?!https?:\/\/|data:)([^"\']+)["\']/i',
+            function($matches) use ($proxy_url) {
+                $tag = $matches[1];
+                $attrs = $matches[2];
+                $attr_name = $matches[3];
+                $url = ltrim($matches[4], '/');
+                return "<{$tag} {$attrs}{$attr_name}=\"{$proxy_url}{$url}\"";
+            },
+            $response_body
+        );
+        
+        // Rewrite location.href assignments
+        $response_body = preg_replace(
+            '/location\.href\s*=\s*["\'](?!http)([^"\']+)["\']/i',
+            "location.href=\"{$proxy_url}$1\"",
+            $response_body
+        );
+        
+        // Rewrite dynamic import() statements (ES6 modules)
+        // Skip this for .js files - let the interceptor handle it
+        if (stripos($path, '.js') === false) {
+            $response_body = preg_replace_callback(
+                '/import\s*\(\s*["\'](?!http|\/\/)([^"\']+)["\']/i',
+                function($matches) use ($proxy_url) {
+                    $url = ltrim($matches[1], '/');
+                    return "import('{$proxy_url}{$url}'";
+                },
+                $response_body
+            );
+        }
+        
+        // For HTML pages, inject SIMPLE URL interceptor (no styling, just functional)
+        if ($is_html && stripos($response_body, '</head>') !== false) {
+            $intercept_script = <<<SCRIPT
+<!-- OPNManager Tunnel Proxy URL Interceptor -->
+<script>
+(function() {
+    'use strict';
+    
+    const proxyUrl = 'https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&path=';
+    
+    // Simple URL rewriter - only rewrite paths that start with /
+    function rewriteUrl(url) {
+        if (typeof url !== 'string') return url;
+        
+        // Skip if already proxied
+        if (url.includes('tunnel_proxy.php')) return url;
+        
+        // Skip full URLs
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        
+        // Rewrite absolute paths
+        if (url.startsWith('/')) {
+            return proxyUrl + url.substring(1);
+        }
+        
+        return url;
+    }
+    
+    // Intercept fetch
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        return originalFetch(rewriteUrl(url), options);
+    };
+    
+    // Intercept XMLHttpRequest
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        return originalOpen.call(this, method, rewriteUrl(url), ...rest);
+    };
+})();
+</script>
+SCRIPT;
+            $response_body = str_replace('</head>', $intercept_script . '</head>', $response_body);
+        }
+        
+        // Inject footer badge before closing </body> tag
+        // DISABLED: Removing tunnel mode indicators
+        if (false && $is_html && stripos($response_body, '</body>') !== false) {
+            $footer_badge = <<<FOOTER
+<!-- OPNManager Tunnel Footer Badge -->
+<div id="opnmanager-tunnel-footer" style="position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 8px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; z-index: 999999; box-shadow: 0 -2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; gap: 15px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+    <span style="font-weight: 500;">🔒 SECURE TUNNEL MODE</span>
+    <span style="opacity: 0.9;">Connected via encrypted SSH tunnel on port {$tunnel_port}</span>
+    <span style="margin-left: auto; font-size: 11px; opacity: 0.8;">Session ID: {$session_id}</span>
+</div>
+<script>
+// Add padding to body to prevent content from being hidden by footer
+(function() {
+    if (document.body) {
+        document.body.style.paddingBottom = '40px';
+    } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.style.paddingBottom = '40px';
+        });
+    }
+})();
+</script>
+FOOTER;
+            $response_body = str_replace('</body>', $footer_badge . '</body>', $response_body);
+        }
+    }
+    
+    // Rewrite import() statements and URL constructions in JavaScript files
+    if ($is_js) {
+        $has_imports = stripos($response_body, 'import(') !== false;
+        
+        // Only modify JavaScript files that actually use import() to avoid corrupting other code
+        if ($has_imports) {
+            // CRITICAL: Rewrite path strings that are concatenated in import() statements
+            // E.g., import('/ui/js/widgets/' + module) becomes import(proxyUrl + 'ui/js/widgets/' + module)
+            
+            // NOTE: We DON'T inject __PROXY_URL__ into JS files anymore - the HTML interceptor handles all requests
+            // If a JS file needs it, it will get it from the window scope set in HTML pages
+        
+            // Rewrite import() calls with path concatenation
+            // Match: import('/path' + ...) or import("/path" + ...) or import(`/path` + ...)
+            $response_body = preg_replace_callback(
+                '/import\s*\(\s*([\'"`])(\/[^\'"`]+)\1\s*\+/i',
+                function($matches) {
+                    $quote = $matches[1];
+                    $path = $matches[2]; // e.g., '/ui/js/widgets/'
+                    $clean_path = ltrim($path, '/');
+                    return "import(__PROXY_URL__ + {$quote}{$clean_path}{$quote} +";
+                },
+                $response_body
+            );
+            
+            // Also rewrite standalone import() statements with complete paths
+            $response_body = preg_replace_callback(
+                '/import\s*\(\s*([\'"`])([^\'"`]+)\1\s*\)/i',
+                function($matches) use ($proxy_url) {
+                    $quote = $matches[1];
+                    $url = $matches[2];
+                    
+                    // Skip if it's already proxied or uses __PROXY_URL__
+                    if (strpos($url, 'tunnel_proxy.php') !== false || strpos($url, '__PROXY_URL__') !== false) {
+                        return $matches[0];
+                    }
+                    
+                    // Rewrite absolute URLs pointing to this firewall
+                    if ($url[0] === '/' || strpos($url, './') === 0 || strpos($url, '../') === 0) {
+                        $clean_path = ltrim($url, '/');
+                        return "import(__PROXY_URL__ + {$quote}{$clean_path}{$quote})";
+                    }
+                    
+                    // Leave external imports unchanged
+                    return $matches[0];
+                },
+                $response_body
+            );
+            
+            // Rewrite window.location.origin in JavaScript to return proxied URLs
+            $response_body = preg_replace(
+                '/\bwindow\.location\.origin\b/',
+                '__PROXY_URL__',
+                $response_body
+            );
+            
+            // Also rewrite location.origin without window
+            $response_body = preg_replace(
+                '/\blocation\.origin\b/',
+                '__PROXY_URL__',
+                $response_body
+            );
+        }  // End of if(import check)
+    }
+}
+
+// Send response headers (but skip certain headers if we modified the content)
+$content_was_modified = $is_html || $is_css || $is_js;  // Modify HTML, CSS, and JS files
+$proxy_url = "https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&path=";
+
+foreach ($response_headers as $header) {
+    $header_lower = strtolower($header);
+    
+    // Rewrite Location header for redirects
+    if (stripos($header_lower, 'location:') === 0) {
+        $location = trim(substr($header, 9));
+        $original_location = $location;
+        
+        // If it's a relative URL or starts with /, rewrite it through proxy
+        if ($location[0] === '/' || !preg_match('/^https?:\/\//', $location)) {
+            $location = ltrim($location, '/');
+            $header = "Location: {$proxy_url}{$location}";
+            error_log("Tunnel proxy session {$session_id}: Rewrote Location header from '{$original_location}' to '{$header}'");
+        } else {
+            error_log("Tunnel proxy session {$session_id}: NOT rewriting Location header (absolute URL): '{$location}'");
+        }
+    }
+    
+    // DO NOT send Set-Cookie headers to the browser - they're stored in the curl cookie jar
+    // Sending them would interfere with the OPNManager session cookies
+    if (stripos($header_lower, 'set-cookie:') === 0) {
+        continue; // Skip this header entirely
+    }
+    
+    // ALWAYS skip Content-Encoding and Content-Length - curl auto-decompresses, we send uncompressed
+    if (stripos($header_lower, 'content-encoding:') === 0) {
+        // Skip - curl automatically decompresses gzip/deflate, we're sending uncompressed
+        continue;
+    }
+    if (stripos($header_lower, 'content-length:') === 0) {
+        // Skip - we'll set correct length below
+        continue;
+    }
+    
+    // Skip Content-Type - we set it ourselves based on file extension (server often sends wrong type)
+    if (stripos($header_lower, 'content-type:') === 0) {
+        continue; // Skip - we'll set our own corrected Content-Type below
+    }
+    
+    header($header, false);
+}
+
+// Always set correct Content-Length for uncompressed content
+header('Content-Length: ' . strlen($response_body));
+
+// Content-Type was already set earlier based on file extension
+header("Content-Type: {$content_type}");
+
+// Prevent browser caching of proxied content to avoid stale MIME type issues
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
+
+// For HEAD requests, don't send the body
+if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+    exit;
+}
+
+// Send content
+echo $response_body;

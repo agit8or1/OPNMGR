@@ -3,11 +3,9 @@
  * Reboot Firewall API
  * Sends a reboot command to the specified firewall
  */
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../inc/logging.php';
-require_once __DIR__ . '/../inc/csrf.php';
 requireLogin();
 
 header('Content-Type: application/json');
@@ -27,7 +25,7 @@ if ($firewall_id <= 0) {
 
 try {
     // Verify firewall exists
-    $stmt = $DB->prepare("SELECT hostname FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT hostname FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -39,19 +37,19 @@ try {
     // Queue reboot command (shutdown -r in 1 minute to allow response)
     $reboot_command = '/sbin/shutdown -r +1 "Reboot initiated from OPNManager"';
     
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, status, created_at)
         VALUES (?, ?, 'Reboot firewall', 'pending', NOW())
     ");
     $stmt->execute([$firewall_id, $reboot_command]);
     
-    $command_id = $DB->lastInsertId();
+    $command_id = db()->lastInsertId();
     
     // Log the reboot request
     log_info('system', 'Reboot command queued for ' . $firewall['hostname'], null, $firewall_id);
     
     // Clear reboot_required flag since we're rebooting
-    $stmt = $DB->prepare("UPDATE firewalls SET reboot_required = 0 WHERE id = ?");
+    $stmt = db()->prepare("UPDATE firewalls SET reboot_required = 0 WHERE id = ?");
     $stmt->execute([$firewall_id]);
     
     echo json_encode([

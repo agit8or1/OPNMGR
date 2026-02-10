@@ -4,8 +4,7 @@
  * Returns current status of a proxy request
  */
 
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -18,7 +17,7 @@ if (!$request_id) {
     exit;
 }
 
-$stmt = $DB->prepare('SELECT status, updated_at FROM request_queue WHERE id = ?');
+$stmt = db()->prepare('SELECT status, updated_at FROM request_queue WHERE id = ?');
 $stmt->execute([$request_id]);
 $request = $stmt->fetch(PDO::FETCH_ASSOC);
 

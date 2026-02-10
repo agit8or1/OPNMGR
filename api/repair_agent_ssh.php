@@ -3,10 +3,7 @@
  * SSH-Based Agent Repair API
  * Uses SSH to directly connect to firewall and fix/update the agent
  */
-
-session_start();
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -31,7 +28,7 @@ if ($firewall_id <= 0) {
 }
 
 // Get firewall info
-$stmt = $DB->prepare("SELECT id, hostname, wan_ip FROM firewalls WHERE id = ?");
+$stmt = db()->prepare("SELECT id, hostname, wan_ip FROM firewalls WHERE id = ?");
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -165,7 +162,7 @@ $cmd = sprintf(
 exec($cmd);
 
 // Log the operation
-$stmt = $DB->prepare("INSERT INTO activity_log (user_id, firewall_id, action, details, created_at) VALUES (?, ?, 'repair_agent_ssh', ?, NOW())");
+$stmt = db()->prepare("INSERT INTO activity_log (user_id, firewall_id, action, details, created_at) VALUES (?, ?, 'repair_agent_ssh', ?, NOW())");
 $stmt->execute([
     $_SESSION['user_id'],
     $firewall_id,

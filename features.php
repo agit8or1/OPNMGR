@@ -1,16 +1,15 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 
 // Get feature statistics
-$stmt = $pdo->query("SELECT COUNT(*) as total_firewalls FROM firewalls");
+$stmt = db()->query("SELECT COUNT(*) as total_firewalls FROM firewalls");
 $firewall_count = $stmt->fetchColumn();
 
-$stmt = $pdo->query("SELECT COUNT(*) as active_agents FROM firewalls f JOIN firewall_agents fa ON f.id = fa.firewall_id WHERE fa.last_checkin > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+$stmt = db()->query("SELECT COUNT(*) as active_agents FROM firewalls f JOIN firewall_agents fa ON f.id = fa.firewall_id WHERE fa.last_checkin > DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
 $active_agents = $stmt->fetchColumn();
 
-$stmt = $pdo->query("SELECT COUNT(*) as completed_features FROM todos WHERE status = 'completed'");
+$stmt = db()->query("SELECT COUNT(*) as completed_features FROM todos WHERE status = 'completed'");
 $completed_features = $stmt->fetchColumn();
 
 include __DIR__ . '/inc/header.php';

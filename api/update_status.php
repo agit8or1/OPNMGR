@@ -1,7 +1,7 @@
 <?php
-header('Content-Type: application/json');
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
+header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'error' => 'Method not allowed']);
@@ -32,17 +32,17 @@ try {
         case 'completed':
             $firewall_status = 'online';
             // Clear update request flag on completion
-            $stmt = $DB->prepare("UPDATE firewalls SET update_requested = 0 WHERE id = ?");
+            $stmt = db()->prepare("UPDATE firewalls SET update_requested = 0 WHERE id = ?");
             $stmt->execute([$firewall_id]);
             break;
     }
     
     // Update firewall status
-    $stmt = $DB->prepare("UPDATE firewalls SET status = ? WHERE id = ?");
+    $stmt = db()->prepare("UPDATE firewalls SET status = ? WHERE id = ?");
     $stmt->execute([$firewall_status, $firewall_id]);
     
     // Log the update status
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, timestamp)
         VALUES (?, 'update', ?, NOW())
     ");
@@ -51,7 +51,7 @@ try {
     // If update completed successfully, trigger version check
     if ($status === 'completed') {
         // This will be updated on next agent check-in with new version info
-        $stmt = $DB->prepare("UPDATE firewalls SET last_update_check = NULL WHERE id = ?");
+        $stmt = db()->prepare("UPDATE firewalls SET last_update_check = NULL WHERE id = ?");
         $stmt->execute([$firewall_id]);
     }
     

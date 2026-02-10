@@ -5,7 +5,7 @@
  * Monitors database for tunnel requests and establishes SSH reverse tunnels
  */
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Configuration
 $CHECK_INTERVAL = 30; // seconds between database checks
@@ -39,7 +39,7 @@ while (true) {
 }
 
 function cleanupDeadTunnels() {
-    global $active_tunnels, $DB;
+    global $active_tunnels;
     
     foreach ($active_tunnels as $firewall_id => $tunnel_info) {
         $pid = $tunnel_info['pid'];
@@ -49,7 +49,7 @@ function cleanupDeadTunnels() {
             echo "Tunnel for firewall $firewall_id (PID $pid) has died\n";
             
             // Update database
-            $stmt = $DB->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
             $stmt->execute([$firewall_id]);
             
             unset($active_tunnels[$firewall_id]);
@@ -58,10 +58,10 @@ function cleanupDeadTunnels() {
 }
 
 function checkTunnelRequests() {
-    global $active_tunnels, $DB, $MAX_TUNNELS;
+    global $active_tunnels, $MAX_TUNNELS;
     
     // Get pending tunnel requests
-    $stmt = $DB->prepare('
+    $stmt = db()->prepare('
         SELECT id, hostname, wan_ip, tunnel_port, tunnel_client_ip 
         FROM firewalls 
         WHERE tunnel_active = 1 
@@ -101,7 +101,7 @@ function checkTunnelRequests() {
             echo "Failed to establish tunnel for firewall $firewall_id: {$tunnel_result['message']}\n";
             
             // Mark tunnel as failed in database
-            $stmt = $DB->prepare('UPDATE firewalls SET tunnel_active = 0 WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET tunnel_active = 0 WHERE id = ?');
             $stmt->execute([$firewall_id]);
         }
     }
@@ -191,7 +191,7 @@ function testTunnelConnection($port) {
 }
 
 function cleanupExpiredTunnels() {
-    global $active_tunnels, $DB, $TUNNEL_TIMEOUT;
+    global $active_tunnels, $TUNNEL_TIMEOUT;
     
     $cutoff_time = time() - $TUNNEL_TIMEOUT;
     
@@ -203,7 +203,7 @@ function cleanupExpiredTunnels() {
             posix_kill($tunnel_info['pid'], SIGTERM);
             
             // Update database
-            $stmt = $DB->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
+            $stmt = db()->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
             $stmt->execute([$firewall_id]);
             
             unset($active_tunnels[$firewall_id]);
@@ -213,7 +213,7 @@ function cleanupExpiredTunnels() {
 
 // Handle signals gracefully
 function signalHandler($signal) {
-    global $active_tunnels, $DB;
+    global $active_tunnels;
     
     echo "\nReceived signal $signal, cleaning up...\n";
     
@@ -222,7 +222,7 @@ function signalHandler($signal) {
         posix_kill($tunnel_info['pid'], SIGTERM);
         
         // Update database
-        $stmt = $DB->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
+        $stmt = db()->prepare('UPDATE firewalls SET tunnel_active = 0, tunnel_port = NULL WHERE id = ?');
         $stmt->execute([$firewall_id]);
     }
     

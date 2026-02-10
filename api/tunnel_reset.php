@@ -3,12 +3,9 @@
  * Tunnel System Reset API
  * Provides complete reset functionality for SSH tunnels and nginx configs
  */
-
-require_once dirname(__DIR__) . '/inc/auth.php';
-require_once dirname(__DIR__) . '/inc/db.php';
-require_once dirname(__DIR__) . '/inc/csrf.php';
-
 // Require authentication - check if user session exists
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
@@ -50,8 +47,6 @@ switch ($action) {
  * Get current tunnel system status
  */
 function getTunnelStatus() {
-    global $DB;
-    
     // Get all SSH tunnel processes
     exec("ps aux | grep 'ssh.*-L 0.0.0.0:' | grep -v grep", $ps_output);
     
@@ -62,7 +57,7 @@ function getTunnelStatus() {
             $port = $matches[2];
             
             // Check if session exists in DB
-            $stmt = $DB->prepare("SELECT id, firewall_id, status, created_at, expires_at 
+            $stmt = db()->prepare("SELECT id, firewall_id, status, created_at, expires_at 
                                    FROM ssh_access_sessions 
                                    WHERE tunnel_port = ? 
                                    ORDER BY created_at DESC LIMIT 1");
@@ -82,7 +77,7 @@ function getTunnelStatus() {
     }
     
     // Get active sessions from DB
-    $stmt = $DB->query("SELECT id, firewall_id, tunnel_port, status, created_at, expires_at 
+    $stmt = db()->query("SELECT id, firewall_id, tunnel_port, status, created_at, expires_at 
                         FROM ssh_access_sessions 
                         WHERE status = 'active' 
                         ORDER BY created_at DESC");
@@ -127,8 +122,6 @@ function getTunnelStatus() {
  * Reset all tunnels - nuclear option
  */
 function resetAllTunnels() {
-    global $DB;
-    
     $log = [];
     
     // Step 1: Kill ALL SSH tunnel processes
@@ -150,11 +143,11 @@ function resetAllTunnels() {
     
     // Step 2: Close all active sessions in DB
     $log[] = "\nStep 2: Closing all active sessions in database...";
-    $stmt = $DB->query("SELECT COUNT(*) as count FROM ssh_access_sessions WHERE status = 'active'");
+    $stmt = db()->query("SELECT COUNT(*) as count FROM ssh_access_sessions WHERE status = 'active'");
     $count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
     if ($count > 0) {
-        $DB->exec("UPDATE ssh_access_sessions 
+        db()->exec("UPDATE ssh_access_sessions 
                    SET status = 'closed', 
                        closed_at = NOW() 
                    WHERE status = 'active'");
@@ -192,7 +185,7 @@ function resetAllTunnels() {
     
     // Step 5: Update firewall tunnel ports
     $log[] = "\nStep 5: Clearing firewall tunnel ports...";
-    $DB->exec("UPDATE firewalls SET ssh_tunnel_port = NULL");
+    db()->exec("UPDATE firewalls SET ssh_tunnel_port = NULL");
     $log[] = "  ✓ Cleared all firewall tunnel ports";
     
     // Step 6: Verify cleanup
@@ -203,7 +196,7 @@ function resetAllTunnels() {
     exec("ls /etc/nginx/sites-enabled/tunnel-session-* 2>/dev/null | wc -l", $remaining_configs);
     $remaining_nginx = intval($remaining_configs[0] ?? 0);
     
-    $stmt = $DB->query("SELECT COUNT(*) as count FROM ssh_access_sessions WHERE status = 'active'");
+    $stmt = db()->query("SELECT COUNT(*) as count FROM ssh_access_sessions WHERE status = 'active'");
     $remaining_db = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
     $log[] = "  • SSH tunnels remaining: $remaining";

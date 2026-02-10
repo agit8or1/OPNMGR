@@ -1,18 +1,17 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
 include __DIR__ . '/inc/header.php';
 
 // Clean up expired tokens
-$stmt = $DB->prepare("DELETE FROM enrollment_tokens WHERE expires_at < NOW()");
+$stmt = db()->prepare("DELETE FROM enrollment_tokens WHERE expires_at < NOW()");
 $stmt->execute();
 
 // Check if we have a valid existing token
 $enrollment_token = null;
-$stmt = $DB->prepare("SELECT token FROM enrollment_tokens WHERE expires_at > NOW() AND used = FALSE ORDER BY created_at DESC LIMIT 1");
+$stmt = db()->prepare("SELECT token FROM enrollment_tokens WHERE expires_at > NOW() AND used = FALSE ORDER BY created_at DESC LIMIT 1");
 $stmt->execute();
 $existing_token = $stmt->fetch();
 
@@ -24,7 +23,7 @@ if ($existing_token) {
     
     // Store in database with 24 hour expiration
     $expires_at = date('Y-m-d H:i:s', time() + 86400);
-    $stmt = $DB->prepare("INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, ?)");
+    $stmt = db()->prepare("INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, ?)");
     $stmt->execute([$enrollment_token, $expires_at]);
 }
 

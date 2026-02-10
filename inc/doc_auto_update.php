@@ -11,16 +11,15 @@ require_once __DIR__ . '/db.php';
  * Log a documentation update event
  */
 function log_documentation_update($type, $description, $user = null) {
-    global $pdo;
-    
+        
     try {
-        $stmt = $pdo->prepare("
+        $stmt = db()->prepare("
             INSERT INTO change_log (version, change_type, component, title, description, author, created_at) 
             VALUES (?, 'documentation', 'documentation', ?, ?, ?, NOW())
         ");
         
         // Get current development version
-        $dev_version_stmt = $pdo->query("SELECT version FROM platform_versions WHERE status = 'development' ORDER BY created_at DESC LIMIT 1");
+        $dev_version_stmt = db()->query("SELECT version FROM platform_versions WHERE status = 'development' ORDER BY created_at DESC LIMIT 1");
         $dev_version = $dev_version_stmt->fetchColumn() ?: 'dev';
         
         $stmt->execute([
@@ -41,11 +40,10 @@ function log_documentation_update($type, $description, $user = null) {
  * Update features documentation when a new feature is completed
  */
 function update_features_documentation($todo_id) {
-    global $pdo;
-    
+        
     try {
         // Get the completed todo
-        $stmt = $pdo->prepare("SELECT title, description, component FROM todos WHERE id = ?");
+        $stmt = db()->prepare("SELECT title, description, component FROM todos WHERE id = ?");
         $stmt->execute([$todo_id]);
         $todo = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -71,11 +69,10 @@ function update_features_documentation($todo_id) {
  * Update changelog when bugs are resolved
  */
 function update_changelog_for_bug($bug_id) {
-    global $pdo;
-    
+        
     try {
         // Get the resolved bug
-        $stmt = $pdo->prepare("SELECT title, description, component, severity FROM bugs WHERE id = ?");
+        $stmt = db()->prepare("SELECT title, description, component, severity FROM bugs WHERE id = ?");
         $stmt->execute([$bug_id]);
         $bug = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -99,16 +96,15 @@ function update_changelog_for_bug($bug_id) {
  * Generate updated documentation files
  */
 function regenerate_documentation() {
-    global $pdo;
-    
+        
     try {
         // Update last generation timestamp
-        $stmt = $pdo->prepare("
+        $stmt = db()->prepare("
             INSERT INTO change_log (version, change_type, component, title, description, author, created_at) 
             VALUES (?, 'improvement', 'documentation', 'Documentation Regenerated', 'All documentation files were automatically regenerated to include latest changes', 'system', NOW())
         ");
         
-        $dev_version_stmt = $pdo->query("SELECT version FROM platform_versions WHERE status = 'development' ORDER BY created_at DESC LIMIT 1");
+        $dev_version_stmt = db()->query("SELECT version FROM platform_versions WHERE status = 'development' ORDER BY created_at DESC LIMIT 1");
         $dev_version = $dev_version_stmt->fetchColumn() ?: 'dev';
         
         $stmt->execute([$dev_version]);
@@ -151,11 +147,10 @@ function on_version_management_change($action, $type, $item_id) {
  * This function should be called periodically (e.g., via cron)
  */
 function scheduled_documentation_update() {
-    global $pdo;
-    
+        
     try {
         // Check for recent changes that need documentation updates
-        $stmt = $pdo->query("
+        $stmt = db()->query("
             SELECT 'bug' as type, id, title, updated_at 
             FROM bugs 
             WHERE status IN ('resolved', 'closed') 

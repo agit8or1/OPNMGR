@@ -1,14 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
  * Get Backups API
  * Returns backup list for specified firewall
  */
-
-require_once __DIR__ . '/../inc/db.php';
-
 header('Content-Type: application/json');
 
 $firewall_id = (int)($_GET['firewall_id'] ?? 0);
@@ -21,7 +19,7 @@ if (!$firewall_id) {
 
 try {
     // Get backups for this firewall (last 60 days)
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT id, backup_file, backup_type, created_at, file_size,
                CONCAT('Configuration backup created on ', DATE_FORMAT(created_at, '%M %d, %Y at %H:%i')) as description
         FROM backups 

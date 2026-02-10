@@ -3,9 +3,7 @@
  * Download Backup API
  * Serves backup file for download
  */
-
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
 
@@ -19,7 +17,7 @@ if (!$backup_id) {
 
 try {
     // Get backup info
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT b.*, f.hostname 
         FROM backups b 
         JOIN firewalls f ON b.firewall_id = f.id 

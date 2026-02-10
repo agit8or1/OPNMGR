@@ -1,8 +1,7 @@
 <?php
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
-require_once __DIR__ . '/inc/db.php';
 require_once __DIR__ . '/inc/env.php';
 
 $page_title = "Security Scanner (Snyk Integration)";
@@ -23,9 +22,9 @@ $scan_stats = [
     'trend' => 'Stable'
 ];
 
-if ($DB) {
+if (db()) {
     try {
-        $stmt = $DB->query('SELECT * FROM snyk_scan_results WHERE status = "completed" ORDER BY completed_at DESC LIMIT 1');
+        $stmt = db()->query('SELECT * FROM snyk_scan_results WHERE status = "completed" ORDER BY completed_at DESC LIMIT 1');
         $latest_scan = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($latest_scan) {

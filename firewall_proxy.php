@@ -67,8 +67,7 @@ log_info('proxy', "Response received: $method $path - Status: {$response['status
  * Scales to unlimited firewalls (no dedicated ports needed)
  */
 
-require_once __DIR__ . '/inc/db.php';
-require_once __DIR__ . '/inc/auth.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
 
@@ -82,7 +81,7 @@ if (!$firewall_id) {
 }
 
 // Verify firewall exists
-$stmt = $DB->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+$stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
 $stmt->execute([$firewall_id]);
 $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -108,7 +107,7 @@ $body = file_get_contents('php://input');
 log_info('proxy', "Proxy request initiated: $method $path (firewall_id=$firewall_id, client=$client_id)");
 
 // Insert into request queue
-$stmt = $DB->prepare('
+$stmt = db()->prepare('
     INSERT INTO request_queue (firewall_id, client_id, method, path, headers, request_body, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, "pending", NOW())
 ');
@@ -121,7 +120,7 @@ $stmt->execute([
     $body
 ]);
 
-$request_id = $DB->lastInsertId();
+$request_id = db()->lastInsertId();
 log_info('proxy', "Request queued (ID: $request_id, client: $client_id)");
 
 // Poll for response (max 60 seconds)
@@ -130,7 +129,7 @@ $start_time = time();
 $response = null;
 
 while ((time() - $start_time) < $max_wait) {
-    $stmt = $DB->prepare('SELECT status, status_code, response_headers, response_body FROM request_queue WHERE id = ?');
+    $stmt = db()->prepare('SELECT status, status_code, response_headers, response_body FROM request_queue WHERE id = ?');
     $stmt->execute([$request_id]);
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -170,4 +169,4 @@ if ($response['response_headers']) {
 echo $response['response_body'];
 
 // Clean up old requests (>1 hour)
-$DB->exec("DELETE FROM request_queue WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+db()->exec("DELETE FROM request_queue WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");

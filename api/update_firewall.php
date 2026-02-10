@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/csrf.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 require_once __DIR__ . '/../inc/logging.php';
 requireLogin();
 requireAdmin();
@@ -57,7 +56,7 @@ try {
     }
     
     // Get firewall details
-    $stmt = $DB->prepare("SELECT hostname, ip_address, wan_ip, api_key, api_secret, updates_available FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT hostname, ip_address, wan_ip, api_key, api_secret, updates_available FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
     
@@ -74,7 +73,7 @@ try {
     $firewall_port = 8443; // Default OPNsense port
     
     // Check if we have external hostname and port configured
-    $stmt = $DB->prepare("SELECT external_hostname, external_port FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT external_hostname, external_port FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $external_config = $stmt->fetch();
     
@@ -90,7 +89,7 @@ try {
     
     // Flag the firewall for update - the standalone updater will handle it
     // This ensures updates work even if the main agent fails
-    $stmt = $DB->prepare("UPDATE firewalls SET 
+    $stmt = db()->prepare("UPDATE firewalls SET 
         update_requested = 1,
         update_requested_at = NOW(),
         update_type = ?,

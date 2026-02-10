@@ -1,0 +1,187 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║              ✅ UPDATE AGENT v1.1.0 - READY FOR DEPLOYMENT ✅             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+🎯 OVERVIEW
+
+The OPNManager Update Agent is a FAILSAFE agent that:
+  • Monitors the primary agent health
+  • Can download and install new primary agent versions
+  • Automatically restarts crashed primary agents
+  • Checks in every 30 minutes (low overhead)
+  • CANNOT be updated remotely (manual SSH only - for safety)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ COMPLETED TASKS                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+✅ Update Agent Script Improvements (v1.0 → v1.1.0)
+   • Added PID locking (MUST BE FIRST - like Agent v3.1.0)
+   • Explicit binary paths for FreeBSD compatibility
+   • Inline JSON format (no heredocs)
+   • Proper error handling and logging
+   • Changed check-in interval: 5 min → 30 min (1800 seconds)
+   • Added trap for PID cleanup on exit
+   • Improved logging with timestamps to /var/log/opnsense_update_agent.log
+
+✅ Database Schema Fixed
+   • Removed single-column UNIQUE key on firewall_id
+   • Kept composite UNIQUE key (firewall_id, agent_type)
+   • Now allows both 'primary' and 'update' agents per firewall
+
+✅ Built-in Deployment System Created
+   • deploy_update_agent.php - Queues deployment via command queue
+   • Uses existing primary agent to deploy update agent
+   • Verifies primary agent is online before deploying
+   • Prevents duplicate deployments
+   • Automatic installation of:
+     - Agent script to /usr/local/bin/opnsense_update_agent.sh
+     - rc.d service file /usr/local/etc/rc.d/opnsense_update_agent
+     - Auto-enable and start service
+
+✅ UI Integration
+   • Added "Deploy Update Agent" button to firewall_details.php
+   • Shows deployment status (Not Deployed / Online)
+   • One-click deployment with confirmation dialog
+   • Automatic page reload after successful deployment
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ FILES MODIFIED/CREATED                                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. /var/www/opnsense/opnsense_update_agent.sh
+   • Upgraded from v1.0.0 to v1.1.0
+   • 8.2 KB (was 4.3 KB)
+   • PID locking, explicit paths, inline JSON
+   • Check-in interval: 1800 seconds (30 minutes)
+
+2. /var/www/opnsense/deploy_update_agent.php (NEW)
+   • PHP endpoint to queue update agent deployment
+   • Validates firewall exists and primary agent is online
+   • Builds deployment script dynamically
+   • Inserts command into firewall_commands queue
+
+3. /var/www/opnsense/firewall_details.php
+   • Added "Deploy Update Agent" button in UI
+   • Added deployUpdateAgent() JavaScript function
+   • Shows "Not Deployed" vs "Online" status
+
+4. /var/www/opnsense/inc/version.php
+   • UPDATE_AGENT_VERSION: '1.0.0' → '1.1.0'
+   • UPDATE_AGENT_STATUS: 'Not Deployed' → 'Ready for Deployment'
+
+5. /var/www/opnsense/download_update_agent.php (existing)
+   • Already working - serves agent script to firewalls
+   • Replaces __FIREWALL_ID__ placeholder
+
+6. Database: firewall_agents table
+   • Dropped UNIQUE KEY unique_firewall (firewall_id)
+   • Kept UNIQUE KEY firewall_agent_type (firewall_id, agent_type)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ HOW TO DEPLOY UPDATE AGENT                                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Method 1: Via UI (Recommended)
+  1. Go to firewall details page
+  2. Look for "Update Agent" section showing "Not Deployed"
+  3. Click "Deploy Update Agent" button
+  4. Confirm the deployment dialog
+  5. Wait for primary agent to execute (within 120 seconds)
+  6. Page will auto-reload showing update agent online
+
+Method 2: Via API
+  curl -X POST https://opn.agit8or.net/deploy_update_agent.php \
+    -d "firewall_id=21" \
+    -H "Cookie: PHPSESSID=your_session"
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ UPDATE AGENT BEHAVIOR                                                    ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+📊 Normal Operation:
+  • Checks in every 30 minutes (1800 seconds)
+  • Reports: firewall_id, agent_version, agent_type, hostname, uptime
+  • Monitors primary agent health
+  • Auto-restarts primary agent if crashed
+
+🔄 Update Flow (when commanded):
+  1. Receives "update_primary":true in check-in response
+  2. Downloads new primary agent from download_url
+  3. Validates it's a valid shell script
+  4. Backs up old primary agent
+  5. Installs new primary agent
+  6. Kills old primary agent process
+  7. Starts new primary agent
+  8. Reports success/failure back to server
+
+🚨 Health Monitoring:
+  • Every check-in, verifies primary agent is running
+  • If primary agent dead, automatically restarts it
+  • Logs all actions to /var/log/opnsense_update_agent.log
+
+🔒 Safety Features:
+  • PID locking prevents duplicate instances
+  • Cannot be killed via command queue (failsafe)
+  • Manual SSH access required to update update agent
+  • Validates downloads before installing
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ TESTING CHECKLIST                                                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Ready to test on Firewall ID 21 (home.agit8or.net):
+
+□ Deploy update agent via UI button
+□ Verify command queued in firewall_commands table
+□ Wait 120 seconds for primary agent to execute
+□ Check system_logs for deployment status
+□ Verify update agent appears in firewall_agents table
+□ Verify update agent shows "Online" in UI
+□ Check update agent PID: ls -l /var/run/opnsense_update_agent.pid
+□ Check update agent log: tail -f /var/log/opnsense_update_agent.log
+□ Verify check-in every 30 minutes
+□ Test primary agent crash recovery (kill primary agent)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ TECHNICAL DETAILS                                                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Check-in Intervals:
+  Primary Agent:  120 seconds (2 minutes)
+  Update Agent:   1800 seconds (30 minutes)
+
+Paths:
+  Primary Agent:  /usr/local/bin/opnsense_agent.sh
+  Update Agent:   /usr/local/bin/opnsense_update_agent.sh
+  Primary PID:    /var/run/opnsense_agent.pid
+  Update PID:     /var/run/opnsense_update_agent.pid
+  Update Log:     /var/log/opnsense_update_agent.log
+
+rc.d Services:
+  Primary:  /usr/local/etc/rc.d/opnsense_agent
+  Update:   /usr/local/etc/rc.d/opnsense_update_agent
+
+Database:
+  Table: firewall_agents
+  agent_type: 'primary' or 'update'
+  Composite UNIQUE key: (firewall_id, agent_type)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║ NEXT STEPS                                                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. Test deployment on firewall ID 21
+2. Verify check-ins working
+3. Implement agent update command UI
+4. Test full update flow (deploy new primary agent version)
+5. Document update procedures
+6. Roll out to production firewalls
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    🚀 READY FOR TESTING! 🚀                              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Version: Update Agent v1.1.0
+Status: Ready for Deployment
+Date: 2025-10-09

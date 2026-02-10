@@ -1,0 +1,67 @@
+#!/bin/sh
+
+# PROVIDE: opnmanager_agent
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="opnmanager_agent"
+rcvar="opnmanager_agent_enable"
+
+load_rc_config $name
+
+: ${opnmanager_agent_enable:="NO"}
+: ${opnmanager_agent_pidfile:="/var/run/opnmanager_agent.pid"}
+
+pidfile="${opnmanager_agent_pidfile}"
+command="/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh"
+command_interpreter="/bin/sh"
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+opnmanager_agent_start()
+{
+    if [ -f ${pidfile} ]; then
+        pid=$(cat ${pidfile})
+        if kill -0 ${pid} 2>/dev/null; then
+            echo "${name} is already running (pid ${pid})"
+            return 0
+        fi
+        rm -f ${pidfile}
+    fi
+
+    echo "Starting ${name}."
+    /usr/sbin/daemon -p ${pidfile} -f ${command}
+}
+
+opnmanager_agent_stop()
+{
+    if [ -f ${pidfile} ]; then
+        pid=$(cat ${pidfile})
+        echo "Stopping ${name} (pid ${pid})."
+        kill ${pid} 2>/dev/null
+        rm -f ${pidfile}
+        # Also kill any child processes
+        pkill -f "opnmanager.*agent" 2>/dev/null
+    else
+        echo "${name} is not running."
+    fi
+}
+
+opnmanager_agent_status()
+{
+    if [ -f ${pidfile} ]; then
+        pid=$(cat ${pidfile})
+        if kill -0 ${pid} 2>/dev/null; then
+            echo "${name} is running (pid ${pid})"
+            return 0
+        fi
+    fi
+    echo "${name} is not running"
+    return 1
+}
+
+run_rc_command "$1"

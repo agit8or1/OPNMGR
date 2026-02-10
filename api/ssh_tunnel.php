@@ -1,13 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
  * SSH Tunnel API Endpoint
  * Manages SSH tunnels for firewall access
  */
-
-require_once __DIR__ . '/../inc/db.php';
 require_once __DIR__ . '/../scripts/manage_ssh_tunnel.php';
 
 header('Content-Type: application/json');

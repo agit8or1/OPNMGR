@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 // API endpoint for agents to report command execution results
@@ -33,13 +33,13 @@ if (!$command_id) {
 
 try {
     // Update the command with the result
-    $stmt = $DB->prepare("UPDATE agent_commands SET status = ?, result = ?, completed_at = NOW(), exit_code = ? WHERE command_id = ?");
+    $stmt = db()->prepare("UPDATE agent_commands SET status = ?, result = ?, completed_at = NOW(), exit_code = ? WHERE command_id = ?");
     $status = ($exit_code == 0) ? 'completed' : 'failed';
     $stmt->execute([$status, $result, $exit_code, $command_id]);
     
     if ($stmt->rowCount() > 0) {
         // Get firewall info for logging
-        $stmt = $DB->prepare("SELECT f.hostname FROM agent_commands ac JOIN firewalls f ON ac.firewall_id = f.id WHERE ac.command_id = ?");
+        $stmt = db()->prepare("SELECT f.hostname FROM agent_commands ac JOIN firewalls f ON ac.firewall_id = f.id WHERE ac.command_id = ?");
         $stmt->execute([$command_id]);
         $hostname = $stmt->fetchColumn() ?: 'unknown';
         

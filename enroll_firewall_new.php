@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Handle script download requests
 if (isset($_GET['action']) && $_GET['action'] === 'download' && isset($_GET['token'])) {
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     try {
         // Verify token
-        $stmt = $DB->prepare("SELECT id FROM enrollment_tokens WHERE token = ? AND expires_at > NOW() AND used = FALSE");
+        $stmt = db()->prepare("SELECT id FROM enrollment_tokens WHERE token = ? AND expires_at > NOW() AND used = FALSE");
         $stmt->execute([$token]);
         $token_record = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -84,24 +84,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Check if firewall exists
-        $stmt = $DB->prepare("SELECT id FROM firewalls WHERE hardware_id = ? OR ip_address = ?");
+        $stmt = db()->prepare("SELECT id FROM firewalls WHERE hardware_id = ? OR ip_address = ?");
         $stmt->execute([$hardware_id, $ip_address]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($existing) {
             // Update existing
-            $stmt = $DB->prepare("UPDATE firewalls SET hostname = ?, wan_ip = ?, status = 'online', last_checkin = NOW() WHERE id = ?");
+            $stmt = db()->prepare("UPDATE firewalls SET hostname = ?, wan_ip = ?, status = 'online', last_checkin = NOW() WHERE id = ?");
             $stmt->execute([$hostname, $wan_ip, $existing['id']]);
             $firewall_id = $existing['id'];
         } else {
             // Create new
-            $stmt = $DB->prepare("INSERT INTO firewalls (hostname, hardware_id, ip_address, wan_ip, status, customer_name, last_checkin) VALUES (?, ?, ?, ?, 'online', 'AGIT8OR', NOW())");
+            $stmt = db()->prepare("INSERT INTO firewalls (hostname, hardware_id, ip_address, wan_ip, status, customer_name, last_checkin) VALUES (?, ?, ?, ?, 'online', 'AGIT8OR', NOW())");
             $stmt->execute([$hostname, $hardware_id, $ip_address, $wan_ip]);
-            $firewall_id = $DB->lastInsertId();
+            $firewall_id = db()->lastInsertId();
         }
         
         // Mark token as used
-        $stmt = $DB->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
+        $stmt = db()->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
         $stmt->execute([$token]);
         
         echo json_encode([

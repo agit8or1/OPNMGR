@@ -3,7 +3,7 @@
 // Allows agent to update proxy request status
 // Enhanced with better error handling, timeout management, and monitoring
 
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 
 header('Content-Type: application/json');
@@ -34,7 +34,7 @@ if (!in_array($status, $valid_statuses)) {
 
 try {
     // First, verify the request exists and get its current state
-    $check_stmt = $DB->prepare("SELECT id, status, firewall_id, created_at FROM request_queue WHERE id = ?");
+    $check_stmt = db()->prepare("SELECT id, status, firewall_id, created_at FROM request_queue WHERE id = ?");
     $check_stmt->execute([$request_id]);
     $existing_request = $check_stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -86,7 +86,7 @@ try {
     }
     
     // Update request status
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         UPDATE request_queue
         SET " . implode(', ', $set_clause) . "
         WHERE id = ?

@@ -12,8 +12,7 @@
  * - Port Test
  */
 
-require_once __DIR__ . '/inc/auth.php';
-require_once __DIR__ . '/inc/db.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/header.php';
 
 requireLogin();
@@ -24,13 +23,13 @@ $firewall_id = isset($_GET['firewall_id']) ? (int)$_GET['firewall_id'] : 0;
 // Get firewall details
 $firewall = null;
 if ($firewall_id > 0) {
-    $stmt = $DB->prepare("SELECT * FROM firewalls WHERE id = ?");
+    $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch();
 }
 
 // Get all firewalls for dropdown
-$stmt = $DB->query("SELECT id, hostname, wan_ip FROM firewalls ORDER BY hostname");
+$stmt = db()->query("SELECT id, hostname, wan_ip FROM firewalls ORDER BY hostname");
 $firewalls = $stmt->fetchAll();
 ?>
 

@@ -1,14 +1,12 @@
 <?php
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
+
 requireLogin();
 
 /**
  * Health Monitoring API
  * Provides comprehensive system health and status information
  */
-
-require_once __DIR__ . '/../inc/db.php';
-
 header('Content-Type: application/json');
 
 $action = $_GET['action'] ?? '';
@@ -38,8 +36,6 @@ switch ($action) {
 }
 
 function getSystemHealth() {
-    global $DB;
-    
     try {
         // Get overall system status
         $health = [];
@@ -47,13 +43,13 @@ function getSystemHealth() {
         // Database health
         $db_status = 'healthy';
         try {
-            $DB->query("SELECT 1");
+            db()->query("SELECT 1");
         } catch (Exception $e) {
             $db_status = 'error';
         }
         
         // Queue health
-        $queue_stmt = $DB->prepare("
+        $queue_stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_commands,
                 SUM(CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN 1 ELSE 0 END) as stuck_commands,
@@ -71,7 +67,7 @@ function getSystemHealth() {
         }
         
         // Request queue health
-        $req_stmt = $DB->prepare("
+        $req_stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_requests,
                 SUM(CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END) as stuck_requests,
@@ -89,7 +85,7 @@ function getSystemHealth() {
         }
         
         // Firewall connectivity health
-        $fw_stmt = $DB->prepare("
+        $fw_stmt = db()->prepare("
             SELECT 
                 COUNT(*) as total_firewalls,
                 SUM(CASE WHEN last_checkin > DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END) as online_firewalls,
@@ -144,10 +140,8 @@ function getSystemHealth() {
 }
 
 function getFirewallStatus() {
-    global $DB;
-    
     try {
-        $stmt = $DB->prepare("
+        $stmt = db()->prepare("
             SELECT 
                 id, hostname as name, ip_address, customer_name as customer_id,
                 agent_version, opnsense_version, last_checkin,
@@ -177,8 +171,6 @@ function getFirewallStatus() {
 }
 
 function getServiceStatus() {
-    global $DB;
-    
     try {
         $services = [];
         
@@ -227,14 +219,12 @@ function getServiceStatus() {
 }
 
 function getPerformanceMetrics() {
-    global $DB;
-    
     try {
         // Get recent performance data
         $metrics = [];
         
         // Command processing performance
-        $cmd_perf = $DB->prepare("
+        $cmd_perf = db()->prepare("
             SELECT 
                 COUNT(*) as commands_last_hour,
                 AVG(TIMESTAMPDIFF(MINUTE, created_at, completed_at)) as avg_processing_time
@@ -246,7 +236,7 @@ function getPerformanceMetrics() {
         $cmd_metrics = $cmd_perf->fetch(PDO::FETCH_ASSOC);
         
         // Request processing performance
-        $req_perf = $DB->prepare("
+        $req_perf = db()->prepare("
             SELECT 
                 COUNT(*) as requests_last_hour,
                 AVG(TIMESTAMPDIFF(SECOND, created_at, completed_at)) as avg_response_time
@@ -283,14 +273,12 @@ function getPerformanceMetrics() {
 }
 
 function getRecentAlerts() {
-    global $DB;
-    
     try {
         // Generate alerts based on system conditions
         $alerts = [];
         
         // Check for stuck commands
-        $stuck_cmd = $DB->prepare("
+        $stuck_cmd = db()->prepare("
             SELECT COUNT(*) as count 
             FROM firewall_commands 
             WHERE status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
@@ -308,7 +296,7 @@ function getRecentAlerts() {
         }
         
         // Check for offline firewalls
-        $offline_fw = $DB->prepare("
+        $offline_fw = db()->prepare("
             SELECT hostname as name, TIMESTAMPDIFF(MINUTE, last_checkin, NOW()) as minutes_offline
             FROM firewalls 
             WHERE last_checkin < DATE_SUB(NOW(), INTERVAL 1 HOUR)
@@ -326,7 +314,7 @@ function getRecentAlerts() {
         }
         
         // Check for high failure rates
-        $failure_rate = $DB->prepare("
+        $failure_rate = db()->prepare("
             SELECT 
                 (SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as failure_percentage
             FROM firewall_commands 

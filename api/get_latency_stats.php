@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/db.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
 
@@ -17,7 +17,7 @@ if ($firewall_id <= 0) {
 }
 
 try {
-    $stmt = $DB->prepare("
+    $stmt = db()->prepare("
         SELECT 
             DATE_FORMAT(measured_at, '%Y-%m-%d %H:%i') as time_label,
             AVG(latency_ms) as avg_latency,
