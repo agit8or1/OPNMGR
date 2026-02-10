@@ -2590,8 +2590,8 @@ function updateSystemCharts() {
         })
         .catch(err => console.error('Disk chart error:', err));
     
-    // Latency Chart (using test API temporarily)
-    fetch(`/api/test_latency_stats.php?firewall_id=${firewallId}&days=${days}`)
+    // Latency Chart
+    fetch(`/api/get_latency_stats.php?firewall_id=${firewallId}&days=${days}`, {credentials: 'include'})
         .then(r => {
             console.log('Latency response status:', r.status);
             return r.json();

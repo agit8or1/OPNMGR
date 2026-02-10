@@ -1,7 +1,7 @@
 <?php
 /**
- * On-Demand Reverse Tunnel Proxy for Firewall Access
- * Creates proxy request, waits for agent to establish tunnel, routes traffic
+ * On-Demand Secure Tunnel Proxy for Firewall Access
+ * Creates a direct SSH tunnel via start_tunnel_async.php, then routes through tunnel_proxy.php
  */
 
 require_once __DIR__ . '/inc/bootstrap.php';
@@ -26,46 +26,13 @@ if (!$firewall) {
     die('Firewall not found');
 }
 
-// Generate unique client ID
-$client_id = 'tunnel_' . uniqid() . '_' . mt_rand(1000, 9999);
-
-// Assign a tunnel port (8100-8200 range - matches firewall rules)
-$tunnel_port = assignTunnelPort();
-
-if (!$tunnel_port) {
-    http_response_code(503);
-    die('No available tunnel ports (all 101 ports in use)');
-}
-
-// Insert proxy request into queue
-$stmt = db()->prepare('
-    INSERT INTO request_queue (firewall_id, tunnel_port, client_id, method, path, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, NOW())
-');
-$stmt->execute([$firewall_id, $tunnel_port, $client_id, 'TUNNEL', '/', 'pending']);
-$request_id = db()->lastInsertId();
-
-// Log request creation
-$details = json_encode([
-    'request_id' => $request_id,
-    'tunnel_port' => $tunnel_port,
-    'client_id' => $client_id
-]);
-db()->prepare('INSERT INTO system_logs (category, message, additional_data, firewall_id, level, timestamp) VALUES (?, ?, ?, ?, ?, NOW())')
-   ->execute(['proxy', "On-demand tunnel requested: Port $tunnel_port", $details, $firewall_id, 'INFO']);
-
-// Wait for agent to establish tunnel (max 30 seconds)
-$max_wait = 30;
-$start_time = time();
-$tunnel_ready = false;
-
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <title>Connecting to <?php echo htmlspecialchars($firewall['hostname']); ?></title>
     <style>
-        body { 
+        body {
             font-family: 'Segoe UI', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #fff;
@@ -85,7 +52,7 @@ $tunnel_ready = false;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             text-align: center;
         }
-        h1 { 
+        h1 {
             color: #667eea;
             margin-bottom: 20px;
             font-size: 28px;
@@ -99,6 +66,7 @@ $tunnel_ready = false;
             animation: spin 1s linear infinite;
             margin: 30px auto;
         }
+        .spinner.hidden { display: none; }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
@@ -134,82 +102,68 @@ $tunnel_ready = false;
 </head>
 <body>
     <div class="connection-box">
-        <h1>🔐 Establishing Secure Connection</h1>
-        <div class="spinner"></div>
+        <h1>&#x1f512; Establishing Secure Connection</h1>
+        <div class="spinner" id="spinner"></div>
         <div class="status">
-            <div id="statusText">Requesting tunnel from agent<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+            <div id="statusText">Creating SSH tunnel<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
         </div>
         <div class="technical">
             <strong>Connection Details:</strong><br>
             Firewall: <?php echo htmlspecialchars($firewall['hostname']); ?><br>
-            Request ID: <?php echo $request_id; ?><br>
-            Tunnel Port: <?php echo $tunnel_port; ?><br>
-            Status: <span id="tunnelStatus">Pending</span>
+            Status: <span id="tunnelStatus">Initializing</span>
         </div>
     </div>
-    
+
     <script>
-        let checkCount = 0;
-        const maxChecks = <?php echo $max_wait; ?>;
-        
-        function checkTunnelStatus() {
-            checkCount++;
-            
-            fetch('/check_tunnel_status.php?request_id=<?php echo $request_id; ?>')
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('tunnelStatus').textContent = data.status;
-                    
-                    if (data.status === 'processing') {
-                        document.getElementById('statusText').innerHTML = '<span class="success">✓ Tunnel established! Connecting...</span>';
-                        // Redirect to the firewall through the tunnel
-                        setTimeout(() => {
-                            window.location.href = 'https://opn.agit8or.net:<?php echo $tunnel_port; ?>/firewall/<?php echo $firewall_id; ?>/';
-                        }, 1000);
-                    } else if (data.status === 'failed' || data.status === 'timeout') {
-                        document.getElementById('statusText').innerHTML = '<span class="error">✗ Connection failed</span>';
-                        setTimeout(() => window.location.href = '/firewall_details.php?id=<?php echo $firewall_id; ?>', 3000);
-                    } else if (checkCount >= maxChecks) {
-                        document.getElementById('statusText').innerHTML = '<span class="error">✗ Timeout - Agent not responding</span>';
-                        setTimeout(() => window.location.href = '/firewall_details.php?id=<?php echo $firewall_id; ?>', 3000);
-                    } else {
-                        // Keep checking
-                        setTimeout(checkTunnelStatus, 1000);
-                    }
-                })
-                .catch(err => {
-                    console.error('Check failed:', err);
-                    if (checkCount < maxChecks) {
-                        setTimeout(checkTunnelStatus, 1000);
-                    }
-                });
+        const firewallId = <?php echo $firewall_id; ?>;
+
+        function startTunnel() {
+            document.getElementById('tunnelStatus').textContent = 'Creating tunnel...';
+
+            const formData = new FormData();
+            formData.append('firewall_id', firewallId);
+
+            fetch('/start_tunnel_async.php', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.url) {
+                    document.getElementById('statusText').innerHTML = '<span class="success">&#x2713; Tunnel established! Connecting...</span>';
+                    document.getElementById('tunnelStatus').textContent = 'Connected - Session ' + (data.session_id || 'active');
+                    document.getElementById('spinner').classList.add('hidden');
+
+                    // Redirect to the tunnel proxy URL
+                    setTimeout(() => {
+                        window.location.href = data.url;
+                    }, 1000);
+                } else {
+                    document.getElementById('statusText').innerHTML = '<span class="error">&#x2717; ' + (data.error || 'Connection failed') + '</span>';
+                    document.getElementById('tunnelStatus').textContent = 'Failed';
+                    document.getElementById('spinner').classList.add('hidden');
+
+                    // Return to firewall details after 5 seconds
+                    setTimeout(() => {
+                        window.location.href = '/firewall_details.php?id=' + firewallId;
+                    }, 5000);
+                }
+            })
+            .catch(err => {
+                console.error('Tunnel creation error:', err);
+                document.getElementById('statusText').innerHTML = '<span class="error">&#x2717; Network error - please try again</span>';
+                document.getElementById('tunnelStatus').textContent = 'Error';
+                document.getElementById('spinner').classList.add('hidden');
+
+                setTimeout(() => {
+                    window.location.href = '/firewall_details.php?id=' + firewallId;
+                }, 5000);
+            });
         }
-        
-        // Start checking after 2 seconds
-        setTimeout(checkTunnelStatus, 2000);
+
+        // Start tunnel creation immediately
+        startTunnel();
     </script>
 </body>
 </html>
-<?php
-
-function assignTunnelPort() {
-    // Find an available port in range 8100-8200 (matches firewall rules)
-    for ($port = 8100; $port <= 8200; $port++) {
-        // Check if port is in use (active within last 5 minutes)
-        $stmt = db()->prepare('
-            SELECT COUNT(*) as count 
-            FROM request_queue 
-            WHERE tunnel_port = ? 
-            AND status IN ("pending", "processing")
-            AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
-        ');
-        $stmt->execute([$port]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($result['count'] == 0) {
-            return $port;
-        }
-    }
-    
-    return null; // All ports in use
-}

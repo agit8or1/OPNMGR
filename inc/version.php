@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-09'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Bootstrap architecture & security hardening'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Tunnel proxy & display fixes'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -20,7 +20,7 @@ if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // 
 
 if (!defined('DATABASE_VERSION')) { define('DATABASE_VERSION', '1.4.0'); }
 if (!defined('API_VERSION')) { define('API_VERSION', '1.1.0'); }
-if (!defined('TUNNEL_PROXY_VERSION')) { define('TUNNEL_PROXY_VERSION', '2.0.2'); }
+if (!defined('TUNNEL_PROXY_VERSION')) { define('TUNNEL_PROXY_VERSION', '2.1.0'); }
 
 // System information
 define('PHP_MIN_VERSION', '8.0');

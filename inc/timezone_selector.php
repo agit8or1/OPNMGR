@@ -50,20 +50,18 @@ function convertToDisplayTimezone($utc_timestamp, $format = 'Y-m-d H:i:s') {
 /**
  * Get relative time string (e.g., "5 minutes ago")
  */
-function getRelativeTime($utc_timestamp) {
-    global $current_timezone;
-    
-    if (empty($utc_timestamp) || $utc_timestamp === '0000-00-00 00:00:00') {
+function getRelativeTime($db_timestamp) {
+    if (empty($db_timestamp) || $db_timestamp === '0000-00-00 00:00:00') {
         return 'Never';
     }
-    
+
     try {
-        $utc = new DateTime($utc_timestamp, new DateTimeZone('UTC'));
-        $local_tz = new DateTimeZone($current_timezone);
-        $utc->setTimezone($local_tz);
-        
-        $now = new DateTime('now', $local_tz);
-        $diff = $now->diff($utc);
+        // Database timestamps are in server local time (America/New_York), not UTC
+        $server_tz = new DateTimeZone(date_default_timezone_get());
+        $dt = new DateTime($db_timestamp, $server_tz);
+
+        $now = new DateTime('now', $server_tz);
+        $diff = $now->diff($dt);
         
         if ($diff->d > 0) {
             return $diff->d . ' day' . ($diff->d > 1 ? 's' : '') . ' ago';

@@ -25,29 +25,8 @@ if (!$session_id) {
 
 // For static resources (CSS, JS, images), skip full auth check
 // Just validate the session exists and is active
-$path = '';
-if (preg_match('/session=\d+&path=(.*)$/', $_SERVER['REQUEST_URI'], $matches)) {
-    $path = urldecode($matches[1]);
-} elseif (preg_match('/session=\d+(.*)$/', $_SERVER['REQUEST_URI'], $matches)) {
-    $path = $matches[1];
-    $path = ltrim($path, '&');
-}
-
-// Normalize path - resolve .. and . references
-// This fixes FontAwesome and other relative paths like ../webfonts/file.woff2
-$path_parts = explode('/', $path);
-$normalized = [];
-foreach ($path_parts as $part) {
-    if ($part === '.' || $part === '') {
-        continue; // Skip current directory and empty parts
-    } elseif ($part === '..') {
-        array_pop($normalized); // Go up one directory
-    } else {
-        $normalized[] = $part; // Add directory/file to path
-    }
-}
-$path = implode('/', $normalized);
-
+// Path is extracted properly from $_GET['path'] after session lookup (line ~100)
+$path = $_GET['path'] ?? '';
 $is_static = preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i', $path);
 
 // NOTE: We don't require OPNManager login here because:
@@ -96,25 +75,38 @@ $tunnel_port = $session['tunnel_port'];
 $web_port = $session['web_port'] ?: 80;
 $protocol = ($web_port == 443) ? 'https' : 'http';
 
-// Get the request path (everything after tunnel_proxy.php?session=X)
-$request_uri = $_SERVER['REQUEST_URI'];
-$path = '';
+// Get the request path using proper query parameter parsing
+$path = $_GET['path'] ?? '';
 
-// Extract path after session parameter
-if (preg_match('/session=\d+&path=(.*)$/', $request_uri, $matches)) {
-    // Explicit path parameter (for rewritten URLs)
-    $path = urldecode($matches[1]);
-} elseif (preg_match('/session=\d+(.*)$/', $request_uri, $matches)) {
-    $path = $matches[1];
-    // Remove leading & if present
-    $path = ltrim($path, '&');
-    // Remove fresh parameter (it's for this proxy, not the firewall)
-    $path = preg_replace('/&?fresh=1/', '', $path);
-    $path = ltrim($path, '&');
+// If no explicit path parameter, try to extract from URI
+if (empty($path)) {
+    $request_uri = $_SERVER['REQUEST_URI'];
+    if (preg_match('/session=\d+(.*)$/', $request_uri, $matches)) {
+        $path = $matches[1];
+        $path = ltrim($path, '&');
+        $path = preg_replace('/&?fresh=1/', '', $path);
+        $path = ltrim($path, '&');
+    }
 }
 
-// Clean up path - ensure it starts with /
-$path = '/' . ltrim($path, '/');
+// Normalize path - resolve .. and . references (e.g., /ui/css/../webfonts/font.woff2)
+$path_parts = explode('/', $path);
+$normalized = [];
+foreach ($path_parts as $part) {
+    if ($part === '.' || $part === '') continue;
+    if ($part === '..') { array_pop($normalized); }
+    else { $normalized[] = $part; }
+}
+$path = '/' . implode('/', $normalized);
+
+// Collect additional query parameters to forward (exclude proxy-specific ones)
+$forward_query_params = [];
+foreach ($_GET as $key => $value) {
+    if (!in_array($key, ['session', 'path', 'fresh'])) {
+        $forward_query_params[$key] = $value;
+    }
+}
+$query_string_suffix = !empty($forward_query_params) ? '?' . http_build_query($forward_query_params) : '';
 
 // Sanitize tunnel_port (remove any whitespace/newlines)
 $tunnel_port = trim($tunnel_port);
@@ -122,7 +114,7 @@ $tunnel_port = (int)$tunnel_port;  // Force to integer
 
 // Build target URL - use correct protocol based on web_port
 // The SSH tunnel forwards to the firewall's web interface, so we need to match the protocol
-$target_url = "{$protocol}://127.0.0.1:" . $tunnel_port . $path;
+$target_url = "{$protocol}://127.0.0.1:" . $tunnel_port . $path . $query_string_suffix;
 error_log("Tunnel proxy session {$session_id}: Target URL = {$target_url} (protocol={$protocol}, web_port={$web_port})");
 
 // Debug POST requests
@@ -278,7 +270,9 @@ foreach ($_SERVER as $key => $value) {
         $header_name = str_replace('_', '-', substr($key, 5));
         
         // Skip certain headers that we'll set manually
-        $skip_headers = ['host', 'connection', 'accept-encoding', 'referer'];
+        // IMPORTANT: Must skip 'cookie' - browser sends OPNManager cookies which conflict
+        // with the firewall's PHPSESSID from the cookie jar
+        $skip_headers = ['host', 'connection', 'accept-encoding', 'referer', 'cookie'];
         if (in_array(strtolower($header_name), $skip_headers)) {
             continue;
         }
@@ -291,9 +285,10 @@ foreach ($_SERVER as $key => $value) {
 // This makes the firewall think the request came directly to it
 $forward_headers[] = "Host: " . ($session['firewall_hostname'] ?? '127.0.0.1');
 
-// Don't send Referer header (or set it to the firewall itself)
-// This prevents the HTTP_REFERER security check error
-$forward_headers[] = "Referer: http://127.0.0.1:{$tunnel_port}/";
+// Set Referer to match the firewall's hostname and protocol
+// OPNsense validates Referer matches the Host - must use firewall's actual hostname
+$firewall_host = $session['firewall_hostname'] ?? '127.0.0.1';
+$forward_headers[] = "Referer: {$protocol}://{$firewall_host}/";
 
 // Add X-Forwarded headers for logging purposes
 $forward_headers[] = "X-Forwarded-For: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
@@ -399,6 +394,13 @@ while ($redirect_count < $max_redirects && in_array($http_code, [301, 302, 303, 
         // No location or absolute URL - stop following
         break;
     }
+
+    // Don't follow login-page redirects (/?url=...) - means session is invalid
+    // Following these just returns the dashboard HTML instead of the expected response
+    if (strpos($redirect_location, '/?url=') === 0 || $redirect_location === '/') {
+        error_log("Tunnel proxy session {$session_id}: Login redirect detected ({$redirect_location}) - stopping redirect chain");
+        break;
+    }
     
     $redirect_count++;
     error_log("Tunnel proxy session {$session_id}: Auto-following redirect #{$redirect_count} to {$redirect_location}");
@@ -474,6 +476,16 @@ while ($redirect_count < $max_redirects && in_array($http_code, [301, 302, 303, 
         }
     ]);
     
+    // Build redirect headers - must include Host, Referer, User-Agent, and Cookies
+    $redirect_headers = [];
+    $redirect_headers[] = "Host: " . ($session['firewall_hostname'] ?? '127.0.0.1');
+    $redirect_headers[] = "Referer: {$protocol}://" . ($session['firewall_hostname'] ?? '127.0.0.1') . "/";
+    if (isset($_SERVER['HTTP_USER_AGENT'])) {
+        $redirect_headers[] = "User-Agent: " . $_SERVER['HTTP_USER_AGENT'];
+    }
+    $redirect_headers[] = "X-Forwarded-For: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $redirect_headers[] = "X-Requested-With: XMLHttpRequest";
+
     // Re-send cookies from jar
     if (file_exists($cookie_jar)) {
         $cookies = [];
@@ -485,10 +497,13 @@ while ($redirect_count < $max_redirects && in_array($http_code, [301, 302, 303, 
             }
         }
         if (!empty($cookies)) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Cookie: " . implode('; ', $cookies)]);
+            $redirect_headers[] = "Cookie: " . implode('; ', $cookies);
         }
     }
-    
+
+    // Apply redirect headers to curl handle
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $redirect_headers);
+
     // Execute redirect
     $response_body = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
