@@ -661,7 +661,15 @@ include __DIR__ . '/inc/header.php';
                                         </span>
                                     <?php
                                             endforeach;
-                                        else:
+                                        endif;
+                                        // Show customer_group as a subtle tag if set
+                                        if (!empty($firewall['customer_group'])):
+                                    ?>
+                                        <span class="badge me-1" style="background-color: #6c757d; color: #ffffff;">
+                                            <?php echo htmlspecialchars($firewall['customer_group']); ?>
+                                        </span>
+                                    <?php
+                                        elseif (empty($firewall_tags)):
                                     ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
