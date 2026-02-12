@@ -127,9 +127,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
         $customer_name = trim($_POST['customer_name'] ?? '');
         $customer_group = trim($_POST['customer_group'] ?? '');
 
-        // Handle tags array from multi-select dropdown
+        // Handle tags - support both multi-select array and comma-separated string
         $tags_array = $_POST['tags'] ?? [];
-        $tags = is_array($tags_array) ? implode(', ', array_map('trim', $tags_array)) : trim($tags_array);
+        if (is_array($tags_array)) {
+            $tags_list = array_filter(array_map('trim', $tags_array));
+        } else {
+            $tags_list = array_filter(array_map('trim', explode(',', $tags_array)));
+        }
 
         $allowed_webgui_ips = trim($_POST['allowed_webgui_ips'] ?? '');
 
@@ -142,30 +146,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
             $stmt = db()->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
             $stmt->execute([$id]);
 
-            if (!empty($tags)) {
-                $tag_names = array_map('trim', explode(',', $tags));
-                foreach ($tag_names as $tag_name) {
-                    if (!empty($tag_name)) {
-                        // Get or create tag
-                        $stmt = db()->prepare('SELECT id FROM tags WHERE name = ?');
-                        $stmt->execute([$tag_name]);
-                        $tag_id = $stmt->fetchColumn();
+            foreach ($tags_list as $tag_name) {
+                // Get or create tag
+                $stmt = db()->prepare('SELECT id FROM tags WHERE name = ?');
+                $stmt->execute([$tag_name]);
+                $tag_id = $stmt->fetchColumn();
 
-                        if (!$tag_id) {
-                            // Create new tag with random color
-                            $colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
-                            $color = $colors[array_rand($colors)];
-                            $stmt = db()->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
-                            $stmt->execute([$tag_name, $color]);
-                            $tag_id = db()->lastInsertId();
-                        }
-
-                        // Link tag to firewall
-                        $stmt = db()->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
-                        $stmt->execute([$id, $tag_id]);
-                    }
+                if (!$tag_id) {
+                    // Create new tag with random color
+                    $colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14'];
+                    $color = $colors[array_rand($colors)];
+                    $stmt = db()->prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
+                    $stmt->execute([$tag_name, $color]);
+                    $tag_id = db()->lastInsertId();
                 }
+
+                // Link tag to firewall
+                $stmt = db()->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)');
+                $stmt->execute([$id, $tag_id]);
             }
+
+            error_log("Tags saved for FW$id: " . implode(', ', $tags_list) . " (" . count($tags_list) . " tags)");
 
             // Queue command to apply web GUI IP lockdown if changed
             if ($allowed_webgui_ips !== ($firewall['allowed_webgui_ips'] ?? '')) {
@@ -174,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
             }
 
             // Log the update
-            error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, speedtest_interval={$speedtest_interval}h, customer_group=$customer_group, tags=$tags, webgui_ips=$allowed_webgui_ips");
+            error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, speedtest_interval={$speedtest_interval}h, customer_group=$customer_group, tags=" . implode(',', $tags_list) . ", webgui_ips=$allowed_webgui_ips");
 
             // Redirect to same page to show updated data (Post/Redirect/Get pattern)
             header('Location: /firewall_details.php?id=' . $id . '&updated=1');
