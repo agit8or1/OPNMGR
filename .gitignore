@@ -29,11 +29,16 @@ firewall_*_key
 *secret*.txt
 *credentials*.txt
 
-# Backups
+# Backups (catch *.bak, *.bak_col, *.backup_pre_fix, etc.)
 *.backup
+*.backup_*
+*.backup.*
 *.bak
+*.bak_*
+*.bak.*
 *.old
 *.orig
+*.save
 backup/
 backups/
 .archive/
@@ -142,9 +147,11 @@ robots.txt.local
 .claude.json
 .claude.json.backup
 
-# Screenshots - keep local only, not in repo
-# Keep screenshots/ for README (tracked in git)
-# screenshots/
+# Screenshots and generated docs - keep local only
+review_screenshots.html
+view_screenshots.html
+scripts/capture_gui_screenshots.sh
+OPNsense_Manager_Complete_Documentation.pdf
 public_screenshots/
 screenshots_comprehensive/
 screenshots_final/
