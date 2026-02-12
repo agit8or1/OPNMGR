@@ -218,7 +218,15 @@ try {
     $reboot_required = $agent_sent_reboot_status ? (int)$_POST['reboot_required'] : null;
     
     // Update the main firewalls table with all the collected information
-    // Always update the version column with the reported OPNsense version
+    // If agent sends empty version, preserve existing value in DB
+    if (empty($opnsense_version)) {
+        $ver_stmt = db()->prepare('SELECT version FROM firewalls WHERE id = ?');
+        $ver_stmt->execute([$firewall_id]);
+        $existing_ver = $ver_stmt->fetchColumn();
+        if (!empty($existing_ver)) {
+            $opnsense_version = $existing_ver;
+        }
+    }
     $uptime = $uptime ?: "Unknown";  // Provide default if empty
     
     if ($agent_sent_reboot_status) {
@@ -326,8 +334,14 @@ try {
     $stmt->execute([$firewall_id]);
     $firewall_status = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Always update current_version with the reported version
-    $current_version = $opnsense_version ?: "Unknown";
+    // Use reported version, or preserve existing current_version from DB
+    $current_version = $opnsense_version;
+    if (empty($current_version) || $current_version === 'Unknown') {
+        $current_version = $firewall_status['current_version'] ?? '';
+    }
+    if (empty($current_version)) {
+        $current_version = 'Unknown';
+    }
     
     $check_updates = false;
     if (!$firewall_status['last_update_check'] || strtotime($firewall_status['last_update_check']) < (time() - 18000)) { // 5 hours = 18000 seconds

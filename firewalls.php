@@ -575,11 +575,21 @@ include __DIR__ . '/inc/header.php';
                                 
                                 <!-- OPNsense Version Column -->
                                 <td>
-                                    <?php if (!empty($firewall["version"])): ?>
-                                        <?php 
+                                    <?php
+                                    // Use version column, fall back to current_version
+                                    $fw_version = $firewall["version"];
+                                    if (empty($fw_version) || $fw_version === 'Unknown') {
+                                        $fw_version = $firewall["current_version"] ?? '';
+                                    }
+                                    if (empty($fw_version) || $fw_version === 'Unknown') {
+                                        $fw_version = '';
+                                    }
+                                    ?>
+                                    <?php if (!empty($fw_version)): ?>
+                                        <?php
                                         // Parse version - could be JSON or plain string
-                                        $version_display = $firewall["version"];
-                                        $version_data = json_decode($firewall["version"], true);
+                                        $version_display = $fw_version;
+                                        $version_data = json_decode($fw_version, true);
                                         
                                         $tooltip = "📦 SOFTWARE VERSIONS\n";
                                         $tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
@@ -598,9 +608,9 @@ include __DIR__ . '/inc/header.php';
                                                 $tooltip .= "🏗️ Architecture: " . $version_data['architecture'] . "\n";
                                             }
                                         } else {
-                                            $tooltip .= "🛡️ OPNsense: " . htmlspecialchars($firewall['version']) . "\n";
+                                            $tooltip .= "🛡️ OPNsense: " . htmlspecialchars($fw_version) . "\n";
                                         }
-                                        
+
                                         if (!empty($firewall['agent_version'])) {
                                             $tooltip .= "🤖 Agent: v" . htmlspecialchars($firewall['agent_version']) . "\n";
                                         }
