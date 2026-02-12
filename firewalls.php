@@ -1050,6 +1050,9 @@ include __DIR__ . '/inc/header.php';
                                         <span class="badge bg-info text-white hover-tooltip" data-tooltip="<?php echo htmlspecialchars($upgrade_tooltip); ?>">
                                             <i class="fas fa-arrow-circle-up me-1"></i>Upgrade
                                         </span>
+                                        <button class="btn btn-sm btn-outline-info mt-1" onclick="updateFirewall(<?php echo $firewall['id']; ?>)" title="Upgrade Firewall to <?php echo htmlspecialchars($latest_major_version); ?>">
+                                            <i class="fas fa-arrow-circle-up"></i>
+                                        </button>
                                         <?php else:
                                             // Truly up to date
                                             $current_display = htmlspecialchars($current_ver ?: 'Unknown');
