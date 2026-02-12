@@ -129,8 +129,8 @@ if (!empty($status_filter) && $status_filter !== 'all') {
     } elseif ($status_filter === 'offline') {
         $query .= " AND (fa.last_checkin IS NULL OR fa.last_checkin <= DATE_SUB(NOW(), INTERVAL 10 MINUTE))";
     } elseif ($status_filter === 'need_updates' || $status_filter === 'needs_update') {
-        // Filter for firewalls that need updates
-        $query .= " AND (f.updates_available = 1 OR f.current_version != f.available_version)";
+        // Filter for firewalls that need updates (agent-reported, version mismatch, or behind newest known version)
+        $query .= " AND (f.updates_available = 1 OR (f.available_version IS NOT NULL AND f.current_version != f.available_version) OR (f.current_version IS NOT NULL AND f.current_version != (SELECT MAX(f2.current_version) FROM firewalls f2 WHERE f2.current_version IS NOT NULL)))";
     }
 }
 

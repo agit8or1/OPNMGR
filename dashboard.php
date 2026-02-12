@@ -22,8 +22,22 @@ if (db()) {
         $stmt = db()->query('SELECT COUNT(*) as recent FROM firewalls WHERE last_checkin > DATE_SUB(NOW(), INTERVAL 24 HOUR)');
         $recent_checkins = $stmt->fetch(PDO::FETCH_ASSOC)['recent'];
         
-        // Count firewalls that need updates (agent-reported or version mismatch)
-        $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE updates_available = 1 OR (available_version IS NOT NULL AND available_version != current_version)');
+        // Count firewalls that need updates
+        // Check agent-reported updates, version mismatch, or behind the newest version across all firewalls
+        $stmt = db()->query('SELECT MAX(current_version) as latest FROM firewalls WHERE current_version IS NOT NULL');
+        $latest_version = $stmt->fetch(PDO::FETCH_ASSOC)['latest'];
+
+        if ($latest_version) {
+            $stmt = db()->prepare('
+                SELECT COUNT(*) as updates FROM firewalls
+                WHERE updates_available = 1
+                   OR (available_version IS NOT NULL AND available_version != current_version)
+                   OR (current_version IS NOT NULL AND current_version != ? AND current_version != "")
+            ');
+            $stmt->execute([$latest_version]);
+        } else {
+            $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE updates_available = 1');
+        }
         $need_updates = $stmt->fetch(PDO::FETCH_ASSOC)['updates'];
         
         $offline_firewalls = $total_firewalls - $online_firewalls;
@@ -85,7 +99,7 @@ if (db()) {
                             <div class="card card-ghost p-3">
                                 <div class="d-flex align-items-center">
                                     <div class="flex-grow-1">
-                                        <h3 class="text-warning mb-1"><a href="/firewalls.php?updates=needed" class="text-warning text-decoration-none"><?php echo $need_updates; ?></a></h3>
+                                        <h3 class="text-warning mb-1"><a href="/firewalls.php?status=need_updates" class="text-warning text-decoration-none"><?php echo $need_updates; ?></a></h3>
                                         <p class="text-light mb-0" style="font-size: 0.9rem; font-weight: 500;">Need Updates</p>
                                     </div>
                                     <div class="text-warning">
