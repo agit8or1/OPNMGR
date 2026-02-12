@@ -564,10 +564,12 @@ include __DIR__ . '/inc/header.php';
                                 </td>
                                 
                                 <!-- Customer Column -->
-                                                                <!-- Customer Column -->
                                 <td>
-                                    <?php if (!empty($firewall["customer_name"])): ?>
-                                        <small class="text-light hover-tooltip" data-tooltip="Customer: <?php echo htmlspecialchars($firewall['customer_name']); ?>"><?php echo htmlspecialchars($firewall["customer_name"]); ?></small>
+                                    <?php
+                                    $customer_display = $firewall["customer_name"] ?: $firewall["customer_group"] ?: '';
+                                    ?>
+                                    <?php if (!empty($customer_display)): ?>
+                                        <small class="text-light hover-tooltip" data-tooltip="<?php echo !empty($firewall['customer_name']) ? 'Customer: ' . htmlspecialchars($firewall['customer_name']) : ''; ?><?php echo (!empty($firewall['customer_name']) && !empty($firewall['customer_group'])) ? ' | ' : ''; ?><?php echo !empty($firewall['customer_group']) ? 'Company: ' . htmlspecialchars($firewall['customer_group']) : ''; ?>"><?php echo htmlspecialchars($customer_display); ?></small>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
