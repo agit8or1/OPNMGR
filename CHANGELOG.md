@@ -2,7 +2,28 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: December 11, 2025 6:15 PM
+**Last Updated**: February 11, 2026
+
+---
+
+## Version 3.6.0
+_Released: February 11, 2026_
+
+### New Features
+
+- **Configurable Speedtest Intervals** `firewall_details.php`, `schedule_speedtest.php`
+  Per-firewall speedtest scheduling with configurable intervals: every 2, 4, 8, 12, or 24 hours, or disabled entirely. Default is every 4 hours. Replaces the previous random once-daily scheduling with interval-based logic. Includes deduplication to prevent queuing when a test is already pending.
+  _Implemented by: Claude Code_
+
+### Database Changes
+
+- Added `speedtest_interval_hours` column to `firewalls` table (INT, default 4)
+  - `0` = disabled, `2/4/8/12/24` = hours between tests
+
+### Files Modified
+- `/var/www/opnsense/firewall_details.php` - Added speedtest interval dropdown and POST handler
+- `/var/www/opnsense/api/schedule_speedtest.php` - Rewritten with interval-based scheduling logic
+- `/var/www/opnsense/inc/version.php` - Version bump to 3.6.0
 
 ---
 

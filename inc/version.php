@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-09'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Tunnel proxy & display fixes'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-11'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Configurable speedtest intervals'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,19 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.6.0',
+            'date' => '2026-02-11',
+            'type' => 'minor',
+            'title' => 'Configurable Per-Firewall Speedtest Intervals',
+            'changes' => [
+                'NEW: Per-firewall speedtest interval setting (2h, 4h, 8h, 12h, 24h, or disabled)',
+                'NEW: Speedtest interval dropdown in firewall Configuration section',
+                'IMPROVED: Scheduler now uses interval-based logic instead of random daily scheduling',
+                'IMPROVED: Deduplication prevents queuing speedtests when one is already pending',
+                'Database: Added speedtest_interval_hours column (default: 4 hours)'
+            ]
+        ],
         [
             'version' => '2.2.3',
             'date' => '2025-12-11',

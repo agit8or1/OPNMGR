@@ -120,6 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
     } else {
         $checkin_interval = (int)($_POST['checkin_interval'] ?? 180);
         $checkin_interval = max(30, min(3600, $checkin_interval));
+        $speedtest_interval = (int)($_POST['speedtest_interval_hours'] ?? 4);
+        if (!in_array($speedtest_interval, [0, 2, 4, 8, 12, 24])) {
+            $speedtest_interval = 4;
+        }
         $customer_name = trim($_POST['customer_name'] ?? '');
         $customer_group = trim($_POST['customer_group'] ?? '');
 
@@ -131,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 
         try {
             // Update firewall basic fields
-            $stmt = db()->prepare('UPDATE firewalls SET checkin_interval = ?, customer_name = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
-            $stmt->execute([$checkin_interval, $customer_name, $customer_group, $allowed_webgui_ips, $id]);
+            $stmt = db()->prepare('UPDATE firewalls SET checkin_interval = ?, speedtest_interval_hours = ?, customer_name = ?, customer_group = ?, allowed_webgui_ips = ? WHERE id = ?');
+            $stmt->execute([$checkin_interval, $speedtest_interval, $customer_name, $customer_group, $allowed_webgui_ips, $id]);
 
             // Handle tags - clear existing and insert new ones
             $stmt = db()->prepare('DELETE FROM firewall_tags WHERE firewall_id = ?');
@@ -170,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
             }
 
             // Log the update
-            error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, customer_group=$customer_group, tags=$tags, webgui_ips=$allowed_webgui_ips");
+            error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, speedtest_interval={$speedtest_interval}h, customer_group=$customer_group, tags=$tags, webgui_ips=$allowed_webgui_ips");
 
             // Redirect to same page to show updated data (Post/Redirect/Get pattern)
             header('Location: /firewall_details.php?id=' . $id . '&updated=1');
@@ -660,6 +664,21 @@ include __DIR__ . '/inc/header.php';
                                                        value="<?php echo htmlspecialchars($firewall['checkin_interval'] ?? 180); ?>"
                                                        min="30" max="3600">
                                                 <small class="text-light">How often this firewall should check in (30 seconds to 1 hour)</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="speedtest_interval_hours" class="form-label text-white fw-bold">Speedtest Interval</label>
+                                                <?php $st_interval = (int)($firewall['speedtest_interval_hours'] ?? 4); ?>
+                                                <select name="speedtest_interval_hours" id="speedtest_interval_hours" class="form-select">
+                                                    <option value="2" <?php echo $st_interval === 2 ? 'selected' : ''; ?>>Every 2 hours</option>
+                                                    <option value="4" <?php echo $st_interval === 4 ? 'selected' : ''; ?>>Every 4 hours</option>
+                                                    <option value="8" <?php echo $st_interval === 8 ? 'selected' : ''; ?>>Every 8 hours</option>
+                                                    <option value="12" <?php echo $st_interval === 12 ? 'selected' : ''; ?>>Every 12 hours</option>
+                                                    <option value="24" <?php echo $st_interval === 24 ? 'selected' : ''; ?>>Every 24 hours</option>
+                                                    <option value="0" <?php echo $st_interval === 0 ? 'selected' : ''; ?>>Disabled</option>
+                                                </select>
+                                                <small class="text-light">How often to run automatic speedtests</small>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -1791,7 +1810,7 @@ function loadCommandLog() {
                             <small class="d-inline-block me-2 text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${cmd.result}">
                                 ${outputPreview}${isTruncated}
                             </small>
-                            <button class="btn btn-sm btn-outline-info" onclick="showCommandOutput(${cmd.id}, '${cmd.description.replace(/'/g, "\\'")}')">
+                            <button class="btn btn-sm btn-outline-info" onclick="showCommandOutput(${cmd.id}, '${(cmd.description || cmd.command || '').replace(/'/g, "\\'")}')">
                                 <i class="fas fa-eye me-1"></i>View
                             </button>
                         `;

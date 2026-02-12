@@ -18,7 +18,7 @@ if (!$firewall_id) {
 try {
     // Get last 10 bandwidth tests
     $stmt = db()->prepare("
-        SELECT 
+        SELECT
             id,
             test_type,
             download_speed,
@@ -27,11 +27,10 @@ try {
             test_server,
             test_status,
             error_message,
-            test_duration,
-            DATE_FORMAT(tested_at, '%m/%d %H:%i') as tested_at
-        FROM bandwidth_tests 
-        WHERE firewall_id = ? 
-        ORDER BY tested_at DESC 
+            DATE_FORMAT(tested_at, '%m/%d/%y %H:%i') as tested_at
+        FROM bandwidth_tests
+        WHERE firewall_id = ?
+        ORDER BY id DESC
         LIMIT 10
     ");
     $stmt->execute([$firewall_id]);
