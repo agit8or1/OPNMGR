@@ -707,23 +707,26 @@ include __DIR__ . '/inc/header.php';
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="tags" class="form-label text-white fw-bold">Tags</label>
-                                                <select name="tags[]" id="tags" class="form-select" multiple size="3">
+                                                <label class="form-label text-white fw-bold">Tags</label>
+                                                <div class="border border-secondary rounded p-2" style="max-height: 120px; overflow-y: auto;">
                                                     <?php
                                                     $selected_tags = !empty($firewall['tag_names']) ? array_map('trim', explode(',', $firewall['tag_names'])) : [];
                                                     foreach ($all_tags as $tag):
                                                         $is_selected = in_array($tag['name'], $selected_tags);
                                                     ?>
-                                                        <option value="<?php echo htmlspecialchars($tag['name']); ?>"
-                                                                <?php echo $is_selected ? 'selected' : ''; ?>>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="tags[]"
+                                                               value="<?php echo htmlspecialchars($tag['name']); ?>"
+                                                               id="tag_<?php echo $tag['id']; ?>"
+                                                               <?php echo $is_selected ? 'checked' : ''; ?>>
+                                                        <label class="form-check-label text-light" for="tag_<?php echo $tag['id']; ?>">
+                                                            <span class="badge me-1" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>;">&nbsp;</span>
                                                             <?php echo htmlspecialchars($tag['name']); ?>
-                                                        </option>
+                                                        </label>
+                                                    </div>
                                                     <?php endforeach; ?>
-                                                </select>
-                                                <small class="text-light">
-                                                    Hold Ctrl/Cmd to select multiple tags<br>
-                                                    <strong>Current:</strong> <?php echo !empty($firewall['tag_names']) ? htmlspecialchars($firewall['tag_names']) : '<span class="text-muted">None</span>'; ?>
-                                                </small>
+                                                </div>
+                                                <small class="text-light">Check tags to assign to this firewall</small>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
