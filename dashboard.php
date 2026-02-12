@@ -22,8 +22,8 @@ if (db()) {
         $stmt = db()->query('SELECT COUNT(*) as recent FROM firewalls WHERE last_checkin > DATE_SUB(NOW(), INTERVAL 24 HOUR)');
         $recent_checkins = $stmt->fetch(PDO::FETCH_ASSOC)['recent'];
         
-        // Count firewalls that need updates (no version or old version)
-        $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE version IS NULL OR version < "24.7"');
+        // Count firewalls that need updates (agent-reported or version mismatch)
+        $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE updates_available = 1 OR (available_version IS NOT NULL AND available_version != current_version)');
         $need_updates = $stmt->fetch(PDO::FETCH_ASSOC)['updates'];
         
         $offline_firewalls = $total_firewalls - $online_firewalls;
