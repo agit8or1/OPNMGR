@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-12'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Remove duplicate customer group from tags'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fix health monitor duplicate function'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -182,50 +182,5 @@ function getVersionInfo() {
             'jquery' => JQUERY_VERSION
         ]
     ];
-}
-
-// Get system health summary
-function getSystemHealth() {
-    global $DB;
-    
-    $health = [
-        'status' => 'healthy',
-        'checks' => []
-    ];
-    
-    try {
-        // Check database
-        $stmt = $DB->query('SELECT COUNT(*) as count FROM firewalls');
-        $result = $stmt->fetch();
-        $health['checks']['database'] = [
-            'status' => 'ok',
-            'message' => $result['count'] . ' firewalls registered'
-        ];
-        
-        // Check active agents
-        $stmt = $DB->query('SELECT COUNT(*) as count FROM firewalls WHERE status = "online" AND last_checkin > DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
-        $result = $stmt->fetch();
-        $health['checks']['active_agents'] = [
-            'status' => $result['count'] > 0 ? 'ok' : 'warning',
-            'message' => $result['count'] . ' active agent(s)'
-        ];
-        
-        // Check for old agent versions
-        $stmt = $DB->query("SELECT COUNT(DISTINCT fa.firewall_id) as count FROM firewall_agents fa WHERE fa.agent_version < '" . AGENT_MIN_VERSION . "' AND fa.status = 'online'");
-        $result = $stmt->fetch();
-        $health['checks']['agent_versions'] = [
-            'status' => $result['count'] == 0 ? 'ok' : 'warning',
-            'message' => $result['count'] == 0 ? 'All agents up to date' : $result['count'] . ' firewall(s) with outdated agents'
-        ];
-        
-    } catch (Exception $e) {
-        $health['status'] = 'error';
-        $health['checks']['database'] = [
-            'status' => 'error',
-            'message' => 'Database connection failed'
-        ];
-    }
-    
-    return $health;
 }
 ?>
