@@ -130,35 +130,75 @@ include __DIR__ . '/inc/header.php';
 
             <!-- Queue Summary -->
             <div class="row mt-4">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title text-warning">Pending</h5>
-                            <h2 class="mb-0" id="pendingCount">-</h2>
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-warning mb-1">Pending</h6>
+                            <h3 class="mb-0" id="pendingCount">-</h3>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title text-success">Completed</h5>
-                            <h2 class="mb-0" id="completedCount">-</h2>
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-primary mb-1">Sent</h6>
+                            <h3 class="mb-0" id="sentCount">-</h3>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title text-danger">Failed</h5>
-                            <h2 class="mb-0" id="failedCount">-</h2>
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-success mb-1">Completed</h6>
+                            <h3 class="mb-0" id="completedCount">-</h3>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title text-info">Total</h5>
-                            <h2 class="mb-0" id="totalCount">-</h2>
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-danger mb-1">Failed</h6>
+                            <h3 class="mb-0" id="failedCount">-</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-secondary mb-1">Cancelled</h6>
+                            <h3 class="mb-0" id="cancelledCount">-</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body py-3">
+                            <h6 class="card-title text-info mb-1">Total</h6>
+                            <h3 class="mb-0" id="totalCount">-</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Retention / Purge -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                            <h6 class="mb-0"><i class="bi bi-clock-history"></i> Data Retention</h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <span id="purgeableInfo" class="text-muted small"></span>
+                                <span id="stuckInfo" class="small"></span>
+                                <button class="btn btn-sm btn-outline-warning" onclick="purgeOldRecords()" id="purgeBtn" disabled>
+                                    <i class="bi bi-trash3"></i> Purge Old Records
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body py-2">
+                            <small class="text-muted">
+                                Auto-cleanup runs hourly. Retention: completed 7 days, failed/cancelled 14 days.
+                                Stuck commands (pending >1h, sent >30m) are auto-failed. Oldest record: <span id="oldestRecord">-</span>
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -197,13 +237,13 @@ function formatTimestamp(timestamp) {
 
 function refreshData() {
     if (isRefreshing) return;
-    
+
     isRefreshing = true;
     const refreshIcon = document.getElementById('refreshIcon');
     refreshIcon.classList.add('refresh-indicator');
-    
+
     Promise.all([
-        fetch('/api/admin_queue.php?action=get_queue_summary'),
+        fetch('/api/admin_queue.php?action=get_global_queue_summary'),
         fetch('/api/admin_queue.php?action=get_command_queue'),
         fetch('/api/admin_queue.php?action=get_request_queue')
     ])
@@ -212,8 +252,8 @@ function refreshData() {
         updateSummary(summary);
         updateCommandQueue(commandQueue);
         updateHttpQueue(httpQueue);
-        
-        document.getElementById('lastUpdate').textContent = 
+
+        document.getElementById('lastUpdate').textContent =
             'Last updated: ' + new Date().toLocaleTimeString();
     })
     .catch(error => {
@@ -229,9 +269,36 @@ function refreshData() {
 function updateSummary(data) {
     if (data.success) {
         document.getElementById('pendingCount').textContent = data.pending || 0;
+        document.getElementById('sentCount').textContent = data.sent || 0;
         document.getElementById('completedCount').textContent = data.completed || 0;
         document.getElementById('failedCount').textContent = data.failed || 0;
+        document.getElementById('cancelledCount').textContent = data.cancelled || 0;
         document.getElementById('totalCount').textContent = data.total || 0;
+
+        // Update purge info
+        const purgeable = parseInt(data.purgeable_total) || 0;
+        const stuck = parseInt(data.stuck) || 0;
+        const purgeInfo = document.getElementById('purgeableInfo');
+        const purgeBtn = document.getElementById('purgeBtn');
+        const stuckInfo = document.getElementById('stuckInfo');
+
+        if (purgeable > 0) {
+            purgeInfo.textContent = `${purgeable} purgeable records`;
+            purgeBtn.disabled = false;
+        } else {
+            purgeInfo.textContent = 'No old records to purge';
+            purgeBtn.disabled = true;
+        }
+
+        if (stuck > 0) {
+            stuckInfo.innerHTML = `<span class="badge bg-danger">${stuck} stuck</span>`;
+        } else {
+            stuckInfo.innerHTML = '';
+        }
+
+        if (data.oldest_record) {
+            document.getElementById('oldestRecord').textContent = formatTimestamp(data.oldest_record);
+        }
     }
 }
 
@@ -441,6 +508,27 @@ function clearAllRequests() {
             alert('Request queue cleared successfully');
         } else {
             showError(data.error || 'Failed to clear request queue');
+        }
+    })
+    .catch(error => showError('Network error'));
+}
+
+function purgeOldRecords() {
+    if (!confirm('Purge old command records?\n\nThis will delete:\n- Completed commands older than 7 days\n- Failed/cancelled commands older than 14 days\n\nThis cannot be undone.')) return;
+
+    fetch('/api/admin_queue.php?action=purge_old_commands', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({retention_days: 7})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const p = data.purged;
+            alert(`Purged ${data.total} records:\n- ${p.completed} completed\n- ${p.failed} failed\n- ${p.cancelled} cancelled`);
+            refreshData();
+        } else {
+            showError(data.error || 'Failed to purge records');
         }
     })
     .catch(error => showError('Network error'));

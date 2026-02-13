@@ -43,6 +43,12 @@ switch ($action) {
     case 'get_recent_activity':
         getRecentActivity();
         break;
+    case 'purge_old_commands':
+        purgeOldCommands();
+        break;
+    case 'get_global_queue_summary':
+        getGlobalQueueSummary();
+        break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Invalid action']);
@@ -447,6 +453,87 @@ function getRecentActivity() {
             'hours' => $hours
         ]);
         
+    } catch (Exception $e) {
+        http_response_code(500);
+        error_log("admin_queue.php error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
+    }
+}
+
+function purgeOldCommands() {
+    try {
+        requireLogin();
+        requireAdmin();
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $retention_days = max(1, (int)($input['retention_days'] ?? 7));
+
+        $purged = ['completed' => 0, 'failed' => 0, 'cancelled' => 0];
+
+        // Purge completed older than retention period
+        $stmt = db()->prepare("
+            DELETE FROM firewall_commands
+            WHERE status = 'completed' AND completed_at < DATE_SUB(NOW(), INTERVAL ? DAY)
+        ");
+        $stmt->execute([$retention_days]);
+        $purged['completed'] = $stmt->rowCount();
+
+        // Purge failed older than retention period * 2
+        $stmt = db()->prepare("
+            DELETE FROM firewall_commands
+            WHERE status = 'failed' AND COALESCE(completed_at, created_at) < DATE_SUB(NOW(), INTERVAL ? DAY)
+        ");
+        $stmt->execute([$retention_days * 2]);
+        $purged['failed'] = $stmt->rowCount();
+
+        // Purge cancelled older than retention period * 2
+        $stmt = db()->prepare("
+            DELETE FROM firewall_commands
+            WHERE status = 'cancelled' AND COALESCE(completed_at, created_at) < DATE_SUB(NOW(), INTERVAL ? DAY)
+        ");
+        $stmt->execute([$retention_days * 2]);
+        $purged['cancelled'] = $stmt->rowCount();
+
+        $total = array_sum($purged);
+        echo json_encode([
+            'success' => true,
+            'message' => "Purged $total old commands",
+            'purged' => $purged,
+            'total' => $total
+        ]);
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        error_log("admin_queue.php purge error: " . $e->getMessage());
+        echo json_encode(['error' => 'Internal server error']);
+    }
+}
+
+function getGlobalQueueSummary() {
+    try {
+        $stmt = db()->query("
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+                SUM(CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN 1 ELSE 0 END) as stuck,
+                MIN(created_at) as oldest_record,
+                SUM(CASE WHEN status = 'completed' AND completed_at < DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as purgeable_completed,
+                SUM(CASE WHEN status = 'failed' AND COALESCE(completed_at, created_at) < DATE_SUB(NOW(), INTERVAL 14 DAY) THEN 1 ELSE 0 END) as purgeable_failed,
+                SUM(CASE WHEN status = 'cancelled' AND COALESCE(completed_at, created_at) < DATE_SUB(NOW(), INTERVAL 14 DAY) THEN 1 ELSE 0 END) as purgeable_cancelled
+            FROM firewall_commands
+        ");
+        $summary = $stmt->fetch(PDO::FETCH_ASSOC);
+        $summary['purgeable_total'] = (int)$summary['purgeable_completed'] + (int)$summary['purgeable_failed'] + (int)$summary['purgeable_cancelled'];
+
+        echo json_encode([
+            'success' => true,
+            ...$summary
+        ]);
+
     } catch (Exception $e) {
         http_response_code(500);
         error_log("admin_queue.php error: " . $e->getMessage());

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-12'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Auto-cleanup stuck queue commands'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Queue Auto-Cleanup & Data Retention'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,22 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.7.0',
+            'date' => '2026-02-12',
+            'type' => 'minor',
+            'title' => 'Queue Auto-Cleanup & Data Retention',
+            'changes' => [
+                'NEW: Automatic purge of old command queue records (completed >7d, failed/cancelled >14d)',
+                'NEW: System health check on About page (database, queue, agents, disk)',
+                'NEW: Global queue summary with all status counts across all firewalls',
+                'NEW: Purge Old Records button in Queue Management with purgeable count',
+                'NEW: Stuck command indicator badge in Queue Management',
+                'FIXED: About page 500 error - missing getSystemHealth() function',
+                'IMPROVED: Queue Management summary now shows sent/cancelled counts',
+                'IMPROVED: Cron cleanup now runs in two phases: stuck recovery + data purge'
+            ]
+        ],
         [
             'version' => '3.6.0',
             'date' => '2026-02-11',
@@ -150,6 +166,81 @@ function getChangelogEntries($limit = 10) {
             ]
         ]
     ];
+}
+
+// Get system health status for about page
+function getSystemHealth() {
+    $checks = [];
+    $overall = 'healthy';
+
+    // Database connectivity
+    try {
+        db()->query("SELECT 1");
+        $checks['database'] = ['status' => 'ok', 'message' => 'Connected'];
+    } catch (Exception $e) {
+        $checks['database'] = ['status' => 'error', 'message' => 'Connection failed'];
+        $overall = 'unhealthy';
+    }
+
+    // Command queue health
+    try {
+        $stmt = db()->prepare("
+            SELECT
+                SUM(CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN 1 ELSE 0 END) as stuck,
+                SUM(CASE WHEN status = 'failed' AND completed_at > DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN 1 ELSE 0 END) as recent_failures
+            FROM firewall_commands
+        ");
+        $stmt->execute();
+        $q = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stuck = (int)$q['stuck'];
+        $failures = (int)$q['recent_failures'];
+        if ($stuck > 5) {
+            $checks['command_queue'] = ['status' => 'error', 'message' => "$stuck stuck commands"];
+            $overall = 'unhealthy';
+        } elseif ($stuck > 0 || $failures > 10) {
+            $checks['command_queue'] = ['status' => 'warning', 'message' => "$stuck stuck, $failures recent failures"];
+        } else {
+            $checks['command_queue'] = ['status' => 'ok', 'message' => 'Healthy'];
+        }
+    } catch (Exception $e) {
+        $checks['command_queue'] = ['status' => 'warning', 'message' => 'Unable to check'];
+    }
+
+    // Firewall agents
+    try {
+        $stmt = db()->query("
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'online' AND last_checkin > DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END) as online
+            FROM firewalls
+        ");
+        $f = $stmt->fetch(PDO::FETCH_ASSOC);
+        $total = (int)$f['total'];
+        $online = (int)$f['online'];
+        if ($total > 0 && $online === 0) {
+            $checks['firewall_agents'] = ['status' => 'error', 'message' => "0/$total online"];
+            $overall = 'unhealthy';
+        } elseif ($online < $total) {
+            $checks['firewall_agents'] = ['status' => 'warning', 'message' => "$online/$total online"];
+        } else {
+            $checks['firewall_agents'] = ['status' => 'ok', 'message' => "$online/$total online"];
+        }
+    } catch (Exception $e) {
+        $checks['firewall_agents'] = ['status' => 'warning', 'message' => 'Unable to check'];
+    }
+
+    // Disk space
+    $free_pct = disk_free_space('/') / disk_total_space('/') * 100;
+    if ($free_pct < 5) {
+        $checks['disk_space'] = ['status' => 'error', 'message' => sprintf('%.0f%% free', $free_pct)];
+        $overall = 'unhealthy';
+    } elseif ($free_pct < 15) {
+        $checks['disk_space'] = ['status' => 'warning', 'message' => sprintf('%.0f%% free', $free_pct)];
+    } else {
+        $checks['disk_space'] = ['status' => 'ok', 'message' => sprintf('%.0f%% free', $free_pct)];
+    }
+
+    return ['status' => $overall, 'checks' => $checks];
 }
 
 // Get version info array
