@@ -168,7 +168,8 @@ function getChangelogEntries($limit = 10) {
     ];
 }
 
-// Get system health status for about page
+// Get system health status for about page (guarded to avoid conflict with api/health_monitor.php)
+if (!function_exists('getSystemHealth')) {
 function getSystemHealth() {
     $checks = [];
     $overall = 'healthy';
@@ -242,6 +243,7 @@ function getSystemHealth() {
 
     return ['status' => $overall, 'checks' => $checks];
 }
+} // end function_exists('getSystemHealth')
 
 // Get version info array
 function getVersionInfo() {

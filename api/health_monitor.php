@@ -13,7 +13,7 @@ $action = $_GET['action'] ?? '';
 
 switch ($action) {
     case 'get_system_health':
-        getSystemHealth();
+        getSystemHealthApi();
         break;
     case 'get_firewall_status':
         getFirewallStatus();
@@ -35,7 +35,7 @@ switch ($action) {
         echo json_encode(['error' => 'Invalid action']);
 }
 
-function getSystemHealth() {
+function getSystemHealthApi() {
     try {
         // Get overall system status
         $health = [];
@@ -134,7 +134,7 @@ function getSystemHealth() {
         
     } catch (Exception $e) {
         http_response_code(500);
-        error_log("health_monitor.php getSystemHealth error: " . $e->getMessage());
+        error_log("health_monitor.php getSystemHealthApi error: " . $e->getMessage());
         echo json_encode(['error' => 'Failed to get system health']);
     }
 }
