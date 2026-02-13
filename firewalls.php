@@ -662,11 +662,11 @@ include __DIR__ . '/inc/header.php';
                                     <?php
                                             endforeach;
                                         endif;
-                                        // Show customer_group as a subtle tag if set
+                                        // Show customer_group as a subtle label if set
                                         if (!empty($firewall['customer_group'])):
                                     ?>
-                                        <span class="badge me-1" style="background-color: #6c757d; color: #ffffff;">
-                                            <?php echo htmlspecialchars($firewall['customer_group']); ?>
+                                        <span class="badge me-1 border border-secondary" style="background-color: transparent; color: #94a3b8;">
+                                            <i class="fas fa-building me-1" style="font-size: 0.6rem;"></i><?php echo htmlspecialchars($firewall['customer_group']); ?>
                                         </span>
                                     <?php
                                         elseif (empty($firewall_tags)):
