@@ -61,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hostname = trim($_POST['hostname'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
     $customer_group = trim($_POST['customer_group'] ?? '');
-    $tags = trim($_POST['tags'] ?? '');
+    $tags_array = $_POST['tags'] ?? [];
+    $tags_list = is_array($tags_array) ? array_filter(array_map('trim', $tags_array)) : array_filter(array_map('trim', explode(',', $tags_array)));
 
     if (empty($hostname)) {
         $error = 'Firewall hostname is required';
@@ -75,32 +76,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ");
             $stmt->execute([$hostname, $notes, $customer_group, $firewall_id]);
 
-            // Handle tags - clear existing tags and insert new ones
-            if (!empty($tags)) {
-                // Delete existing tags for this firewall
-                $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
-                $stmt->execute([$firewall_id]);
+            // Handle tags - clear existing and insert checked ones
+            $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
+            $stmt->execute([$firewall_id]);
 
-                // Insert new tags
-                $tag_names = array_map('trim', explode(',', $tags));
-                foreach ($tag_names as $tag_name) {
-                    if (!empty($tag_name)) {
-                        // Get tag ID from name
-                        $stmt = db()->prepare("SELECT id FROM tags WHERE name = ?");
-                        $stmt->execute([$tag_name]);
-                        $tag_id = $stmt->fetchColumn();
-                        
-                        if ($tag_id) {
-                            // Insert into firewall_tags junction table
-                            $stmt = db()->prepare("INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)");
-                            $stmt->execute([$firewall_id, $tag_id]);
-                        }
-                    }
+            foreach ($tags_list as $tag_name) {
+                $stmt = db()->prepare("SELECT id FROM tags WHERE name = ?");
+                $stmt->execute([$tag_name]);
+                $tag_id = $stmt->fetchColumn();
+
+                if ($tag_id) {
+                    $stmt = db()->prepare("INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?, ?)");
+                    $stmt->execute([$firewall_id, $tag_id]);
                 }
-            } else {
-                // If no tags selected, clear all tags for this firewall
-                $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
-                $stmt->execute([$firewall_id]);
             }
 
             header('Location: firewall_details.php?id=' . $firewall_id . '&success=1');
@@ -162,8 +150,22 @@ include __DIR__ . '/inc/header.php';
                         </div>
 
                         <div class="mb-3">
-                            <label for="tags" class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Tags</label>
-                            <select class="form-select" id="tags_select" multiple size="4"                                   style="background-color: rgba(255,255,255,0.15)!important; border-color: rgba(138,180,248,0.5)!important; color: #fff!important; font-weight: 500;">                                <?php foreach ($available_tags as $tag): ?>                                    <option value="<?php echo $tag["name"]; ?>" <?php echo in_array($tag["id"], $current_tag_ids) ? "selected" : ""; ?> style="color: <?php echo $tag["color"]; ?>;">● <?php echo htmlspecialchars($tag["name"]); ?></option>                                <?php endforeach; ?>                            </select>                            <input type="hidden" id="tags" name="tags" value="<?php echo htmlspecialchars(implode(', ', $current_tag_names)); ?>">                            <div class="form-text" style="color: #8ab4f8;">Hold Ctrl/Cmd to select multiple tags. Selected tags will be applied to the firewall.</div>
+                            <label class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Tags</label>
+                            <div class="border rounded p-2" style="border-color: rgba(138,180,248,0.5)!important; max-height: 150px; overflow-y: auto;">
+                                <?php foreach ($available_tags as $tag): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="tags[]"
+                                           value="<?php echo htmlspecialchars($tag['name']); ?>"
+                                           id="tag_<?php echo $tag['id']; ?>"
+                                           <?php echo in_array($tag['id'], $current_tag_ids) ? 'checked' : ''; ?>>
+                                    <label class="form-check-label text-light" for="tag_<?php echo $tag['id']; ?>">
+                                        <span class="badge me-1" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>;">&nbsp;</span>
+                                        <?php echo htmlspecialchars($tag['name']); ?>
+                                    </label>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="form-text" style="color: #8ab4f8;">Check tags to assign to this firewall.</div>
                         </div>
 
                         <div class="row mt-4">
@@ -238,5 +240,4 @@ include __DIR__ . '/inc/header.php';
     </div>
 </div>
 
-<script>    // Sync tags multi-select with hidden field for form submission    document.getElementById("tags_select").addEventListener("change", function() {        var selected = Array.from(this.selectedOptions).map(opt => opt.value);        document.getElementById("tags").value = selected.join(", ");    });</script>
 <?php include __DIR__ . '/inc/footer.php'; ?>
