@@ -96,7 +96,8 @@ __pycache__/
 *.7z
 downloads/
 
-# Screenshots are now tracked in git for documentation
+# Screenshots and images (keep only assets/img/)
+screenshots/
 *.gif
 *.mp4
 
@@ -107,12 +108,37 @@ temp_*
 *_test.*
 *_debug.*
 *_broken*
+*.broken
+*.broken_*
+*.before_move
+*.saved
 fix_*.sh
 fix_*.php
 emergency_*
 *_fix.php
 simple_*.sh
 super_simple_*.sh
+
+# Old session notes, fix logs, handoff docs
+SESSION_*.md
+FIXES_*.md
+FIX_*.md
+*_FIX_*.md
+*_HANDOFF*.md
+*_REFERENCE*.md
+*_ARCHITECTURE*.md
+*_DESIGN*.md
+HOTFIX_*.md
+WORK_SUMMARY*.md
+CURRENT_STATUS*.md
+ROOT_CAUSE*.md
+SOLUTION_SUMMARY*.md
+FINAL_FIX*.md
+EMERGENCY_*.md
+*_SYSTEM_HANGING*.md
+*_CONNECTIVITY*.md
+*_ISSUE*.md
+*_BUG_*.md
 
 # Documentation builds
 docs/_build/
