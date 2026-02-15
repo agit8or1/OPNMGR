@@ -54,57 +54,22 @@ A comprehensive web-based management platform for centralized monitoring, config
 
 ---
 
-## Screenshots
+## Web Interface
 
-### Login Page
-![Login Page](screenshots/01-login.png)
-*Secure authentication with session management*
+OPNManager features a dark-themed Bootstrap 5 UI with the following pages:
 
-### Dashboard
-![Dashboard](screenshots/02-dashboard.png)
-*Real-time overview with firewall statistics, status charts, and network map*
-
-### Firewall Management
-| Firewall List | Firewall Details |
-|---------------|------------------|
-| ![Firewall List](screenshots/03-firewall-list.png) | ![Firewall Details](screenshots/03-firewall-details.png) |
-*Complete firewall inventory with filtering and search (left) - Detailed firewall information with network config and status (right)*
-
-### Firewall Editing
-![Edit Firewall](screenshots/10-firewall-edit.png)
-*Edit firewall configuration including hostname, IP addresses, customer assignment, and tags*
-
-### Add New Firewall
-![Add Firewall](screenshots/04-add-firewall.png)
-*Simple firewall enrollment with automatic agent installation script generation*
-
-### Customer Management
-![Customers](screenshots/05-customers.png)
-*Multi-tenant customer organization with firewall counts and contact information*
-
-### Tag Management
-![Manage Tags](screenshots/06-manage-tags.png)
-*Color-coded tags for organizing firewalls by location, type, or custom categories*
-
-### Activity Logs
-![Logs](screenshots/07-logs.png)
-*Complete audit trail of all actions, commands, and system events*
-
-### System Configuration
-![Settings](screenshots/08-settings.png)
-*System configuration including branding, theme, GitHub integration, security scanning, and backup policies*
-
-### User Management
-![Users](screenshots/09-users.png)
-*User access control with role-based permissions*
-
-### User Administration
-![Add User](screenshots/11-add-user.png)
-*Create new users with role-based permissions (admin/viewer)*
-
-### About & System Information
-![About](screenshots/12-about.png)
-*Version information, system statistics, and GitHub integration status*
+| Page | Description |
+|------|-------------|
+| **Dashboard** | Real-time overview with firewall stats, status charts, and network map |
+| **Firewalls** | Searchable firewall inventory with health scores and status badges |
+| **Firewall Details** | Per-firewall info: network config, traffic graphs, command log, tunnels |
+| **Customers** | Multi-tenant customer organization with firewall grouping |
+| **Tags** | Color-coded tags for organizing firewalls by location or type |
+| **AI Security Scan** | AI-powered configuration analysis with risk scoring |
+| **Bandwidth Tests** | On-demand speedtest scheduling and results history |
+| **Queue Management** | Command queue monitoring with auto-cleanup and purge controls |
+| **Settings** | Branding, theme, SMTP, security scanning, backup policies |
+| **System Update** | One-click updates from GitHub with SSE progress streaming |
 
 ---
 
