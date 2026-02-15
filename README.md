@@ -54,22 +54,37 @@ A comprehensive web-based management platform for centralized monitoring, config
 
 ---
 
-## Web Interface
+## Screenshots
 
-OPNManager features a dark-themed Bootstrap 5 UI with the following pages:
+### Login
+![Login](screenshots/01-login.png)
 
-| Page | Description |
-|------|-------------|
-| **Dashboard** | Real-time overview with firewall stats, status charts, and network map |
-| **Firewalls** | Searchable firewall inventory with health scores and status badges |
-| **Firewall Details** | Per-firewall info: network config, traffic graphs, command log, tunnels |
-| **Customers** | Multi-tenant customer organization with firewall grouping |
-| **Tags** | Color-coded tags for organizing firewalls by location or type |
-| **AI Security Scan** | AI-powered configuration analysis with risk scoring |
-| **Bandwidth Tests** | On-demand speedtest scheduling and results history |
-| **Queue Management** | Command queue monitoring with auto-cleanup and purge controls |
-| **Settings** | Branding, theme, SMTP, security scanning, backup policies |
-| **System Update** | One-click updates from GitHub with SSE progress streaming |
+### Dashboard
+![Dashboard](screenshots/02-dashboard.png)
+
+### Firewall Management
+![Firewalls](screenshots/03-firewalls.png)
+
+### Firewall Details
+![Firewall Details](screenshots/04-firewall-details.png)
+
+### Customer Management
+![Customers](screenshots/05-customers.png)
+
+### Tag Management
+![Tags](screenshots/06-tags.png)
+
+### Queue Management
+![Queue](screenshots/07-queue.png)
+
+### User Documentation
+![Documentation](screenshots/08-documentation.png)
+
+### Settings
+![Settings](screenshots/09-settings.png)
+
+### About & System Health
+![About](screenshots/10-about.png)
 
 ---
 

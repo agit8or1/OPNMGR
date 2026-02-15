@@ -96,8 +96,8 @@ __pycache__/
 *.7z
 downloads/
 
-# Screenshots and images (keep only assets/img/)
-screenshots/
+# Screenshots and images (keep only assets/img/ and screenshots/)
+!screenshots/
 *.gif
 *.mp4
 
