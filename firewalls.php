@@ -4,66 +4,65 @@ require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . "/inc/timezone_selector.php";
 requireLogin();
 
-// Health calculation function
+// Health calculation function - weights sum to exactly 100
 function calculateHealthScore($firewall) {
     $health_score = 0;
-    
-    // Connectivity Score (35 points)
+
+    // Connectivity Score (30 points)
     $status = 'unknown';
     if (!empty($firewall['agent_last_checkin'])) {
         $checkin_time = strtotime($firewall['agent_last_checkin']);
         $minutes_ago = (time() - $checkin_time) / 60;
         $status = ($minutes_ago <= 10) ? 'online' : 'offline';
     }
-    
+
     if ($status === 'online') {
         $checkin_time = strtotime($firewall['agent_last_checkin']);
         $minutes_ago = (time() - $checkin_time) / 60;
         if ($minutes_ago <= 5) {
-            $health_score += 35;
+            $health_score += 30;
         } elseif ($minutes_ago <= 15) {
-            $health_score += 32;
+            $health_score += 27;
         } elseif ($minutes_ago <= 60) {
-            $health_score += 25;
-        } else {
-            $health_score += 15;
-        }
-    }
-    
-    // Agent Version Score (25 points) - More generous for 2.1.x
-    if (!empty($firewall['agent_version'])) {
-        $agent_version = $firewall['agent_version'];
-        if (version_compare($agent_version, '2.3.0', '>=')) {
-            $health_score += 25;
-        } elseif (version_compare($agent_version, '2.1.0', '>=')) {
-            $health_score += 24; // Almost full score for 2.1.x
-        } elseif (version_compare($agent_version, '2.0.0', '>=')) {
             $health_score += 20;
         } else {
-            $health_score += 10;
+            $health_score += 12;
         }
     }
-    
+
+    // Agent Version Score (20 points)
+    if (!empty($firewall['agent_version'])) {
+        $agent_version = $firewall['agent_version'];
+        if (version_compare($agent_version, AGENT_VERSION, '>=')) {
+            $health_score += 20;
+        } elseif (version_compare($agent_version, AGENT_MIN_VERSION, '>=')) {
+            $health_score += 18;
+        } elseif (version_compare($agent_version, '1.0.0', '>=')) {
+            $health_score += 14;
+        } else {
+            $health_score += 8;
+        }
+    }
+
     // System Updates Score (20 points)
     if (isset($firewall['updates_available'])) {
         if ($firewall['updates_available'] == 0) {
             $health_score += 20;
         } elseif ($firewall['updates_available'] == 1) {
-            $health_score += 15;
-        } else {
             $health_score += 10;
+        } else {
+            $health_score += 8;
         }
     } else {
-        $health_score += 10;
+        $health_score += 8;
     }
-    
+
     // Uptime Score (15 points)
     if (!empty($firewall['uptime'])) {
         $uptime = $firewall['uptime'];
         if (preg_match('/(\d+)\s*days?/', $uptime, $matches) || preg_match('/up\s+(\d+)/', $uptime, $matches)) {
             $days = (int)$matches[1];
             if ($days >= 7) {
-                // 7+ days is excellent uptime for a firewall
                 $health_score += 15;
             } elseif ($days >= 3) {
                 $health_score += 12;
@@ -74,15 +73,14 @@ function calculateHealthScore($firewall) {
             $health_score += 5;
         }
     }
-    
+
     // Configuration Score (15 points)
     $config_score = 0;
     if (!empty($firewall['version'])) $config_score += 5;
     if (!empty($firewall['wan_ip'])) $config_score += 5;
     if (!empty($firewall['api_key']) && !empty($firewall['api_secret'])) $config_score += 5;
     $health_score += $config_score;
-    
-    // Cap the score at 100 (perfect score) - Fixed Oct 11, 2025
+
     return min($health_score, 100);
 }
 
@@ -794,55 +792,54 @@ include __DIR__ . '/inc/header.php';
                                     }
                                     
                                     // Calculate comprehensive health score (0-100)
+                                    // Weights: Connectivity(30) + Agent(20) + Updates(20) + Uptime(15) + Config(15) = 100
                                     $health_score = 0;
                                     $health_issues = [];
                                     $health_details = [];
-                                    
-                                    // Connectivity Score (35 points) - Higher weight for connectivity
+
+                                    // Connectivity Score (30 points)
                                     if ($current_status === 'online') {
-                                        // Use agent_last_checkin if available, otherwise last_checkin
                                         $checkin_field = !empty($firewall['agent_last_checkin']) ? 'agent_last_checkin' : 'last_checkin';
                                         $checkin_time = strtotime($firewall[$checkin_field]);
                                         $minutes_ago = (time() - $checkin_time) / 60;
                                         if ($minutes_ago <= 5) {
-                                            $health_score += 35;
+                                            $health_score += 30;
                                             $health_details[] = "✓ Excellent connectivity (last checkin " . round($minutes_ago, 1) . "m ago)";
                                         } elseif ($minutes_ago <= 15) {
-                                            $health_score += 32;
+                                            $health_score += 27;
                                             $health_details[] = "✓ Good connectivity (last checkin " . round($minutes_ago, 1) . "m ago)";
                                         } elseif ($minutes_ago <= 60) {
-                                            $health_score += 25;
+                                            $health_score += 20;
                                             $health_details[] = "✓ Acceptable connectivity (" . round($minutes_ago, 1) . "m ago)";
                                         } else {
-                                            $health_score += 15;
+                                            $health_score += 12;
                                             $health_issues[] = "⚠ Delayed checkin (" . round($minutes_ago/60, 1) . "h ago)";
                                         }
                                     } else {
                                         $health_issues[] = "✗ Firewall offline";
                                     }
-                                    
-                                    // Agent Version Score (25 points) - More generous scoring
+
+                                    // Agent Version Score (20 points)
                                     if (!empty($firewall['agent_version'])) {
                                         $agent_version = $firewall['agent_version'];
                                         if (version_compare($agent_version, AGENT_VERSION, '>=')) {
-                                            $health_score += 25;
+                                            $health_score += 20;
                                             $health_details[] = "✓ Agent up to date (v" . $agent_version . ")";
                                         } elseif (version_compare($agent_version, AGENT_MIN_VERSION, '>=')) {
-                                            $health_score += 24; // Almost full score for supported versions
-                                            $health_details[] = "✓ Agent recent version (v" . $agent_version . ")";
+                                            $health_score += 18;
+                                            $health_details[] = "✓ Agent supported version (v" . $agent_version . ")";
                                         } elseif (version_compare($agent_version, '1.0.0', '>=')) {
-                                            $health_score += 20;
-                                            $health_details[] = "⚠ Agent needs update (v" . $agent_version . ")";
+                                            $health_score += 14;
+                                            $health_issues[] = "⚠ Agent needs update (v" . $agent_version . ")";
                                         } else {
-                                            $health_score += 10;
+                                            $health_score += 8;
                                             $health_issues[] = "⚠ Agent severely outdated (v" . $agent_version . ")";
                                         }
                                     } else {
                                         $health_issues[] = "✗ No agent version reported";
                                     }
-                                    
+
                                     // System Updates Score (20 points)
-                                    // Check for major version upgrade available (server-side detection)
                                     $fw_upgrade_available = false;
                                     if (!empty($firewall['current_version']) && !empty($latest_major_version) && $firewall['current_version'] !== 'Unknown') {
                                         $fw_cur_parts = explode('.', $firewall['current_version']);
@@ -855,31 +852,30 @@ include __DIR__ . '/inc/header.php';
                                     }
 
                                     if ($fw_upgrade_available) {
-                                        $health_score += 15;
+                                        $health_score += 5;
                                         $health_issues[] = "⚠ Major upgrade available (v" . htmlspecialchars($firewall['current_version']) . " → " . htmlspecialchars($latest_major_version) . ")";
                                     } elseif (isset($firewall['updates_available'])) {
                                         if ($firewall['updates_available'] == 0) {
                                             $health_score += 20;
                                             $health_details[] = "✓ System up to date";
                                         } elseif ($firewall['updates_available'] == 1) {
-                                            $health_score += 15;
-                                            $health_details[] = "⚠ System updates available";
-                                        } else {
                                             $health_score += 10;
+                                            $health_issues[] = "⚠ System updates available";
+                                        } else {
+                                            $health_score += 8;
                                             $health_issues[] = "⚠ Update status unknown";
                                         }
                                     } else {
-                                        $health_score += 10;
+                                        $health_score += 8;
                                         $health_issues[] = "⚠ Update check needed";
                                     }
-                                    
+
                                     // Uptime Score (15 points)
                                     if (!empty($firewall['uptime'])) {
                                         $uptime = $firewall['uptime'];
                                         if (preg_match('/(\d+)\s*days?/', $uptime, $matches) || preg_match('/up\s+(\d+)/', $uptime, $matches)) {
                                             $days = (int)$matches[1];
                                             if ($days >= 7) {
-                                                // 7+ days is excellent for a firewall
                                                 $health_score += 15;
                                                 $health_details[] = "✓ Excellent uptime (" . $days . " days)";
                                             } elseif ($days >= 3) {
@@ -890,25 +886,24 @@ include __DIR__ . '/inc/header.php';
                                                 $health_details[] = "⚠ Recent restart (" . $days . " days)";
                                             }
                                         } else {
-                                            // Less than 1 day uptime
                                             $health_score += 5;
                                             $health_issues[] = "⚠ Recent restart (< 1 day)";
                                         }
                                     } else {
                                         $health_issues[] = "✗ No uptime data";
                                     }
-                                    
+
                                     // Configuration Score (15 points)
                                     $config_score = 0;
                                     if (!empty($firewall['version'])) $config_score += 5;
                                     if (!empty($firewall['wan_ip'])) $config_score += 5;
                                     if (!empty($firewall['api_key']) && !empty($firewall['api_secret'])) $config_score += 5;
                                     $health_score += $config_score;
-                                    
+
                                     if ($config_score >= 15) {
                                         $health_details[] = "✓ Complete configuration";
                                     } elseif ($config_score >= 10) {
-                                        $health_issues[] = "⚠ Minor configuration issues";
+                                        $health_issues[] = "⚠ Missing API credentials";
                                     } else {
                                         $health_issues[] = "⚠ Configuration incomplete";
                                     }
