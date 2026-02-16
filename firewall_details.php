@@ -1322,7 +1322,7 @@ function runBandwidthTest() {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `firewall_id=${firewallId}`
+        body: `firewall_id=${firewallId}&csrf_token=${csrfToken}`
     })
     .then(response => response.json())
     .then(data => {

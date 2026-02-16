@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-15'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Login Branding Fix & Obfuscated Screenshots'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'CSRF Fix for JSON API Endpoints'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }

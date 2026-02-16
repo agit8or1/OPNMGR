@@ -25,19 +25,14 @@ if (!$input) {
 }
 
 $firewall_id = (int)($input['firewall_id'] ?? 0);
-$csrf_token = $input['csrf'] ?? '';
+$csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 
 // Validate CSRF token
-// TEMPORARILY DISABLED - CSRF causing issues in production
-/*
 if (!csrf_verify($csrf_token)) {
     http_response_code(403);
     echo json_encode(['error' => 'CSRF verification failed']);
     exit;
 }
-*/
-
-// TODO: Re-enable CSRF after debugging session issues
 
 if (!$firewall_id) {
     http_response_code(400);
