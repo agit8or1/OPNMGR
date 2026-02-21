@@ -40,24 +40,33 @@ function get_manager_public_ip() {
 }
 
 function find_available_tunnel_port() {
-        
-    // Get ports already in use
+
+    // Get ports already in use (both tunnel_port AND tunnel_port-1 for nginx)
     $stmt = db()->query("SELECT tunnel_port FROM ssh_access_sessions WHERE status = 'active'");
     $used_ports = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    // Find first available port in range
-    for ($port = TUNNEL_PORT_MIN; $port <= TUNNEL_PORT_MAX; $port++) {
-        if (!in_array($port, $used_ports)) {
-            // Double-check with system (use ss which doesn't need sudo)
-            $check = shell_exec("ss -tln | grep ':{$port} ' 2>/dev/null");
-            if (empty($check)) {
+    $all_used = [];
+    foreach ($used_ports as $p) {
+        $all_used[] = (int)$p;
+        $all_used[] = (int)$p - 1; // nginx HTTPS proxy port
+    }
+
+    // Each session uses a port pair: odd for SSH tunnel, even (port-1) for nginx HTTPS proxy
+    // Step by 2 starting from first odd port to avoid overlapping pairs
+    $start = TUNNEL_PORT_MIN % 2 === 0 ? TUNNEL_PORT_MIN + 1 : TUNNEL_PORT_MIN;
+    for ($port = $start; $port <= TUNNEL_PORT_MAX; $port += 2) {
+        $nginx_port = $port - 1;
+        if (!in_array($port, $all_used) && !in_array($nginx_port, $all_used)) {
+            // Double-check both ports with system
+            $check_ssh = shell_exec("ss -tln | grep ':{$port} ' 2>/dev/null");
+            $check_nginx = shell_exec("ss -tln | grep ':{$nginx_port} ' 2>/dev/null");
+            if (empty($check_ssh) && empty($check_nginx)) {
                 return $port;
             } else {
-                error_log("Port {$port} shows as free in DB but is actually in use (orphaned tunnel?)");
+                error_log("Port pair {$nginx_port}/{$port} shows as free in DB but one is in use on system");
             }
         }
     }
-    
+
     return null;
 }
 
