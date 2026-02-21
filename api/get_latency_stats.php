@@ -17,47 +17,63 @@ if ($firewall_id <= 0) {
 }
 
 try {
+    // Downsample based on time range to keep chart readable
+    if ($days <= 1) {
+        // 24h: group by 5-minute intervals
+        $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(MINUTE(measured_at),5) MINUTE), '%Y-%m-%d %H:%i')";
+    } elseif ($days <= 7) {
+        // 7 days: group by 30-minute intervals
+        $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(MINUTE(measured_at),30) MINUTE), '%Y-%m-%d %H:%i')";
+    } else {
+        // 30 days: group by 2-hour intervals
+        $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(HOUR(measured_at),2) HOUR), '%Y-%m-%d %H:00')";
+    }
+
     $stmt = db()->prepare("
-        SELECT 
-            DATE_FORMAT(measured_at, '%Y-%m-%d %H:%i') as time_label,
+        SELECT
+            {$group_expr} as time_label,
             AVG(latency_ms) as avg_latency,
             MIN(latency_ms) as min_latency,
             MAX(latency_ms) as max_latency,
             COUNT(*) as count
         FROM firewall_latency
-        WHERE firewall_id = :firewall_id 
+        WHERE firewall_id = :firewall_id
         AND measured_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
-        GROUP BY DATE_FORMAT(measured_at, '%Y-%m-%d %H:%i')
+        GROUP BY time_label
         ORDER BY time_label ASC
     ");
-    
+
     $stmt->execute([
         ':firewall_id' => $firewall_id,
         ':days' => $days
     ]);
-    
+
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $labels = [];
     $latency_data = [];
-    
+
     foreach ($results as $row) {
         $labels[] = $row['time_label'];
         $latency_data[] = round($row['avg_latency'], 2);
     }
-    
-    // If no data, return empty arrays
-    if (empty($labels)) {
-        $labels = [];
-        $latency_data = [];
+
+    // Calculate 95th percentile for Y-axis suggested max
+    $p95 = 0;
+    if (!empty($latency_data)) {
+        $sorted = $latency_data;
+        sort($sorted);
+        $p95_index = (int)floor(count($sorted) * 0.95);
+        $p95 = $sorted[min($p95_index, count($sorted) - 1)];
     }
-    
+
     http_response_code(200);
     echo json_encode([
         'success' => true,
         'labels' => $labels,
         'latency' => $latency_data,
-        'count' => count($latency_data)
+        'count' => count($latency_data),
+        'p95' => round($p95, 2)
     ]);
     
 } catch (PDOException $e) {

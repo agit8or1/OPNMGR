@@ -118,12 +118,25 @@ try {
         $unit = 'Gb/s';
     }
 
+    // Calculate 95th percentile for Y-axis suggested max
+    $all_values = array_merge($inbound, $outbound);
+    $p95 = 0;
+    if (!empty($all_values)) {
+        $sorted = array_filter($all_values, fn($v) => $v > 0);
+        sort($sorted);
+        if (!empty($sorted)) {
+            $p95_index = (int)floor(count($sorted) * 0.95);
+            $p95 = $sorted[min($p95_index, count($sorted) - 1)];
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'labels' => $labels,
         'inbound' => $inbound,
         'outbound' => $outbound,
-        'unit' => $unit
+        'unit' => $unit,
+        'p95' => round($p95, 2)
     ]);
     
 } catch (Exception $e) {

@@ -2419,6 +2419,9 @@ function updateTrafficChart(days) {
                 
                 console.log('Creating new traffic chart with', data.labels.length, 'data points');
                 
+                // Use p95 to cap Y-axis so spikes don't distort the chart
+                const trafficYMax = data.p95 ? Math.ceil(data.p95 * 1.3) : undefined;
+
                 trafficChart = new Chart(trafficCtx, {
                     type: 'line',
                     data: {
@@ -2449,18 +2452,19 @@ function updateTrafficChart(days) {
                         responsive: true,
                         maintainAspectRatio: false,
                         devicePixelRatio: window.devicePixelRatio || 2,
-                        plugins: { 
+                        plugins: {
                             legend: { labels: { color: '#fff' } }
                         },
                         scales: {
-                            y: { 
+                            y: {
                                 beginAtZero: true,
+                                suggestedMax: trafficYMax,
                                 title: { display: true, text: data.unit || 'Mb/s', color: '#fff' },
-                                ticks: { color: '#aaa' }, 
+                                ticks: { color: '#aaa' },
                                 grid: { color: 'rgba(255,255,255,0.05)' }
                             },
-                            x: { 
-                                ticks: { color: '#aaa' }, 
+                            x: {
+                                ticks: { color: '#aaa' },
                                 grid: { color: 'rgba(255,255,255,0.05)' }
                             }
                         }
@@ -2540,6 +2544,10 @@ function updateSystemCharts() {
                     pointRadius: 0,
                     pointHoverRadius: 4
                 }];
+                // Cap Y-axis at p95 to prevent spike distortion
+                if (data.p95) {
+                    cpuChart.options.scales.y.suggestedMax = Math.ceil(data.p95 * 1.3 * 100) / 100;
+                }
                 cpuChart.update();
                 console.log('CPU chart updated with', data.labels.length, 'data points');
 
@@ -2635,6 +2643,10 @@ function updateSystemCharts() {
                     pointRadius: 0,
                     pointHoverRadius: 4
                 }];
+                // Cap Y-axis at p95 to prevent spike distortion
+                if (data.p95) {
+                    latencyChart.options.scales.y.suggestedMax = Math.ceil(data.p95 * 1.3);
+                }
                 latencyChart.update();
 
                 // Update stats

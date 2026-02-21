@@ -84,13 +84,19 @@ try {
             $load15[] = round($row['load_15min'], 2);
         }
         
+        // Calculate 95th percentile for Y-axis suggested max
+        $sorted = $load1;
+        sort($sorted);
+        $p95 = !empty($sorted) ? $sorted[(int)floor(count($sorted) * 0.95)] : 0;
+
         echo json_encode([
             'success' => true,
             'labels' => $labels,
             'load_1min' => $load1,
             'load_5min' => $load5,
             'load_15min' => $load15,
-            'unit' => 'load average'
+            'unit' => 'load average',
+            'p95' => round($p95, 2)
         ]);
         
     } elseif ($metric == 'memory') {
