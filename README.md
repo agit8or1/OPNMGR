@@ -65,26 +65,59 @@ A comprehensive web-based management platform for centralized monitoring, config
 ### Firewall Management
 ![Firewalls](screenshots/03-firewalls.png)
 
-### Firewall Details
-![Firewall Details](screenshots/04-firewall-details.png)
+### Firewall Details - Overview
+![Firewall Overview](screenshots/04-firewall-overview.png)
+
+### System Statistics & Charts
+![Charts](screenshots/05-firewall-charts.png)
+
+### Network Diagnostics
+![Network Tools](screenshots/06-firewall-network.png)
+
+### Configuration Backups
+![Backups](screenshots/07-firewall-backups.png)
+
+### Command Log
+![Commands](screenshots/08-firewall-commands.png)
+
+### Security & SSH Keys
+![Security](screenshots/09-firewall-security.png)
+
+### AI Analysis
+![AI](screenshots/10-firewall-ai.png)
 
 ### Customer Management
-![Customers](screenshots/05-customers.png)
+![Customers](screenshots/11-customers.png)
 
 ### Tag Management
-![Tags](screenshots/06-tags.png)
+![Tags](screenshots/12-tags.png)
 
 ### Queue Management
-![Queue](screenshots/07-queue.png)
+![Queue](screenshots/13-queue.png)
 
-### User Documentation
-![Documentation](screenshots/08-documentation.png)
+### User Administration
+![Users](screenshots/14-users.png)
+
+### System Logs
+![Logs](screenshots/15-logs.png)
+
+### Health Monitor
+![Health Monitor](screenshots/16-health-monitor.png)
 
 ### Settings
-![Settings](screenshots/09-settings.png)
+![Settings](screenshots/17-settings.png)
 
-### About & System Health
-![About](screenshots/10-about.png)
+### User Documentation
+![Documentation](screenshots/18-documentation.png)
+
+### About & Version Info
+![About](screenshots/19-about.png)
+
+### Add Firewall
+![Add Firewall](screenshots/20-add-firewall.png)
+
+### User Profile
+![Profile](screenshots/21-profile.png)
 
 ---
 
