@@ -23,21 +23,8 @@ if (db()) {
         $recent_checkins = $stmt->fetch(PDO::FETCH_ASSOC)['recent'];
         
         // Count firewalls that need updates
-        // Check agent-reported updates, version mismatch, or behind the newest version across all firewalls
-        $stmt = db()->query('SELECT MAX(current_version) as latest FROM firewalls WHERE current_version IS NOT NULL');
-        $latest_version = $stmt->fetch(PDO::FETCH_ASSOC)['latest'];
-
-        if ($latest_version) {
-            $stmt = db()->prepare('
-                SELECT COUNT(*) as updates FROM firewalls
-                WHERE updates_available = 1
-                   OR (available_version IS NOT NULL AND available_version != current_version)
-                   OR (current_version IS NOT NULL AND current_version != ? AND current_version != "")
-            ');
-            $stmt->execute([$latest_version]);
-        } else {
-            $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE updates_available = 1');
-        }
+        // Trust the agent-reported updates_available flag as authoritative
+        $stmt = db()->query('SELECT COUNT(*) as updates FROM firewalls WHERE updates_available = 1');
         $need_updates = $stmt->fetch(PDO::FETCH_ASSOC)['updates'];
         
         $offline_firewalls = $total_firewalls - $online_firewalls;

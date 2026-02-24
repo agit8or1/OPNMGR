@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-24'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Update System Overhaul & Chart Timeframes'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Auto-Healing SSH Tunnels'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,21 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.9.0',
+            'date' => '2026-02-24',
+            'type' => 'minor',
+            'title' => 'Auto-Healing SSH Tunnels',
+            'changes' => [
+                'NEW: tunnel_health_monitor.php cron — auto-detects and restarts dead SSH tunnels every 2 min',
+                'NEW: SSH key auto-repair — re-deploys keys via agent when authentication fails',
+                'NEW: Missing/broken nginx proxy configs auto-recreated during heal cycle',
+                'NEW: Expired session cleanup integrated into health monitor',
+                'NEW: File-lock prevents overlapping monitor runs',
+                'FIXED: Nginx proxy protocol mismatch — firewalls with web_port=443 now get proxy_pass https://',
+                'FIXED: Removed dead cron entries (cleanup_proxy_sessions.php, cleanup_tunnels.sh)',
+            ]
+        ],
         [
             'version' => '3.8.6',
             'date' => '2026-02-24',

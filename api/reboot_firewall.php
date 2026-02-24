@@ -48,15 +48,15 @@ try {
     }
 
     // Check if a reboot command is already queued
-    $stmt = db()->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND command LIKE '%shutdown -r%' AND status IN ('pending', 'sent') LIMIT 1");
+    $stmt = db()->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND (command LIKE '%shutdown -r%' OR command LIKE '%/sbin/reboot%') AND status IN ('pending', 'sent') LIMIT 1");
     $stmt->execute([$firewall_id]);
     if ($stmt->fetch()) {
         echo json_encode(['success' => false, 'message' => 'Reboot already queued for this firewall']);
         exit;
     }
 
-    // Queue reboot command (shutdown -r in 1 minute to allow response)
-    $reboot_command = '/sbin/shutdown -r +1 "Reboot initiated from OPNManager"';
+    // Queue reboot command - use /sbin/reboot (works reliably on FreeBSD/OPNsense)
+    $reboot_command = '/sbin/reboot';
 
     $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, status, created_at)

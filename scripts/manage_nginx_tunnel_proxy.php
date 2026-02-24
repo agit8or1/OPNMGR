@@ -45,16 +45,19 @@ if (empty($ssl_cert)) {
 
 error_log("Using SSL certificates: $ssl_cert");
 
-function create_nginx_config($session_id, $https_port, $http_port) {
+function create_nginx_config($session_id, $https_port, $http_port, $fw_web_port = 80) {
     global $ssl_cert, $ssl_key;
-    
+
+    // Use correct upstream protocol based on the firewall's web_port
+    $upstream_proto = ((int)$fw_web_port === 443) ? 'https' : 'http';
+
     $config = <<<EOF
 # HTTPS proxy for SSH tunnel session {$session_id}
 # Auto-generated - do not edit manually
 server {
     listen {$https_port} ssl http2;
     server_name opn.agit8or.net;
-    
+
     # SSL configuration
     ssl_certificate {$ssl_cert};
     ssl_certificate_key {$ssl_key};
@@ -62,14 +65,14 @@ server {
     ssl_session_timeout 10m;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
-    
+
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    
+
     # Proxy to local SSH tunnel
     location / {
-        proxy_pass http://127.0.0.1:{$http_port};
+        proxy_pass {$upstream_proto}://127.0.0.1:{$http_port};
         proxy_http_version 1.1;
         
         # Decompress gzipped responses so sub_filter can work
@@ -223,22 +226,29 @@ switch ($action) {
         }
         
         $session_id = intval($argv[2]);
-        
-        // Get session details from database
-        $stmt = $pdo->prepare("SELECT tunnel_port FROM ssh_access_sessions WHERE id = ?");
+
+        // Get session details + firewall web_port from database
+        $stmt = $pdo->prepare("
+            SELECT s.tunnel_port, f.web_port
+            FROM ssh_access_sessions s
+            JOIN firewalls f ON s.firewall_id = f.id
+            WHERE s.id = ?
+        ");
         $stmt->execute([$session_id]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$session) {
             echo "Error: Session {$session_id} not found\n";
             exit(1);
         }
-        
+
         $http_port = $session['tunnel_port']; // Odd number (8101, 8103, etc.)
         $https_port = $http_port - 1; // Even number (8100, 8102, etc.)
-        
-        if (create_nginx_config($session_id, $https_port, $http_port)) {
-            echo "Created nginx proxy: https://opn.agit8or.net:{$https_port} -> http://127.0.0.1:{$http_port}\n";
+        $fw_web_port = !empty($session['web_port']) ? (int)$session['web_port'] : 443;
+        $upstream_proto = ($fw_web_port === 443) ? 'https' : 'http';
+
+        if (create_nginx_config($session_id, $https_port, $http_port, $fw_web_port)) {
+            echo "Created nginx proxy: https://opn.agit8or.net:{$https_port} -> {$upstream_proto}://127.0.0.1:{$http_port}\n";
             exit(0);
         } else {
             echo "Failed to create nginx proxy for session {$session_id}\n";
