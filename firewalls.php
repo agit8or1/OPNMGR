@@ -1138,8 +1138,9 @@ include __DIR__ . '/inc/header.php';
                                         </button>
                                     <?php endif; ?>
                                     
-                                    <!-- Reboot Required Badge -->
-                                    <?php if (isset($firewall["reboot_required"]) && $firewall["reboot_required"] == 1): ?>
+                                    <!-- Reboot Required Badge (hidden during active updates) -->
+                                    <?php if (isset($firewall["reboot_required"]) && $firewall["reboot_required"] == 1
+                                        && !in_array($firewall["status"], ['updating', 'update_pending'])): ?>
                                         <br>
                                         <span class="badge bg-danger text-white hover-tooltip mt-1" data-tooltip="Firewall requires reboot to complete updates.\\nPlease reboot from OPNsense web interface.">
                                             <i class="fas fa-power-off me-1"></i>Reboot Required

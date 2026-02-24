@@ -395,13 +395,19 @@ try {
         
         // If firewall was marked as 'updating' but reported back with current version,
         // check if update actually completed
-        if ($firewall_status['status'] === 'updating') {
+        if (in_array($firewall_status['status'], ['updating', 'update_pending'])) {
+            // Check for stuck update timeout (15 minutes)
+            $update_requested_at_stmt = db()->prepare('SELECT update_requested_at FROM firewalls WHERE id = ?');
+            $update_requested_at_stmt->execute([$firewall_id]);
+            $update_requested_at = $update_requested_at_stmt->fetchColumn();
+            $update_age_minutes = $update_requested_at ? (time() - strtotime($update_requested_at)) / 60 : 999;
+
             if ($updates_available == 0) {
-                // Update completed successfully - firewall is now up to date
-                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
+                // Update completed (or was already up to date) - return to online
+                $stmt = db()->prepare('UPDATE firewalls SET status = ?, reboot_required = 0 WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
-                
-                log_info('firewall', "Update completed for firewall - now running version $current_version", 
+
+                log_info('firewall', "Update completed for firewall - now running version $current_version",
                     null, $firewall_id, [
                         'action' => 'update_completed',
                         'new_version' => $current_version
@@ -410,14 +416,22 @@ try {
                 // Version increased but still not latest - partial update
                 $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
-                
-                log_info('firewall', "Partial update completed for firewall - version upgraded to $current_version", 
+
+                log_info('firewall', "Partial update completed for firewall - version upgraded to $current_version",
                     null, $firewall_id, [
                         'action' => 'partial_update_completed',
                         'new_version' => $current_version
                     ]);
+            } elseif ($update_age_minutes > 15) {
+                // Stuck for more than 15 minutes - auto-recover
+                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
+                $stmt->execute(['online', $firewall_id]);
+
+                log_info('firewall', "Auto-recovered stuck updating status for firewall (stuck {$update_age_minutes}min)",
+                    null, $firewall_id, [
+                        'action' => 'update_timeout_recovery'
+                    ]);
             }
-            // If still updating and no version change, keep status as 'updating'
         }
     } else {
         // Even if not doing full update check, update current_version
