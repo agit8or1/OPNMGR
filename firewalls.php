@@ -1138,13 +1138,17 @@ include __DIR__ . '/inc/header.php';
                                         </button>
                                     <?php endif; ?>
                                     
-                                    <!-- Reboot Required Badge (hidden during active updates) -->
+                                    <!-- Reboot Required Badge + Button (hidden during active updates) -->
                                     <?php if (isset($firewall["reboot_required"]) && $firewall["reboot_required"] == 1
                                         && !in_array($firewall["status"], ['updating', 'update_pending'])): ?>
-                                        <br>
-                                        <span class="badge bg-danger text-white hover-tooltip mt-1" data-tooltip="Firewall requires reboot to complete updates.\\nPlease reboot from OPNsense web interface.">
-                                            <i class="fas fa-power-off me-1"></i>Reboot Required
-                                        </span>
+                                        <div class="reboot-badge-wrapper mt-1">
+                                            <span class="badge bg-danger text-white hover-tooltip" data-tooltip="Firewall requires reboot to complete updates.&#10;Click the reboot button to reboot now.">
+                                                <i class="fas fa-power-off me-1"></i>Reboot Required
+                                            </span>
+                                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="rebootFirewall(<?php echo $firewall['id']; ?>, '<?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>')" title="Reboot <?php echo htmlspecialchars($firewall['hostname']); ?>">
+                                                <i class="fas fa-redo me-1"></i>Reboot
+                                            </button>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 
@@ -1343,6 +1347,49 @@ function checkUpdates(firewallId) {
         console.error('Error:', error);
         cell.innerHTML = originalCellHTML;
         showToast('Error checking updates.', 'danger');
+    });
+}
+
+// Reboot a firewall
+function rebootFirewall(firewallId, hostname) {
+    if (!confirm(`Are you sure you want to reboot ${hostname}?\n\nThe firewall will go offline for 1-3 minutes during reboot.`)) {
+        return;
+    }
+
+    const button = event.target.closest('button') || event.target;
+    const badge = button.closest('td').querySelector('.reboot-badge-wrapper');
+    const originalHTML = badge ? badge.innerHTML : '';
+
+    if (badge) {
+        badge.innerHTML = `
+            <span class="badge bg-warning text-white">
+                <i class="fas fa-sync-alt fa-spin me-1"></i>Rebooting...
+            </span>`;
+    }
+
+    fetch('/api/reboot_firewall.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Reboot queued. Firewall will reboot within ~3 minutes.', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            if (badge) badge.innerHTML = originalHTML;
+            showToast('Error: ' + (data.message || 'Failed to queue reboot'), 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (badge) badge.innerHTML = originalHTML;
+        showToast('Error sending reboot command.', 'danger');
     });
 }
 
