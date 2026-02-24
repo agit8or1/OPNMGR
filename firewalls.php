@@ -1138,16 +1138,13 @@ include __DIR__ . '/inc/header.php';
                                         </button>
                                     <?php endif; ?>
                                     
-                                    <!-- Reboot Required Badge + Button (hidden during active updates) -->
+                                    <!-- Reboot Required - clickable badge (hidden during active updates) -->
                                     <?php if (isset($firewall["reboot_required"]) && $firewall["reboot_required"] == 1
                                         && !in_array($firewall["status"], ['updating', 'update_pending'])): ?>
                                         <div class="reboot-badge-wrapper mt-1">
-                                            <span class="badge bg-danger text-white hover-tooltip" data-tooltip="Firewall requires reboot to complete updates.&#10;Click the reboot button to reboot now.">
+                                            <span class="badge bg-danger text-white hover-tooltip" style="cursor:pointer;" role="button" onclick="rebootFirewall(<?php echo $firewall['id']; ?>, '<?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>')" data-tooltip="Click to reboot this firewall">
                                                 <i class="fas fa-power-off me-1"></i>Reboot Required
                                             </span>
-                                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="rebootFirewall(<?php echo $firewall['id']; ?>, '<?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>')" title="Reboot <?php echo htmlspecialchars($firewall['hostname']); ?>">
-                                                <i class="fas fa-redo me-1"></i>Reboot
-                                            </button>
                                         </div>
                                     <?php endif; ?>
                                 </td>
