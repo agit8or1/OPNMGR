@@ -214,8 +214,22 @@ try {
     // Check if agent reports reboot is required
     // Only update reboot_required if agent explicitly sends it (for newer agents)
     // Otherwise, preserve existing value in database
-    $agent_sent_reboot_status = isset($_POST['reboot_required']);
-    $reboot_required = $agent_sent_reboot_status ? (int)$_POST['reboot_required'] : null;
+    // FIXED: Use $input (JSON body) instead of $_POST (which is empty for JSON requests)
+    $agent_sent_reboot_status = isset($input['reboot_required']);
+    $reboot_required = $agent_sent_reboot_status ? (int)$input['reboot_required'] : null;
+
+    // When reboot_required transitions from 1→0 (firewall rebooted), force update check
+    if ($agent_sent_reboot_status && $reboot_required === 0) {
+        $prev_reboot = db()->prepare('SELECT reboot_required FROM firewalls WHERE id = ?');
+        $prev_reboot->execute([$firewall_id]);
+        $prev_reboot_val = (int)$prev_reboot->fetchColumn();
+        if ($prev_reboot_val === 1) {
+            // Firewall just rebooted - force fresh update check
+            $force_check = db()->prepare('UPDATE firewalls SET last_update_check = NULL WHERE id = ?');
+            $force_check->execute([$firewall_id]);
+            error_log("Firewall $firewall_id rebooted (reboot_required 1→0), forcing update check");
+        }
+    }
     
     // Update the main firewalls table with all the collected information
     // If agent sends empty version, preserve existing value in DB
@@ -367,7 +381,14 @@ try {
         if (!empty($input['available_version'])) {
             $latest_stable_version = trim($input['available_version']);
         }
-        
+
+        // Sanity check: if current and available versions match, no updates needed
+        if ($updates_available == 1 && !empty($current_version) && $current_version !== 'Unknown'
+            && !empty($latest_stable_version) && $current_version === $latest_stable_version) {
+            $updates_available = 0;
+            error_log("Firewall $firewall_id: Cleared stale updates_available (current=$current_version matches available=$latest_stable_version)");
+        }
+
         // Update the database with check results from agent
         $stmt = db()->prepare('UPDATE firewalls SET last_update_check = NOW(), current_version = ?, available_version = ?, updates_available = ? WHERE id = ?');
         $stmt->execute([$current_version, $latest_stable_version, $updates_available, $firewall_id]);
