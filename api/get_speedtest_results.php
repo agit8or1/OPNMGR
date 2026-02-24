@@ -15,7 +15,14 @@ date_default_timezone_set('America/New_York');
 // to avoid session cookie issues with AJAX calls
 
 $firewall_id = intval($_GET['firewall_id'] ?? 0);
-$days = intval($_GET['days'] ?? 7);
+
+// Support both hours (new) and days (legacy) parameters
+$hours = intval($_GET['hours'] ?? 0);
+if (!$hours) {
+    $days = intval($_GET['days'] ?? 1);
+    $hours = $days * 24;
+}
+$hours = max(1, min($hours, 720));
 
 if ($firewall_id <= 0) {
     http_response_code(400);
@@ -36,14 +43,14 @@ try {
         FROM bandwidth_tests
         WHERE firewall_id = :firewall_id
         AND test_status = 'completed'
-        AND tested_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
+        AND tested_at >= DATE_SUB(NOW(), INTERVAL :hours HOUR)
         GROUP BY DATE_FORMAT(CONVERT_TZ(tested_at, '+00:00', '-05:00'), '%Y-%m-%d %H:%i')
         ORDER BY test_label ASC
     ");
 
     $stmt->execute([
         ':firewall_id' => $firewall_id,
-        ':days' => $days
+        ':hours' => $hours
     ]);
 
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);

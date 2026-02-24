@@ -8,7 +8,14 @@ header('Content-Type: application/json');
 // to avoid session cookie issues with AJAX calls
 
 $firewall_id = intval($_GET['firewall_id'] ?? 0);
-$days = intval($_GET['days'] ?? 7);
+
+// Support both hours (new) and days (legacy) parameters
+$hours = intval($_GET['hours'] ?? 0);
+if (!$hours) {
+    $days = intval($_GET['days'] ?? 1);
+    $hours = $days * 24;
+}
+$hours = max(1, min($hours, 720));
 
 if ($firewall_id <= 0) {
     http_response_code(400);
@@ -18,14 +25,17 @@ if ($firewall_id <= 0) {
 
 try {
     // Downsample based on time range to keep chart readable
-    if ($days <= 1) {
-        // 24h: group by 5-minute intervals
+    if ($hours <= 4) {
+        // 1-4h: per-minute
+        $group_expr = "DATE_FORMAT(measured_at, '%Y-%m-%d %H:%i')";
+    } elseif ($hours <= 24) {
+        // 12-24h: 5-minute intervals
         $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(MINUTE(measured_at),5) MINUTE), '%Y-%m-%d %H:%i')";
-    } elseif ($days <= 7) {
-        // 7 days: group by 30-minute intervals
+    } elseif ($hours <= 168) {
+        // 1 week: 30-minute intervals
         $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(MINUTE(measured_at),30) MINUTE), '%Y-%m-%d %H:%i')";
     } else {
-        // 30 days: group by 2-hour intervals
+        // 30 days: 2-hour intervals
         $group_expr = "DATE_FORMAT(DATE_SUB(measured_at, INTERVAL MOD(HOUR(measured_at),2) HOUR), '%Y-%m-%d %H:00')";
     }
 
@@ -38,14 +48,14 @@ try {
             COUNT(*) as count
         FROM firewall_latency
         WHERE firewall_id = :firewall_id
-        AND measured_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
+        AND measured_at >= DATE_SUB(NOW(), INTERVAL :hours HOUR)
         GROUP BY time_label
         ORDER BY time_label ASC
     ");
 
     $stmt->execute([
         ':firewall_id' => $firewall_id,
-        ':days' => $days
+        ':hours' => $hours
     ]);
 
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);

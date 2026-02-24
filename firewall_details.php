@@ -269,9 +269,12 @@ include __DIR__ . '/inc/header.php';
                                     <div>
                                         <label for="timeFrameSelect" class="text-white-50 me-2" style="font-size: 0.9rem;">Time Frame:</label>
                                         <select id="timeFrameSelect" class="form-select form-select-sm d-inline-block" style="width: auto; background-color: #1a1a1a; color: #fff; border-color: #444;" onchange="updateCharts()">
-                                            <option value="1" selected>24 Hours</option>
-                                            <option value="7">1 Week</option>
-                                            <option value="30">30 Days</option>
+                                            <option value="1">1 Hour</option>
+                                            <option value="4">4 Hours</option>
+                                            <option value="12">12 Hours</option>
+                                            <option value="24" selected>24 Hours</option>
+                                            <option value="168">1 Week</option>
+                                            <option value="720">30 Days</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2369,29 +2372,22 @@ function updateTimeLabel(days) {
 
 // Initialize or update charts
 function updateCharts() {
-    console.log('updateCharts() called');
-    const days = document.getElementById('timeFrameSelect')?.value || 1;
-    console.log('Selected days:', days);
-    updateTimeLabel(days);
-    
+    const hours = document.getElementById('timeFrameSelect')?.value || 24;
+
     // Update traffic chart
-    console.log('Calling updateTrafficChart...');
-    updateTrafficChart(days);
-    
+    updateTrafficChart(hours);
+
     // Update system stats charts
-    console.log('Calling updateSystemCharts...');
     updateSystemCharts();
 }
 
 // Update traffic chart
-function updateTrafficChart(days) {
-    
+function updateTrafficChart(hours) {
+
     // Traffic Chart
     const trafficCtx = document.getElementById('trafficChart');
-    console.log('Traffic canvas element:', trafficCtx);
     if (trafficCtx) {
-        const url = `/api/get_traffic_stats.php?firewall_id=<?php echo $firewall['id']; ?>&days=${days}`;
-        console.log('Fetching traffic data from:', url);
+        const url = `/api/get_traffic_stats.php?firewall_id=<?php echo $firewall['id']; ?>&hours=${hours}`;
         fetch(url, {credentials: 'include'})
             .then(r => {
                 console.log('Traffic response status:', r.status);
@@ -2522,11 +2518,11 @@ function calculateStats(dataArray) {
 
 // Fetch and update system stats charts
 function updateSystemCharts() {
-    const days = document.getElementById('timeFrameSelect')?.value || 1;
+    const hours = document.getElementById('timeFrameSelect')?.value || 24;
     const firewallId = <?php echo $firewall['id']; ?>;
 
     // CPU Chart
-    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&days=${days}&metric=cpu`, {credentials: 'include'})
+    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&hours=${hours}&metric=cpu`, {credentials: 'include'})
         .then(r => r.json())
         .then(data => {
             console.log('CPU data received:', data);
@@ -2561,7 +2557,7 @@ function updateSystemCharts() {
         .catch(err => console.error('CPU chart error:', err));
     
     // Memory Chart
-    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&days=${days}&metric=memory`, {credentials: 'include'})
+    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&hours=${hours}&metric=memory`, {credentials: 'include'})
         .then(r => r.json())
         .then(data => {
             console.log('Memory data received:', data);
@@ -2592,7 +2588,7 @@ function updateSystemCharts() {
         .catch(err => console.error('Memory chart error:', err));
     
     // Disk Chart
-    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&days=${days}&metric=disk`, {credentials: 'include'})
+    fetch(`/api/get_system_stats.php?firewall_id=${firewallId}&hours=${hours}&metric=disk`, {credentials: 'include'})
         .then(r => r.json())
         .then(data => {
             console.log('Disk data received:', data);
@@ -2622,7 +2618,7 @@ function updateSystemCharts() {
         .catch(err => console.error('Disk chart error:', err));
     
     // Latency Chart
-    fetch(`/api/get_latency_stats.php?firewall_id=${firewallId}&days=${days}`, {credentials: 'include'})
+    fetch(`/api/get_latency_stats.php?firewall_id=${firewallId}&hours=${hours}`, {credentials: 'include'})
         .then(r => {
             console.log('Latency response status:', r.status);
             return r.json();
@@ -2663,7 +2659,7 @@ function updateSystemCharts() {
         .catch(err => console.error('Latency chart error:', err));
     
     // SpeedTest Chart
-    fetch(`/api/get_speedtest_results.php?firewall_id=${firewallId}&days=${days}`)
+    fetch(`/api/get_speedtest_results.php?firewall_id=${firewallId}&hours=${hours}`)
         .then(r => {
             console.log('SpeedTest response status:', r.status);
             return r.json();
@@ -2732,7 +2728,7 @@ function updateSpeedtestChart() {
 
     console.log('Updating speedtest chart for firewall', firewallId);
 
-    fetch(`/api/get_speedtest_results.php?firewall_id=${firewallId}&days=${days}`)
+    fetch(`/api/get_speedtest_results.php?firewall_id=${firewallId}&hours=${hours}`)
         .then(r => {
             console.log('SpeedTest response status:', r.status);
             return r.json();
