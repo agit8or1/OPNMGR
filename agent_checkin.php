@@ -115,9 +115,9 @@ if ($command_id > 0 && !empty($command_status)) {
 $agent_version = trim($input['agent_version'] ?? '');
 $agent_type = trim($input['agent_type'] ?? 'primary'); // 'primary' or 'update'
 $api_key = trim($input['api_key'] ?? '');
-$wan_ip = trim($input['wan_ip'] ?? '');
-$lan_ip = trim($input['lan_ip'] ?? '');
-$ipv6_address = trim($input['ipv6_address'] ?? '');
+$wan_ip_raw = trim($input['wan_ip'] ?? '');
+$lan_ip_raw = trim($input['lan_ip'] ?? '');
+$ipv6_raw = trim($input['ipv6_address'] ?? '');
 
 // WAN interface auto-detection fields (Agent v3.4.0+)
 $wan_interfaces = trim($input['wan_interfaces'] ?? '');
@@ -232,16 +232,24 @@ try {
     }
     
     // Update the main firewalls table with all the collected information
-    // If agent sends empty version, preserve existing value in DB
+    // If agent sends empty values, preserve existing data in DB
+    // This prevents good data from being overwritten when agent restarts or has collection issues
+    $preserve_stmt = db()->prepare('SELECT wan_ip, lan_ip, ipv6_address, version, uptime FROM firewalls WHERE id = ?');
+    $preserve_stmt->execute([$firewall_id]);
+    $existing = $preserve_stmt->fetch(PDO::FETCH_ASSOC);
+
+    $wan_ip = !empty($wan_ip_raw) ? $wan_ip_raw : ($existing['wan_ip'] ?? '');
+    $lan_ip = !empty($lan_ip_raw) ? $lan_ip_raw : ($existing['lan_ip'] ?? '');
+    $ipv6_address = !empty($ipv6_raw) ? $ipv6_raw : ($existing['ipv6_address'] ?? '');
+
     if (empty($opnsense_version)) {
-        $ver_stmt = db()->prepare('SELECT version FROM firewalls WHERE id = ?');
-        $ver_stmt->execute([$firewall_id]);
-        $existing_ver = $ver_stmt->fetchColumn();
-        if (!empty($existing_ver)) {
-            $opnsense_version = $existing_ver;
-        }
+        $opnsense_version = $existing['version'] ?? '';
     }
-    $uptime = $uptime ?: "Unknown";  // Provide default if empty
+
+    if (empty($uptime) || $uptime === 'Unknown') {
+        $uptime = $existing['uptime'] ?? 'Unknown';
+    }
+    $uptime = $uptime ?: 'Unknown';
     
     if ($agent_sent_reboot_status) {
         // Agent supports reboot detection - update the flag
