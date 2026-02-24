@@ -78,7 +78,7 @@ function calculateHealthScore($firewall) {
     $config_score = 0;
     if (!empty($firewall['version'])) $config_score += 5;
     if (!empty($firewall['wan_ip'])) $config_score += 5;
-    if (!empty($firewall['api_key']) && !empty($firewall['api_secret'])) $config_score += 5;
+    if (!empty($firewall['lan_ip'])) $config_score += 5;
     $health_score += $config_score;
 
     return min($health_score, 100);
@@ -894,16 +894,17 @@ include __DIR__ . '/inc/header.php';
                                     }
 
                                     // Configuration Score (15 points)
+                                    // Agent-based management doesn't require OPNsense API creds
                                     $config_score = 0;
                                     if (!empty($firewall['version'])) $config_score += 5;
                                     if (!empty($firewall['wan_ip'])) $config_score += 5;
-                                    if (!empty($firewall['api_key']) && !empty($firewall['api_secret'])) $config_score += 5;
+                                    if (!empty($firewall['lan_ip'])) $config_score += 5;
                                     $health_score += $config_score;
 
                                     if ($config_score >= 15) {
                                         $health_details[] = "✓ Complete configuration";
                                     } elseif ($config_score >= 10) {
-                                        $health_issues[] = "⚠ Missing API credentials";
+                                        $health_details[] = "✓ Basic configuration";
                                     } else {
                                         $health_issues[] = "⚠ Configuration incomplete";
                                     }
@@ -981,7 +982,23 @@ include __DIR__ . '/inc/header.php';
                                 </td>
                                 <!-- Updates Column -->
                                 <td>
-                                    <?php if ($firewall["updates_available"] == 1): ?>
+                                    <?php if (in_array($firewall["status"], ['updating', 'update_pending'])): ?>
+                                        <div class="updating-animation">
+                                            <span class="badge bg-primary text-white">
+                                                <i class="fas fa-sync-alt fa-spin me-1"></i>Updating...
+                                            </span>
+                                            <div class="progress mt-1" style="height: 4px; max-width: 120px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 100%"></div>
+                                            </div>
+                                            <small class="text-muted d-block mt-1" style="font-size: 0.65rem;">
+                                                <?php if ($firewall["status"] === 'update_pending'): ?>
+                                                    Waiting for agent...
+                                                <?php else: ?>
+                                                    Update in progress
+                                                <?php endif; ?>
+                                            </small>
+                                        </div>
+                                    <?php elseif ($firewall["updates_available"] == 1): ?>
                                         <?php
                                         // Build enhanced update information tooltip
                                         $update_tooltip = "📦 SOFTWARE UPDATES AVAILABLE\n";
@@ -1154,11 +1171,24 @@ include __DIR__ . '/inc/header.php';
                                             $status = "unknown";
                                         }
                                         
+                                        // Override status for updating firewalls
+                                        if (in_array($firewall['status'], ['updating', 'update_pending'])) {
+                                            $status = $firewall['status'];
+                                        }
+
                                         // Set badge style based on status
                                         switch($status) {
                                             case "online":
                                                 $statusClass = "bg-success text-white";
                                                 $statusText = "Online";
+                                                break;
+                                            case "updating":
+                                                $statusClass = "bg-primary text-white";
+                                                $statusText = '<i class="fas fa-sync-alt fa-spin me-1"></i>Updating';
+                                                break;
+                                            case "update_pending":
+                                                $statusClass = "bg-info text-white";
+                                                $statusText = '<i class="fas fa-clock me-1"></i>Update Queued';
                                                 break;
                                             case "offline":
                                                 $statusClass = "bg-danger text-white";
@@ -1261,6 +1291,60 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+// Toast notification helper
+function showToast(message, type = 'info') {
+    // Remove existing toasts
+    document.querySelectorAll('.toast-notification').forEach(t => t.remove());
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    const bgColor = type === 'success' ? '#198754' : type === 'danger' ? '#dc3545' : '#0d6efd';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'danger' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    toast.style.cssText = `position:fixed;top:20px;right:20px;z-index:9999;padding:12px 20px;border-radius:8px;color:#fff;background:${bgColor};box-shadow:0 4px 12px rgba(0,0,0,0.3);font-size:0.9rem;max-width:400px;animation:slideIn 0.3s ease;`;
+    toast.innerHTML = `<i class="fas ${icon} me-2"></i>${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(() => toast.remove(), 500); }, 5000);
+}
+
+// Check for updates on a firewall
+function checkUpdates(firewallId) {
+    const button = event.target.closest('button') || event.target;
+    const cell = button.closest('td');
+    const originalCellHTML = cell.innerHTML;
+
+    cell.innerHTML = `
+        <span class="badge bg-info text-white">
+            <i class="fas fa-search fa-pulse me-1"></i>Checking...
+        </span>
+        <div class="progress mt-1" style="height: 3px; max-width: 120px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: 100%"></div>
+        </div>`;
+
+    fetch('/api/check_updates.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            firewall_id: firewallId,
+            csrf: "<?php echo csrf_token(); ?>"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Update check triggered. Status will refresh on next agent check-in.', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            cell.innerHTML = originalCellHTML;
+            showToast('Error: ' + (data.message || 'Failed to check updates'), 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        cell.innerHTML = originalCellHTML;
+        showToast('Error checking updates.', 'danger');
+    });
+}
+
 function applyFilters() {
     const search = document.getElementById('searchInput').value;
     const status = document.getElementById('statusFilter').value;
@@ -1401,20 +1485,30 @@ function updateAllFirewalls() {
 }
 
 function updateFirewall(firewallId) {
-    if (!confirm("This will trigger an update on this firewall. The firewall will update automatically and only reboot if necessary. Continue?")) {
+    if (!confirm("This will trigger an OPNsense update on this firewall. The firewall will update automatically and reboot if necessary.\n\nContinue?")) {
         return;
     }
-    
-    const button = event.target;
-    const originalText = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    
+
+    const button = event.target.closest('button') || event.target;
+    const cell = button.closest('td');
+    const originalCellHTML = cell.innerHTML;
+
+    // Show updating animation immediately in the cell
+    cell.innerHTML = `
+        <div class="updating-animation">
+            <span class="badge bg-primary text-white">
+                <i class="fas fa-sync-alt fa-spin me-1"></i>Updating...
+            </span>
+            <div class="progress mt-1" style="height: 4px; max-width: 120px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 100%"></div>
+            </div>
+            <small class="text-muted d-block mt-1" style="font-size: 0.65rem;">Sending update request...</small>
+        </div>`;
+
     fetch('/api/update_firewall.php', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             firewall_id: firewallId,
             csrf: "<?php echo csrf_token(); ?>"
@@ -1423,19 +1517,21 @@ function updateFirewall(firewallId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Update initiated successfully. The firewall will update automatically and only reboot if necessary.');
-            location.reload();
+            // Update the small text to show success
+            const small = cell.querySelector('small');
+            if (small) small.textContent = 'Waiting for agent pickup...';
+            showToast('Update queued successfully. The firewall will update on next agent check-in.', 'success');
+            // Reload after 2 seconds to show updated status
+            setTimeout(() => location.reload(), 2000);
         } else {
-            alert('Error: ' + (data.message || 'Failed to initiate update'));
+            cell.innerHTML = originalCellHTML;
+            showToast('Error: ' + (data.message || 'Failed to initiate update'), 'danger');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error initiating update');
-    })
-    .finally(() => {
-        button.disabled = false;
-        button.innerHTML = originalText;
+        cell.innerHTML = originalCellHTML;
+        showToast('Error initiating update. Check console for details.', 'danger');
     });
 }
 
