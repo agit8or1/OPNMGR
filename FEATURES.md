@@ -1,6 +1,6 @@
 # OPNManager Feature Catalog
-**Last Updated**: October 23, 2025
-**Version**: 2.2.0+
+**Last Updated**: February 24, 2026
+**Version**: 3.8.6
 
 This document provides a comprehensive catalog of all features in OPNManager, organized by category with implementation status and technical details.
 
@@ -53,28 +53,24 @@ This document provides a comprehensive catalog of all features in OPNManager, or
   - Configuration persistence between check-ins
   - IP class-based network estimation fallback
 
-### Dual Agent Architecture
-**Status**: ✅ Production | **Version**: 3.6.0+
+### Unified Agent Architecture
+**Status**: ✅ Production | **Version**: 3.8.0+
 
-**Primary Agent (opnsense_agent_v3.6.0.sh)**
-- Check-in interval: 2 minutes
+**OPNManager Agent (Plugin-based, v1.5.6)**
+- Check-in interval: 2 minutes (configurable per-firewall)
+- Native OPNsense plugin with auto-update support
 - Functions:
   - System metrics collection (CPU, Memory, Disk, Uptime)
-  - Network configuration reporting (WAN/LAN)
-  - Traffic statistics (interface bytes in/out)
-  - Command execution and response
+  - Network configuration reporting (WAN/LAN with multi-WAN)
+  - Traffic statistics (interface bytes in/out, pf counter fallback)
+  - OPNsense version and update availability detection
+  - Reboot-required status reporting
+  - Command execution and response (base64 encoded)
   - SSH tunnel management
   - Firewall backup coordination
-- **Technical**: Shell script, runs via cron, base64 output encoding
-
-**Update Check Agent (opnsense_update_agent_v1.1.0.sh)**
-- Check-in interval: 5 minutes
-- Functions:
-  - OPNsense version detection
-  - Available updates checking
-  - Reboot pending status
-  - Auto-update capability (when enabled)
-- **Technical**: Independent from primary agent, updates via pkg-query
+  - Latency monitoring (ping measurements)
+  - Bandwidth testing (iperf3 speed tests)
+- **Technical**: Shell script, runs via cron, PID-based duplicate prevention
 
 ---
 
@@ -323,10 +319,12 @@ ai_scan_findings:
   - Database storage for historical data
 
 - **Time Range Selection**
-  - 24 hours (1440 data points)
-  - 1 week (10,080 data points)  
-  - 30 days (43,200 data points)
-  - Custom date range support
+  - 1 hour (per-minute granularity)
+  - 4 hours (per-minute granularity)
+  - 12 hours (10-minute intervals)
+  - 24 hours (10-minute intervals)
+  - 1 week (hourly intervals)
+  - 30 days (hourly/2-hour intervals)
 
 - **Metrics Displayed**
   - Traffic IN (Mb/s)
@@ -562,22 +560,32 @@ ai_scan_findings:
 - Bandwidth testing
 
 ### WAN Bandwidth Testing
-**Status**: 📋 Planned
+**Status**: ✅ Production | **Version**: 3.6.0+
 
-- Automated speed tests
-- Historical speed tracking
-- ISP performance monitoring
-- Speed test graphs
-- Downtime detection
+- Automated iperf3 speed tests with configurable intervals (2h, 4h, 8h, 12h, 24h)
+- Historical speed tracking with download/upload graphs
+- Multi-server fallback for reliability
+- On-demand manual speed tests
+- Per-firewall scheduling configuration
 
 ### Data Retention Management
-**Status**: 📋 Planned
+**Status**: ✅ Production | **Version**: 3.7.0+
 
-- Configurable retention periods
-- Automatic data purging
-- Archive before delete
-- Compliance reporting
-- Storage optimization
+- Automatic purge of old command queue records (completed >7d, failed >14d)
+- System health checks (database, queue, agents, disk)
+- Cron-based cleanup in two phases: stuck recovery + data purge
+- Purgeable record count display in Queue Management
+
+### Firmware Update Management
+**Status**: ✅ Production | **Version**: 3.8.0+
+
+- One-click OPNsense firmware updates from web interface
+- Animated "Updating..." status with progress bar during updates
+- Clickable "Reboot Required" badge triggers remote reboot
+- Auto-recovery for updates stuck in updating state (>15 minute timeout)
+- Toast notifications for update/reboot/check actions
+- Force update check when firewall reboots
+- Duplicate reboot command prevention
 
 ### DNS Traffic Analysis
 **Status**: 📋 Planned
@@ -608,8 +616,10 @@ ai_scan_findings:
 | SSH Tunnel System | ✅ Production | 2.1.0 | ✅ | ✅ | ✅ |
 | Tunnel Proxy | ✅ Production | 2.1.0 | ✅ | ❌ | ✅ |
 | Network Diagnostic Tools | 🚧 Development | 2.3.0 | ✅ | ✅ | ✅ |
-| WAN Bandwidth Testing | 📋 Planned | 2.3.0 | ✅ | ✅ | ✅ |
-| DNS Traffic Analysis | 📋 Planned | 2.4.0 | ✅ | ✅ | ✅ |
+| WAN Bandwidth Testing | ✅ Production | 3.6.0 | ✅ | ✅ | ✅ |
+| Data Retention Management | ✅ Production | 3.7.0 | ✅ | ✅ | ❌ |
+| Firmware Update Management | ✅ Production | 3.8.0 | ✅ | ✅ | ✅ |
+| DNS Traffic Analysis | 📋 Planned | TBD | ✅ | ✅ | ✅ |
 
 ## 🔄 Feature Update Process
 
@@ -646,6 +656,6 @@ VALUES ('Feature Name', 'Category', 'production', '2.2.0', 'Description', 1, 1, 
 
 ---
 
-**Document Version**: 1.0  
-**Generated**: October 23, 2025  
+**Document Version**: 2.0
+**Updated**: February 24, 2026
 **Maintainer**: OPNManager Development Team

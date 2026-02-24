@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-24'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fix Update Flow & Status Animation'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Update System Overhaul & Chart Timeframes'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,29 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.8.6',
+            'date' => '2026-02-24',
+            'type' => 'minor',
+            'title' => 'Update System Overhaul & Chart Timeframes',
+            'changes' => [
+                'FIXED: Critical bug - reboot_required never clearing (read $_POST instead of JSON $input)',
+                'FIXED: updates_available stuck when current and available versions match',
+                'FIXED: Update button click handler (event.target hit icon, not button)',
+                'FIXED: check_updates.php was demo code with hardcoded versions and rand()',
+                'FIXED: Health score penalty for missing API credentials (not used by agent system)',
+                'NEW: Animated "Updating..." state with progress bar in Updates column',
+                'NEW: Updating/Update Queued status badges in Status column',
+                'NEW: Clickable "Reboot Required" badge triggers firewall reboot',
+                'NEW: Toast notifications replace alert() dialogs for update/reboot actions',
+                'NEW: 1 Hour, 4 Hours, 12 Hours chart timeframes in firewall details',
+                'NEW: Auto-recovery for firewalls stuck in updating status (>15 min timeout)',
+                'NEW: Force update check when firewall reboots (reboot_required 1→0)',
+                'NEW: checkUpdates() JS function (was referenced but never defined)',
+                'IMPROVED: All chart APIs now accept hours parameter with smart aggregation',
+                'IMPROVED: Reboot API rewritten with JSON support, CSRF, duplicate prevention'
+            ]
+        ],
         [
             'version' => '3.7.0',
             'date' => '2026-02-12',

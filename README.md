@@ -1,6 +1,6 @@
 # OPNManager - OPNsense Firewall Management Platform
 
-**Status**: Production Stable | **License**: MIT | **Agent**: v1.5.6
+**Status**: Production Stable | **License**: MIT | **Version**: 3.8.6 | **Agent**: v1.5.6
 
 A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
 
@@ -26,9 +26,10 @@ A comprehensive web-based management platform for centralized monitoring, config
 ### System Monitoring
 - **Accurate Uptime Tracking**: Real system uptime from agent
 - **Version Tracking**: OPNsense version, agent version, available updates
-- **Update Detection**: Agent-reported update availability with auto-update
-- **Reboot Status**: Track pending reboots and system state
-- **System Stats**: CPU, memory, disk usage charts over time
+- **One-Click Updates**: Trigger OPNsense updates with animated progress status
+- **Reboot Control**: Clickable "Reboot Required" badge triggers remote reboot with confirmation
+- **Stuck Update Recovery**: Auto-recovery for updates stuck >15 minutes
+- **System Stats**: CPU, memory, disk usage charts (1h, 4h, 12h, 24h, 1w, 30d timeframes)
 
 ### Command Execution
 - **Remote Command Queue**: Execute commands on firewalls remotely

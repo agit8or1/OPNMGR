@@ -2,7 +2,69 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: February 11, 2026
+**Last Updated**: February 24, 2026
+
+---
+
+## Version 3.8.6
+_Released: February 24, 2026_
+
+### Critical Bug Fixes
+
+- **Reboot Required Never Clearing** `agent_checkin.php`
+  `reboot_required` flag could never be cleared by agent check-ins because the code read from `$_POST` (empty for JSON requests) instead of `$input`. Once set to 1, it was permanent.
+  _Fixed by: Claude Code_
+
+- **Updates Available Stuck After Manual Update** `agent_checkin.php`
+  `updates_available=1` persisted even when `current_version` matched `available_version`. Added sanity check to clear stale flag.
+  _Fixed by: Claude Code_
+
+- **Update Button Click Did Nothing** `firewalls.php`
+  `event.target` hit the `<i>` icon inside the button, not the button itself. Fixed with `.closest('button')`.
+  _Fixed by: Claude Code_
+
+- **check_updates.php Was Demo Code** `api/check_updates.php`
+  Endpoint used hardcoded version strings and `rand(0,1)`. Rewritten to trigger real update check on next agent check-in.
+  _Fixed by: Claude Code_
+
+### New Features
+
+- **Update Status Animation** `firewalls.php`
+  Animated "Updating..." state with progress bar and status text in the Updates column when firewall is updating. Status column shows blue spinning badge.
+
+- **Clickable Reboot Required Badge** `firewalls.php`
+  "Reboot Required" badge is now a clickable button that triggers a firewall reboot with confirmation dialog.
+
+- **Toast Notifications** `firewalls.php`
+  Replaced browser `alert()` dialogs with styled toast notifications for update, reboot, and check actions.
+
+- **Chart Timeframes: 1h, 4h, 12h** `firewall_details.php`
+  Added 1 Hour, 4 Hours, and 12 Hours to the time frame dropdown. All chart APIs updated from days to hours parameter with adaptive aggregation intervals.
+
+- **Stuck Update Auto-Recovery** `agent_checkin.php`
+  Firewalls stuck in `updating` status for >15 minutes auto-recover to `online` on next agent check-in.
+
+- **Force Update Check on Reboot** `agent_checkin.php`
+  When `reboot_required` transitions from 1→0 (firewall rebooted), forces immediate update check instead of waiting 5 hours.
+
+### Improvements
+
+- Health score no longer penalizes for missing OPNsense API credentials (agent system doesn't use them)
+- Reboot API rewritten with JSON support, CSRF validation, admin requirement, and duplicate command prevention
+- Added missing `checkUpdates()` JavaScript function
+- "Reboot Required" badge hidden during active updates (redundant)
+
+### Files Modified
+- `agent_checkin.php` - $_POST→$input fix, sanity checks, stuck recovery, reboot transition
+- `firewalls.php` - Update animation, reboot button, toast notifications, health score fix
+- `api/update_firewall.php` - No changes (was already correct)
+- `api/check_updates.php` - Complete rewrite
+- `api/reboot_firewall.php` - Complete rewrite with JSON/CSRF support
+- `firewall_details.php` - Added 1h/4h/12h timeframes
+- `api/get_traffic_stats.php` - Hours parameter, adaptive aggregation
+- `api/get_system_stats.php` - Hours parameter, adaptive aggregation
+- `api/get_latency_stats.php` - Hours parameter, adaptive aggregation
+- `api/get_speedtest_results.php` - Hours parameter
 
 ---
 
