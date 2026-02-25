@@ -153,6 +153,24 @@ include __DIR__ . '/inc/header.php';
                                 </div>
                             </div>
 
+                            <!-- SSH Tunnel Management -->
+                            <div class="feature-card">
+                                <div class="feature-header">
+                                    <i class="fas fa-network-wired feature-icon"></i>
+                                    <h5>SSH Tunnel Management</h5>
+                                    <span class="badge bg-success">Production Ready</span>
+                                </div>
+                                <div class="feature-content">
+                                    <ul>
+                                        <li><strong>On-Demand Tunnels:</strong> Instant SSH tunnels to firewall web interfaces with HTTPS proxy</li>
+                                        <li><strong>Auto-Healing:</strong> Dead tunnels automatically detected and re-established every 2 minutes</li>
+                                        <li><strong>SSH Key Auto-Repair:</strong> Rejected keys automatically re-deployed to firewalls via agent</li>
+                                        <li><strong>Protocol-Aware Proxy:</strong> Nginx proxy automatically selects HTTP or HTTPS based on firewall web port</li>
+                                        <li><strong>Session Management:</strong> Time-limited sessions with automatic expiry and cleanup</li>
+                                    </ul>
+                                </div>
+                            </div>
+
                             <!-- Version Management -->
                             <div class="feature-card">
                                 <div class="feature-header">
