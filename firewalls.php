@@ -1614,6 +1614,11 @@ document.addEventListener('DOMContentLoaded', function() {
         select.value = savedRefresh;
         setAutoRefresh();
     }
+
+    // Auto-refresh every 10 seconds when any firewall is updating
+    if (document.querySelector('.updating-animation')) {
+        setInterval(() => location.reload(), 10000);
+    }
 });
 
 // Better tooltip positioning

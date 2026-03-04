@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-02-24'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Auto-Healing SSH Tunnels'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-03-02'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Update Status Fix'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,18 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.9.1',
+            'date' => '2026-03-02',
+            'type' => 'patch',
+            'title' => 'Update Status Fix',
+            'changes' => [
+                'FIXED: OPNsense update stuck in "Updating..." state - completion detection was gated behind 5-hour timer',
+                'FIXED: Check-in no longer overwrites updating/update_pending status with online prematurely',
+                'FIXED: Reduced stuck-update timeout from 15 to 5 minutes for faster recovery',
+                'NEW: Auto-refresh every 10 seconds on firewalls page when any firewall is updating',
+            ]
+        ],
         [
             'version' => '3.9.0',
             'date' => '2026-02-24',

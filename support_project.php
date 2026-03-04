@@ -77,7 +77,24 @@ require_once __DIR__ . '/inc/header.php';
 
     <!-- Support Options -->
     <div class="row mb-4 justify-content-center">
-        <div class="col-md-5 mb-3">
+        <div class="col-md-4 mb-3">
+            <div class="support-option">
+                <div class="text-center mb-3">
+                    <i class="fas fa-heart fa-3x" style="color: #db61a2;"></i>
+                </div>
+                <h4 class="text-center">GitHub Sponsors</h4>
+                <p class="text-center">
+                    Sponsor the project directly on GitHub. Your support helps fund new features, bug fixes, and ongoing maintenance.
+                </p>
+                <div class="text-center">
+                    <a href="https://github.com/sponsors/agit8or1" target="_blank" class="btn btn-support">
+                        <i class="fab fa-github me-2"></i>Become a Sponsor
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
             <div class="support-option">
                 <div class="text-center mb-3">
                     <i class="fas fa-star fa-3x" style="color: #fbbf24;"></i>
@@ -94,7 +111,7 @@ require_once __DIR__ . '/inc/header.php';
             </div>
         </div>
 
-        <div class="col-md-5 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="support-option">
                 <div class="text-center mb-3">
                     <i class="fas fa-briefcase fa-3x" style="color: #60a5fa;"></i>

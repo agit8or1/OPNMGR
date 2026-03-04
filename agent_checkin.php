@@ -251,27 +251,31 @@ try {
     }
     $uptime = $uptime ?: 'Unknown';
     
+    // Preserve 'updating'/'update_pending' status during check-in - let the update
+    // detection logic (below) handle the status transition properly
+    $checkin_status = in_array($firewall_status['status'], ['updating', 'update_pending']) ? $firewall_status['status'] : 'online';
+
     if ($agent_sent_reboot_status) {
         // Agent supports reboot detection - update the flag
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
             $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
+            $result = $stmt->execute([$agent_version, $checkin_status, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
             $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, reboot_required = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
+            $result = $stmt->execute([$agent_version, $checkin_status, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $reboot_required, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     } else {
         // Agent doesn't support reboot detection - preserve existing reboot_required value
         // Only update network config if provided by agent, otherwise preserve existing values
         if (!empty($wan_netmask) || !empty($wan_gateway)) {
             $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_netmask = ?, wan_gateway = ?, wan_dns_primary = ?, wan_dns_secondary = ?, lan_netmask = ?, lan_network = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, network_config_updated = NOW(), tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
+            $result = $stmt->execute([$agent_version, $checkin_status, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_netmask, $wan_gateway, $wan_dns_primary, $wan_dns_secondary, $lan_netmask, $lan_network, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         } else {
             // Preserve existing network config
             $stmt = db()->prepare('UPDATE firewalls SET last_checkin = NOW(), agent_version = ?, status = ?, wan_ip = ?, lan_ip = ?, ipv6_address = ?, version = ?, uptime = ?, wan_interfaces = ?, wan_groups = ?, wan_interface_stats = ?, tunnel_active = 1 WHERE id = ?');
-            $result = $stmt->execute([$agent_version, 'online', $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
+            $result = $stmt->execute([$agent_version, $checkin_status, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version, $uptime, $wan_interfaces, $wan_groups, $wan_interface_stats, $firewall_id]);
         }
     }
     
@@ -366,7 +370,8 @@ try {
     }
     
     $check_updates = false;
-    if (!$firewall_status['last_update_check'] || strtotime($firewall_status['last_update_check']) < (time() - 18000)) { // 5 hours = 18000 seconds
+    $is_updating = in_array($firewall_status['status'], ['updating', 'update_pending']);
+    if ($is_updating || !$firewall_status['last_update_check'] || strtotime($firewall_status['last_update_check']) < (time() - 18000)) { // 5 hours = 18000 seconds
         $check_updates = true;
         
         // Accept update status from agent instead of hardcoded version comparison
@@ -430,14 +435,19 @@ try {
                         'action' => 'partial_update_completed',
                         'new_version' => $current_version
                     ]);
-            } elseif ($update_age_minutes > 15) {
-                // Stuck for more than 15 minutes - auto-recover
-                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
+            } elseif ($update_age_minutes > 5) {
+                // Agent is checking in while status is 'updating' and 5+ minutes have passed.
+                // The update either completed (after reboot) or failed - recover to online.
+                // opnsense-update -bkf may leave minor patches still available, so
+                // updates_available can still be 1 even after a successful base update.
+                $stmt = db()->prepare('UPDATE firewalls SET status = ?, reboot_required = 0 WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
 
-                log_info('firewall', "Auto-recovered stuck updating status for firewall (stuck {$update_age_minutes}min)",
+                log_info('firewall', "Update completed for firewall after {$update_age_minutes}min - version $current_version (minor patches may still be available)",
                     null, $firewall_id, [
-                        'action' => 'update_timeout_recovery'
+                        'action' => 'update_timeout_recovery',
+                        'version' => $current_version,
+                        'updates_still_available' => $updates_available
                     ]);
             }
         }
@@ -510,7 +520,7 @@ try {
     // Include OPNsense update command if requested
     if ($opnsense_update_requested) {
         $response['opnsense_update_requested'] = true;
-        $response['opnsense_update_command'] = '/usr/local/sbin/opnsense-update -bkf';
+        $response['opnsense_update_command'] = '/usr/local/sbin/opnsense-update -bkp';
     }
     
     // Check for agent cleanup request
