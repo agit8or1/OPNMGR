@@ -328,12 +328,15 @@ function cleanup_expired_sessions() {
         
         // NO LONGER REMOVE FIREWALL RULES - Using permanent rule now
         // The permanent "Allow SSH from OPNManager - PERMANENT" rule stays active
-        
+
+        // Remove nginx proxy config for this session
+        exec("sudo /usr/bin/php " . __DIR__ . "/manage_nginx_tunnel_proxy.php remove {$session['id']} 2>&1");
+
         // Update status
         $reason = (strtotime($session['expires_at']) < time()) ? 'Expired' : 'Idle timeout';
         $stmt = db()->prepare("UPDATE ssh_access_sessions SET status = 'closed', closed_reason = ? WHERE id = ?");
         $stmt->execute([$reason, $session['id']]);
-        
+
         $cleaned++;
     }
     

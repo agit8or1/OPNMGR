@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-03-02'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Update Status Fix'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-03-09'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'DST Timezone Fix & Tunnel Improvements'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,19 @@ define('JQUERY_VERSION', '3.7.0');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.9.2',
+            'date' => '2026-03-09',
+            'type' => 'patch',
+            'title' => 'DST Timezone Fix & Tunnel Improvements',
+            'changes' => [
+                'FIXED: Checkin times showing "1 hour ago" on DST transition — MySQL timezone changed from hardcoded offset to America/New_York',
+                'FIXED: Tunnel health monitor SSH key lookup now checks multiple key locations (/var/www/opnsense/keys/ and /etc/opnmgr/keys/)',
+                'FIXED: Tunnel health monitor SSH key permissions auto-corrected if not 0600',
+                'FIXED: Tunnel heal exec() replaced redundant shell_exec() call for proper exit code capture',
+                'FIXED: Expired tunnel sessions now properly remove nginx proxy config on cleanup',
+            ]
+        ],
         [
             'version' => '3.9.1',
             'date' => '2026-03-02',

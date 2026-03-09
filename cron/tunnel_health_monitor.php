@@ -88,19 +88,48 @@ foreach ($sessions as $session) {
         echo "[{$now}] Session #{$sid} (fw#{$fw_id} port {$port}): tunnel DEAD, attempting auto-heal\n";
 
         // Step 1: Ensure SSH key on disk
-        $key_file = "/etc/opnmgr/keys/id_firewall_{$fw_id}";
+        // Try multiple key locations in order of preference
+        $key_locations = [
+            "/var/www/opnsense/keys/id_firewall_{$fw_id}",
+            "/etc/opnmgr/keys/id_firewall_{$fw_id}",
+        ];
+        $key_file = $key_locations[0]; // Default to app keys dir
+
         if (empty($session['ssh_private_key'])) {
             echo "[{$now}]   SKIP: No SSH key in DB for firewall #{$fw_id}\n";
             log_warning('TUNNEL', "Auto-heal skipped for session #{$sid}: no SSH key in DB", null, $fw_id);
             continue;
         }
 
-        $private_key = base64_decode($session['ssh_private_key']);
-        if (!is_dir(dirname($key_file))) {
-            mkdir(dirname($key_file), 0700, true);
+        // Check if a valid key already exists on disk (any location)
+        $found_existing = false;
+        foreach ($key_locations as $loc) {
+            if (file_exists($loc) && is_readable($loc)) {
+                $key_file = $loc;
+                // Ensure correct permissions (SSH refuses keys with 0644)
+                $perms = fileperms($loc) & 0777;
+                if ($perms !== 0600) {
+                    @chmod($loc, 0600);
+                }
+                $found_existing = true;
+                break;
+            }
         }
-        file_put_contents($key_file, $private_key);
-        chmod($key_file, 0600);
+
+        // If no existing key found, write it to the writable location
+        if (!$found_existing) {
+            $private_key = base64_decode($session['ssh_private_key']);
+            $key_dir = dirname($key_file);
+            if (!is_dir($key_dir)) {
+                @mkdir($key_dir, 0700, true);
+            }
+            if (file_put_contents($key_file, $private_key) === false) {
+                echo "[{$now}]   FAILED: Cannot write SSH key to {$key_file}\n";
+                log_error('TUNNEL', "Auto-heal failed for session #{$sid}: cannot write SSH key", null, $fw_id);
+                continue;
+            }
+            chmod($key_file, 0600);
+        }
 
         // Step 2: Test SSH key
         $test_cmd = sprintf(
@@ -141,9 +170,8 @@ foreach ($sessions as $session) {
             $fw_web_port,
             escapeshellarg($fw_ip)
         );
-        $ssh_output = trim(shell_exec($ssh_cmd) ?? '');
-        $ssh_result = 0;
         exec($ssh_cmd, $exec_output, $ssh_result);
+        $ssh_output = implode("\n", $exec_output);
 
         // Verify tunnel came up
         sleep(1);
