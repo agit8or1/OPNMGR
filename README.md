@@ -1,8 +1,12 @@
 # OPNManager - OPNsense Firewall Management Platform
 
-**Status**: Production Stable | **License**: MIT | **Version**: 3.8.6 | **Agent**: v1.5.6
+[![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
+
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.9.3](https://img.shields.io/badge/version-3.9.3-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
 
 A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
+
+If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
 ---
 
