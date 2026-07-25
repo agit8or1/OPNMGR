@@ -21,24 +21,34 @@ if (!isset($_SESSION['user_id'])) {
 
 $action = $_GET['action'] ?? '';
 
+// CSRF validation for state-changing actions
+if (in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'])) {
+    $csrf_token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!csrf_verify($csrf_token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+        exit;
+    }
+}
+
 switch ($action) {
     case 'list':
         listActiveTunnels();
         break;
-    
+
     case 'reset_all':
         resetAllTunnels();
         break;
-    
+
     case 'kill_tunnel':
         $session_id = (int)($_POST['session_id'] ?? 0);
         killTunnel($session_id);
         break;
-    
+
     case 'cleanup_zombies':
         cleanupZombieTunnels();
         break;
-    
+
     default:
         echo json_encode(['success' => false, 'error' => 'Invalid action']);
 }

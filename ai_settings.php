@@ -10,7 +10,10 @@ $message_type = '';
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['save_ai_provider'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = 'CSRF validation failed. Please try again.';
+        $message_type = 'danger';
+    } elseif (isset($_POST['save_ai_provider'])) {
         $provider = $_POST['provider'];
         $api_key = $_POST['api_key'];
         $model = $_POST['model'];

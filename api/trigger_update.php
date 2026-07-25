@@ -15,6 +15,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 try {
     // Get input data
     $input = json_decode(file_get_contents('php://input'), true);
+
+    // CSRF validation
+    $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!csrf_verify($csrf_token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        exit;
+    }
     
     if (!$input || !isset($input['firewall_id'])) {
         http_response_code(400);

@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireLogin();
+
 try {
     // Get all firewalls with their update status
     $stmt = db()->query("

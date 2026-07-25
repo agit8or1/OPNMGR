@@ -10,6 +10,7 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireLogin();
 
 try {
     $firewall_id = (int)($_GET['firewall_id'] ?? 0);

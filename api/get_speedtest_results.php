@@ -10,9 +10,7 @@ header('Expires: 0');
 // Set timezone to America/New_York (EST/EDT)
 date_default_timezone_set('America/New_York');
 
-// Note: Authentication handled by parent page (firewall_details.php)
-// This API is only called from authenticated sessions, so we skip auth check here
-// to avoid session cookie issues with AJAX calls
+requireLogin();
 
 $firewall_id = intval($_GET['firewall_id'] ?? 0);
 

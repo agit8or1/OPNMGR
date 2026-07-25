@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/inc/bootstrap_agent.php';
+require_once __DIR__ . '/inc/bootstrap.php';
+requireLogin();
 
 header('Content-Type: text/html; charset=UTF-8');
 ?>

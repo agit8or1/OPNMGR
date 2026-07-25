@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/inc/bootstrap.php';
+requireLogin();
+requireAdmin();
+
 header('Content-Type: application/octet-stream');
 header('Cache-Control: no-cache');
 

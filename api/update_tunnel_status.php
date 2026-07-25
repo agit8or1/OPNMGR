@@ -3,7 +3,7 @@
  * Update Tunnel Status API
  * Called by agents to update the status of proxy tunnel requests
  */
-require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 
@@ -11,11 +11,25 @@ header('Content-Type: application/json');
 $input = json_decode(file_get_contents('php://input'), true);
 
 $request_id = (int)($input['request_id'] ?? 0);
+$firewall_id = (int)($input['firewall_id'] ?? 0);
+$hardware_id = trim($input['hardware_id'] ?? '');
 $status = trim($input['status'] ?? '');
 $tunnel_pid = (int)($input['tunnel_pid'] ?? 0);
 
-if (!$request_id || !$status) {
+if (!$request_id || !$status || !$firewall_id || empty($hardware_id)) {
     echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
+    exit;
+}
+
+// Validate agent identity
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt->execute([$firewall_id]);
+$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$auth_fw || (
+    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Authentication failed']);
     exit;
 }
 

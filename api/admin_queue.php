@@ -6,6 +6,8 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireLogin();
+requireAdmin();
 
 $action = $_GET['action'] ?? '';
 
@@ -165,6 +167,15 @@ function cancelCommand() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $command_id = (int)($input['id'] ?? 0);
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         
@@ -196,6 +207,15 @@ function cancelRequest() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $request_id = (int)($input['id'] ?? 0);
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         
@@ -227,6 +247,15 @@ function deleteCommand() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $command_id = (int)($input['id'] ?? 0);
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         
@@ -257,6 +286,15 @@ function deleteRequest() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $request_id = (int)($input['id'] ?? 0);
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         
@@ -287,6 +325,15 @@ function clearCommandQueue() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         $status = $input['status'] ?? 'all';
         
@@ -317,6 +364,15 @@ function clearRequestQueue() {
     try {
         // Read JSON input
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $firewall_id = (int)($input['firewall_id'] ?? 21);
         $status = $input['status'] ?? 'all';
         
@@ -345,6 +401,13 @@ function clearRequestQueue() {
 
 function retryCommand() {
     try {
+        // CSRF validation
+        if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $command_id = (int)($_POST['command_id'] ?? 0);
         $firewall_id = (int)($_POST['firewall_id'] ?? 21);
         
@@ -466,6 +529,15 @@ function purgeOldCommands() {
         requireAdmin();
 
         $input = json_decode(file_get_contents('php://input'), true);
+
+        // CSRF validation
+        $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            return;
+        }
+
         $retention_days = max(1, (int)($input['retention_days'] ?? 7));
 
         $purged = ['completed' => 0, 'failed' => 0, 'cancelled' => 0];

@@ -1,10 +1,27 @@
 <?php
-require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: text/plain');
-$firewall_id = $_GET['firewall_id'] ?? null;
+$firewall_id = (int)($_GET['firewall_id'] ?? 0);
+$hardware_id = trim($_GET['hardware_id'] ?? '');
 
-if (!$firewall_id) {
+if (!$firewall_id || empty($hardware_id)) {
+    echo "ERROR";
+    exit;
+}
+
+// Validate agent identity
+try {
+    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt->execute([$firewall_id]);
+    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$auth_fw || (
+        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+    )) {
+        echo "ERROR";
+        exit;
+    }
+} catch (Exception $e) {
     echo "ERROR";
     exit;
 }

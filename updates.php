@@ -18,6 +18,10 @@ $message = '';
 $message_type = '';
 
 if ($_POST) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = 'CSRF validation failed.';
+        $message_type = 'danger';
+    } else {
     $action = $_POST['action'] ?? '';
     
     switch ($action) {
@@ -47,6 +51,7 @@ if ($_POST) {
             }
             break;
     }
+    } // end CSRF check
 }
 
 $current_version = APP_VERSION;

@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireLogin();
 
 $action = $_GET['action'] ?? '';
 

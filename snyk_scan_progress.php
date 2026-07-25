@@ -2,12 +2,14 @@
 /**
  * AJAX endpoint for checking scan progress
  */
+require_once __DIR__ . '/inc/bootstrap.php';
+requireLogin();
 
 header('Content-Type: application/json');
 
 $scan_id = $_GET['scan_id'] ?? '';
-if (empty($scan_id)) {
-    echo json_encode(['error' => 'No scan ID provided']);
+if (empty($scan_id) || !preg_match('/^[a-zA-Z0-9_\-]+$/', $scan_id)) {
+    echo json_encode(['error' => 'Invalid scan ID']);
     exit;
 }
 

@@ -18,6 +18,10 @@ if ($current_user) {
 
 // Handle profile update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = 'CSRF validation failed. Please try again.';
+        $message_type = 'danger';
+    } else {
     $action = $_POST['action'];
 
     switch ($action) {
@@ -79,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             break;
     }
+    } // end CSRF check
 }
 
 require_once __DIR__ . '/inc/header.php';

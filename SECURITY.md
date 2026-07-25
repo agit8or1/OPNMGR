@@ -12,8 +12,9 @@
 
 ### How to Report
 
-1. **GitHub Private Vulnerability Reporting**: Use [GitHub's security advisory feature](https://github.com/agit8or1/OPNMGR/security/advisories/new)
-2. **Include**:
+1. **GitHub Private Vulnerability Reporting** (preferred): Use [GitHub's security advisory feature](https://github.com/agit8or1/OPNMGR/security/advisories/new)
+2. **Email**: Send details to **agit8or@gmail.com** with subject line "OPNMGR Security Report"
+3. **Include**:
    - Detailed description of the vulnerability
    - Steps to reproduce
    - Potential impact

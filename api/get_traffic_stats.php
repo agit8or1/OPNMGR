@@ -11,6 +11,8 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
+requireLogin();
+
 $firewall_id = (int)($_GET['firewall_id'] ?? 0);
 
 // Support both hours (new) and days (legacy) parameters

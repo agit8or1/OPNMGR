@@ -2,10 +2,7 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
-
-// Note: Authentication handled by parent page (firewall_details.php)
-// This API is only called from authenticated sessions, so we skip auth check here
-// to avoid session cookie issues with AJAX calls
+requireLogin();
 
 $firewall_id = intval($_GET['firewall_id'] ?? 0);
 

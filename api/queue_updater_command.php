@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -10,13 +10,26 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $input = json_decode(file_get_contents('php://input'), true);
 $firewall_id = $input['firewall_id'] ?? null;
+$hardware_id = trim($input['hardware_id'] ?? '');
 $command_type = $input['command_type'] ?? null;
 $command = $input['command'] ?? null;
 $description = $input['description'] ?? null;
 
-if (!$firewall_id || !$command_type || !$command || !$description) {
+if (!$firewall_id || !$command_type || !$command || !$description || empty($hardware_id)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
+    exit;
+}
+
+// Validate agent identity
+$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+$auth_stmt->execute([$firewall_id]);
+$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$auth_fw || (
+    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Authentication failed']);
     exit;
 }
 

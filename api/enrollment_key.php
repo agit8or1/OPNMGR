@@ -28,6 +28,14 @@ if (!$input) {
     $input = $_POST;
 }
 
+// CSRF validation
+$csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!csrf_verify($csrf_token)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+    exit;
+}
+
 $firewall_id = (int)($input['firewall_id'] ?? 0);
 
 if (!$firewall_id) {

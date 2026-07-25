@@ -34,7 +34,10 @@ try {
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tablesExist) {
-    if (isset($_POST['add_instance'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = 'CSRF validation failed. Please try again.';
+        $message_type = 'danger';
+    } elseif (isset($_POST['add_instance'])) {
         // Generate unique instance key
         $instance_key = generateLicenseKey();
         $server_mac = trim($_POST['server_mac'] ?? '');
@@ -63,9 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tablesExist) {
         
         $message = "Instance created successfully!<br><strong>Instance Key:</strong> " . htmlspecialchars($instance_key) . "<br><strong>API Key:</strong> " . htmlspecialchars($apiCreds['key']);
         $message_type = 'success';
-    }
-    
-    if (isset($_POST['update_instance'])) {
+    } elseif (isset($_POST['update_instance'])) {
         $server_mac = trim($_POST['server_mac'] ?? '');
         $stmt = db()->prepare("UPDATE deployed_instances SET instance_name = ?, license_tier = ?, max_firewalls = ?, status = ?, notes = ?, server_mac = ? WHERE id = ?");
         $stmt->execute([
@@ -80,17 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tablesExist) {
         
         $message = "Instance updated successfully!";
         $message_type = 'success';
-    }
-    
-    if (isset($_POST['delete_instance'])) {
+    } elseif (isset($_POST['delete_instance'])) {
         $stmt = db()->prepare("DELETE FROM deployed_instances WHERE id = ?");
         $stmt->execute([$_POST['instance_id']]);
         
         $message = "Instance deleted successfully!";
         $message_type = 'success';
-    }
-    
-    if (isset($_POST['extend_license'])) {
+    } elseif (isset($_POST['extend_license'])) {
         $stmt = db()->prepare("UPDATE deployed_instances SET license_expires = DATE_ADD(license_expires, INTERVAL ? DAY) WHERE id = ?");
         $stmt->execute([$_POST['extend_days'], $_POST['instance_id']]);
         

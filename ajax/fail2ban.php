@@ -23,6 +23,13 @@ $use_wrapper = is_executable($wrapper);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($method === 'POST') {
+    // CSRF validation
+    if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+        exit;
+    }
+
     $act = $_POST['act'] ?? '';
     $ip = trim($_POST['ip'] ?? '');
 

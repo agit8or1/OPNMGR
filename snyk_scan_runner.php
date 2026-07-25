@@ -7,6 +7,12 @@
 
 require_once __DIR__ . '/inc/env.php';
 
+// CLI only — block web access
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    die('CLI only');
+}
+
 // Get parameters
 $scan_type = $argv[1] ?? 'dependencies';
 $scan_id   = $argv[2] ?? uniqid('scan_');

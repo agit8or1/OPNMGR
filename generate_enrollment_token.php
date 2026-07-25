@@ -1,5 +1,7 @@
 <?php
-require_once __DIR__ . '/inc/bootstrap_agent.php';
+require_once __DIR__ . '/inc/bootstrap.php';
+requireLogin();
+requireAdmin();
 
 header('Content-Type: application/json');
 

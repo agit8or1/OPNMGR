@@ -9,6 +9,7 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../scripts/manage_ssh_keys.php';
 
 header('Content-Type: application/json');
+requireLogin();
 
 // Get firewall by hardware_id (from query param or POST)
 $hardware_id = trim($_GET['hardware_id'] ?? $_POST['hardware_id'] ?? '');

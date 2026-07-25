@@ -83,7 +83,15 @@ function handle_post_action() {
     }
     
     $input = json_decode(file_get_contents('php://input'), true);
-    
+
+    // CSRF validation
+    $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!csrf_verify($csrf_token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+        return;
+    }
+
     if (!isset($input['action'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Missing action']);

@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireAdmin();
 $response = [
     'healthy' => true,
     'checks' => [],

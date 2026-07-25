@@ -16,5 +16,7 @@ if (!$user) {
 }
 
 header('Content-Type: application/json');
+// Remove sensitive fields before sending
+unset($user['password']);
 echo json_encode($user);
 ?>

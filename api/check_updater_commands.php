@@ -1,13 +1,32 @@
 <?php
-require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 header('Content-Type: text/plain');
-// Get firewall ID
-$firewall_id = $_GET['firewall_id'] ?? null;
+// Get firewall ID and validate agent identity
+$firewall_id = (int)($_GET['firewall_id'] ?? 0);
+$hardware_id = trim($_GET['hardware_id'] ?? '');
 
-if (!$firewall_id) {
+if (!$firewall_id || empty($hardware_id)) {
     http_response_code(400);
-    echo "ERROR:Missing firewall_id parameter";
+    echo "ERROR:Missing firewall_id or hardware_id parameter";
+    exit;
+}
+
+// Validate agent identity
+try {
+    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+    $auth_stmt->execute([$firewall_id]);
+    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$auth_fw || (
+        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
+    )) {
+        http_response_code(403);
+        echo "ERROR:Authentication failed";
+        exit;
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo "ERROR:Authentication error";
     exit;
 }
 

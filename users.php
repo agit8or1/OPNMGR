@@ -8,7 +8,9 @@ requireAdmin();
 // Handle user actions
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['add_user'])) {
+    if (!csrf_verify($_POST['csrf'] ?? '')) {
+        $message = '<div class="alert alert-danger">CSRF validation failed. Please try again.</div>';
+    } elseif (isset($_POST['add_user'])) {
         $username = trim($_POST['username']);
         $password = $_POST['password'];
         $firstName = trim($_POST['first_name']);
@@ -106,6 +108,7 @@ $users = $stmt->fetchAll();
                     <div class="mb-4">
                         <h6>Change Your Password</h6>
                         <form method="post" class="row g-3">
+                            <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                             <div class="col-md-4">
                                 <input type="password" class="form-control" name="new_password" placeholder="New Password" required>
                             </div>
@@ -126,6 +129,7 @@ $users = $stmt->fetchAll();
                     <div class="mb-4">
                         <h6>Add New User</h6>
                         <form method="post" class="row g-3">
+                            <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                             <div class="col-md-2">
                                 <input type="text" class="form-control" name="first_name" placeholder="First Name">
                             </div>
@@ -187,6 +191,7 @@ $users = $stmt->fetchAll();
                                         </button>
                                         <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this user?')">
+                                            <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                                             <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                             <button type="submit" name="delete_user" class="btn btn-sm btn-danger">
                                                 <i class="fa fa-trash"></i> Delete
@@ -217,6 +222,7 @@ $users = $stmt->fetchAll();
             </div>
             <div class="modal-body bg-dark">
                 <form id="editUserForm" method="post">
+                    <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                     <input type="hidden" name="user_id" id="editUserId">
                     <div class="mb-3">
                         <label for="editFirstName" class="form-label text-light fw-bold">First Name</label>

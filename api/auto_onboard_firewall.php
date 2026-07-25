@@ -8,6 +8,23 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 
 require_once __DIR__ . '/../inc/logging.php';
 
+// Require authentication for web requests (not CLI)
+if (php_sapi_name() !== 'cli') {
+    requireAdmin();
+
+    // CSRF validation for POST requests
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $csrf_token = $input['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if (!csrf_verify($csrf_token)) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'CSRF token validation failed']);
+            exit;
+        }
+    }
+}
+
 /**
  * Check if firewall needs onboarding and queue necessary commands
  */

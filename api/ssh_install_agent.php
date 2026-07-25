@@ -14,6 +14,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// CSRF validation
+if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
+
 $host = trim($_POST['host'] ?? '');
 $port = (int)($_POST['port'] ?? 22);
 $user = trim($_POST['user'] ?? 'root');

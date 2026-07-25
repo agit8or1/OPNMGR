@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-04-08'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'GitHub Promotion & README Updates'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-07-25'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Security Hardening & Dependency Updates'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -24,12 +24,35 @@ if (!defined('TUNNEL_PROXY_VERSION')) { define('TUNNEL_PROXY_VERSION', '2.1.0');
 
 // System information
 define('PHP_MIN_VERSION', '8.0');
-define('BOOTSTRAP_VERSION', '5.3.3');
-define('JQUERY_VERSION', '3.7.0');
+define('BOOTSTRAP_VERSION', '5.3.8');
+define('JQUERY_VERSION', '3.7.1');
 
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.10.0',
+            'date' => '2026-07-25',
+            'type' => 'minor',
+            'title' => 'Security Hardening & Dependency Updates',
+            'changes' => [
+                'SECURITY: Enabled GitHub Private Vulnerability Reporting (closes #5)',
+                'SECURITY: Added authentication to 25+ unauthenticated API endpoints (critical: download_tunnel_key, generate_enrollment_token, admin_queue, tunnel_close, etc.)',
+                'SECURITY: Added CSRF validation to 19+ state-changing endpoints (users, profile, AI settings, license server, fail2ban, tunnel management, etc.)',
+                'SECURITY: Fixed command injection in tcpdump filter (run_diagnostic.php) — switched from blocklist to allowlist + escapeshellarg()',
+                'SECURITY: Removed hardcoded auth key from emergency_agent_update.php — now uses hardware_id validation',
+                'SECURITY: Fixed password hash exposure in get_user.php API response',
+                'SECURITY: Fixed path traversal in snyk_scan_progress.php — added scan_id allowlist regex',
+                'SECURITY: Added CLI-only guard to snyk_scan_runner.php (blocks web access)',
+                'SECURITY: Added auth to monitor.php, tunnel_auto_login.php, tunnel_health_check.php, create_backup_test.php, restore_backup.php',
+                'SECURITY: Agent-facing endpoints now validate hardware_id via hash_equals() (check_update_flag, clear_update_flag, update_complete, update_status, etc.)',
+                'UPDATED: Bootstrap 5.3.3→5.3.8, Font Awesome 6.4.0→6.7.2, Chart.js 4.4.0→4.5.1 (all pages unified)',
+                'UPDATED: Parsedown 1.7.4→1.8.0, Puppeteer 24.37.3→24.43.1',
+                'FIXED: npm audit vulnerabilities — basic-ftp (critical), ws (high), js-yaml (high), ip-address (moderate)',
+                'FIXED: Pinned Chart.js version in dashboard.php (was loading unversioned from CDN)',
+                'IMPROVED: SECURITY.md updated with email contact for vulnerability reports',
+            ]
+        ],
         [
             'version' => '3.9.2',
             'date' => '2026-03-09',

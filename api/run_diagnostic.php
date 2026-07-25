@@ -101,11 +101,11 @@ switch ($tool) {
         $filter = $params['filter'] ?? '';
         
         if ($filter) {
-            // Basic filter validation (prevent command injection)
-            if (preg_match('/[;&|`$]/', $filter)) {
+            // Strict filter validation — only allow safe BPF syntax characters
+            if (!preg_match('/^[a-zA-Z0-9 .\-_:\/()]+$/', $filter)) {
                 die(json_encode(['success' => false, 'error' => 'Invalid filter characters']));
             }
-            $command = "tcpdump -i {$iface} -c {$count} -n {$filter} 2>&1";
+            $command = "tcpdump -i {$iface} -c {$count} -n " . escapeshellarg($filter) . " 2>&1";
         } else {
             $command = "tcpdump -i {$iface} -c {$count} -n 2>&1";
         }

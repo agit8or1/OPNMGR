@@ -4,6 +4,7 @@
  * Handles OPNsense's dynamic CSRF tokens and logs in automatically
  */
 require_once __DIR__ . '/inc/bootstrap.php';
+requireLogin();
 
 // Get session ID from URL
 $session_id = (int)($_GET['session'] ?? 0);

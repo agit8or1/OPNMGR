@@ -8,6 +8,11 @@
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
 
+// Require authentication for web requests (cron runs via CLI)
+if (php_sapi_name() !== 'cli') {
+    requireLogin();
+}
+
 try {
     // Get all online firewalls with their speedtest interval setting
     $stmt = db()->prepare('

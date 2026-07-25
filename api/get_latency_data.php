@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 header('Content-Type: application/json');
+requireLogin();
 
 $firewall_id = (int)($_GET['firewall_id'] ?? 0);
 $timeframe = $_GET['timeframe'] ?? '24h'; // 24h, 7d, 30d
