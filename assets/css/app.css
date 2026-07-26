@@ -1,0 +1,1619 @@
+/* ==========================================================================
+   OPNManager — Master Stylesheet
+   Datadog/Grafana-inspired monitoring dashboard UI
+   Version: 1.0.0
+   ========================================================================== */
+
+/* ==========================================================================
+   1. CSS Custom Properties — Dark Theme (Default)
+   ========================================================================== */
+
+[data-theme="dark"],
+:root {
+    /* Backgrounds */
+    --bg:              #0f1117;
+    --bg-surface:      #1a1d23;
+    --bg-elevated:     #22252d;
+
+    /* Typography */
+    --text-primary:    #e8eaed;
+    --text-secondary:  #9aa0a6;
+    --text-muted:      #6b7280;
+
+    /* Borders */
+    --border:          rgba(255, 255, 255, 0.06);
+    --border-subtle:   rgba(255, 255, 255, 0.03);
+
+    /* Accent */
+    --accent:          #3b82f6;
+    --accent-hover:    #2563eb;
+
+    /* Semantic */
+    --success:         #22c55e;
+    --danger:          #ef4444;
+    --warning:         #f59e0b;
+
+    /* Layout */
+    --header-bg:       #0f1117;
+    --sidebar-bg:      #0f1117;
+    --sidebar-border:  rgba(255, 255, 255, 0.06);
+    --sidebar-hover:   rgba(255, 255, 255, 0.04);
+    --sidebar-active:  rgba(59, 130, 246, 0.12);
+
+    /* Inputs */
+    --input-bg:        rgba(255, 255, 255, 0.05);
+    --input-border:    rgba(255, 255, 255, 0.1);
+
+    /* Tables */
+    --table-hover:     rgba(255, 255, 255, 0.02);
+    --table-stripe:    rgba(255, 255, 255, 0.015);
+
+    /* Shadows */
+    --shadow:          0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-lg:       0 4px 12px rgba(0, 0, 0, 0.5);
+
+    /* Sidebar dimensions */
+    --sidebar-width:          72px;
+    --sidebar-width-expanded: 250px;
+}
+
+/* ==========================================================================
+   2. CSS Custom Properties — Light Theme
+   ========================================================================== */
+
+[data-theme="light"] {
+    /* Backgrounds */
+    --bg:              #f0f2f5;
+    --bg-surface:      #ffffff;
+    --bg-elevated:     #ffffff;
+
+    /* Typography */
+    --text-primary:    #1a1d23;
+    --text-secondary:  #4b5563;
+    --text-muted:      #9ca3af;
+
+    /* Borders */
+    --border:          rgba(0, 0, 0, 0.08);
+    --border-subtle:   rgba(0, 0, 0, 0.04);
+
+    /* Accent — slightly darker for contrast on white */
+    --accent:          #2563eb;
+    --accent-hover:    #1d4ed8;
+
+    /* Semantic — darker variants for light backgrounds */
+    --success:         #16a34a;
+    --danger:          #dc2626;
+    --warning:         #d97706;
+
+    /* Layout */
+    --header-bg:       #ffffff;
+    --sidebar-bg:      #ffffff;
+    --sidebar-border:  rgba(0, 0, 0, 0.08);
+    --sidebar-hover:   rgba(0, 0, 0, 0.04);
+    --sidebar-active:  rgba(59, 130, 246, 0.08);
+
+    /* Inputs */
+    --input-bg:        #f9fafb;
+    --input-border:    #d1d5db;
+
+    /* Tables */
+    --table-hover:     rgba(0, 0, 0, 0.02);
+    --table-stripe:    rgba(0, 0, 0, 0.015);
+
+    /* Shadows */
+    --shadow:          0 1px 3px rgba(0, 0, 0, 0.08);
+    --shadow-lg:       0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
+   3. Base / Reset
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg);
+    overflow-x: hidden;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+a:hover {
+    color: var(--accent-hover);
+}
+
+a.text-muted {
+    color: var(--text-muted);
+}
+
+a.text-muted:hover {
+    color: var(--text-primary);
+}
+
+::selection {
+    background: rgba(59, 130, 246, 0.3);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   4. Top Bar (.app-header)
+   ========================================================================== */
+
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    z-index: 1030;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    transition: background 0.2s;
+}
+
+/* Dark theme header gets a subtle blue tint */
+[data-theme="dark"] .app-header {
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.03), transparent),
+                var(--header-bg);
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text-primary);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+}
+
+.header-brand:hover {
+    color: var(--text-primary);
+}
+
+.logo-header {
+    max-height: 28px;
+    max-width: 100px;
+    object-fit: contain;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Hamburger — mobile only */
+.hamburger-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.hamburger-btn:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   5. Theme Toggle
+   ========================================================================== */
+
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.theme-toggle:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   6. User Dropdown (header)
+   ========================================================================== */
+
+.user-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+    border: none;
+    background: none;
+    font-size: 0.875rem;
+}
+
+.user-dropdown:hover {
+    background: var(--sidebar-hover);
+}
+
+.user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   7. Sidebar (.app-sidebar)
+   ========================================================================== */
+
+.app-sidebar {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    z-index: 1020;
+}
+
+.app-sidebar:hover,
+.app-sidebar.pinned {
+    width: var(--sidebar-width-expanded);
+}
+
+/* Custom scrollbar */
+.app-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.app-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.app-sidebar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.app-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox scrollbar */
+.app-sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+/* ---------- Sidebar pin button ---------- */
+
+.sidebar-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    margin-left: auto;
+}
+
+.app-sidebar:hover .sidebar-pin,
+.app-sidebar.pinned .sidebar-pin {
+    opacity: 1;
+}
+
+.sidebar-pin:hover {
+    color: var(--accent);
+}
+
+.app-sidebar.pinned .sidebar-pin {
+    color: var(--accent);
+}
+
+/* ---------- Sidebar sections ---------- */
+
+.sidebar-section {
+    padding: 4px 0;
+}
+
+.sidebar-section-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 8px 20px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.app-sidebar:hover .sidebar-section-label,
+.app-sidebar.pinned .sidebar-section-label {
+    opacity: 1;
+}
+
+/* ---------- Sidebar items ---------- */
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    height: 42px;
+    padding: 0 16px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-radius: 6px;
+    margin: 1px 8px;
+    transition: all 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    border: none;
+    background: none;
+    width: calc(100% - 16px);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.sidebar-item:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.sidebar-item.active {
+    background: var(--sidebar-active);
+    color: var(--accent);
+    border-left: 3px solid var(--accent);
+    font-weight: 600;
+}
+
+.sidebar-icon {
+    width: 40px;
+    min-width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+}
+
+.sidebar-label {
+    opacity: 0;
+    transition: opacity 0.15s;
+    font-size: 0.875rem;
+}
+
+.app-sidebar:hover .sidebar-label,
+.app-sidebar.pinned .sidebar-label {
+    opacity: 1;
+}
+
+/* ---------- Sidebar footer ---------- */
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* ==========================================================================
+   8. Content Area (.app-content)
+   ========================================================================== */
+
+.app-content {
+    margin-left: var(--sidebar-width);
+    margin-top: 48px;
+    padding: 24px;
+    min-height: calc(100vh - 48px);
+    background: var(--bg);
+    transition: margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-sidebar-pinned="true"] .app-content {
+    margin-left: var(--sidebar-width-expanded);
+}
+
+/* ==========================================================================
+   9. Cards
+   ========================================================================== */
+
+.card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+}
+
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--text-primary);
+    padding: 12px 16px;
+}
+
+.card-body {
+    padding: 16px;
+}
+
+.card-footer {
+    border-top: 1px solid var(--border);
+    background: transparent;
+    padding: 12px 16px;
+}
+
+/* Backwards-compat aliases */
+.card-dark,
+.card-ghost {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+}
+
+.card-dark .card-header,
+.card-ghost .card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ==========================================================================
+   10. Tables — Datadog-style
+   ========================================================================== */
+
+.table {
+    color: var(--text-primary);
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.table th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 10;
+    white-space: nowrap;
+}
+
+.table td {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+}
+
+.table tbody tr:hover {
+    background: var(--table-hover);
+}
+
+.table thead th {
+    border-top: none;
+}
+
+/* Compact table variant */
+.table-compact th {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.table-compact td {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+}
+
+/* Striped variant */
+.table-striped tbody tr:nth-of-type(odd) {
+    background: var(--table-stripe);
+}
+
+.table-striped tbody tr:hover {
+    background: var(--table-hover);
+}
+
+/* ==========================================================================
+   11. Status Dots
+   ========================================================================== */
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.status-dot.online {
+    background: var(--success);
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.status-dot.offline {
+    background: var(--danger);
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+.status-dot.warning {
+    background: var(--warning);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+/* ==========================================================================
+   12. Health Bars
+   ========================================================================== */
+
+.health-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    overflow: hidden;
+    width: 100%;
+}
+
+.health-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.health-bar-fill.good {
+    background: var(--success);
+}
+
+.health-bar-fill.warn {
+    background: var(--warning);
+}
+
+.health-bar-fill.bad {
+    background: var(--danger);
+}
+
+/* ==========================================================================
+   13. Forms
+   ========================================================================== */
+
+select.form-select,
+select.form-control,
+input.form-control,
+textarea.form-control {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+select.form-select:focus,
+select.form-control:focus,
+input.form-control:focus,
+textarea.form-control:focus {
+    background: var(--input-bg);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    color: var(--text-primary);
+    outline: none;
+}
+
+select option {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+.form-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.375rem;
+}
+
+.form-text {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* Input groups */
+.input-group-text {
+    background: var(--bg-elevated);
+    border: 1px solid var(--input-border);
+    color: var(--text-secondary);
+}
+
+/* Form check overrides */
+.form-check-input {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+}
+
+.form-check-input:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.form-check-label {
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   14. Buttons
+   ========================================================================== */
+
+.btn {
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 6px;
+    padding: 0.375rem 0.875rem;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: #ffffff;
+}
+
+.btn-outline-primary {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: transparent;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.btn-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: #ffffff;
+}
+
+.btn-success:hover {
+    filter: brightness(0.9);
+}
+
+.btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #ffffff;
+}
+
+.btn-danger:hover {
+    filter: brightness(0.9);
+}
+
+.btn-warning {
+    background: var(--warning);
+    border-color: var(--warning);
+    color: #ffffff;
+}
+
+.btn-warning:hover {
+    filter: brightness(0.9);
+}
+
+.btn-outline-secondary {
+    border-color: var(--border);
+    color: var(--text-secondary);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+    border-color: var(--input-border);
+}
+
+.btn-link {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.btn-link:hover {
+    color: var(--accent-hover);
+}
+
+/* Small variant */
+.btn-sm {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.625rem;
+}
+
+/* ==========================================================================
+   15. Badges
+   ========================================================================== */
+
+.badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+.badge.bg-success {
+    background: var(--success) !important;
+}
+
+.badge.bg-danger {
+    background: var(--danger) !important;
+}
+
+.badge.bg-warning {
+    background: var(--warning) !important;
+    color: #ffffff;
+}
+
+.badge.bg-primary {
+    background: var(--accent) !important;
+}
+
+.badge.bg-secondary {
+    background: var(--text-muted) !important;
+}
+
+/* ==========================================================================
+   16. Modals
+   ========================================================================== */
+
+.modal-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+}
+
+.modal-header .modal-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.modal-header .btn-close {
+    filter: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.modal-body {
+    padding: 16px;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+}
+
+.modal-pre {
+    white-space: pre-wrap;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    color: var(--text-primary);
+    overflow-x: auto;
+}
+
+/* Dark theme close button */
+[data-theme="dark"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* ==========================================================================
+   17. Dropdown Menus
+   ========================================================================== */
+
+.dropdown-menu {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 180px;
+}
+
+.dropdown-item {
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background: var(--sidebar-active);
+    color: var(--accent);
+}
+
+.dropdown-divider {
+    border-top-color: var(--border);
+    margin: 4px 0;
+}
+
+.dropdown-header {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 1rem 0.25rem;
+}
+
+/* ==========================================================================
+   18. KPI Strip — Dashboard Metrics
+   ========================================================================== */
+
+.kpi-strip {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.kpi-pill {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 140px;
+    transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.kpi-pill:hover {
+    box-shadow: var(--shadow);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.kpi-pill .kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.kpi-pill .kpi-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+}
+
+.kpi-pill .kpi-icon {
+    font-size: 1.2rem;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   19. Firewall Grid — Card Layout
+   ========================================================================== */
+
+.firewall-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.firewall-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.firewall-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent);
+    color: inherit;
+    text-decoration: none;
+}
+
+.firewall-card .fw-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.firewall-card .fw-hostname {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.firewall-card .fw-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.firewall-card .fw-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+}
+
+.firewall-card .fw-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+
+.firewall-card .fw-stat-label {
+    color: var(--text-muted);
+}
+
+.firewall-card .fw-stat-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   20. Pagination
+   ========================================================================== */
+
+.pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.pagination-info {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* Bootstrap pagination overrides */
+.page-link {
+    background: var(--bg-surface);
+    border-color: var(--border);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.page-link:hover {
+    background: var(--sidebar-hover);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.page-item.active .page-link {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+.page-item.disabled .page-link {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   21. Animations
+   ========================================================================== */
+
+@keyframes pulse {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@keyframes heart-pulse {
+    0%   { transform: scale(1); }
+    25%  { transform: scale(1.15); }
+    50%  { transform: scale(1); }
+    75%  { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.awaiting-data {
+    color: var(--warning);
+    font-style: italic;
+    animation: pulse 2s infinite;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.25s ease-out;
+}
+
+/* ==========================================================================
+   22. Alerts / Toasts
+   ========================================================================== */
+
+.alert {
+    border-radius: 8px;
+    font-size: 0.875rem;
+    border: 1px solid;
+}
+
+.alert-success {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.2);
+    color: var(--success);
+}
+
+.alert-danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+}
+
+.alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+}
+
+.alert-info {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+    color: var(--accent);
+}
+
+/* ==========================================================================
+   23. Tooltips (disable CSS, defer to JS)
+   ========================================================================== */
+
+.hover-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.hover-tooltip::after {
+    display: none;
+}
+
+/* ==========================================================================
+   24. Navigation Tabs
+   ========================================================================== */
+
+.nav-tabs {
+    border-bottom-color: var(--border);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-secondary);
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
+    border-radius: 0;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-muted);
+    background: transparent;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: transparent;
+}
+
+/* Pills variant */
+.nav-pills .nav-link {
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.875rem;
+}
+
+.nav-pills .nav-link:hover {
+    background: var(--sidebar-hover);
+    color: var(--text-primary);
+}
+
+.nav-pills .nav-link.active {
+    background: var(--accent);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   25. Progress Bars
+   ========================================================================== */
+
+.progress {
+    background: var(--border);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* ==========================================================================
+   26. Accordion
+   ========================================================================== */
+
+.accordion-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+}
+
+.accordion-button {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-weight: 500;
+    box-shadow: none;
+}
+
+.accordion-button:not(.collapsed) {
+    background: var(--bg-elevated);
+    color: var(--accent);
+    box-shadow: none;
+}
+
+.accordion-button::after {
+    filter: brightness(0.5);
+}
+
+[data-theme="dark"] .accordion-button::after {
+    filter: invert(1) brightness(0.8);
+}
+
+.accordion-body {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   27. Sidebar Mobile Backdrop
+   ========================================================================== */
+
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1019;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+}
+
+.sidebar-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ==========================================================================
+   28. Responsive — Mobile (max-width: 768px)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .hamburger-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .app-sidebar {
+        transform: translateX(-100%);
+        width: var(--sidebar-width-expanded);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .app-sidebar:hover {
+        width: var(--sidebar-width-expanded);
+    }
+
+    .app-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    /* Labels are always visible when sidebar is shown on mobile */
+    .app-sidebar.mobile-open .sidebar-label,
+    .app-sidebar.mobile-open .sidebar-section-label {
+        opacity: 1;
+    }
+
+    .app-sidebar.mobile-open .sidebar-pin {
+        opacity: 1;
+    }
+
+    .app-content {
+        margin-left: 0;
+        padding: 16px;
+    }
+
+    [data-sidebar-pinned="true"] .app-content {
+        margin-left: 0;
+    }
+
+    .header-brand span {
+        display: none;
+    }
+
+    .kpi-strip {
+        flex-direction: column;
+    }
+
+    .kpi-pill {
+        min-width: 100%;
+    }
+
+    .firewall-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pagination-controls {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+}
+
+/* Tablet adjustments */
+@media (max-width: 992px) and (min-width: 769px) {
+    .firewall-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+
+/* ==========================================================================
+   29. Print Styles
+   ========================================================================== */
+
+@media print {
+    .app-sidebar,
+    .app-header,
+    .sidebar-backdrop,
+    .hamburger-btn,
+    .theme-toggle,
+    .btn,
+    .pagination-controls {
+        display: none !important;
+    }
+
+    .app-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+    }
+
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+        break-inside: avoid;
+    }
+
+    .table th,
+    .table td {
+        color: #000000 !important;
+    }
+}
+
+/* ==========================================================================
+   30. Utility Classes
+   ========================================================================== */
+
+.text-primary-theme  { color: var(--text-primary) !important; }
+.text-secondary-theme { color: var(--text-secondary) !important; }
+.text-muted-theme    { color: var(--text-muted) !important; }
+.text-accent         { color: var(--accent) !important; }
+.text-success-theme  { color: var(--success) !important; }
+.text-danger-theme   { color: var(--danger) !important; }
+.text-warning-theme  { color: var(--warning) !important; }
+
+.bg-surface          { background: var(--bg-surface) !important; }
+.bg-elevated         { background: var(--bg-elevated) !important; }
+.border-theme        { border-color: var(--border) !important; }
+
+.rounded-lg          { border-radius: 8px !important; }
+.shadow-theme        { box-shadow: var(--shadow) !important; }
+.shadow-lg-theme     { box-shadow: var(--shadow-lg) !important; }
+
+.font-mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.no-select {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Transition helpers */
+.transition-fast     { transition: all 0.1s ease; }
+.transition-normal   { transition: all 0.2s ease; }
+.transition-slow     { transition: all 0.3s ease; }
+
+/* Loading spinner */
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+}
+
+.spinner-lg {
+    width: 32px;
+    height: 32px;
+    border-width: 3px;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.empty-state-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.empty-state-text {
+    font-size: 0.875rem;
+    max-width: 360px;
+    margin: 0 auto;
+}
+
+/* ==========================================================================
+   31. Scrollbar — Global
+   ========================================================================== */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+/* ==========================================================================
+   32. Code / Pre
+   ========================================================================== */
+
+code {
+    background: var(--bg-elevated);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--accent);
+}
+
+pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    overflow-x: auto;
+}
+
+pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+}
+
+/* ==========================================================================
+   33. List Groups
+   ========================================================================== */
+
+.list-group-item {
+    background: var(--bg-surface);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.list-group-item:hover {
+    background: var(--table-hover);
+}
+
+.list-group-item.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   34. Breadcrumbs
+   ========================================================================== */
+
+.breadcrumb {
+    background: transparent;
+    padding: 0;
+    margin-bottom: 16px;
+    font-size: 0.8rem;
+}
+
+.breadcrumb-item {
+    color: var(--text-muted);
+}
+
+.breadcrumb-item a {
+    color: var(--text-muted);
+}
+
+.breadcrumb-item a:hover {
+    color: var(--text-primary);
+}
+
+.breadcrumb-item.active {
+    color: var(--text-secondary);
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   End of OPNManager Stylesheet
+   ========================================================================== */
