@@ -1,88 +1,9 @@
 <?php
 
 require_once __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . "/inc/timezone_selector.php";
+require_once __DIR__ . '/inc/timezone_selector.php';
+require_once __DIR__ . '/inc/health.php';
 requireLogin();
-
-// Health calculation function - weights sum to exactly 100
-function calculateHealthScore($firewall) {
-    $health_score = 0;
-
-    // Connectivity Score (30 points)
-    $status = 'unknown';
-    if (!empty($firewall['agent_last_checkin'])) {
-        $checkin_time = strtotime($firewall['agent_last_checkin']);
-        $minutes_ago = (time() - $checkin_time) / 60;
-        $status = ($minutes_ago <= 10) ? 'online' : 'offline';
-    }
-
-    if ($status === 'online') {
-        $checkin_time = strtotime($firewall['agent_last_checkin']);
-        $minutes_ago = (time() - $checkin_time) / 60;
-        if ($minutes_ago <= 5) {
-            $health_score += 30;
-        } elseif ($minutes_ago <= 15) {
-            $health_score += 27;
-        } elseif ($minutes_ago <= 60) {
-            $health_score += 20;
-        } else {
-            $health_score += 12;
-        }
-    }
-
-    // Agent Version Score (20 points)
-    if (!empty($firewall['agent_version'])) {
-        $agent_version = $firewall['agent_version'];
-        if (version_compare($agent_version, AGENT_VERSION, '>=')) {
-            $health_score += 20;
-        } elseif (version_compare($agent_version, AGENT_MIN_VERSION, '>=')) {
-            $health_score += 18;
-        } elseif (version_compare($agent_version, '1.0.0', '>=')) {
-            $health_score += 14;
-        } else {
-            $health_score += 8;
-        }
-    }
-
-    // System Updates Score (20 points)
-    if (isset($firewall['updates_available'])) {
-        if ($firewall['updates_available'] == 0) {
-            $health_score += 20;
-        } elseif ($firewall['updates_available'] == 1) {
-            $health_score += 10;
-        } else {
-            $health_score += 8;
-        }
-    } else {
-        $health_score += 8;
-    }
-
-    // Uptime Score (15 points)
-    if (!empty($firewall['uptime'])) {
-        $uptime = $firewall['uptime'];
-        if (preg_match('/(\d+)\s*days?/', $uptime, $matches) || preg_match('/up\s+(\d+)/', $uptime, $matches)) {
-            $days = (int)$matches[1];
-            if ($days >= 7) {
-                $health_score += 15;
-            } elseif ($days >= 3) {
-                $health_score += 12;
-            } else {
-                $health_score += 8;
-            }
-        } else {
-            $health_score += 5;
-        }
-    }
-
-    // Configuration Score (15 points)
-    $config_score = 0;
-    if (!empty($firewall['version'])) $config_score += 5;
-    if (!empty($firewall['wan_ip'])) $config_score += 5;
-    if (!empty($firewall['lan_ip'])) $config_score += 5;
-    $health_score += $config_score;
-
-    return min($health_score, 100);
-}
 
 // Get search and filter parameters
 $search = $_GET['search'] ?? '';
