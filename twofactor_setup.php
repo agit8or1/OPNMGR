@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-md-8 mx-auto">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fa fa-mobile-alt me-2"></i>Two-Factor Authentication Setup</h5>
                 </div>

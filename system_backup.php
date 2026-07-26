@@ -370,7 +370,7 @@ if (is_dir($backupDir)) {
 require_once 'inc/header.php';
 ?>
 
-<div class="card-dark">
+<div class="card">
     <h2><i class="fa fa-archive me-2"></i> System Backup & Restore</h2>
     <p class="text-muted">
         Create and manage full system backups including database, configuration files, SSH keys, and SSL certificates.
@@ -387,7 +387,7 @@ require_once 'inc/header.php';
 <div class="row g-4">
     <!-- Create Backup Card -->
     <div class="col-md-6">
-        <div class="card-dark">
+        <div class="card">
             <h4><i class="fa fa-plus-circle me-2"></i> Create New Backup</h4>
             <p class="text-muted">
                 This will create a compressed backup containing:
@@ -416,7 +416,7 @@ require_once 'inc/header.php';
     
     <!-- Backup Statistics Card -->
     <div class="col-md-6">
-        <div class="card-dark">
+        <div class="card">
             <h4><i class="fa fa-chart-bar me-2"></i> Backup Statistics</h4>
             
             <div class="row text-center mt-3">
@@ -455,7 +455,7 @@ require_once 'inc/header.php';
 </div>
 
 <!-- Upload Backup for Restore -->
-<div class="card-dark mt-4">
+<div class="card mt-4">
     <h4><i class="fa fa-cloud-upload-alt me-2"></i> Upload Backup to Restore</h4>
     <p class="text-muted">
         Upload a backup file from another OPNManager installation or a previously downloaded backup for disaster recovery.
@@ -502,7 +502,7 @@ require_once 'inc/header.php';
 </div>
 
 <!-- Existing Backups -->
-<div class="card-dark mt-4">
+<div class="card mt-4">
     <h4><i class="fa fa-list me-2"></i> Existing Backups</h4>
     
     <?php if (empty($backups)): ?>
@@ -512,7 +512,7 @@ require_once 'inc/header.php';
         </div>
     <?php else: ?>
         <div class="table-responsive">
-            <table class="table table-dark table-striped">
+            <table class="table table-striped">
                 <thead>
                     <tr>
                         <th>Filename</th>
@@ -644,56 +644,5 @@ function confirmDelete(filename) {
 }
 </script>
 
-<style>
-.card-dark {
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03)) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255,255,255,0.15) !important;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    border-radius: 8px;
-}
-
-.card-dark h2, .card-dark h3, .card-dark h4, .card-dark h5, .card-dark h6 {
-    color: #ffffff !important;
-}
-
-.card-dark .text-muted, .card-dark small {
-    color: #cbd5e0 !important;
-}
-
-.card-dark ul li {
-    color: #e2e8f0 !important;
-}
-
-.card-dark strong {
-    color: #ffffff !important;
-}
-
-.card-dark p {
-    color: #e2e8f0 !important;
-}
-
-.form-label {
-    color: #f7fafc !important;
-    font-weight: 500 !important;
-}
-
-.table-dark {
-    color: #fff !important;
-}
-
-.table-dark th {
-    border-color: rgba(255,255,255,0.1);
-}
-
-.table-dark td {
-    border-color: rgba(255,255,255,0.05);
-}
-
-.table-striped tbody tr:nth-of-type(odd) {
-    background-color: rgba(255,255,255,0.02);
-}
-</style>
 
 <?php require_once 'inc/footer.php'; ?>

@@ -116,10 +116,10 @@ include __DIR__ . '/inc/header.php';
 
 <div class="row">
     <div class="col-md-12">
-        <div class="card card-dark">
+        <div class="card">
             <div class="card-body">
                 <div class="d-flex align-items-center gap-2 mb-3">
-                    <small class="text-light fw-bold mb-0">
+                    <small class="form-label-text fw-bold mb-0">
                         <i class="fas fa-envelope me-1"></i>SMTP Configuration
                     </small>
                 </div>
@@ -131,15 +131,15 @@ include __DIR__ . '/inc/header.php';
 
                     <div class="row g-2">
                         <div class="col-md-6">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">SMTP Host</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">SMTP Host</label>
                             <input type="text" name="smtp_host" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="smtp.gmail.com" required>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">Port</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">Port</label>
                             <input type="number" name="smtp_port" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_port); ?>" min="1" max="65535" required>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">Encryption</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">Encryption</label>
                             <select name="smtp_encryption" class="form-select form-select-sm">
                                 <option value="tls" <?php echo ($smtp_encryption === 'tls') ? 'selected' : ''; ?>>TLS</option>
                                 <option value="ssl" <?php echo ($smtp_encryption === 'ssl') ? 'selected' : ''; ?>>SSL</option>
@@ -150,22 +150,22 @@ include __DIR__ . '/inc/header.php';
 
                     <div class="row g-2 mt-1">
                         <div class="col-md-6">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">Username</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">Username</label>
                             <input type="text" name="smtp_username" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="your-email@gmail.com">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">Password</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">Password</label>
                             <input type="password" name="smtp_password" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_password); ?>" placeholder="Your SMTP password">
                         </div>
                     </div>
 
                     <div class="row g-2 mt-1">
                         <div class="col-md-6">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">From Email</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">From Email</label>
                             <input type="email" name="smtp_from_email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_from_email); ?>" placeholder="noreply@yourdomain.com">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-light fw-bold" style="font-size: 0.85rem;">From Name</label>
+                            <label class="form-label fw-bold" style="font-size: 0.85rem;">From Name</label>
                             <input type="text" name="smtp_from_name" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_from_name); ?>" placeholder="OPNsense Manager">
                         </div>
                     </div>
@@ -174,14 +174,14 @@ include __DIR__ . '/inc/header.php';
                         <button type="submit" name="save_smtp" value="1" class="btn btn-primary btn-sm">
                             <i class="fas fa-save me-1"></i>Save SMTP Settings
                         </button>
-                        <button type="submit" name="test_smtp" value="1" class="btn btn-outline-light btn-sm">
+                        <button type="submit" name="test_smtp" value="1" class="btn btn-outline-secondary btn-sm">
                             <i class="fas fa-flask me-1"></i>Test Connection
                         </button>
                     </div>
                 </form>
 
                 <div class="mt-4">
-                    <h6 class="text-light fw-bold" style="font-size: 0.9rem;">
+                    <h6 class="form-label-text fw-bold" style="font-size: 0.9rem;">
                         <i class="fas fa-info-circle me-2"></i>SMTP Configuration Guide
                     </h6>
                     <div class="alert alert-dark" style="font-size: 0.8rem;">

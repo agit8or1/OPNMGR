@@ -21,16 +21,6 @@ echo '<style>
 .text-danger { color: #ec7063 !important; }
 .text-success { color: #82e0aa !important; }
 .text-secondary { color: #d5d8dc !important; }
-.text-white { color: #e0e0e0 !important; }
-.card { background: #1a1d23 !important; border-color: #3a3f4b !important; }
-.card-header { background: #1a1d23 !important; border-color: #3a3f4b !important; color: #e0e0e0 !important; }
-.card-body { color: #e0e0e0; }
-.border-primary { border-color: #4fc3f7 !important; }
-.border-info { border-color: #5dade2 !important; }
-.border-warning { border-color: #f5b041 !important; }
-.border-danger { border-color: #ec7063 !important; }
-.bg-dark { background: #0d0f12 !important; }
-.text-muted { color: #95a5a6 !important; }
 </style>';
 
 // Get filter parameters
@@ -154,7 +144,7 @@ $firewalls = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname")
             <div class="card border-dark">
                 <div class="card-body text-center">
                     <h5 class="text-muted">Anomaly Score</h5>
-                    <h2 class="text-white"><?php echo number_format($stats['avg_anomaly_score'] ?? 0); ?></h2>
+                    <h2><?php echo number_format($stats['avg_anomaly_score'] ?? 0); ?></h2>
                 </div>
             </div>
         </div>
@@ -164,7 +154,7 @@ $firewalls = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname")
     <div class="row mb-4">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header bg-dark text-white">
+                <div class="card-header">
                     <i class="fas fa-exclamation-triangle"></i> Threat Level Distribution
                 </div>
                 <div class="card-body">
@@ -243,7 +233,7 @@ $firewalls = db()->query("SELECT id, hostname FROM firewalls ORDER BY hostname")
     <div class="row">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-primary">
                     <i class="fas fa-list"></i> Recent Log Analyses (<?php echo count($analyses); ?>)
                 </div>
                 <div class="card-body p-0">

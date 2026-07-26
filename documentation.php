@@ -11,31 +11,31 @@ include __DIR__ . '/inc/header.php';
     <div class="row">
         <!-- Quick Navigation Sidebar -->
         <div class="col-md-3">
-            <div class="card card-dark sticky-top" style="top: 20px; max-height: calc(100vh - 40px); overflow-y: auto;">
+            <div class="card card sticky-top" style="top: 20px; max-height: calc(100vh - 40px); overflow-y: auto;">
                 <div class="card-header bg-primary">
-                    <h6 class="mb-0 text-white"><i class="fas fa-list me-2"></i>Quick Navigation</h6>
+                    <h6 class="mb-0"><i class="fas fa-list me-2"></i>Quick Navigation</h6>
                 </div>
-                <div class="card-body p-2" style="background: #2c3e50;">
+                <div class="card-body p-2">
                     <div class="nav flex-column nav-pills">
-                        <a class="nav-link py-2 mb-1 text-white" href="#getting-started" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#getting-started" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-play-circle me-2"></i>Getting Started
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#firewall-management" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#firewall-management" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-network-wired me-2"></i>Firewall Management
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#agent-installation" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#agent-installation" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-download me-2"></i>Agent Installation
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#monitoring" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#monitoring" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-chart-line me-2"></i>Monitoring
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#updates" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#updates" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-sync me-2"></i>Updates
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#troubleshooting" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#troubleshooting" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-wrench me-2"></i>Troubleshooting
                         </a>
-                        <a class="nav-link py-2 mb-1 text-white" href="#advanced-topics" style="border-radius: 5px; font-size: 14px;">
+                        <a class="nav-link py-2 mb-1" href="#advanced-topics" style="border-radius: 5px; font-size: 14px;">
                             <i class="fas fa-cogs me-2"></i>Advanced Topics
                         </a>
                     </div>
@@ -48,7 +48,7 @@ include __DIR__ . '/inc/header.php';
 
         <!-- Main Content -->
         <div class="col-md-9">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-book me-2"></i>User Documentation

@@ -20,7 +20,7 @@ include __DIR__ . '/inc/header.php';
                 <p class="mb-0">SSH access allows OPNManager to automatically repair agents, run remote commands, and manage firewalls without manual intervention.</p>
             </div>
 
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Security Configuration</h5>
                 </div>
@@ -30,11 +30,11 @@ include __DIR__ . '/inc/header.php';
                         <p class="mb-0 mt-2">During enrollment, firewalls automatically receive the server's SSH public key. No password required!</p>
                     </div>
 
-                    <h6 class="text-white mt-4 mb-3">Server Information:</h6>
-                    <div class="bg-dark p-3 rounded border border-secondary">
+                    <h6 class=" mt-4 mb-3">Server Information:</h6>
+                    <div class="p-3 rounded border">
                         <div class="row">
                             <div class="col-md-4">
-                                <strong class="text-white">Server IP:</strong>
+                                <strong>Server IP:</strong>
                             </div>
                             <div class="col-md-8">
                                 <code class="text-info">184.175.206.229</code>
@@ -42,7 +42,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
                         <div class="row mt-2">
                             <div class="col-md-4">
-                                <strong class="text-white">SSH Public Key:</strong>
+                                <strong>SSH Public Key:</strong>
                             </div>
                             <div class="col-md-8">
                                 <code class="text-info" style="word-break: break-all;">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOSF41zYTRe76rGOj6Q21S2UJPGMaQy2Fx2RfEDYShkU</code>
@@ -52,9 +52,9 @@ include __DIR__ . '/inc/header.php';
                 </div>
             </div>
 
-            <div class="card card-dark mt-4">
+            <div class="card mt-4">
                 <div class="card-header bg-warning">
-                    <h5 class="mb-0 text-white"><i class="fas fa-exclamation-triangle me-2"></i>Manual Step Required</h5>
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Manual Step Required</h5>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-warning">
@@ -62,17 +62,17 @@ include __DIR__ . '/inc/header.php';
                         <p class="mb-0 mt-2">For each firewall, you must create a firewall rule to allow SSH from the OPNManager server.</p>
                     </div>
 
-                    <h6 class="text-white mb-3">Step-by-Step Instructions:</h6>
+                    <h6 class=" mb-3">Step-by-Step Instructions:</h6>
 
                     <div class="accordion" id="setupAccordion">
-                        <div class="accordion-item bg-dark border-secondary">
+                        <div class="accordion-item">
                             <h2 class="accordion-header">
-                                <button class="accordion-button bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#step1">
                                     <strong>Step 1:</strong>&nbsp;Access Firewall Rules
                                 </button>
                             </h2>
                             <div id="step1" class="accordion-collapse collapse show">
-                                <div class="accordion-body bg-dark text-light">
+                                <div class="accordion-body">
                                     <ol>
                                         <li>Log into your OPNsense firewall web UI</li>
                                         <li>Navigate to: <code class="text-info">Firewall → Rules → WAN</code></li>
@@ -82,15 +82,15 @@ include __DIR__ . '/inc/header.php';
                             </div>
                         </div>
 
-                        <div class="accordion-item bg-dark border-secondary mt-2">
+                        <div class="accordion-item mt-2">
                             <h2 class="accordion-header">
-                                <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step2">
                                     <strong>Step 2:</strong>&nbsp;Configure Rule Settings
                                 </button>
                             </h2>
                             <div id="step2" class="accordion-collapse collapse">
-                                <div class="accordion-body bg-dark text-light">
-                                    <table class="table table-dark table-bordered">
+                                <div class="accordion-body">
+                                    <table class="table table-bordered">
                                         <tbody>
                                             <tr>
                                                 <td><strong>Action:</strong></td>
@@ -130,14 +130,14 @@ include __DIR__ . '/inc/header.php';
                             </div>
                         </div>
 
-                        <div class="accordion-item bg-dark border-secondary mt-2">
+                        <div class="accordion-item mt-2">
                             <h2 class="accordion-header">
-                                <button class="accordion-button collapsed bg-secondary text-white" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#step3">
                                     <strong>Step 3:</strong>&nbsp;Save and Apply
                                 </button>
                             </h2>
                             <div id="step3" class="accordion-collapse collapse">
-                                <div class="accordion-body bg-dark text-light">
+                                <div class="accordion-body">
                                     <ol>
                                         <li>Click <button class="btn btn-sm btn-primary">Save</button> at the bottom of the rule form</li>
                                         <li>Click <button class="btn btn-sm btn-success">Apply Changes</button> at the top of the page</li>
@@ -151,21 +151,21 @@ include __DIR__ . '/inc/header.php';
                     <div class="alert alert-info mt-4">
                         <h6><i class="fas fa-lightbulb me-2"></i>Testing Connection</h6>
                         <p>After adding the rule, test SSH access from this server:</p>
-                        <pre class="bg-dark p-3 border border-secondary rounded text-light mb-0"><code>sudo -u www-data ssh -i /etc/opnmgr/keys/id_firewall_ID root@FIREWALL_IP 'echo "Working"'</code></pre>
+                        <pre class="p-3 border rounded mb-0"><code>sudo -u www-data ssh -i /etc/opnmgr/keys/id_firewall_ID root@FIREWALL_IP 'echo "Working"'</code></pre>
                     </div>
                 </div>
             </div>
 
-            <div class="card card-dark mt-4">
+            <div class="card mt-4">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>Troubleshooting</h5>
                 </div>
                 <div class="card-body">
-                    <h6 class="text-white">Common Issues:</h6>
+                    <h6>Common Issues:</h6>
 
                     <div class="mb-3">
                         <strong class="text-warning">Connection Timeout:</strong>
-                        <ul class="text-light">
+                        <ul>
                             <li>Firewall rule not created yet</li>
                             <li>Rule is on wrong interface (should be WAN)</li>
                             <li>Firewall is offline or unreachable</li>
@@ -174,7 +174,7 @@ include __DIR__ . '/inc/header.php';
 
                     <div class="mb-3">
                         <strong class="text-warning">Connection Refused:</strong>
-                        <ul class="text-light">
+                        <ul>
                             <li>SSH service not enabled on firewall</li>
                             <li>Go to: System → Settings → Administration → Enable Secure Shell</li>
                         </ul>
@@ -182,7 +182,7 @@ include __DIR__ . '/inc/header.php';
 
                     <div class="mb-3">
                         <strong class="text-warning">Permission Denied:</strong>
-                        <ul class="text-light">
+                        <ul>
                             <li>SSH key not in authorized_keys</li>
                             <li>Re-run enrollment script to add key</li>
                         </ul>

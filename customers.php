@@ -97,10 +97,10 @@ try {
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-4">
-                        <small class="text-light fw-bold mb-0">
+                        <small class="fw-bold mb-0">
                             <i class="fas fa-building me-1"></i>Customer Management
                         </small>
                     </div>
@@ -143,7 +143,7 @@ try {
                     <!-- Customers List -->
                     <h6>Current Customers</h6>
                     <div class="table-responsive">
-                        <table class="table table-dark table-hover">
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -198,42 +198,42 @@ try {
 <!-- Edit Customer Modal -->
 <div class="modal fade" id="editCustomerModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header bg-dark border-secondary">
-                <h5 class="modal-title text-light">Edit Customer</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Customer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body bg-dark">
+            <div class="modal-body">
                 <form id="editCustomerForm" method="post">
                     <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                     <input type="hidden" name="customer_id" id="editCustomerId">
                     <div class="mb-3">
-                        <label for="editName" class="form-label text-light fw-bold">Customer Name</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editName" name="name" required>
+                        <label for="editName" class="form-label fw-bold">Customer Name</label>
+                        <input type="text" class="form-control" id="editName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editContactPerson" class="form-label text-light fw-bold">Contact Person</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editContactPerson" name="contact_person">
+                        <label for="editContactPerson" class="form-label fw-bold">Contact Person</label>
+                        <input type="text" class="form-control" id="editContactPerson" name="contact_person">
                     </div>
                     <div class="mb-3">
-                        <label for="editEmail" class="form-label text-light fw-bold">Email</label>
-                        <input type="email" class="form-control bg-dark text-light border-secondary" id="editEmail" name="email">
+                        <label for="editEmail" class="form-label fw-bold">Email</label>
+                        <input type="email" class="form-control" id="editEmail" name="email">
                     </div>
                     <div class="mb-3">
-                        <label for="editPhone" class="form-label text-light fw-bold">Phone</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editPhone" name="phone">
+                        <label for="editPhone" class="form-label fw-bold">Phone</label>
+                        <input type="text" class="form-control" id="editPhone" name="phone">
                     </div>
                     <div class="mb-3">
-                        <label for="editAddress" class="form-label text-light fw-bold">Address</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editAddress" name="address">
+                        <label for="editAddress" class="form-label fw-bold">Address</label>
+                        <input type="text" class="form-control" id="editAddress" name="address">
                     </div>
                     <div class="mb-3">
-                        <label for="editNotes" class="form-label text-light fw-bold">Notes</label>
-                        <textarea class="form-control bg-dark text-light border-secondary" id="editNotes" name="notes" rows="3"></textarea>
+                        <label for="editNotes" class="form-label fw-bold">Notes</label>
+                        <textarea class="form-control" id="editNotes" name="notes" rows="3"></textarea>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer bg-dark border-secondary">
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" form="editCustomerForm" name="edit_customer" class="btn btn-primary">Save Changes</button>
             </div>

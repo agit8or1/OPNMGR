@@ -100,9 +100,8 @@ include __DIR__ . '/inc/header.php';
 ?>
 
 <style>
-.card-dark {
-  background-color: #1a1a1a;
-  border: 1px solid #333;
+.quick-add-section {
+  margin-top: 1rem;
 }
 
 .badge-enabled {
@@ -147,7 +146,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row">
         <!-- Add Country Block Form -->
         <div class="col-md-4">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h5 class="card-title mb-0"><i class="fas fa-plus-circle me-2"></i>Add Country Block</h5>
                 </div>
@@ -157,7 +156,7 @@ include __DIR__ . '/inc/header.php';
 
                         <div class="mb-3">
                             <label for="country_select" class="form-label">Quick Select</label>
-                            <select id="country_select" class="form-select bg-dark text-light border-secondary" onchange="selectCountry(this.value)">
+                            <select id="country_select" class="form-select" onchange="selectCountry(this.value)">
                                 <option value="">-- Select a country --</option>
                                 <?php foreach ($common_countries as $code => $name): ?>
                                     <option value="<?php echo $code . '|' . $name; ?>"><?php echo htmlspecialchars($name); ?> (<?php echo $code; ?>)</option>
@@ -167,20 +166,20 @@ include __DIR__ . '/inc/header.php';
 
                         <div class="mb-3">
                             <label for="country_code" class="form-label">Country Code (ISO 3166-1 alpha-2)</label>
-                            <input type="text" class="form-control bg-dark text-light border-secondary" id="country_code" name="country_code"
+                            <input type="text" class="form-control" id="country_code" name="country_code"
                                    placeholder="e.g., CN" maxlength="2" required style="text-transform: uppercase;">
                             <small class="form-text text-muted">2-letter country code (e.g., CN for China, RU for Russia)</small>
                         </div>
 
                         <div class="mb-3">
                             <label for="country_name" class="form-label">Country Name</label>
-                            <input type="text" class="form-control bg-dark text-light border-secondary" id="country_name" name="country_name"
+                            <input type="text" class="form-control" id="country_name" name="country_name"
                                    placeholder="e.g., China" required>
                         </div>
 
                         <div class="mb-3">
                             <label for="action" class="form-label">Action</label>
-                            <select class="form-select bg-dark text-light border-secondary" id="action" name="action">
+                            <select class="form-select" id="action" name="action">
                                 <option value="block">Block (Deny traffic)</option>
                                 <option value="allow">Allow (Whitelist)</option>
                             </select>
@@ -188,7 +187,7 @@ include __DIR__ . '/inc/header.php';
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Description (Optional)</label>
-                            <textarea class="form-control bg-dark text-light border-secondary" id="description" name="description"
+                            <textarea class="form-control" id="description" name="description"
                                       rows="2" placeholder="Reason for this block..."></textarea>
                         </div>
 
@@ -219,7 +218,7 @@ include __DIR__ . '/inc/header.php';
 
         <!-- Current Blocks List -->
         <div class="col-md-8">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Active Country Blocks (<?php echo count($blocks); ?>)</h5>
                 </div>
@@ -230,7 +229,7 @@ include __DIR__ . '/inc/header.php';
                         </div>
                     <?php else: ?>
                         <div class="table-responsive">
-                            <table class="table table-dark table-striped table-hover">
+                            <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
                                         <th>Country</th>
@@ -294,10 +293,10 @@ include __DIR__ . '/inc/header.php';
             </div>
 
             <!-- Information Card -->
-            <div class="card card-dark mt-3">
+            <div class="card card mt-3">
                 <div class="card-body">
                     <h6><i class="fas fa-info-circle me-2"></i>How GeoIP Blocking Works for OPNManager</h6>
-                    <ul class="mb-0" style="color: #e0e0e0;">
+                    <ul class="mb-0">
                         <li><strong>OPNManager Access Only:</strong> These rules control access to THIS management panel, NOT your firewall clients</li>
                         <li><strong>Geolocation:</strong> Uses IP address geolocation databases to identify traffic origin</li>
                         <li><strong>Enforcement:</strong> Blocks are enforced on the OPNManager server using iptables/nftables</li>

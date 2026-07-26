@@ -78,7 +78,7 @@ $firewalls = $stmt->fetchAll();
         <!-- Ping Tool -->
         <div class="col-md-6 mb-4">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-primary">
                     <i class="fas fa-wifi me-2"></i>Ping
                 </div>
                 <div class="card-body">
@@ -100,7 +100,7 @@ $firewalls = $stmt->fetchAll();
         <!-- Traceroute Tool -->
         <div class="col-md-6 mb-4">
             <div class="card">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-success">
                     <i class="fas fa-route me-2"></i>Traceroute
                 </div>
                 <div class="card-body">
@@ -122,7 +122,7 @@ $firewalls = $stmt->fetchAll();
         <!-- DNS Lookup Tool -->
         <div class="col-md-6 mb-4">
             <div class="card">
-                <div class="card-header bg-info text-white">
+                <div class="card-header bg-info">
                     <i class="fas fa-search me-2"></i>DNS Lookup
                 </div>
                 <div class="card-body">
@@ -151,7 +151,7 @@ $firewalls = $stmt->fetchAll();
         <!-- Port Test Tool -->
         <div class="col-md-6 mb-4">
             <div class="card">
-                <div class="card-header bg-warning text-white">
+                <div class="card-header bg-warning">
                     <i class="fas fa-door-open me-2"></i>Port Test
                 </div>
                 <div class="card-body">
@@ -173,7 +173,7 @@ $firewalls = $stmt->fetchAll();
         <!-- Live Logs -->
         <div class="col-md-12 mb-4">
             <div class="card">
-                <div class="card-header bg-danger text-white">
+                <div class="card-header bg-danger">
                     <i class="fas fa-file-alt me-2"></i>Live Log Viewer
                 </div>
                 <div class="card-body">
@@ -200,7 +200,7 @@ $firewalls = $stmt->fetchAll();
         <!-- Packet Capture -->
         <div class="col-md-12 mb-4">
             <div class="card">
-                <div class="card-header bg-dark text-white">
+                <div class="card-header">
                     <i class="fas fa-network-wired me-2"></i>Packet Capture (tcpdump)
                 </div>
                 <div class="card-body">
@@ -237,7 +237,7 @@ $firewalls = $stmt->fetchAll();
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="fas fa-terminal me-2"></i>Output</span>
                     <button class="btn btn-sm btn-outline-light" onclick="clearOutput()">
                         <i class="fas fa-trash me-1"></i>Clear

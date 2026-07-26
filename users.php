@@ -97,7 +97,7 @@ $users = $stmt->fetchAll();
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h4 class="mb-0">User Management</h4>
                 </div>
@@ -162,7 +162,7 @@ $users = $stmt->fetchAll();
                     <!-- Users List -->
                     <h6>Current Users</h6>
                     <div class="table-responsive">
-                        <table class="table table-dark table-hover">
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -215,41 +215,41 @@ $users = $stmt->fetchAll();
 <!-- Edit User Modal -->
 <div class="modal fade" id="editUserModal" tabindex="-1">
     <div class="modal-dialog">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header bg-dark border-secondary">
-                <h5 class="modal-title text-light">Edit User</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body bg-dark">
+            <div class="modal-body">
                 <form id="editUserForm" method="post">
                     <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                     <input type="hidden" name="user_id" id="editUserId">
                     <div class="mb-3">
-                        <label for="editFirstName" class="form-label text-light fw-bold">First Name</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editFirstName" name="first_name">
+                        <label for="editFirstName" class="form-label fw-bold">First Name</label>
+                        <input type="text" class="form-control" id="editFirstName" name="first_name">
                     </div>
                     <div class="mb-3">
-                        <label for="editLastName" class="form-label text-light fw-bold">Last Name</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editLastName" name="last_name">
+                        <label for="editLastName" class="form-label fw-bold">Last Name</label>
+                        <input type="text" class="form-control" id="editLastName" name="last_name">
                     </div>
                     <div class="mb-3">
-                        <label for="editUsername" class="form-label text-light fw-bold">Username</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" id="editUsername" name="username" required>
+                        <label for="editUsername" class="form-label fw-bold">Username</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label for="editEmail" class="form-label text-light fw-bold">Email</label>
-                        <input type="email" class="form-control bg-dark text-light border-secondary" id="editEmail" name="email">
+                        <label for="editEmail" class="form-label fw-bold">Email</label>
+                        <input type="email" class="form-control" id="editEmail" name="email">
                     </div>
                     <div class="mb-3">
-                        <label for="editRole" class="form-label text-light fw-bold">Role</label>
-                        <select class="form-select bg-dark text-light border-secondary" id="editRole" name="role" required>
+                        <label for="editRole" class="form-label fw-bold">Role</label>
+                        <select class="form-select" id="editRole" name="role" required>
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="editPassword" class="form-label text-light fw-bold">New Password (leave blank to keep current)</label>
-                        <input type="password" class="form-control bg-dark text-light border-secondary" id="editPassword" name="password" placeholder="Leave blank to keep current password">
+                        <label for="editPassword" class="form-label fw-bold">New Password (leave blank to keep current)</label>
+                        <input type="password" class="form-control" id="editPassword" name="password" placeholder="Leave blank to keep current password">
                     </div>
                     <button type="submit" name="edit_user" class="btn btn-primary">Save Changes</button>
                 </form>

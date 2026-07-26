@@ -253,7 +253,7 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <h2 class="text-white"><i class="fas fa-sync-alt me-2 text-primary"></i>System Update</h2>
+            <h2><i class="fas fa-sync-alt me-2 text-primary"></i>System Update</h2>
             <p class="text-muted">Update OPNsense Manager from GitHub repository</p>
         </div>
     </div>
@@ -278,9 +278,9 @@ include __DIR__ . '/inc/header.php';
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="update-card">
-                <h5 class="text-white mb-3"><i class="fas fa-code-branch me-2"></i>Current Version</h5>
+                <h5 class="mb-3"><i class="fas fa-code-branch me-2"></i>Current Version</h5>
                 <div class="text-center">
-                    <span class="version-badge bg-primary text-white">
+                    <span class="version-badge bg-primary">
                         <?php echo htmlspecialchars($current_version); ?>
                     </span>
                 </div>
@@ -296,7 +296,7 @@ include __DIR__ . '/inc/header.php';
 
         <div class="col-md-6">
             <div class="update-card">
-                <h5 class="text-white mb-3"><i class="fas fa-info-circle me-2"></i>Repository Info</h5>
+                <h5 class="mb-3"><i class="fas fa-info-circle me-2"></i>Repository Info</h5>
                 <dl class="row mb-0">
                     <dt class="col-sm-4">Repository:</dt>
                     <dd class="col-sm-8">
@@ -308,12 +308,12 @@ include __DIR__ . '/inc/header.php';
 
                     <dt class="col-sm-4">Branch:</dt>
                     <dd class="col-sm-8">
-                        <span class="badge bg-secondary">main</span>
+                        <span class="badge bg-info">main</span>
                     </dd>
 
                     <dt class="col-sm-4">Commit:</dt>
                     <dd class="col-sm-8">
-                        <code style="color: #60a5fa;"><?php echo htmlspecialchars($local_commit); ?></code>
+                        <code><?php echo htmlspecialchars($local_commit); ?></code>
                     </dd>
                 </dl>
             </div>
@@ -340,7 +340,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row mb-4" id="update-progress" style="display: none;">
         <div class="col-12">
             <div class="update-card">
-                <h5 class="text-white mb-3"><i class="fas fa-terminal me-2"></i>Update Progress</h5>
+                <h5 class="mb-3"><i class="fas fa-terminal me-2"></i>Update Progress</h5>
                 <div id="progress-steps">
                     <div class="progress-step" id="step-backup_dir">
                         <i class="fas fa-circle text-muted me-2 step-icon"></i>
@@ -382,7 +382,7 @@ include __DIR__ . '/inc/header.php';
                     <div class="progress" style="height: 8px; background: #334155;">
                         <div class="progress-bar bg-primary" id="update-progress-bar" role="progressbar" style="width: 0%; transition: width 0.3s ease;"></div>
                     </div>
-                    <small id="progress-text" style="color: #94a3b8;" class="mt-1 d-block">Starting update...</small>
+                    <small id="progress-text" class="text-muted mt-1 d-block">Starting update...</small>
                 </div>
                 <div class="mt-3" id="update-result" style="display: none;"></div>
             </div>
@@ -393,7 +393,7 @@ include __DIR__ . '/inc/header.php';
         <div class="row mb-4">
             <div class="col-12">
                 <div class="update-card">
-                    <h5 class="text-white mb-3"><i class="fas fa-list me-2"></i>Recent Changes</h5>
+                    <h5 class="mb-3"><i class="fas fa-list me-2"></i>Recent Changes</h5>
                     <?php foreach (array_slice($commit_log, 0, 10) as $commit): ?>
                         <div class="commit-item">
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -408,7 +408,7 @@ include __DIR__ . '/inc/header.php';
                                     ?>
                                 </small>
                             </div>
-                            <div class="text-white">
+                            <div>
                                 <?php
                                 $message_lines = explode("\n", $commit['commit']['message']);
                                 echo htmlspecialchars($message_lines[0]);
@@ -425,7 +425,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row">
         <div class="col-12">
             <div class="update-card">
-                <h5 class="text-white mb-3"><i class="fas fa-question-circle me-2"></i>Manual Update</h5>
+                <h5 class="mb-3"><i class="fas fa-question-circle me-2"></i>Manual Update</h5>
                 <p>If the automatic update fails, you can update manually:</p>
                 <div class="update-log">
 cd <?php echo htmlspecialchars(__DIR__); ?>
@@ -476,7 +476,7 @@ function startUpdate() {
             const result = document.getElementById('update-result');
             result.style.display = '';
             if (status === 'done') {
-                result.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-2"></i>' + message + ' <a href="javascript:location.reload()" class="ms-2 text-white"><strong>Reload page</strong></a></div>';
+                result.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle me-2"></i>' + message + ' <a href="javascript:location.reload()" class="ms-2"><strong>Reload page</strong></a></div>';
             } else {
                 result.innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-2"></i>' + message + '</div>';
             }

@@ -190,10 +190,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 include __DIR__ . '/inc/header.php';
 ?>
 
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-body">
                     <div class="d-flex align-items-center gap-2 mb-3">
-                        <small class="text-light fw-bold mb-0">
+                        <small class="fw-bold mb-0">
                             <i class="fas fa-server me-1"></i>Firewall Details: <?php echo htmlspecialchars($firewall['hostname']); ?>
                         </small>
                         <div class="ms-auto">
@@ -261,14 +261,14 @@ include __DIR__ . '/inc/header.php';
                     <!-- System Statistics -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <div class="card card-ghost p-4 border border-secondary">
+                            <div class="card p-4 border border-secondary">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-chart-area me-2"></i>System Statistics
                                     </h6>
                                     <div>
-                                        <label for="timeFrameSelect" class="text-white-50 me-2" style="font-size: 0.9rem;">Time Frame:</label>
-                                        <select id="timeFrameSelect" class="form-select form-select-sm d-inline-block" style="width: auto; background-color: #1a1a1a; color: #fff; border-color: #444;" onchange="updateCharts()">
+                                        <label for="timeFrameSelect" class="text-muted me-2" style="font-size: 0.9rem;">Time Frame:</label>
+                                        <select id="timeFrameSelect" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="updateCharts()">
                                             <option value="1">1 Hour</option>
                                             <option value="4">4 Hours</option>
                                             <option value="12">12 Hours</option>
@@ -282,8 +282,8 @@ include __DIR__ . '/inc/header.php';
                                 <div class="row">
                                     <!-- Traffic Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
-                                            <h6 class="text-white-50 mb-2" style="font-size: 0.9rem;">
+                                        <div class="p-3 rounded">
+                                            <h6 class="text-muted mb-2" style="font-size: 0.9rem;">
                                                 <i class="fas fa-network-wired me-1"></i> WAN Traffic <span id="trafficTimeLabel"></span>
                                             </h6>
                                             <div style="position: relative; height: 200px;">
@@ -296,20 +296,20 @@ include __DIR__ . '/inc/header.php';
                                                         <div class="mb-2">
                                                             <span class="text-success" style="font-size: 0.75rem; font-weight: 600;">Inbound</span>
                                                         </div>
-                                                        <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                            <span class="me-2" style="color: #a0aec0;">Avg: <span id="trafficInAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span class="me-2" style="color: #a0aec0;">Peak: <span id="trafficInPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span style="color: #a0aec0;">Low: <span id="trafficInLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                        <div style="font-size: 0.7rem;">
+                                                            <span class="me-2" class="text-muted">Avg: <span id="trafficInAvg" style="font-weight: 500;">--</span></span>
+                                                            <span class="me-2" class="text-muted">Peak: <span id="trafficInPeak" style="font-weight: 500;">--</span></span>
+                                                            <span class="text-muted">Low: <span id="trafficInLow" style="font-weight: 500;">--</span></span>
                                                         </div>
                                                     </div>
                                                     <div class="col-6">
                                                         <div class="mb-2">
                                                             <span class="text-primary" style="font-size: 0.75rem; font-weight: 600;">Outbound</span>
                                                         </div>
-                                                        <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                            <span class="me-2" style="color: #a0aec0;">Avg: <span id="trafficOutAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span class="me-2" style="color: #a0aec0;">Peak: <span id="trafficOutPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span style="color: #a0aec0;">Low: <span id="trafficOutLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                        <div style="font-size: 0.7rem;">
+                                                            <span class="me-2" class="text-muted">Avg: <span id="trafficOutAvg" style="font-weight: 500;">--</span></span>
+                                                            <span class="me-2" class="text-muted">Peak: <span id="trafficOutPeak" style="font-weight: 500;">--</span></span>
+                                                            <span class="text-muted">Low: <span id="trafficOutLow" style="font-weight: 500;">--</span></span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -319,8 +319,8 @@ include __DIR__ . '/inc/header.php';
                                     
                                     <!-- CPU Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
-                                            <h6 class="text-white-50 mb-2" style="font-size: 0.9rem;">
+                                        <div class="p-3 rounded">
+                                            <h6 class="text-muted mb-2" style="font-size: 0.9rem;">
                                                 <i class="fas fa-microchip me-1"></i> CPU Usage
                                             </h6>
                                             <div style="position: relative; height: 200px;">
@@ -329,10 +329,10 @@ include __DIR__ . '/inc/header.php';
                                             <!-- Stats Section -->
                                             <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
                                                 <div class="text-center">
-                                                    <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                        <span class="me-3" style="color: #a0aec0;">Avg: <span id="cpuAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span class="me-3" style="color: #a0aec0;">Peak: <span id="cpuPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span style="color: #a0aec0;">Low: <span id="cpuLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                    <div style="font-size: 0.7rem;">
+                                                        <span class="me-3" class="text-muted">Avg: <span id="cpuAvg" style="font-weight: 500;">--</span></span>
+                                                        <span class="me-3" class="text-muted">Peak: <span id="cpuPeak" style="font-weight: 500;">--</span></span>
+                                                        <span class="text-muted">Low: <span id="cpuLow" style="font-weight: 500;">--</span></span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -341,8 +341,8 @@ include __DIR__ . '/inc/header.php';
                                     
                                     <!-- Memory Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
-                                            <h6 class="text-white-50 mb-2" style="font-size: 0.9rem;">
+                                        <div class="p-3 rounded">
+                                            <h6 class="text-muted mb-2" style="font-size: 0.9rem;">
                                                 <i class="fas fa-memory me-1"></i> Memory Usage
                                             </h6>
                                             <div style="position: relative; height: 200px;">
@@ -351,10 +351,10 @@ include __DIR__ . '/inc/header.php';
                                             <!-- Stats Section -->
                                             <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
                                                 <div class="text-center">
-                                                    <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                        <span class="me-3" style="color: #a0aec0;">Avg: <span id="memoryAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span class="me-3" style="color: #a0aec0;">Peak: <span id="memoryPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span style="color: #a0aec0;">Low: <span id="memoryLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                    <div style="font-size: 0.7rem;">
+                                                        <span class="me-3" class="text-muted">Avg: <span id="memoryAvg" style="font-weight: 500;">--</span></span>
+                                                        <span class="me-3" class="text-muted">Peak: <span id="memoryPeak" style="font-weight: 500;">--</span></span>
+                                                        <span class="text-muted">Low: <span id="memoryLow" style="font-weight: 500;">--</span></span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -363,8 +363,8 @@ include __DIR__ . '/inc/header.php';
                                     
                                     <!-- Disk Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
-                                            <h6 class="text-white-50 mb-2" style="font-size: 0.9rem;">
+                                        <div class="p-3 rounded">
+                                            <h6 class="text-muted mb-2" style="font-size: 0.9rem;">
                                                 <i class="fas fa-hdd me-1"></i> Disk Usage
                                             </h6>
                                             <div style="position: relative; height: 200px;">
@@ -373,10 +373,10 @@ include __DIR__ . '/inc/header.php';
                                             <!-- Stats Section -->
                                             <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
                                                 <div class="text-center">
-                                                    <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                        <span class="me-3" style="color: #a0aec0;">Avg: <span id="diskAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span class="me-3" style="color: #a0aec0;">Peak: <span id="diskPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span style="color: #a0aec0;">Low: <span id="diskLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                    <div style="font-size: 0.7rem;">
+                                                        <span class="me-3" class="text-muted">Avg: <span id="diskAvg" style="font-weight: 500;">--</span></span>
+                                                        <span class="me-3" class="text-muted">Peak: <span id="diskPeak" style="font-weight: 500;">--</span></span>
+                                                        <span class="text-muted">Low: <span id="diskLow" style="font-weight: 500;">--</span></span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -385,8 +385,8 @@ include __DIR__ . '/inc/header.php';
                                     
                                     <!-- Latency Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
-                                            <h6 class="text-white-50 mb-2" style="font-size: 0.9rem;">
+                                        <div class="p-3 rounded">
+                                            <h6 class="text-muted mb-2" style="font-size: 0.9rem;">
                                                 <i class="fas fa-stopwatch me-1"></i> Latency (ms) <span id="latencyTimeLabel" class="text-muted small"></span>
                                             </h6>
                                             <div style="position: relative; height: 200px;">
@@ -395,10 +395,10 @@ include __DIR__ . '/inc/header.php';
                                             <!-- Stats Section -->
                                             <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
                                                 <div class="text-center">
-                                                    <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                        <span class="me-3" style="color: #a0aec0;">Avg: <span id="latencyAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span class="me-3" style="color: #a0aec0;">Peak: <span id="latencyPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                        <span style="color: #a0aec0;">Low: <span id="latencyLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                    <div style="font-size: 0.7rem;">
+                                                        <span class="me-3" class="text-muted">Avg: <span id="latencyAvg" style="font-weight: 500;">--</span></span>
+                                                        <span class="me-3" class="text-muted">Peak: <span id="latencyPeak" style="font-weight: 500;">--</span></span>
+                                                        <span class="text-muted">Low: <span id="latencyLow" style="font-weight: 500;">--</span></span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -407,9 +407,9 @@ include __DIR__ . '/inc/header.php';
                                     
                                     <!-- SpeedTest Graph -->
                                     <div class="col-md-6 mb-3">
-                                        <div class="p-3 rounded" style="background-color: #1a1a1a !important;">
+                                        <div class="p-3 rounded">
                                             <div style="display: flex; justify-content: space-between; align-items: center; mb-2;">
-                                                <h6 class="text-white-50 mb-0" style="font-size: 0.9rem;">
+                                                <h6 class="text-muted mb-0" style="font-size: 0.9rem;">
                                                     <i class="fas fa-tachometer-alt me-1"></i> SpeedTest Results (Mbps) <span id="speedtestTimeLabel" class="text-muted small"></span>
                                                 </h6>
                                                 <button id="speedtestButton" class="btn btn-sm btn-outline-info" onclick="triggerSpeedtest()" style="padding: 0.25rem 0.75rem; font-size: 0.85rem;">
@@ -426,20 +426,20 @@ include __DIR__ . '/inc/header.php';
                                                         <div class="mb-2">
                                                             <span class="text-success" style="font-size: 0.75rem; font-weight: 600;">Download</span>
                                                         </div>
-                                                        <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                            <span class="me-2" style="color: #a0aec0;">Avg: <span id="downloadAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span class="me-2" style="color: #a0aec0;">Peak: <span id="downloadPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span style="color: #a0aec0;">Low: <span id="downloadLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                        <div style="font-size: 0.7rem;">
+                                                            <span class="me-2" class="text-muted">Avg: <span id="downloadAvg" style="font-weight: 500;">--</span></span>
+                                                            <span class="me-2" class="text-muted">Peak: <span id="downloadPeak" style="font-weight: 500;">--</span></span>
+                                                            <span class="text-muted">Low: <span id="downloadLow" style="font-weight: 500;">--</span></span>
                                                         </div>
                                                     </div>
                                                     <div class="col-6">
                                                         <div class="mb-2">
                                                             <span class="text-warning" style="font-size: 0.75rem; font-weight: 600;">Upload</span>
                                                         </div>
-                                                        <div style="font-size: 0.7rem; color: #cbd5e0;">
-                                                            <span class="me-2" style="color: #a0aec0;">Avg: <span id="uploadAvg" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span class="me-2" style="color: #a0aec0;">Peak: <span id="uploadPeak" class="text-white" style="font-weight: 500;">--</span></span>
-                                                            <span style="color: #a0aec0;">Low: <span id="uploadLow" class="text-white" style="font-weight: 500;">--</span></span>
+                                                        <div style="font-size: 0.7rem;">
+                                                            <span class="me-2" class="text-muted">Avg: <span id="uploadAvg" style="font-weight: 500;">--</span></span>
+                                                            <span class="me-2" class="text-muted">Peak: <span id="uploadPeak" style="font-weight: 500;">--</span></span>
+                                                            <span class="text-muted">Low: <span id="uploadLow" style="font-weight: 500;">--</span></span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -454,30 +454,30 @@ include __DIR__ . '/inc/header.php';
                     <!-- Basic Information -->
                     <div class="row mb-4">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border border-secondary">
-                                <h6 class="text-white fw-bold mb-3" style="font-size: 1.1rem;">Basic Information</h6>
+                            <div class="card p-4 border border-secondary">
+                                <h6 class="fw-bold mb-3" style="font-size: 1.1rem;">Basic Information</h6>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-2">
-                                            <strong class="text-white">Hostname:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['hostname']); ?></span>
+                                            <strong>Hostname:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['hostname']); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">IP Address:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['wan_ip'] ?? 'N/A'); ?></span>
+                                            <strong>IP Address:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['wan_ip'] ?? 'N/A'); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">Hardware ID:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['hardware_id'] ?? 'Not set'); ?></span>
+                                            <strong>Hardware ID:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['hardware_id'] ?? 'Not set'); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">Customer:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['customer_name'] ?? 'N/A'); ?></span>
+                                            <strong>Customer:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['customer_name'] ?? 'N/A'); ?></span>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-2">
-                                            <strong class="text-white">Status:</strong>
+                                            <strong>Status:</strong>
                                             <?php
                                             $status = $firewall['agent_status'] ?? $firewall['status'] ?? 'unknown';
                                             $status_class = $status === 'online' ? 'text-success' : ($status === 'offline' ? 'text-danger' : 'text-warning');
@@ -485,8 +485,8 @@ include __DIR__ . '/inc/header.php';
                                             <span class="<?php echo $status_class; ?> fw-bold" style="font-size: 1.1rem;"><?php echo htmlspecialchars(ucfirst($status)); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">Version:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['agent_version'] ?? $firewall['version'] ?? 'N/A'); ?></span>
+                                            <strong>Version:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['agent_version'] ?? $firewall['version'] ?? 'N/A'); ?></span>
                                         </div>
                                     </div>
                                 </div>
@@ -497,8 +497,8 @@ include __DIR__ . '/inc/header.php';
                     <!-- Agent Information -->
                     <div class="row mb-4">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border border-secondary">
-                                <h6 class="text-white fw-bold mb-3" style="font-size: 1.1rem;">Agent Information</h6>
+                            <div class="card p-4 border border-secondary">
+                                <h6 class="fw-bold mb-3" style="font-size: 1.1rem;">Agent Information</h6>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <?php if (isset($agents['primary'])): 
@@ -507,11 +507,11 @@ include __DIR__ . '/inc/header.php';
                                             $status_dot = $primary['status'] === 'online' ? '●' : '○';
                                         ?>
                                         <div class="mb-3">
-                                            <strong class="text-white">
+                                            <strong>
                                                 <span class="text-<?php echo $status_class; ?>"><?php echo $status_dot; ?></span>
                                                 Primary Agent:
                                             </strong><br>
-                                            <span class="text-light">Version: <?php echo htmlspecialchars($primary['agent_version']); ?></span>
+                                            <span>Version: <?php echo htmlspecialchars($primary['agent_version']); ?></span>
                                             <?php
                                             $update_available = isUpdateAvailable($primary['agent_version']);
                                             if ($update_available):
@@ -535,62 +535,62 @@ include __DIR__ . '/inc/header.php';
                                         </div>
                                         <?php else: ?>
                                         <div class="mb-3">
-                                            <strong class="text-white"><span class="text-danger">○</span> Primary Agent:</strong><br>
-                                            <span class="text-light">Not connected</span>
+                                            <strong><span class="text-danger">○</span> Primary Agent:</strong><br>
+                                            <span>Not connected</span>
                                         </div>
                                         <?php endif; ?>
                                         
                                         <div class="mb-2">
-                                            <strong class="text-white">WAN IP:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars(($agents['primary']['wan_ip'] ?? $firewall['wan_ip']) ?? 'N/A'); ?></span>
+                                            <strong>WAN IP:</strong>
+                                            <span><?php echo htmlspecialchars(($agents['primary']['wan_ip'] ?? $firewall['wan_ip']) ?? 'N/A'); ?></span>
                                         </div>
                                         <?php if (!empty($firewall['wan_netmask']) || !empty($firewall['wan_gateway'])): ?>
                                         <div class="mb-2">
-                                            <strong class="text-white">WAN Subnet:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['wan_netmask'] ?? 'N/A'); ?></span>
+                                            <strong>WAN Subnet:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['wan_netmask'] ?? 'N/A'); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">WAN Gateway:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['wan_gateway'] ?? 'N/A'); ?></span>
+                                            <strong>WAN Gateway:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['wan_gateway'] ?? 'N/A'); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">WAN DNS Primary:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['wan_dns_primary'] ?? 'N/A'); ?></span>
+                                            <strong>WAN DNS Primary:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['wan_dns_primary'] ?? 'N/A'); ?></span>
                                         </div>
                                         <?php if (!empty($firewall['wan_dns_secondary'])): ?>
                                         <div class="mb-2">
-                                            <strong class="text-white">WAN DNS Secondary:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['wan_dns_secondary']); ?></span>
+                                            <strong>WAN DNS Secondary:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['wan_dns_secondary']); ?></span>
                                         </div>
                                         <?php endif; ?>
                                         <?php endif; ?>
                                         <div class="mb-2">
-                                            <strong class="text-white">LAN IP:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars(($agents['primary']['lan_ip'] ?? $firewall['lan_ip'] ?? $firewall['ip_address']) ?? 'N/A'); ?></span>
+                                            <strong>LAN IP:</strong>
+                                            <span><?php echo htmlspecialchars(($agents['primary']['lan_ip'] ?? $firewall['lan_ip'] ?? $firewall['ip_address']) ?? 'N/A'); ?></span>
                                         </div>
                                         <?php if (!empty($firewall['lan_netmask']) || !empty($firewall['lan_network'])): ?>
                                         <div class="mb-2">
-                                            <strong class="text-white">LAN Subnet:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['lan_netmask'] ?? 'N/A'); ?></span>
+                                            <strong>LAN Subnet:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['lan_netmask'] ?? 'N/A'); ?></span>
                                         </div>
                                         <div class="mb-2">
-                                            <strong class="text-white">LAN Network:</strong>
-                                            <span class="text-light"><?php echo htmlspecialchars($firewall['lan_network'] ?? 'N/A'); ?></span>
+                                            <strong>LAN Network:</strong>
+                                            <span><?php echo htmlspecialchars($firewall['lan_network'] ?? 'N/A'); ?></span>
                                         </div>
                                         <?php endif; ?>
                                         <?php if (!empty($wan_stats)): ?>
                                         <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                                            <strong class="text-white d-block mb-2"><i class="fas fa-ethernet me-1"></i> Interface Status:</strong>
+                                            <strong class="d-block mb-2"><i class="fas fa-ethernet me-1"></i> Interface Status:</strong>
                                             <?php foreach ($wan_stats as $iface): ?>
                                             <div class="mb-2 p-2 rounded" style="background: rgba(255,255,255,0.05);">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <span class="text-white fw-bold"><?php echo htmlspecialchars($iface['interface_name']); ?></span>
+                                                    <span class="fw-bold"><?php echo htmlspecialchars($iface['interface_name']); ?></span>
                                                     <span class="badge <?php echo ($iface['status'] === 'active') ? 'bg-success' : 'bg-danger'; ?>">
                                                         <?php echo htmlspecialchars($iface['status']); ?>
                                                     </span>
                                                 </div>
                                                 <?php if (!empty($iface['ip_address'])): ?>
-                                                <small class="text-light"><?php echo htmlspecialchars($iface['ip_address']); ?></small>
+                                                <small><?php echo htmlspecialchars($iface['ip_address']); ?></small>
                                                 <?php endif; ?>
                                                 <div class="d-flex justify-content-between mt-1" style="font-size: 0.75rem;">
                                                     <span class="text-success"><i class="fas fa-arrow-down me-1"></i>RX: <?php echo number_format($iface['rx_bytes'] / 1073741824, 2); ?> GB</span>
@@ -608,8 +608,8 @@ include __DIR__ . '/inc/header.php';
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3" style="background-color: rgba(23,162,184,0.15); padding: 0.75rem; border-radius: 0.25rem; border-left: 3px solid #17a2b8;">
-                                            <strong class="text-white"><i class="fas fa-wrench"></i> Agent Maintenance:</strong><br>
-                                            <small class="text-light">Fix, update, or reinstall the agent via SSH</small><br>
+                                            <strong><i class="fas fa-wrench"></i> Agent Maintenance:</strong><br>
+                                            <small>Fix, update, or reinstall the agent via SSH</small><br>
                                             <button class="btn btn-sm btn-info mt-2" onclick="repairAgent()" id="repairAgentBtn">
                                                 <i class="fas fa-tools"></i> Update/Repair Agent
                                             </button>
@@ -623,13 +623,13 @@ include __DIR__ . '/inc/header.php';
                     <!-- On-Demand Secure Tunnel Connection -->
                     <div class="row mb-4">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border-success" style="border: 2px solid #28a745;">
+                            <div class="card p-4 border-success" style="border: 2px solid #28a745;">
                                 <div class="row align-items-center">
                                     <div class="col-md-8">
-                                        <h6 class="text-white fw-bold mb-2" style="font-size: 1.1rem;">
+                                        <h6 class="fw-bold mb-2" style="font-size: 1.1rem;">
                                             <i class="fas fa-link me-2" style="color: #28a745;"></i>Secure SSH Tunnel Access
                                         </h6>
-                                        <p class="text-light mb-0" style="font-size: 0.9rem;">
+                                        <p class=" mb-0" style="font-size: 0.9rem;">
                                             <i class="fas fa-check me-1" style="color: #28a745;"></i>Encrypted on-demand tunnel to firewall web interface
                                         </p>
                                         <small class="text-muted d-block mt-1">
@@ -656,23 +656,23 @@ include __DIR__ . '/inc/header.php';
                     <!-- Configuration -->
                     <div class="row">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border border-secondary">
-                                <h6 class="text-white fw-bold mb-3" style="font-size: 1.1rem;">Configuration</h6>
+                            <div class="card p-4 border border-secondary">
+                                <h6 class="fw-bold mb-3" style="font-size: 1.1rem;">Configuration</h6>
                                 <form method="post">
                                     <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                                     <div class="row">
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="checkin_interval" class="form-label text-white fw-bold">Check-in Interval (seconds)</label>
+                                                <label for="checkin_interval" class="form-label fw-bold">Check-in Interval (seconds)</label>
                                                 <input type="number" name="checkin_interval" id="checkin_interval" class="form-control"
                                                        value="<?php echo htmlspecialchars($firewall['checkin_interval'] ?? 180); ?>"
                                                        min="30" max="3600">
-                                                <small class="text-light">How often this firewall should check in (30 seconds to 1 hour)</small>
+                                                <small>How often this firewall should check in (30 seconds to 1 hour)</small>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="speedtest_interval_hours" class="form-label text-white fw-bold">Speedtest Interval</label>
+                                                <label for="speedtest_interval_hours" class="form-label fw-bold">Speedtest Interval</label>
                                                 <?php $st_interval = (int)($firewall['speedtest_interval_hours'] ?? 4); ?>
                                                 <select name="speedtest_interval_hours" id="speedtest_interval_hours" class="form-select">
                                                     <option value="2" <?php echo $st_interval === 2 ? 'selected' : ''; ?>>Every 2 hours</option>
@@ -682,12 +682,12 @@ include __DIR__ . '/inc/header.php';
                                                     <option value="24" <?php echo $st_interval === 24 ? 'selected' : ''; ?>>Every 24 hours</option>
                                                     <option value="0" <?php echo $st_interval === 0 ? 'selected' : ''; ?>>Disabled</option>
                                                 </select>
-                                                <small class="text-light">How often to run automatic speedtests</small>
+                                                <small>How often to run automatic speedtests</small>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="customer_name" class="form-label text-white fw-bold">Customer Name</label>
+                                                <label for="customer_name" class="form-label fw-bold">Customer Name</label>
                                                 <input type="text" name="customer_name" id="customer_name" class="form-control"
                                                        value="<?php echo htmlspecialchars($firewall['customer_name'] ?? ''); ?>"
                                                        placeholder="Enter customer name">
@@ -695,7 +695,7 @@ include __DIR__ . '/inc/header.php';
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label for="customer_group" class="form-label text-white fw-bold">Company</label>
+                                                <label for="customer_group" class="form-label fw-bold">Company</label>
                                                 <select name="customer_group" id="customer_group" class="form-select">
                                                     <option value="">-- Select or type new --</option>
                                                     <?php foreach ($all_companies as $company): ?>
@@ -705,12 +705,12 @@ include __DIR__ . '/inc/header.php';
                                                         </option>
                                                     <?php endforeach; ?>
                                                 </select>
-                                                <small class="text-light">Select existing company or type new one</small>
+                                                <small>Select existing company or type new one</small>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label class="form-label text-white fw-bold">Tags</label>
+                                                <label class="form-label fw-bold">Tags</label>
                                                 <div class="border border-secondary rounded p-2" style="max-height: 120px; overflow-y: auto;">
                                                     <?php
                                                     $selected_tags = !empty($firewall['tag_names']) ? array_map('trim', explode(',', $firewall['tag_names'])) : [];
@@ -722,14 +722,14 @@ include __DIR__ . '/inc/header.php';
                                                                value="<?php echo htmlspecialchars($tag['name']); ?>"
                                                                id="tag_<?php echo $tag['id']; ?>"
                                                                <?php echo $is_selected ? 'checked' : ''; ?>>
-                                                        <label class="form-check-label text-light" for="tag_<?php echo $tag['id']; ?>">
+                                                        <label class="form-check-label" for="tag_<?php echo $tag['id']; ?>">
                                                             <span class="badge me-1" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>;">&nbsp;</span>
                                                             <?php echo htmlspecialchars($tag['name']); ?>
                                                         </label>
                                                     </div>
                                                     <?php endforeach; ?>
                                                 </div>
-                                                <small class="text-light">Check tags to assign to this firewall</small>
+                                                <small>Check tags to assign to this firewall</small>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
@@ -737,14 +737,14 @@ include __DIR__ . '/inc/header.php';
                                                 <div class="form-check form-switch">
                                                     <input class="form-check-input" type="checkbox" id="secure_outbound_toggle" 
                                                            <?php echo ($firewall['secure_outbound_lockdown'] ?? 0) ? 'checked' : ''; ?>>
-                                                    <label class="form-check-label text-white fw-bold" for="secure_outbound_toggle">
+                                                    <label class="form-check-label fw-bold" for="secure_outbound_toggle">
                                                         <i class="fas fa-lock me-2" style="color: #f39c12;"></i>Secure Outbound Lockdown
                                                     </label>
                                                     <div class="mt-2">
-                                                        <small class="text-light d-block mb-2">
+                                                        <small class="d-block mb-2">
                                                             <strong>What it does:</strong>
                                                         </small>
-                                                        <small class="text-light d-block">
+                                                        <small class="d-block">
                                                             ✓ Blocks ALL outbound except HTTP (80) and HTTPS (443)<br>
                                                             ✓ Forces DNS through Unbound on port 53<br>
                                                             ✓ Prevents tunnel/VPN abuse from LAN<br>
@@ -756,13 +756,13 @@ include __DIR__ . '/inc/header.php';
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label for="allowed_webgui_ips" class="form-label text-white fw-bold">
+                                                <label for="allowed_webgui_ips" class="form-label fw-bold">
                                                     <i class="fas fa-shield-alt me-2" style="color: #17a2b8;"></i>Web GUI IP Lockdown
                                                 </label>
                                                 <input type="text" name="allowed_webgui_ips" id="allowed_webgui_ips" class="form-control"
                                                        value="<?php echo htmlspecialchars($firewall['allowed_webgui_ips'] ?? ''); ?>"
                                                        placeholder="192.168.1.100, 10.0.0.50">
-                                                <small class="text-light d-block mt-2">
+                                                <small class="d-block mt-2">
                                                     <strong>Restrict web GUI access to specific IPs</strong><br>
                                                     ✓ Comma-separated IP addresses (e.g., 192.168.1.100, 10.0.0.50)<br>
                                                     ✓ Management platform (184.175.206.229) is <strong>always included</strong><br>
@@ -802,13 +802,13 @@ function connectViaOnDemandTunnel(firewallId) {
                     <!-- Command Log Section -->
                     <div class="row mb-4">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border border-secondary">
+                            <div class="card p-4 border border-secondary">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-terminal me-2"></i>Command Execution Log
                                     </h6>
                                     <div class="d-flex align-items-center">
-                                        <label for="commandLogTimezone" class="text-light me-2 small">Timezone:</label>
+                                        <label for="commandLogTimezone" class="me-2 small">Timezone:</label>
                                         <select id="commandLogTimezone" class="form-select form-select-sm" style="width: auto; min-width: 120px;" onchange="refreshCommandLogWithTimezone()">
                                             <option value="America/New_York">EST/EDT</option>
                                             <option value="America/Chicago">CST/CDT</option>
@@ -824,15 +824,15 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
                                 
                                 <div id="commandLogLoading" class="text-center py-2">
-                                    <div class="spinner-border text-light spinner-border-sm" role="status">
+                                    <div class="spinner-border spinner-border-sm" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <span class="text-light ms-2">Loading recent commands...</span>
+                                    <span class="ms-2">Loading recent commands...</span>
                                 </div>
                                 
                                 <div id="commandLogContainer" style="display: none;">
                                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                        <table class="table table-dark table-hover table-sm">
+                                        <table class="table table-hover table-sm">
                                             <thead>
                                                 <tr>
                                                     <th>Time</th>
@@ -850,7 +850,7 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
                                 
                                 <div id="noCommands" style="display: none;">
-                                    <p class="text-light text-center py-3 mb-0">No recent commands found.</p>
+                                    <p class=" text-center py-3 mb-0">No recent commands found.</p>
                                 </div>
                             </div>
                         </div>
@@ -864,9 +864,9 @@ function connectViaOnDemandTunnel(firewallId) {
                     <!-- Backup Management Section -->
                     <div class="row mb-4">
                         <div class="col-md-12">
-                            <div class="card card-ghost p-4 border border-secondary">
+                            <div class="card p-4 border border-secondary">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-save me-2"></i>Configuration Backups
                                     </h6>
                                     <button type="button" class="btn btn-success btn-sm" onclick="createBackup()">
@@ -875,15 +875,15 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
                                 
                                 <div id="backupsLoading" class="text-center py-4">
-                                    <div class="spinner-border text-light" role="status">
+                                    <div class="spinner-border" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
-                                    <p class="text-light mt-2">Loading backups...</p>
+                                    <p class=" mt-2">Loading backups...</p>
                                 </div>
                                 
                                 <div id="backupsContainer" style="display: none;">
                                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                        <table class="table table-dark table-hover">
+                                        <table class="table table-hover">
                                             <thead>
                                                 <tr>
                                                     <th>Date Created</th>
@@ -899,7 +899,7 @@ function connectViaOnDemandTunnel(firewallId) {
                                         </table>
                                     </div>
                                     <div id="noBackups" style="display: none;">
-                                        <p class="text-light text-center py-4">No backups found. Create your first backup to get started.</p>
+                                        <p class=" text-center py-4">No backups found. Create your first backup to get started.</p>
                                     </div>
                                 </div><!-- End backupsContainer -->
                             </div><!-- End card -->
@@ -912,9 +912,9 @@ function connectViaOnDemandTunnel(firewallId) {
                         <div class="tab-pane fade" id="ai" role="tabpanel" aria-labelledby="ai-tab">
                             
                             <!-- AI Scanning Section -->
-                            <div class="card card-ghost p-4 border border-primary mb-4">
+                            <div class="card p-4 border border-primary mb-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-brain me-2 text-primary"></i>AI Security Analysis
                                     </h6>
                                     <button type="button" class="btn btn-primary btn-sm" onclick="runManualScan()">
@@ -927,7 +927,7 @@ function connectViaOnDemandTunnel(firewallId) {
                                     <div class="col-md-12">
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" id="autoScanEnabled" onchange="saveAISettings()">
-                                            <label class="form-check-label text-light" for="autoScanEnabled">
+                                            <label class="form-check-label" for="autoScanEnabled">
                                                 Enable Automatic Scanning
                                             </label>
                                             <small class="d-block text-muted mt-1">AI scans will automatically include configuration and log analysis</small>
@@ -937,7 +937,7 @@ function connectViaOnDemandTunnel(firewallId) {
 
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label text-light">Scan Frequency</label>
+                                        <label class="form-label">Scan Frequency</label>
                                         <select class="form-select" id="scanFrequency" onchange="saveAISettings()">
                                             <option value="daily">Daily</option>
                                             <option value="weekly">Weekly</option>
@@ -945,7 +945,7 @@ function connectViaOnDemandTunnel(firewallId) {
                                         </select>
                                     </div>
                                     <div class="col-md-6 mb-3">
-                                        <label class="form-label text-light">Preferred AI Provider</label>
+                                        <label class="form-label">Preferred AI Provider</label>
                                         <select class="form-select" id="preferredProvider" onchange="saveAISettings()">
                                             <option value="">Use Default</option>
                                             <option value="openai">OpenAI (GPT-4)</option>
@@ -961,11 +961,11 @@ function connectViaOnDemandTunnel(firewallId) {
                                     <div class="row">
                                         <div class="col-md-6">
                                             <small class="text-muted">Last Scan:</small><br>
-                                            <span id="lastScanDate" class="text-light">Never</span>
+                                            <span id="lastScanDate">Never</span>
                                         </div>
                                         <div class="col-md-6 text-end">
                                             <small class="text-muted">Next Scheduled:</small><br>
-                                            <span id="nextScanDate" class="text-light">Not scheduled</span>
+                                            <span id="nextScanDate">Not scheduled</span>
                                         </div>
                                     </div>
                                 </div>
@@ -983,12 +983,12 @@ function connectViaOnDemandTunnel(firewallId) {
                                 <!-- Recent Reports -->
                                 <div id="recentReports" class="mt-3">
                                     <hr class="border-secondary">
-                                    <h6 class="text-light mb-3">Recent Scan Reports</h6>
+                                    <h6 class="mb-3">Recent Scan Reports</h6>
                                     <div id="noReportsMessage" class="alert alert-info">
                                         <i class="fas fa-info-circle me-2"></i>No AI scans have been performed yet. Click "Run Scan Now" to generate your first security analysis report.
                                     </div>
                                     <div class="table-responsive" style="display: none;">
-                                        <table class="table table-dark table-hover table-sm">
+                                        <table class="table table-hover table-sm">
                                             <thead>
                                                 <tr>
                                                     <th>Date</th>
@@ -1007,9 +1007,9 @@ function connectViaOnDemandTunnel(firewallId) {
                             </div>
 
                             <!-- Log Analysis Statistics Section -->
-                            <div class="card card-ghost p-4 border border-info mt-4">
+                            <div class="card p-4 border border-info mt-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-chart-line me-2 text-info"></i>Log Analysis Statistics (Last 30 Days)
                                     </h6>
                                 </div>
@@ -1065,9 +1065,9 @@ function connectViaOnDemandTunnel(firewallId) {
                         <div class="tab-pane fade" id="network" role="tabpanel" aria-labelledby="network-tab">
                             
                             <!-- Network Diagnostic Tools -->
-                            <div class="card card-ghost p-3 border border-info mb-4" style="max-width: 100%; overflow-x: auto;">
+                            <div class="card p-3 border border-info mb-4" style="max-width: 100%; overflow-x: auto;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                    <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                         <i class="fas fa-network-wired me-2 text-info"></i>Network Diagnostics
                                     </h6>
                                 </div>
@@ -1075,8 +1075,8 @@ function connectViaOnDemandTunnel(firewallId) {
                                 <div class="row">
                                     <!-- Ping Tool -->
                                     <div class="col-md-4 mb-3">
-                                        <div class="card bg-dark border-secondary">
-                                            <div class="card-header bg-secondary text-white">
+                                        <div class="card border-secondary">
+                                            <div class="card-header">
                                                 <i class="fas fa-wifi me-2"></i>Ping
                                             </div>
                                             <div class="card-body">
@@ -1096,8 +1096,8 @@ function connectViaOnDemandTunnel(firewallId) {
 
                                     <!-- Traceroute Tool -->
                                     <div class="col-md-4 mb-3">
-                                        <div class="card bg-dark border-secondary">
-                                            <div class="card-header bg-secondary text-white">
+                                        <div class="card border-secondary">
+                                            <div class="card-header">
                                                 <i class="fas fa-route me-2"></i>Traceroute
                                             </div>
                                             <div class="card-body">
@@ -1117,8 +1117,8 @@ function connectViaOnDemandTunnel(firewallId) {
 
                                     <!-- DNS Lookup Tool -->
                                     <div class="col-md-4 mb-3">
-                                        <div class="card bg-dark border-secondary">
-                                            <div class="card-header bg-secondary text-white">
+                                        <div class="card border-secondary">
+                                            <div class="card-header">
                                                 <i class="fas fa-search me-2"></i>DNS Lookup
                                             </div>
                                             <div class="card-body">
@@ -1144,9 +1144,9 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
 
                                 <!-- Bandwidth Testing -->
-                                <div class="card card-ghost p-3 border border-warning mb-4" style="max-width: 100%; overflow-x: auto;">
+                                <div class="card p-3 border border-warning mb-4" style="max-width: 100%; overflow-x: auto;">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h6 class="text-white fw-bold mb-0" style="font-size: 1.1rem;">
+                                        <h6 class="fw-bold mb-0" style="font-size: 1.1rem;">
                                             <i class="fas fa-tachometer-alt me-2 text-warning"></i>Bandwidth Testing
                                         </h6>
                                     </div>
@@ -1157,13 +1157,13 @@ function connectViaOnDemandTunnel(firewallId) {
                                         </div>
                                         
                                         <div class="col-md-6 mb-3">
-                                            <div class="card bg-dark border-secondary">
-                                                <div class="card-header bg-info text-white">
+                                            <div class="card border-secondary">
+                                                <div class="card-header">
                                                     <i class="fas fa-chart-line me-2"></i>Test History
                                                 </div>
                                                 <div class="card-body">
                                                     <p class="small text-muted mb-2">Last 5 bandwidth tests:</p>
-                                                    <div id="bandwidthHistory" class="small text-light">
+                                                    <div id="bandwidthHistory" class="small"
                                                         <i class="fas fa-spinner fa-spin me-2"></i>Loading...
                                                     </div>
                                                     <button class="btn btn-sm btn-outline-info mt-2 w-100" onclick="loadBandwidthHistory()">
@@ -1176,7 +1176,7 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
 
                                 <!-- Results Terminal -->
-                                <div class="card bg-dark border-secondary mt-3">
+                                <div class="card border-secondary mt-3">
                                     <div class="card-header d-flex justify-content-between align-items-center">
                                         <span><i class="fas fa-terminal me-2"></i>Output</span>
                                         <button class="btn btn-sm btn-outline-light" onclick="clearDiagnosticOutput()">
@@ -1616,7 +1616,7 @@ function loadBackups() {
                         <td>${formattedDate}</td>
                         <td><span class="badge bg-info">${backup.backup_type || 'manual'}</span></td>
                         <td>${fileSize}</td>
-                        <td class="text-light small">${backup.description || 'N/A'}</td>
+                        <td class="small">${backup.description || 'N/A'}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-primary me-1" onclick="downloadBackup(${backup.id})" title="Download">
                                 <i class="fas fa-download"></i>
@@ -1832,7 +1832,7 @@ function loadCommandLog() {
                     
                     row.innerHTML = `
                         <td><small>${timeStr}</small></td>
-                        <td class="text-light small">${cmd.description || 'N/A'}</td>
+                        <td class="small">${cmd.description || 'N/A'}</td>
                         <td>${statusBadge}</td>
                         <td><small class="text-muted">${duration}</small></td>
                         <td class="text-end">${outputButton}</td>
@@ -2276,7 +2276,7 @@ function showEnrollmentKeyModal(key, expiresAt) {
         modal.className = 'modal fade';
         modal.innerHTML = `
             <div class="modal-dialog modal-lg">
-                <div class="modal-content bg-dark text-light">
+                <div class="modal-content">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title"><i class="fas fa-key me-2"></i>Enrollment Key</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -2286,7 +2286,7 @@ function showEnrollmentKeyModal(key, expiresAt) {
                         <div class="mb-3">
                             <label class="form-label">Enrollment Key:</label>
                             <div class="input-group">
-                                <input type="text" id="enrollmentKeyValue" class="form-control bg-secondary text-light font-monospace" readonly>
+                                <input type="text" id="enrollmentKeyValue" class="form-control font-monospace" readonly>
                                 <button class="btn btn-primary" onclick="copyEnrollmentKey()">
                                     <i class="fas fa-copy me-1"></i>Copy
                                 </button>
@@ -3240,7 +3240,7 @@ document.getElementById('secure_outbound_toggle').addEventListener('change', fun
                 <strong>Success!</strong> ${data.message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
-            document.querySelector('.card.card-ghost').insertAdjacentElement('afterend', alertDiv);
+            document.querySelector('.card').insertAdjacentElement('afterend', alertDiv);
             
             // Auto-dismiss after 5 seconds
             setTimeout(() => alertDiv.remove(), 5000);
@@ -3302,7 +3302,7 @@ async function loadSSHKeys() {
             container.innerHTML = '';
             data.keys.forEach(key => {
                 const keyDiv = document.createElement('div');
-                keyDiv.className = 'card bg-dark border-secondary mb-2';
+                keyDiv.className = 'card border-secondary mb-2';
                 // Obfuscate the fingerprint - show first 8 and last 8 chars with asterisks in between
                 const fp = key.fingerprint;
                 const obfuscatedFp = fp.substring(0, 8) + '*'.repeat(Math.max(0, fp.length - 16)) + fp.substring(Math.max(8, fp.length - 8));
@@ -3312,7 +3312,7 @@ async function loadSSHKeys() {
                             <div class="col-md-9">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
-                                        <small class="text-white">
+                                        <small>
                                             <i class="fas fa-certificate text-success me-2"></i>
                                             ${escapeHtml(key.key_type)} (${key.key_bits}b)
                                         </small>
@@ -3455,9 +3455,9 @@ initializeSSHKeys();
                     <div class="tab-pane fade" id="security" role="tabpanel" aria-labelledby="security-tab">
                     
                         <!-- SSH Key Management Section -->
-                        <div class="card card-ghost p-3 border border-success mb-3">
+                        <div class="card p-3 border border-success mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="text-white fw-bold mb-0" style="font-size: 1rem;">
+                                <h6 class="fw-bold mb-0" style="font-size: 1rem;">
                                     <i class="fas fa-key me-2 text-success"></i>SSH Keys
                                 </h6>
                                 <button type="button" class="btn btn-success btn-sm" onclick="regenerateSSHKeys()" title="Generate new SSH key pair">
@@ -3472,25 +3472,25 @@ initializeSSHKeys();
                         </div>
                         
                         <!-- Security Audit Section -->
-                        <div class="card card-ghost p-3 border border-warning mb-3">
-                            <h6 class="text-white fw-bold mb-2" style="font-size: 1rem;">
+                        <div class="card p-3 border border-warning mb-3">
+                            <h6 class="fw-bold mb-2" style="font-size: 1rem;">
                                 <i class="fas fa-shield-alt me-2 text-warning"></i>Security Status
                             </h6>
                             
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <div class="card bg-dark border-secondary">
+                                    <div class="card border-secondary">
                                         <div class="card-body p-2">
-                                            <small class="text-light d-block">SSH Access</small>
+                                            <small class="d-block">SSH Access</small>
                                             <span class="text-success small"><i class="fas fa-check-circle me-1"></i>Enabled</span>
                                             <small class="text-muted d-block" style="font-size: 0.75rem;">Port 22</small>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="card bg-dark border-secondary">
+                                    <div class="card border-secondary">
                                         <div class="card-body p-2">
-                                            <small class="text-light d-block">API Authentication</small>
+                                            <small class="d-block">API Authentication</small>
                                             <span class="text-success small"><i class="fas fa-check-circle me-1"></i>Enabled</span>
                                             <small class="text-muted d-block" style="font-size: 0.75rem;">Token-based auth</small>
                                         </div>

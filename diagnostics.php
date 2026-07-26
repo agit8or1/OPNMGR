@@ -162,7 +162,7 @@ include __DIR__ . '/inc/header.php';
         
         <div class="mt-3">
             <h6>Test Results:</h6>
-            <div id="test-results" class="border rounded p-3 bg-light" style="min-height: 200px; font-family: monospace; white-space: pre-wrap;"></div>
+            <div id="test-results" class="border rounded p-3" style="min-height: 200px; font-family: monospace; white-space: pre-wrap;"></div>
         </div>
     </div>
 </div>

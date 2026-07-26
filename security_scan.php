@@ -752,10 +752,10 @@ include __DIR__ . '/inc/header.php';
                 <div class="security-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
                     <div class="row align-items-center">
                         <div class="col-md-8">
-                            <h4 class="text-white mb-2">
+                            <h4 class="mb-2" style="color: #fff;">
                                 <i class="fas fa-shield-alt me-2"></i>Run Selected Scans
                             </h4>
-                            <p class="text-white mb-0" style="opacity: 0.9;">
+                            <p class="mb-0" style="color: #fff; opacity: 0.9;">
                                 <span id="selected-count"><?php
                                     $default_count = 0;
                                     foreach ($scan_types as $t) { if ($t['default_checked']) $default_count++; }

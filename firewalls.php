@@ -156,10 +156,10 @@ try {
 include __DIR__ . '/inc/header.php';
 ?>
 
-            <div class="card card-dark">
+            <div class="card">
         <div class="card-body">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                <small class="text-light fw-bold mb-0">
+                <small class="fw-bold mb-0">
                     <i class="fas fa-network-wired me-1"></i>Firewall Management
                 </small>
             </div>
@@ -219,19 +219,19 @@ include __DIR__ . '/inc/header.php';
 
             <!-- Firewall List -->
             <div class="table-responsive">
-                <table class="table table-dark table-hover table-compact">
+                <table class="table table-hover table-compact">
                     <thead>
                         <tr>
-                            <th class="col-name"><a href="?sort=hostname&order=<?php echo ($sort_by === 'hostname' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Name <?php if($sort_by === 'hostname') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-ip"><a href="?sort=ip_address&order=<?php echo ($sort_by === 'ip_address' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">WAN IP <?php if($sort_by === 'ip_address') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-name"><a href="?sort=hostname&order=<?php echo ($sort_by === 'hostname' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Name <?php if($sort_by === 'hostname') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-ip"><a href="?sort=ip_address&order=<?php echo ($sort_by === 'ip_address' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">WAN IP <?php if($sort_by === 'ip_address') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
                             <th class="col-ip">IPv6</th>
                             <th class="col-ip">LAN IP</th>
-                            <th class="col-customer"><a href="?sort=customer_name&order=<?php echo ($sort_by === 'customer_name' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Customer <?php if($sort_by === 'customer_name') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-version"><a href="?sort=version&order=<?php echo ($sort_by === 'version' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Version <?php if($sort_by === 'version') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-tags"><a href="?sort=customer_group&order=<?php echo ($sort_by === 'customer_group' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Tags <?php if($sort_by === 'customer_group') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-checkin"><a href="?sort=agent_last_checkin&order=<?php echo ($sort_by === 'agent_last_checkin' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Checkin <?php if($sort_by === 'agent_last_checkin') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-uptime"><a href="?sort=uptime&order=<?php echo ($sort_by === 'uptime' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Uptime <?php if($sort_by === 'uptime') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
-                            <th class="col-status"><a href="?sort=health&order=<?php echo ($sort_by === 'health' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-light text-decoration-none">Health <?php if($sort_by === 'health') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-customer"><a href="?sort=customer_name&order=<?php echo ($sort_by === 'customer_name' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Customer <?php if($sort_by === 'customer_name') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-version"><a href="?sort=version&order=<?php echo ($sort_by === 'version' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Version <?php if($sort_by === 'version') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-tags"><a href="?sort=customer_group&order=<?php echo ($sort_by === 'customer_group' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Tags <?php if($sort_by === 'customer_group') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-checkin"><a href="?sort=agent_last_checkin&order=<?php echo ($sort_by === 'agent_last_checkin' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Checkin <?php if($sort_by === 'agent_last_checkin') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-uptime"><a href="?sort=uptime&order=<?php echo ($sort_by === 'uptime' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Uptime <?php if($sort_by === 'uptime') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
+                            <th class="col-status"><a href="?sort=health&order=<?php echo ($sort_by === 'health' && $sort_order === 'ASC') ? 'DESC' : 'ASC'; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo urlencode($status_filter); ?>&tag=<?php echo urlencode($tag_filter); ?>" class="text-decoration-none">Health <?php if($sort_by === 'health') echo ($sort_order === 'ASC' ? '↑' : '↓'); ?></a></th>
                             <th class="col-status">Updates</th>
                             <th class="col-status">Status</th>
                             <th class="col-actions">Actions</th>
@@ -285,15 +285,15 @@ include __DIR__ . '/inc/header.php';
                                         $stats_tooltip .= "  • Hardware ID: " . htmlspecialchars($firewall['hardware_id']) . "\n";
                                     }
                                     ?>
-                                    <strong class="text-light hover-tooltip" data-tooltip="<?php echo htmlspecialchars($stats_tooltip); ?>"><?php echo htmlspecialchars($firewall["hostname"]); ?></strong>
+                                    <strong class="hover-tooltip" data-tooltip="<?php echo htmlspecialchars($stats_tooltip); ?>"><?php echo htmlspecialchars($firewall["hostname"]); ?></strong>
                                     <?php if (!empty($firewall["agent_version"])): ?>
-                                        <br><small class="text-light">v<?php echo htmlspecialchars($firewall["agent_version"]); ?></small>
+                                        <br><small>v<?php echo htmlspecialchars($firewall["agent_version"]); ?></small>
                                     <?php endif; ?>
                                 </td>                                <!-- IPv4 WAN Column -->
                                 <!-- IPv4 WAN Column -->
                                 <!-- IPv4 WAN Column -->
                                 <!-- IPv4 WAN Column -->
-                                <td class="text-light">
+                                <td>
                                     <?php if (!empty($firewall["wan_ip"]) && filter_var($firewall["wan_ip"], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)): ?>
                                         <?php
                                         $wan_ip = $firewall["wan_ip"];
@@ -354,7 +354,7 @@ include __DIR__ . '/inc/header.php';
                                     <?php endif; ?>
                                 </td>                                <!-- IPv6 WAN Column -->
                                 <!-- IPv6 WAN Column -->
-                                <td class="text-light">
+                                <td>
                                     <?php if (!empty($firewall["ipv6_address"])): ?>
                                         <?php
                                         $ipv6_full = $firewall["ipv6_address"];
@@ -437,7 +437,7 @@ include __DIR__ . '/inc/header.php';
                                     <?php endif; ?>
                                 </td>                                <!-- LAN IP Column -->
                                                                 <!-- LAN IP Column -->
-                                <td class="text-light">
+                                <td>
                                     <?php if (!empty($firewall["lan_ip"])): ?>
                                         <?php
                                         $lan_tooltip = "🏠 INTERNAL NETWORK\n";
@@ -488,7 +488,7 @@ include __DIR__ . '/inc/header.php';
                                     $customer_display = $firewall["customer_name"] ?: $firewall["customer_group"] ?: '';
                                     ?>
                                     <?php if (!empty($customer_display)): ?>
-                                        <small class="text-light hover-tooltip" data-tooltip="<?php echo !empty($firewall['customer_name']) ? 'Customer: ' . htmlspecialchars($firewall['customer_name']) : ''; ?><?php echo (!empty($firewall['customer_name']) && !empty($firewall['customer_group'])) ? ' | ' : ''; ?><?php echo !empty($firewall['customer_group']) ? 'Company: ' . htmlspecialchars($firewall['customer_group']) : ''; ?>"><?php echo htmlspecialchars($customer_display); ?></small>
+                                        <small class="hover-tooltip" data-tooltip="<?php echo !empty($firewall['customer_name']) ? 'Customer: ' . htmlspecialchars($firewall['customer_name']) : ''; ?><?php echo (!empty($firewall['customer_name']) && !empty($firewall['customer_group'])) ? ' | ' : ''; ?><?php echo !empty($firewall['customer_group']) ? 'Company: ' . htmlspecialchars($firewall['customer_group']) : ''; ?>"><?php echo htmlspecialchars($customer_display); ?></small>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
@@ -546,7 +546,7 @@ include __DIR__ . '/inc/header.php';
                                             $tooltip .= "Last Check: " . date('M j, Y H:i', strtotime($firewall['last_update_check']));
                                         }
                                         ?>
-                                        <small class="text-light hover-tooltip" data-tooltip="<?php echo $tooltip; ?>"><?php echo htmlspecialchars($version_display); ?></small>
+                                        <small class="hover-tooltip" data-tooltip="<?php echo $tooltip; ?>"><?php echo htmlspecialchars($version_display); ?></small>
                                     <?php else: ?>
                                         <span class="text-muted">Unknown</span>
                                     <?php endif; ?>
@@ -684,7 +684,7 @@ include __DIR__ . '/inc/header.php';
                                         
                                         $uptime_tooltip = "System Uptime: " . htmlspecialchars($uptime_raw);
                                         ?>
-                                        <small class="text-light hover-tooltip" data-tooltip="<?php echo $uptime_tooltip; ?>" style="font-size: 0.65rem; line-height: 1.1;"><?php echo htmlspecialchars($formatted_uptime); ?></small>
+                                        <small class="hover-tooltip" data-tooltip="<?php echo $uptime_tooltip; ?>" style="font-size: 0.65rem; line-height: 1.1;"><?php echo htmlspecialchars($formatted_uptime); ?></small>
                                     <?php else: ?>
                                         <span class="text-muted" style="font-size: 0.65rem;">Unknown</span>
                                     <?php endif; ?>
@@ -1206,7 +1206,7 @@ include __DIR__ . '/inc/header.php';
 
             <?php if (empty($firewalls)): ?>
                 <div class="text-center mt-4">
-                    <p class="text-light">No firewalls found matching your criteria.</p>
+                    <p>No firewalls found matching your criteria.</p>
                 </div>
             <?php endif; ?>
         </div>

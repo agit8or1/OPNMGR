@@ -253,7 +253,7 @@ include __DIR__ . '/inc/header.php';
 <div class="row g-2">
   <!-- ACME / Certificates -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-certificate fa-2x text-success"></i>
@@ -269,7 +269,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Alert Settings -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-bell fa-2x text-warning"></i>
@@ -285,7 +285,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Backup Retention -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-database fa-2x text-primary"></i>
@@ -301,7 +301,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Branding -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-palette fa-2x text-info"></i>
@@ -317,7 +317,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Fail2Ban -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-shield-alt fa-2x text-danger"></i>
@@ -333,7 +333,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- GeoIP Blocking -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-globe fa-2x text-danger"></i>
@@ -349,7 +349,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- General Settings -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-cog fa-2x text-secondary"></i>
@@ -365,7 +365,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- SMTP Settings -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-envelope fa-2x text-info"></i>
@@ -381,7 +381,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- System Backup & Restore -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-archive fa-2x text-success"></i>
@@ -397,7 +397,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Tunnel Management -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-network-wired fa-2x text-info"></i>
@@ -413,7 +413,7 @@ include __DIR__ . '/inc/header.php';
 
   <!-- Security Scanner (Snyk) -->
   <div class="col-md-3">
-    <div class="card card-dark h-100">
+    <div class="card h-100">
       <div class="card-body text-center p-2">
         <div class="mb-2">
           <i class="fas fa-shield-alt fa-2x text-danger"></i>
@@ -526,21 +526,21 @@ include __DIR__ . '/inc/header.php';
 <!-- General Settings Modal -->
 <div class="modal fade" id="generalSettings" tabindex="-1">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content bg-dark border-secondary">
+    <div class="modal-content border-secondary">
       <div class="modal-header border-secondary">
-        <h5 class="modal-title text-light">
+        <h5 class="modal-title">
           <i class="fas fa-cog me-2 text-info"></i>General Settings
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="post">
         <div class="modal-body">
           <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
           <div class="mb-4">
-            <label for="timezone" class="form-label text-light fw-bold">
+            <label for="timezone" class="form-label fw-bold">
               <i class="fas fa-globe me-2 text-info"></i>Display Timezone
             </label>
-            <select id="timezone" name="timezone" class="form-select bg-secondary text-light border-secondary" style="color: #fff !important;">
+            <select id="timezone" name="timezone" class="form-select border-secondary">
               <?php
               $current_tz = $_SESSION['display_timezone'] ?? 'America/New_York';
               foreach (timezone_identifiers_list() as $tz) {
@@ -552,15 +552,15 @@ include __DIR__ . '/inc/header.php';
             <small class="form-text text-muted d-block mt-2">Select your timezone for displaying times throughout the system</small>
           </div>
           <div class="mb-4">
-            <label for="manager_fqdn" class="form-label text-light fw-bold">
+            <label for="manager_fqdn" class="form-label fw-bold">
               <i class="fas fa-server me-2 text-info"></i>Manager FQDN
             </label>
-            <input type="text" id="manager_fqdn" name="manager_fqdn" class="form-control bg-secondary text-light border-secondary"
+            <input type="text" id="manager_fqdn" name="manager_fqdn" class="form-control border-secondary"
                    value="<?php echo htmlspecialchars($manager_fqdn); ?>"
                    placeholder="opn.agit8or.net">
             <small class="form-text text-muted d-block mt-2">
               Fully Qualified Domain Name for this manager. Used in agent install commands:<br>
-              <code class="text-light bg-dark px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | sh</code>
+              <code class="px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | sh</code>
             </small>
           </div>
         </div>
@@ -631,10 +631,10 @@ include __DIR__ . '/inc/header.php';
 <!-- Backup Retention Configuration Modal -->
 <div class="modal fade" id="backupRetentionModal" tabindex="-1" aria-labelledby="backupRetentionModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content bg-dark text-light">
+    <div class="modal-content">
       <div class="modal-header border-secondary">
         <h5 class="modal-title" id="backupRetentionModalLabel">Backup Retention Configuration</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form method="post">
         <div class="modal-body">
@@ -646,7 +646,7 @@ include __DIR__ . '/inc/header.php';
           
           <div class="mb-3">
             <label class="form-label">Retention Type</label>
-            <select class="form-control bg-dark text-light border-secondary" name="backup_retention_type" id="backup_retention_type" onchange="toggleRetentionType()">
+            <select class="form-control border-secondary" name="backup_retention_type" id="backup_retention_type" onchange="toggleRetentionType()">
               <option value="count" <?php echo $backup_retention_type === 'count' ? 'selected' : ''; ?>>Count-Based (Keep Last N Backups)</option>
               <option value="time" <?php echo $backup_retention_type === 'time' ? 'selected' : ''; ?>>Time-Based (Keep for X Months)</option>
             </select>
@@ -655,14 +655,14 @@ include __DIR__ . '/inc/header.php';
           <div id="count_retention" style="display: <?php echo $backup_retention_type === 'count' ? 'block' : 'none'; ?>;">
             <div class="mb-3">
               <label for="backup_min_keep" class="form-label">Minimum Backups to Keep</label>
-              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_min_keep" name="backup_min_keep"
+              <input type="number" class="form-control border-secondary" id="backup_min_keep" name="backup_min_keep"
                      value="<?php echo htmlspecialchars($backup_min_keep); ?>"
                      min="10" max="100" step="1">
               <div class="form-text text-light-emphasis">Always keep at least this many backups per firewall (10-100)</div>
             </div>
             <div class="mb-3">
               <label for="backup_max_keep" class="form-label">Maximum Backups to Keep</label>
-              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_max_keep" name="backup_max_keep"
+              <input type="number" class="form-control border-secondary" id="backup_max_keep" name="backup_max_keep"
                      value="<?php echo htmlspecialchars($backup_max_keep); ?>"
                      min="20" max="200" step="1">
               <div class="form-text text-light-emphasis">Delete oldest backups when count exceeds this (20-200)</div>
@@ -672,7 +672,7 @@ include __DIR__ . '/inc/header.php';
           <div id="time_retention" style="display: <?php echo $backup_retention_type === 'time' ? 'block' : 'none'; ?>;">
             <div class="mb-3">
               <label for="backup_retention_months" class="form-label">Retention Period (Months)</label>
-              <input type="number" class="form-control bg-dark text-light border-secondary" id="backup_retention_months" name="backup_retention_months"
+              <input type="number" class="form-control border-secondary" id="backup_retention_months" name="backup_retention_months"
                      value="<?php echo htmlspecialchars($backup_retention_months); ?>"
                      min="1" max="6" step="1">
               <div class="form-text text-light-emphasis">Keep backups for 1-6 months</div>
@@ -740,12 +740,12 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Tunnel Management Modal -->
 <div class="modal fade" id="tunnelManagementModal" tabindex="-1" aria-labelledby="tunnelManagementModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
-    <div class="modal-content bg-dark text-light">
+    <div class="modal-content">
       <div class="modal-header border-secondary">
         <h5 class="modal-title" id="tunnelManagementModalLabel">
           <i class="fas fa-network-wired me-2"></i>Tunnel Management
         </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="alert alert-info bg-opacity-25 mb-3">
@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <!-- Summary Cards -->
         <div class="row g-3 mb-4">
           <div class="col-md-3">
-            <div class="card bg-secondary">
+            <div class="card">
               <div class="card-body text-center">
                 <h3 id="summary-total" class="mb-0">-</h3>
                 <small class="text-muted">Total Sessions</small>
@@ -805,7 +805,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         <!-- Tunnels Table -->
         <div class="table-responsive">
-          <table class="table table-dark table-striped table-hover">
+          <table class="table table-striped table-hover">
             <thead>
               <tr>
                 <th>Session</th>
@@ -873,7 +873,7 @@ function updateTunnelDisplay(data) {
     const tbody = document.getElementById('tunnels-table-body');
     
     if (data.ssh_tunnels.length === 0 && data.db_sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-light"><i class="fas fa-check-circle text-success me-2"></i>No active tunnels - system clean</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-check-circle text-success me-2"></i>No active tunnels - system clean</td></tr>';
         return;
     }
     

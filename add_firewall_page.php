@@ -28,7 +28,7 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
 
             <div class="row">
                 <div class="col-lg-8">
-                    <div class="card card-dark">
+                    <div class="card card">
                         <div class="card-header">
                             <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>One-Click OPNsense Enrollment</h5>
                         </div>
@@ -52,8 +52,8 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
                                             </div>
 
                                             <p><strong>Copy this single command</strong> and paste it into your SSH session:</p>
-                                            <div class="bg-dark border border-secondary p-3 rounded mb-3">
-                                                <input type="text" class="form-control bg-dark text-white border-secondary" id="wgetCommand" value="<?php echo htmlspecialchars($wget_command); ?>" readonly style="font-family: monospace; font-size: 0.9rem;">
+                                            <div class="border p-3 rounded mb-3">
+                                                <input type="text" class="form-control" id="wgetCommand" value="<?php echo htmlspecialchars($wget_command); ?>" readonly style="font-family: monospace; font-size: 0.9rem;">
                                             </div>
 
                                             <div class="d-flex gap-2 mb-3">
@@ -112,7 +112,7 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
                 </div>
 
                 <div class="col-lg-4">
-                    <div class="card card-dark">
+                    <div class="card card">
                         <div class="card-header">
                             <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Quick Info</h5>
                         </div>
@@ -137,7 +137,7 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
                             <div class="alert alert-danger">
                                 <h6><i class="fas fa-trash-alt me-2"></i>Agent Uninstall</h6>
                                 <p class="mb-1">To uninstall the agent from a firewall, run these commands on the firewall:</p>
-                                <code class="d-block p-2 bg-dark text-white border border-secondary rounded mb-2" style="font-family: monospace;">
+                                <code class="d-block p-2 border rounded mb-2" style="font-family: monospace;">
                                     service opnagent stop<br>
                                     pkg remove opnagent<br>
                                     rm -rf /usr/local/opnsense/scripts/opnagent<br>

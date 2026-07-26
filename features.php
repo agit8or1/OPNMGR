@@ -26,7 +26,7 @@ include __DIR__ . '/inc/header.php';
 
         <!-- Main Content -->
         <div class="col-md-9">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-star me-2"></i>Platform Features
@@ -276,7 +276,7 @@ include __DIR__ . '/inc/header.php';
                         
                         <div class="row">
                             <div class="col-md-6">
-                                <table class="table table-dark table-sm">
+                                <table class="table table table-sm">
                                     <tr>
                                         <th>Platform:</th>
                                         <td>PHP 8.3 + MySQL + nginx</td>
@@ -300,7 +300,7 @@ include __DIR__ . '/inc/header.php';
                                 </table>
                             </div>
                             <div class="col-md-6">
-                                <table class="table table-dark table-sm">
+                                <table class="table table table-sm">
                                     <tr>
                                         <th>Concurrent Firewalls:</th>
                                         <td>Unlimited (tested with 50+)</td>

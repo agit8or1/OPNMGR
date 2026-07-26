@@ -89,10 +89,10 @@ include __DIR__ . '/inc/header.php';
 
 <div class="row">
     <div class="col-md-12">
-        <div class="card card-dark">
+        <div class="card">
             <div class="card-body">
                 <div class="d-flex align-items-center gap-2 mb-3">
-                    <small class="text-light fw-bold mb-0">
+                    <small class="fw-bold mb-0">
                         <i class="fas fa-network-wired me-1"></i>Firewall Details - <?php echo htmlspecialchars($firewall['hostname']); ?>
                     </small>
                     <div class="ms-auto">
@@ -112,18 +112,18 @@ include __DIR__ . '/inc/header.php';
 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="card card-ghost p-3">
-                            <h6 class="text-light mb-3">Basic Information</h6>
+                        <div class="card p-3">
+                            <h6 class="mb-3">Basic Information</h6>
                             <div class="mb-2">
-                                <strong class="text-light">Hostname:</strong>
+                                <strong>Hostname:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['hostname']); ?></span>
                             </div>
                             <div class="mb-2">
-                                <strong class="text-light">IP Address:</strong>
+                                <strong>IP Address:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['ip_address']); ?></span>
                             </div>
                             <div class="mb-2">
-                                <strong class="text-light">Status:</strong>
+                                <strong>Status:</strong>
                                 <span class="badge <?php 
                                     $status = $firewall['current_status'] ?? 'unknown';
                                     echo $status === 'online' ? 'bg-success' : ($status === 'offline' ? 'bg-danger' : 'bg-warning');
@@ -143,30 +143,30 @@ include __DIR__ . '/inc/header.php';
                             </div>
                             <?php if (!empty($firewall['enrolled_at'])): ?>
                             <div class="mb-2">
-                                <strong class="text-light">Enrolled:</strong>
+                                <strong>Enrolled:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['enrolled_at']); ?></span>
                             </div>
                             <?php endif; ?>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="card card-ghost p-3">
-                            <h6 class="text-light mb-3">Customer Information</h6>
+                        <div class="card p-3">
+                            <h6 class="mb-3">Customer Information</h6>
                             <?php if (!empty($firewall['customer_name'])): ?>
                             <div class="mb-2">
-                                <strong class="text-light">Customer Name:</strong>
+                                <strong>Customer Name:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['customer_name']); ?></span>
                             </div>
                             <?php endif; ?>
                             <?php if (!empty($firewall['wan_ip'])): ?>
                             <div class="mb-2">
-                                <strong class="text-light">WAN IP:</strong>
+                                <strong>WAN IP:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['wan_ip']); ?></span>
                             </div>
                             <?php endif; ?>
                             <?php if (!empty($firewall['tag_names'])): ?>
                             <div class="mb-2">
-                                <strong class="text-light">Tags:</strong><br>
+                                <strong>Tags:</strong><br>
                                 <?php 
                                 $tag_names = explode(', ', $firewall['tag_names']);
                                 $tag_colors = explode(', ', $firewall['tag_colors']);
@@ -180,7 +180,7 @@ include __DIR__ . '/inc/header.php';
                             <?php endif; ?>
                             <?php if (!empty($firewall['reverse_proxy_url'])): ?>
                             <div class="mb-2">
-                                <strong class="text-light">Reverse Proxy URL:</strong>
+                                <strong>Reverse Proxy URL:</strong>
                                 <span class="text-muted"><?php echo htmlspecialchars($firewall['reverse_proxy_url']); ?></span>
                             </div>
                             <?php endif; ?>
@@ -191,9 +191,9 @@ include __DIR__ . '/inc/header.php';
                 <!-- Backup Management Section -->
                 <div class="row mt-3">
                     <div class="col-md-12">
-                        <div class="card card-ghost p-3">
+                        <div class="card p-3">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-light mb-0">
+                                <h6 class="mb-0">
                                     <i class="fas fa-save me-2"></i>Configuration Backups
                                 </h6>
                                 <button type="button" class="btn btn-success btn-sm" onclick="createBackup()">
@@ -202,7 +202,7 @@ include __DIR__ . '/inc/header.php';
                             </div>
                             
                             <div id="backupsLoading" class="text-center py-4">
-                                <div class="spinner-border text-light" role="status">
+                                <div class="spinner-border" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
                                 <p class="text-muted mt-2">Loading backups...</p>
@@ -210,7 +210,7 @@ include __DIR__ . '/inc/header.php';
                             
                             <div id="backupsContainer" style="display: none;">
                                 <div class="table-responsive">
-                                    <table class="table table-dark table-hover">
+                                    <table class="table table-hover">
                                         <thead>
                                             <tr>
                                                 <th>Date Created</th>
@@ -240,27 +240,27 @@ include __DIR__ . '/inc/header.php';
 <!-- Edit Modal -->
 <div class="modal fade" id="editFirewallModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header bg-dark border-secondary">
-                <h5 class="modal-title text-light">Edit Firewall</h5>
+        <div class="modal-content">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Edit Firewall</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form method="post">
-                <div class="modal-body bg-dark">
+                <div class="modal-body">
                     <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                     <input type="hidden" name="firewall_id" value="<?php echo $firewall['id']; ?>">
                     
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="hostname" class="form-label text-light fw-bold">Hostname</label>
-                                <input type="text" class="form-control bg-dark text-light border-secondary" id="hostname" name="hostname" value="<?php echo htmlspecialchars($firewall['hostname']); ?>" required>
+                                <label for="hostname" class="form-label fw-bold">Hostname</label>
+                                <input type="text" class="form-control border-secondary" id="hostname" name="hostname" value="<?php echo htmlspecialchars($firewall['hostname']); ?>" required>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="ip_address" class="form-label text-light fw-bold">IP Address</label>
-                                <input type="text" class="form-control bg-dark text-light border-secondary" id="ip_address" name="ip_address" value="<?php echo htmlspecialchars($firewall['ip_address']); ?>" required>
+                                <label for="ip_address" class="form-label fw-bold">IP Address</label>
+                                <input type="text" class="form-control border-secondary" id="ip_address" name="ip_address" value="<?php echo htmlspecialchars($firewall['ip_address']); ?>" required>
                             </div>
                         </div>
                     </div>
@@ -268,14 +268,14 @@ include __DIR__ . '/inc/header.php';
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="wan_ip" class="form-label text-light fw-bold">WAN IP Address</label>
-                                <input type="text" class="form-control bg-dark text-light border-secondary" id="wan_ip" name="wan_ip" value="<?php echo htmlspecialchars($firewall['wan_ip'] ?? ''); ?>">
+                                <label for="wan_ip" class="form-label fw-bold">WAN IP Address</label>
+                                <input type="text" class="form-control border-secondary" id="wan_ip" name="wan_ip" value="<?php echo htmlspecialchars($firewall['wan_ip'] ?? ''); ?>">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="customer_name" class="form-label text-light fw-bold">Customer</label>
-                                <select class="form-select bg-dark text-light border-secondary" id="customer_name" name="customer_name">
+                                <label for="customer_name" class="form-label fw-bold">Customer</label>
+                                <select class="form-select border-secondary" id="customer_name" name="customer_name">
                                     <option value="">Select Customer</option>
                                     <?php foreach ($all_customers as $customer): ?>
                                         <option value="<?php echo htmlspecialchars($customer['name']); ?>" 
@@ -289,8 +289,8 @@ include __DIR__ . '/inc/header.php';
                     </div>
                     
                     <div class="mb-3">
-                        <label for="tags" class="form-label text-light fw-bold">Tags</label>
-                        <select multiple class="form-select bg-dark text-light border-secondary" id="tags" name="tags[]" size="5">
+                        <label for="tags" class="form-label fw-bold">Tags</label>
+                        <select multiple class="form-select border-secondary" id="tags" name="tags[]" size="5">
                             <?php 
                             $selected_tag_ids = !empty($firewall['tag_ids']) ? explode(',', $firewall['tag_ids']) : [];
                             foreach ($all_tags as $tag): 
@@ -305,7 +305,7 @@ include __DIR__ . '/inc/header.php';
                         <small class="text-muted">Hold Ctrl/Cmd to select multiple tags</small>
                     </div>
                 </div>
-                <div class="modal-footer bg-dark border-secondary">
+                <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" name="edit_firewall" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -331,14 +331,14 @@ function uninstallAgent() {
         modal.innerHTML = `
             <div class="modal fade" id="uninstallModal" tabindex="-1">
                 <div class="modal-dialog">
-                    <div class="modal-content bg-dark text-light">
+                    <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Uninstall Agent Command</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <p>Run this command on your firewall to uninstall the agent:</p>
-                            <div class="bg-secondary p-3 rounded">
+                            <div class="p-3 rounded">
                                 <code>${uninstallCommand}</code>
                             </div>
                             <p class="mt-3 text-warning"><small>This will stop the agent but keep the firewall entry for future re-enrollment.</small></p>

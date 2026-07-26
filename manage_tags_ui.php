@@ -16,7 +16,7 @@ try {
 
 <div class="row">
     <div class="col-md-12">
-        <div class="card card-dark">
+        <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
                     <i class="fas fa-tags me-2"></i>Manage Tags
@@ -25,7 +25,7 @@ try {
             <div class="card-body">
                 <!-- Add Tag Form -->
                 <div class="mb-4">
-                    <h6 style="color: #e2e8f0;">Add New Tag</h6>
+                    <h6>Add New Tag</h6>
                     <div class="row g-3">
                         <div class="col-md-4">
                             <input type="text" id="newTagName" class="form-control" placeholder="Tag name" required>
@@ -46,10 +46,10 @@ try {
                     <?php foreach ($tags as $tag): ?>
                     <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded" id="tag-<?php echo $tag['id']; ?>">
                         <div class="d-flex align-items-center">
-                            <span class="badge me-3" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>; color: white; font-size: 14px; padding: 6px 12px;">
+                            <span class="badge me-3" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>; font-size: 14px; padding: 6px 12px;">
                                 <?php echo htmlspecialchars($tag['name']); ?>
                             </span>
-                            <small class="me-3" style="color: #94a3b8;">
+                            <small class="me-3 text-muted">
                                 <?php echo $tag['firewall_count']; ?> firewall<?php echo $tag['firewall_count'] != 1 ? 's' : ''; ?>
                             </small>
                             <div class="btn-group btn-group-sm">
@@ -68,22 +68,22 @@ try {
                 <!-- Edit Tag Modal -->
                 <div class="modal fade" id="editTagModal" tabindex="-1">
                     <div class="modal-dialog">
-                        <div class="modal-content" style="background-color: #1e2936; color: #fff; border: 1px solid rgba(255,255,255,0.15);">
-                            <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.15);">
-                                <h5 class="modal-title" style="color: #fff;">Edit Tag</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Edit Tag</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3">
-                                    <label class="form-label" style="color: #cbd7e6; font-weight: 600;">Tag Name</label>
+                                    <label class="form-label fw-semibold">Tag Name</label>
                                     <input type="text" class="form-control" id="editTagName" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label" style="color: #cbd7e6; font-weight: 600;">Tag Color</label>
+                                    <label class="form-label fw-semibold">Tag Color</label>
                                     <input type="color" class="form-control" id="editTagColor" value="#007bff">
                                 </div>
                             </div>
-                            <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.15);">
+                            <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                 <button type="button" class="btn btn-primary" onclick="saveEditTag()">Save Changes</button>
                             </div>

@@ -38,8 +38,8 @@ include __DIR__ . '/inc/header.php';
     
     <!-- Alert Preferences Card -->
     <div class="mb-3">
-      <div class="card bg-light border-primary">
-        <div class="card-header bg-primary text-white">
+      <div class="card border-primary">
+        <div class="card-header bg-primary">
           <i class="fas fa-bell me-2"></i><strong>Alert Preferences</strong>
         </div>
         <div class="card-body">
@@ -60,7 +60,7 @@ include __DIR__ . '/inc/header.php';
           <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" name="alert_levels[]" value="warning" id="alert_warning" <?php echo in_array('warning', $user_levels) ? 'checked' : ''; ?>>
             <label class="form-check-label" for="alert_warning">
-              <span class="badge bg-warning text-white me-2"><i class="fas fa-exclamation-triangle me-1"></i>WARNING</span> 
+              <span class="badge bg-warning me-2"><i class="fas fa-exclamation-triangle me-1"></i>WARNING</span> 
               <strong>Important issues that need attention</strong>
             </label>
           </div>

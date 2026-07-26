@@ -92,7 +92,7 @@ require_once __DIR__ . '/inc/header.php';
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <h2 class="text-light mb-3"><i class="fas fa-user-circle me-2"></i>User Profile</h2>
+            <h2 class="mb-3"><i class="fas fa-user-circle me-2"></i>User Profile</h2>
         </div>
     </div>
 
@@ -107,7 +107,7 @@ require_once __DIR__ . '/inc/header.php';
     <div class="row">
         <!-- Profile Information Card -->
         <div class="col-md-6 mb-4">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Profile Information</h5>
                 </div>
@@ -117,23 +117,23 @@ require_once __DIR__ . '/inc/header.php';
                             <input type="hidden" name="action" value="update_profile">
 
                             <div class="mb-3">
-                                <label for="username" class="form-label text-light">Username</label>
+                                <label for="username" class="form-label">Username</label>
                                 <input type="text" class="form-control" id="username" value="<?php echo htmlspecialchars($user_data['username']); ?>" disabled>
                                 <small class="text-muted">Username cannot be changed</small>
                             </div>
 
                             <div class="mb-3">
-                                <label for="email" class="form-label text-light">Email Address</label>
+                                <label for="email" class="form-label">Email Address</label>
                                 <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($user_data['email'] ?? ''); ?>">
                             </div>
 
                             <div class="mb-3">
-                                <label for="role" class="form-label text-light">Role</label>
+                                <label for="role" class="form-label">Role</label>
                                 <input type="text" class="form-control" id="role" value="<?php echo ucfirst($user_data['role'] ?? 'user'); ?>" disabled>
                             </div>
 
                             <div class="mb-3">
-                                <label for="timezone" class="form-label text-light">Timezone</label>
+                                <label for="timezone" class="form-label">Timezone</label>
                                 <select class="form-select" id="timezone" name="timezone">
                                     <?php
                                     $timezones = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu', 'UTC', 'Europe/London', 'Europe/Paris', 'Asia/Tokyo'];
@@ -147,7 +147,7 @@ require_once __DIR__ . '/inc/header.php';
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label text-light">2FA Status</label>
+                                <label class="form-label">2FA Status</label>
                                 <div>
                                     <span class="badge bg-<?php echo !empty($user_data['two_factor_secret']) ? 'success' : 'warning'; ?>">
                                         <?php echo !empty($user_data['two_factor_secret']) ? 'Enabled' : 'Disabled'; ?>
@@ -171,7 +171,7 @@ require_once __DIR__ . '/inc/header.php';
 
         <!-- Change Password Card -->
         <div class="col-md-6 mb-4">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-key me-2"></i>Change Password</h5>
                 </div>
@@ -180,18 +180,18 @@ require_once __DIR__ . '/inc/header.php';
                         <input type="hidden" name="action" value="change_password">
 
                         <div class="mb-3">
-                            <label for="current_password" class="form-label text-light">Current Password</label>
+                            <label for="current_password" class="form-label">Current Password</label>
                             <input type="password" class="form-control" id="current_password" name="current_password" required>
                         </div>
 
                         <div class="mb-3">
-                            <label for="new_password" class="form-label text-light">New Password</label>
+                            <label for="new_password" class="form-label">New Password</label>
                             <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8">
                             <small class="text-muted">Minimum 8 characters</small>
                         </div>
 
                         <div class="mb-3">
-                            <label for="confirm_password" class="form-label text-light">Confirm New Password</label>
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
                             <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
                         </div>
 
@@ -207,7 +207,7 @@ require_once __DIR__ . '/inc/header.php';
     <!-- Account Details Card -->
     <div class="row">
         <div class="col-12 mb-4">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Account Details</h5>
                 </div>
@@ -216,15 +216,15 @@ require_once __DIR__ . '/inc/header.php';
                         <div class="row">
                             <div class="col-md-4">
                                 <p class="text-muted mb-1">Account Created:</p>
-                                <p class="text-light"><?php echo date('F j, Y g:i A', strtotime($user_data['created_at'] ?? 'now')); ?></p>
+                                <p><?php echo date('F j, Y g:i A', strtotime($user_data['created_at'] ?? 'now')); ?></p>
                             </div>
                             <div class="col-md-4">
                                 <p class="text-muted mb-1">Last Login:</p>
-                                <p class="text-light"><?php echo !empty($user_data['last_login']) ? date('F j, Y g:i A', strtotime($user_data['last_login'])) : 'Never'; ?></p>
+                                <p><?php echo !empty($user_data['last_login']) ? date('F j, Y g:i A', strtotime($user_data['last_login'])) : 'Never'; ?></p>
                             </div>
                             <div class="col-md-4">
                                 <p class="text-muted mb-1">User ID:</p>
-                                <p class="text-light"><?php echo $user_data['id']; ?></p>
+                                <p><?php echo $user_data['id']; ?></p>
                             </div>
                         </div>
                     <?php endif; ?>

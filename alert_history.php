@@ -59,7 +59,7 @@ include __DIR__ . '/inc/header.php';
 
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-light">
+        <h2>
             <i class="fas fa-history me-2"></i>Alert History
         </h2>
         <a href="/alerts.php" class="btn btn-outline-primary">
@@ -68,12 +68,12 @@ include __DIR__ . '/inc/header.php';
     </div>
 
     <!-- Filters -->
-    <div class="card card-dark mb-4">
+    <div class="card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
-                    <label class="form-label text-light">Alert Level</label>
-                    <select name="level" class="form-select bg-dark text-light border-secondary">
+                    <label class="form-label">Alert Level</label>
+                    <select name="level" class="form-select">
                         <option value="">All Levels</option>
                         <option value="info" <?php echo $level_filter === 'info' ? 'selected' : ''; ?>>Info</option>
                         <option value="warning" <?php echo $level_filter === 'warning' ? 'selected' : ''; ?>>Warning</option>
@@ -81,8 +81,8 @@ include __DIR__ . '/inc/header.php';
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label text-light">Firewall</label>
-                    <select name="firewall" class="form-select bg-dark text-light border-secondary">
+                    <label class="form-label">Firewall</label>
+                    <select name="firewall" class="form-select">
                         <option value="">All Firewalls</option>
                         <?php foreach ($firewalls as $fw): ?>
                             <option value="<?php echo $fw['id']; ?>" <?php echo $firewall_filter == $fw['id'] ? 'selected' : ''; ?>>
@@ -106,11 +106,11 @@ include __DIR__ . '/inc/header.php';
     <!-- Stats -->
     <div class="row mb-4">
         <div class="col-md-12">
-            <div class="card card-dark">
+            <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-around text-center">
                         <div>
-                            <h4 class="text-light mb-0"><?php echo number_format($total_alerts); ?></h4>
+                            <h4 class="mb-0"><?php echo number_format($total_alerts); ?></h4>
                             <small class="text-muted">Total Alerts</small>
                         </div>
                         <div class="vr"></div>
@@ -142,7 +142,7 @@ include __DIR__ . '/inc/header.php';
     </div>
 
     <!-- Alert History Table -->
-    <div class="card card-dark">
+    <div class="card">
         <div class="card-body">
             <?php if (empty($alerts)): ?>
                 <div class="alert alert-info text-center">
@@ -151,7 +151,7 @@ include __DIR__ . '/inc/header.php';
                 </div>
             <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover">
+                    <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>Time</th>
@@ -177,7 +177,7 @@ include __DIR__ . '/inc/header.php';
                                 ][$alert['alert_level']] ?? 'circle';
                             ?>
                                 <tr>
-                                    <td class="text-light">
+                                    <td>
                                         <?php echo date('M j, Y g:i A', strtotime($alert['sent_at'])); ?>
                                         <br>
                                         <small class="text-muted"><?php echo date('D', strtotime($alert['sent_at'])); ?></small>
@@ -188,7 +188,7 @@ include __DIR__ . '/inc/header.php';
                                             <?php echo ucfirst($alert['alert_level']); ?>
                                         </span>
                                     </td>
-                                    <td class="text-light">
+                                    <td>
                                         <?php if ($alert['firewall_id']): ?>
                                             <a href="/firewall_details.php?id=<?php echo $alert['firewall_id']; ?>" class="text-decoration-none text-info">
                                                 <?php echo htmlspecialchars($alert['firewall_hostname'] ?? 'Unknown'); ?>
@@ -197,10 +197,10 @@ include __DIR__ . '/inc/header.php';
                                             <span class="text-muted">System</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="text-light">
+                                    <td>
                                         <?php echo nl2br(htmlspecialchars($alert['message'])); ?>
                                     </td>
-                                    <td class="text-light">
+                                    <td>
                                         <small class="text-muted">
                                             <?php 
                                             $recipients = explode(',', $alert['recipient_emails'] ?? '');
@@ -231,7 +231,7 @@ include __DIR__ . '/inc/header.php';
                         <ul class="pagination justify-content-center mt-4">
                             <?php if ($page > 1): ?>
                                 <li class="page-item">
-                                    <a class="page-link bg-dark text-light border-secondary" href="?page=<?php echo $page - 1; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
+                                    <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
                                         Previous
                                     </a>
                                 </li>
@@ -239,7 +239,7 @@ include __DIR__ . '/inc/header.php';
                             
                             <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
                                 <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
-                                    <a class="page-link bg-dark text-light border-secondary" href="?page=<?php echo $i; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
+                                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
                                         <?php echo $i; ?>
                                     </a>
                                 </li>
@@ -247,7 +247,7 @@ include __DIR__ . '/inc/header.php';
                             
                             <?php if ($page < $total_pages): ?>
                                 <li class="page-item">
-                                    <a class="page-link bg-dark text-light border-secondary" href="?page=<?php echo $page + 1; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
+                                    <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $level_filter ? "&level=$level_filter" : ''; ?><?php echo $firewall_filter ? "&firewall=$firewall_filter" : ''; ?>">
                                         Next
                                     </a>
                                 </li>

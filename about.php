@@ -142,7 +142,7 @@ p, td, th, span, strong, small, li {
                             <h4><i class="fas fa-chart-bar me-2"></i>System Statistics</h4>
                             <div class="row">
                                 <div class="col-md-3">
-                                    <div class="card bg-primary text-white mb-3">
+                                    <div class="card bg-primary mb-3">
                                         <div class="card-body text-center">
                                             <h1><?= $firewall_count ?></h1>
                                             <p class="mb-0">Total Firewalls</p>
@@ -150,7 +150,7 @@ p, td, th, span, strong, small, li {
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="card bg-success text-white mb-3">
+                                    <div class="card bg-success mb-3">
                                         <div class="card-body text-center">
                                             <h1><?= $active_agents ?></h1>
                                             <p class="mb-0">Active Agents</p>
@@ -158,7 +158,7 @@ p, td, th, span, strong, small, li {
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="card bg-info text-white mb-3">
+                                    <div class="card bg-info mb-3">
                                         <div class="card-body text-center">
                                             <h1><?= $total_backups ?></h1>
                                             <p class="mb-0">Total Backups</p>
@@ -166,7 +166,7 @@ p, td, th, span, strong, small, li {
                                     </div>
                                 </div>
                                 <div class="col-md-3">
-                                    <div class="card bg-secondary text-white mb-3">
+                                    <div class="card mb-3">
                                         <div class="card-body text-center">
                                             <h1><?= substr(PHP_VERSION, 0, 3) ?></h1>
                                             <p class="mb-0">PHP Version</p>

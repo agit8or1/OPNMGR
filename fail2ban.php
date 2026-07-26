@@ -119,24 +119,24 @@ include __DIR__ . '/inc/header.php';
 
 <div class="row">
   <div class="col-md-12">
-    <div class="card card-dark p-3">
+    <div class="card p-3">
       <h5 class="text-center">Fail2Ban</h5>
       <?php if (empty($fbin)): ?>
         <div class="alert alert-warning">fail2ban-client not found on the server.</div>
       <?php else: ?>
         <div>
           <div class="d-flex align-items-center gap-2 mb-2">
-            <small class="text-light fw-bold mb-0">
+            <small class="fw-bold mb-0">
               <i class="fas fa-shield-alt me-1"></i>Jails
             </small>
           </div>
           <div class="row g-2">
             <?php foreach($jails as $j): ?>
               <div class="col-md-6 col-lg-4">
-                <div class="card card-ghost p-2">
+                <div class="card p-2">
                   <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
-                      <strong class="text-light" style="font-size: 0.85rem;"><?php echo htmlspecialchars($j); ?></strong>
+                      <strong style="font-size: 0.85rem;"><?php echo htmlspecialchars($j); ?></strong>
                       <?php
                         $b = shell_exec(escapeshellcmd($fbin).' status '.escapeshellarg($j).' 2>/dev/null');
                         $banned_count = 0;
@@ -193,10 +193,10 @@ include __DIR__ . '/inc/header.php';
 <!-- IP Management Form - Condensed -->
 <div class="row mb-2">
   <div class="col-md-12">
-    <div class="card card-dark">
+    <div class="card">
       <div class="card-body py-2">
         <div class="d-flex align-items-center gap-2 mb-2">
-          <small class="text-light fw-bold mb-0">
+          <small class="fw-bold mb-0">
             <i class="fas fa-gavel me-1"></i>IP Management
           </small>
         </div>
@@ -243,10 +243,10 @@ include __DIR__ . '/inc/header.php';
 <!-- Fail2Ban Settings - Condensed -->
 <div class="row mb-2">
   <div class="col-md-12">
-    <div class="card card-dark">
+    <div class="card">
       <div class="card-body py-2">
         <div class="d-flex align-items-center gap-2 mb-2">
-          <small class="text-light fw-bold mb-0">
+          <small class="fw-bold mb-0">
             <i class="fas fa-cog me-1"></i>Settings
           </small>
         </div>
@@ -259,7 +259,7 @@ include __DIR__ . '/inc/header.php';
                   <input type="number" name="ban_time_minutes" class="form-control form-control-sm" value="<?php echo htmlspecialchars($ban_time_minutes); ?>" min="1" max="10080" placeholder="Ban time (minutes)">
                 </div>
               </div>
-              <small class="text-light" style="font-size: 0.65rem;">Default ban duration (1-10080 minutes)</small>
+              <small style="font-size: 0.65rem;">Default ban duration (1-10080 minutes)</small>
             </div>
             <div class="col-md-4 d-flex align-items-start">
               <button class="btn btn-primary btn-xs w-100" name="save_fail2ban_settings" type="submit" value="1">
@@ -278,11 +278,11 @@ include __DIR__ . '/inc/header.php';
 <!-- Service Status - Condensed -->
 <div class="row mt-2">
   <div class="col-md-12">
-    <div class="card card-dark">
+    <div class="card">
       <div class="card-body py-2">
         <div class="d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-2">
-            <small class="text-light fw-bold mb-0">
+            <small class="fw-bold mb-0">
               <i class="fas fa-server me-1"></i>Fail2Ban:
             </small>
             <span class="badge <?php echo $service_running ? 'bg-success' : 'bg-danger'; ?> badge-sm">
@@ -401,7 +401,7 @@ function unbanAll(jailName) {
 <!-- Fail2Ban Modal -->
 <div class="modal fade" id="failModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content bg-dark text-light">
+    <div class="modal-content">
     <div class="modal-header">
       <h5 class="modal-title">Fail2Ban Jail Output</h5>
       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>

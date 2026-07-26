@@ -100,10 +100,15 @@ System configuration with ACME, alerts, backup, branding, Fail2Ban, and GeoIP.
 
 ![Settings](screenshots/06-settings.png)
 
-### Collapsible Sidebar
-Icon-only rail (72px) expands to full menu on hover. Pin to keep open.
+### Users
+Admin user management with roles, password changes, and CSRF protection.
 
-![Sidebar Expanded](screenshots/07-sidebar-expanded.png)
+![Users](screenshots/05-users.png)
+
+### Collapsed Sidebar
+Icon-only rail (72px) — hover or pin to expand.
+
+![Sidebar Collapsed](screenshots/07-sidebar-collapsed.png)
 
 ### Light Mode
 Full light theme with system-preference detection and manual toggle.

@@ -53,10 +53,10 @@ $stats = $stmt->fetchAll(PDO::FETCH_ASSOC);
 include __DIR__ . '/inc/header.php';
 ?>
 
-<div class="card card-dark">
+<div class="card">
     <div class="card-body">
         <div class="d-flex align-items-center gap-2 mb-4">
-            <small class="text-light fw-bold mb-0">
+            <small class="fw-bold mb-0">
                 <i class="fas fa-terminal me-1"></i>Approved Commands Management
             </small>
             <div class="ms-auto">
@@ -77,8 +77,8 @@ include __DIR__ . '/inc/header.php';
         <!-- Statistics -->
         <div class="row mb-4">
             <div class="col-md-12">
-                <div class="card card-ghost p-3 border border-secondary">
-                    <h6 class="text-white fw-bold mb-3">Command Statistics</h6>
+                <div class="card p-3 border border-secondary">
+                    <h6 class="fw-bold mb-3">Command Statistics</h6>
                     <div class="row">
                         <?php
                         $category_counts = [];
@@ -89,13 +89,13 @@ include __DIR__ . '/inc/header.php';
                         }
                         ?>
                         <div class="col-md-6">
-                            <strong class="text-white">By Category:</strong><br>
+                            <strong>By Category:</strong><br>
                             <?php foreach ($category_counts as $cat => $count): ?>
                                 <span class="badge bg-info me-2"><?php echo ucfirst($cat); ?>: <?php echo $count; ?></span>
                             <?php endforeach; ?>
                         </div>
                         <div class="col-md-6">
-                            <strong class="text-white">By Risk Level:</strong><br>
+                            <strong>By Risk Level:</strong><br>
                             <span class="badge bg-success me-1">LOW: <?php echo $risk_counts['LOW']; ?></span>
                             <span class="badge bg-warning me-1">MEDIUM: <?php echo $risk_counts['MEDIUM']; ?></span>
                             <span class="badge bg-danger me-1">HIGH: <?php echo $risk_counts['HIGH']; ?></span>
@@ -109,25 +109,25 @@ include __DIR__ . '/inc/header.php';
         <!-- Add New Command -->
         <div class="row mb-4">
             <div class="col-md-12">
-                <div class="card card-ghost p-3 border border-secondary">
-                    <h6 class="text-white fw-bold mb-3">Add New Approved Command</h6>
+                <div class="card p-3 border border-secondary">
+                    <h6 class="fw-bold mb-3">Add New Approved Command</h6>
                     <form method="post">
                         <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label text-white">Command Pattern</label>
+                                    <label class="form-label">Command Pattern</label>
                                     <input type="text" name="command_pattern" class="form-control" placeholder="e.g., ping -c 4 %" required>
                                     <small class="text-muted">Use % as wildcard for parameters</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-white">Description</label>
+                                    <label class="form-label">Description</label>
                                     <input type="text" name="description" class="form-control" placeholder="e.g., Network connectivity test" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label text-white">Category</label>
+                                    <label class="form-label">Category</label>
                                     <select name="category" class="form-control">
                                         <option value="system">System</option>
                                         <option value="network">Network</option>
@@ -141,7 +141,7 @@ include __DIR__ . '/inc/header.php';
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-white">Risk Level</label>
+                                    <label class="form-label">Risk Level</label>
                                     <select name="risk_level" class="form-control">
                                         <option value="LOW">LOW</option>
                                         <option value="MEDIUM">MEDIUM</option>
@@ -150,13 +150,13 @@ include __DIR__ . '/inc/header.php';
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label text-white">Timeout (seconds)</label>
+                                    <label class="form-label">Timeout (seconds)</label>
                                     <input type="number" name="timeout_seconds" class="form-control" value="30" min="5" max="3600">
                                 </div>
                                 <div class="mb-3">
                                     <div class="form-check">
                                         <input type="checkbox" name="requires_confirmation" class="form-check-input">
-                                        <label class="form-check-label text-white">Requires Confirmation</label>
+                                        <label class="form-check-label">Requires Confirmation</label>
                                     </div>
                                 </div>
                             </div>
@@ -172,10 +172,10 @@ include __DIR__ . '/inc/header.php';
         <!-- Commands List -->
         <div class="row">
             <div class="col-md-12">
-                <div class="card card-ghost p-3 border border-secondary">
-                    <h6 class="text-white fw-bold mb-3">Approved Commands (<?php echo count($commands); ?>)</h6>
+                <div class="card p-3 border border-secondary">
+                    <h6 class="fw-bold mb-3">Approved Commands (<?php echo count($commands); ?>)</h6>
                     <div class="table-responsive">
-                        <table class="table table-dark table-hover table-sm">
+                        <table class="table table-hover table-sm">
                             <thead>
                                 <tr>
                                     <th>Pattern</th>
@@ -190,8 +190,8 @@ include __DIR__ . '/inc/header.php';
                             <tbody>
                                 <?php foreach ($commands as $cmd): ?>
                                 <tr>
-                                    <td><code class="text-light"><?php echo htmlspecialchars($cmd['command_pattern']); ?></code></td>
-                                    <td class="text-light small"><?php echo htmlspecialchars($cmd['description']); ?></td>
+                                    <td><code><?php echo htmlspecialchars($cmd['command_pattern']); ?></code></td>
+                                    <td class="small"><?php echo htmlspecialchars($cmd['description']); ?></td>
                                     <td><span class="badge bg-info"><?php echo htmlspecialchars($cmd['category']); ?></span></td>
                                     <td>
                                         <?php

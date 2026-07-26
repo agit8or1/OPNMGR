@@ -75,7 +75,7 @@ include __DIR__ . '/inc/header.php';
 <?php if ($notice): ?><div class="alert alert-info"><?php echo $notice; ?></div><?php endif; ?>
 <div class="row">
   <div class="col-md-12">
-    <div class="card card-dark p-3">
+    <div class="card p-3">
       <h5>ACME / Certificates</h5>
       <form method="post">
         <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">

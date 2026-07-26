@@ -81,7 +81,7 @@ include __DIR__ . '/inc/header.php';
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="text-light">
+                <h2>
                     <i class="fas fa-bell me-2"></i>Alert System Configuration
                 </h2>
                 <a href="/dashboard.php" class="btn btn-outline-light">
@@ -106,14 +106,14 @@ include __DIR__ . '/inc/header.php';
             <div class="row">
                 <!-- Email Settings Card -->
                 <div class="col-md-6 mb-4">
-                    <div class="card card-dark h-100">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-envelope me-2"></i>Email Alerts
                             </h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-light mb-3">
+                            <p class="mb-3">
                                 Configure email notifications for system alerts. Email settings use the SMTP configuration from Settings page.
                             </p>
                             
@@ -129,14 +129,14 @@ include __DIR__ . '/inc/header.php';
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" 
                                            <?php echo $settings['email_enabled'] ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="email_enabled">
+                                    <label class="form-check-label" for="email_enabled">
                                         Enable Email Alerts
                                     </label>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="email_from_address" class="form-label text-light">From Email Address</label>
-                                    <input type="email" class="form-control bg-dark text-light border-secondary" 
+                                    <label for="email_from_address" class="form-label">From Email Address</label>
+                                    <input type="email" class="form-control" 
                                            id="email_from_address" name="email_from_address" 
                                            value="<?php echo htmlspecialchars($settings['email_from_address']); ?>"
                                            placeholder="alerts@example.com">
@@ -144,8 +144,8 @@ include __DIR__ . '/inc/header.php';
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="email_from_name" class="form-label text-light">From Name</label>
-                                    <input type="text" class="form-control bg-dark text-light border-secondary" 
+                                    <label for="email_from_name" class="form-label">From Name</label>
+                                    <input type="text" class="form-control" 
                                            id="email_from_name" name="email_from_name" 
                                            value="<?php echo htmlspecialchars($settings['email_from_name']); ?>"
                                            placeholder="OpnMgr Alert System">
@@ -167,14 +167,14 @@ include __DIR__ . '/inc/header.php';
 
                 <!-- Pushover Settings Card -->
                 <div class="col-md-6 mb-4">
-                    <div class="card card-dark h-100">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-mobile-alt me-2"></i>Pushover Alerts
                             </h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-light mb-3">
+                            <p class="mb-3">
                                 Configure Pushover push notifications for mobile alerts. 
                                 <a href="https://pushover.net/" target="_blank" class="text-info">Get Pushover API Token</a>
                             </p>
@@ -183,17 +183,17 @@ include __DIR__ . '/inc/header.php';
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="pushover_enabled" name="pushover_enabled" 
                                            <?php echo $settings['pushover_enabled'] ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="pushover_enabled">
+                                    <label class="form-check-label" for="pushover_enabled">
                                         Enable Pushover Alerts
                                     </label>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="pushover_api_token" class="form-label text-light">
+                                    <label for="pushover_api_token" class="form-label">
                                         Pushover API Token
                                         <i class="fas fa-info-circle text-info" title="Get from pushover.net/apps"></i>
                                     </label>
-                                    <input type="text" class="form-control bg-dark text-light border-secondary font-monospace" 
+                                    <input type="text" class="form-control font-monospace" 
                                            id="pushover_api_token" name="pushover_api_token" 
                                            value="<?php echo htmlspecialchars($settings['pushover_api_token']); ?>"
                                            placeholder="azGDORePK8gMaC0QOYAMyEEuzJnyUi"
@@ -227,14 +227,14 @@ include __DIR__ . '/inc/header.php';
             <div class="row">
                 <!-- Alert Levels Card -->
                 <div class="col-md-6 mb-4">
-                    <div class="card card-dark h-100">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-layer-group me-2"></i>Alert Levels
                             </h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-light mb-3">
+                            <p class="mb-3">
                                 Enable or disable specific alert levels globally.
                             </p>
                             
@@ -242,7 +242,7 @@ include __DIR__ . '/inc/header.php';
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="alerts_info_enabled" name="alerts_info_enabled" 
                                            <?php echo $settings['alerts_info_enabled'] ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="alerts_info_enabled">
+                                    <label class="form-check-label" for="alerts_info_enabled">
                                         <span class="badge bg-info me-2">INFO</span>
                                         Informational Alerts
                                     </label>
@@ -252,8 +252,8 @@ include __DIR__ . '/inc/header.php';
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="alerts_warning_enabled" name="alerts_warning_enabled" 
                                            <?php echo $settings['alerts_warning_enabled'] ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="alerts_warning_enabled">
-                                        <span class="badge bg-warning text-white me-2">WARNING</span>
+                                    <label class="form-check-label" for="alerts_warning_enabled">
+                                        <span class="badge bg-warning me-2">WARNING</span>
                                         Warning Alerts
                                     </label>
                                     <small class="d-block text-muted ms-4">Backup failures, delayed check-ins, certificate expiring</small>
@@ -262,7 +262,7 @@ include __DIR__ . '/inc/header.php';
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="alerts_critical_enabled" name="alerts_critical_enabled" 
                                            <?php echo $settings['alerts_critical_enabled'] ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="alerts_critical_enabled">
+                                    <label class="form-check-label" for="alerts_critical_enabled">
                                         <span class="badge bg-danger me-2">CRITICAL</span>
                                         Critical Alerts
                                     </label>
@@ -279,14 +279,14 @@ include __DIR__ . '/inc/header.php';
 
                 <!-- Alert Recipients Card -->
                 <div class="col-md-6 mb-4">
-                    <div class="card card-dark h-100">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-users me-2"></i>Alert Recipients
                             </h5>
                         </div>
                         <div class="card-body">
-                            <p class="text-light mb-3">
+                            <p class="mb-3">
                                 Alerts are automatically sent to all administrator users with configured email addresses.
                             </p>
                             
@@ -315,7 +315,7 @@ include __DIR__ . '/inc/header.php';
                                 $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 
                                 if (empty($admins)): ?>
-                                    <div class="list-group-item bg-dark border-secondary text-warning">
+                                    <div class="list-group-item text-warning">
                                         <i class="fas fa-exclamation-triangle me-2"></i>
                                         No administrators have email addresses configured. Please update user profiles to enable alerts.
                                     </div>
@@ -326,11 +326,11 @@ include __DIR__ . '/inc/header.php';
                                             $display_name = $admin['username'];
                                         }
                                 ?>
-                                    <div class="list-group-item bg-dark border-secondary">
+                                    <div class="list-group-item">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
                                                 <i class="fas fa-user-shield me-2 text-primary"></i>
-                                                <strong class="text-light"><?php echo htmlspecialchars($display_name); ?></strong>
+                                                <strong><?php echo htmlspecialchars($display_name); ?></strong>
                                                 <br>
                                                 <small class="text-muted ms-4"><?php echo htmlspecialchars($admin['email']); ?></small>
                                             </div>
@@ -356,7 +356,7 @@ include __DIR__ . '/inc/header.php';
             <!-- Alert History Card -->
             <div class="row">
                 <div class="col-12">
-                    <div class="card card-dark">
+                    <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
                                 <i class="fas fa-history me-2"></i>Recent Alert History
@@ -380,7 +380,7 @@ include __DIR__ . '/inc/header.php';
                                 <p class="text-muted text-center mb-0">No alerts sent yet.</p>
                             <?php else: ?>
                                 <div class="table-responsive">
-                                    <table class="table table-dark table-hover">
+                                    <table class="table table-hover">
                                         <thead>
                                             <tr>
                                                 <th>Time</th>
@@ -400,7 +400,7 @@ include __DIR__ . '/inc/header.php';
                                                         <?php
                                                         $badge_class = [
                                                             'info' => 'bg-info',
-                                                            'warning' => 'bg-warning text-white',
+                                                            'warning' => 'bg-warning',
                                                             'critical' => 'bg-danger'
                                                         ][$alert['alert_level']];
                                                         ?>

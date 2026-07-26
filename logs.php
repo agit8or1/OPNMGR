@@ -73,10 +73,10 @@ include __DIR__ . '/inc/header.php';
 
 <div class="row">
     <div class="col-md-12">
-        <div class="card card-dark">
+        <div class="card">
             <div class="card-body">
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                    <small class="text-light fw-bold mb-0">
+                    <small class="fw-bold mb-0">
                         <i class="fas fa-list-alt me-1"></i>System Logs
                     </small>
                     <div class="ms-auto">
@@ -96,12 +96,12 @@ include __DIR__ . '/inc/header.php';
                 </div>
 
                 <!-- Filters -->
-                <div class="card card-ghost mb-3">
+                <div class="card mb-3">
                     <div class="card-body">
                         <form method="get" class="row g-3">
                             <div class="col-md-2">
-                                <label for="level" class="form-label text-light">Level</label>
-                                <select class="form-select bg-dark text-light border-secondary" name="level" id="level">
+                                <label for="level" class="form-label">Level</label>
+                                <select class="form-select" name="level" id="level">
                                     <option value="">All Levels</option>
                                     <?php foreach ($levels as $level): ?>
                                         <option value="<?php echo htmlspecialchars($level); ?>" 
@@ -112,8 +112,8 @@ include __DIR__ . '/inc/header.php';
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label for="category" class="form-label text-light">Category</label>
-                                <select class="form-select bg-dark text-light border-secondary" name="category" id="category">
+                                <label for="category" class="form-label">Category</label>
+                                <select class="form-select" name="category" id="category">
                                     <option value="">All Categories</option>
                                     <?php foreach ($categories as $category): 
                                         $display_name = $category_names[$category] ?? ucfirst($category);
@@ -126,8 +126,8 @@ include __DIR__ . '/inc/header.php';
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label for="firewall_id" class="form-label text-light">Firewall</label>
-                                <select class="form-select bg-dark text-light border-secondary" name="firewall_id" id="firewall_id">
+                                <label for="firewall_id" class="form-label">Firewall</label>
+                                <select class="form-select" name="firewall_id" id="firewall_id">
                                     <option value="">All Firewalls</option>
                                     <?php foreach ($firewalls as $firewall): ?>
                                         <option value="<?php echo $firewall['id']; ?>" 
@@ -138,8 +138,8 @@ include __DIR__ . '/inc/header.php';
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label for="days" class="form-label text-light">Time Range</label>
-                                <select class="form-select bg-dark text-light border-secondary" name="days" id="days">
+                                <label for="days" class="form-label">Time Range</label>
+                                <select class="form-select" name="days" id="days">
                                     <option value="1" <?php echo $days_filter === 1 ? 'selected' : ''; ?>>Last 24 hours</option>
                                     <option value="7" <?php echo $days_filter === 7 ? 'selected' : ''; ?>>Last 7 days</option>
                                     <option value="30" <?php echo $days_filter === 30 ? 'selected' : ''; ?>>Last 30 days</option>
@@ -147,7 +147,7 @@ include __DIR__ . '/inc/header.php';
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label text-light">&nbsp;</label>
+                                <label class="form-label">&nbsp;</label>
                                 <div>
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="fas fa-search me-1"></i>Filter
@@ -163,7 +163,7 @@ include __DIR__ . '/inc/header.php';
 
                 <!-- Results Summary -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <small class="text-light">
+                    <small>
                         Showing <?php echo number_format(count($logs)); ?> of <?php echo number_format($total_count); ?> log entries
                         <?php if ($days_filter): ?>
                             (last <?php echo $days_filter; ?> days)
@@ -174,21 +174,21 @@ include __DIR__ . '/inc/header.php';
                             <ul class="pagination pagination-sm mb-0">
                                 <?php if ($page > 1): ?>
                                     <li class="page-item">
-                                        <a class="page-link bg-dark text-light border-secondary" 
+                                        <a class="page-link" 
                                            href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page - 1])); ?>">Previous</a>
                                     </li>
                                 <?php endif; ?>
                                 
                                 <?php for ($i = max(1, $page - 2); $i <= min($total_pages, $page + 2); $i++): ?>
                                     <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
-                                        <a class="page-link bg-dark text-light border-secondary" 
+                                        <a class="page-link" 
                                            href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])); ?>"><?php echo $i; ?></a>
                                     </li>
                                 <?php endfor; ?>
                                 
                                 <?php if ($page < $total_pages): ?>
                                     <li class="page-item">
-                                        <a class="page-link bg-dark text-light border-secondary" 
+                                        <a class="page-link" 
                                            href="?<?php echo http_build_query(array_merge($_GET, ['page' => $page + 1])); ?>">Next</a>
                                     </li>
                                 <?php endif; ?>
@@ -199,7 +199,7 @@ include __DIR__ . '/inc/header.php';
 
                 <!-- Logs Table -->
                 <div class="table-responsive">
-                    <table class="table table-dark table-striped table-hover">
+                    <table class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th>Timestamp</th>
@@ -218,26 +218,26 @@ include __DIR__ . '/inc/header.php';
                             <?php else: ?>
                                 <?php foreach ($logs as $log): ?>
                                     <tr>
-                                        <td class="text-light">
+                                        <td>
                                             <small><?php echo convertToDisplayTimezone($log['timestamp'], 'M j, Y H:i:s'); ?></small>
                                         </td>
                                         <td>
                                             <span class="badge <?php 
                                                 echo match($log['level']) {
                                                     'ERROR' => 'bg-danger',
-                                                    'WARNING' => 'bg-warning text-white',
-                                                    'INFO' => 'bg-info text-white',
+                                                    'WARNING' => 'bg-warning',
+                                                    'INFO' => 'bg-info',
                                                     'DEBUG' => 'bg-secondary',
-                                                    default => 'bg-light text-white'
+                                                    default => 'bg-light'
                                                 };
                                             ?>">
                                                 <?php echo htmlspecialchars($log['level']); ?>
                                             </span>
                                         </td>
-                                        <td class="text-light">
+                                        <td>
                                             <small><?php echo htmlspecialchars($log['category']); ?></small>
                                         </td>
-                                        <td class="text-light">
+                                        <td>
                                             <?php echo htmlspecialchars($log['message']); ?>
                                             <?php if (!empty($log['additional_data'])): ?>
                                                 <button class="btn btn-sm btn-outline-info ms-2" 
@@ -246,14 +246,14 @@ include __DIR__ . '/inc/header.php';
                                                 </button>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="text-light">
+                                        <td>
                                             <?php if ($log['firewall_hostname']): ?>
                                                 <small><?php echo htmlspecialchars($log['firewall_hostname']); ?></small>
                                             <?php else: ?>
                                                 <small class="text-muted">-</small>
                                             <?php endif; ?>
                                         </td>
-                                        <td class="text-light">
+                                        <td>
                                             <small><?php echo htmlspecialchars($log['ip_address']); ?></small>
                                         </td>
                                     </tr>
@@ -270,13 +270,13 @@ include __DIR__ . '/inc/header.php';
 <!-- Additional Data Modal -->
 <div class="modal fade" id="additionalDataModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-            <div class="modal-header bg-dark border-secondary">
-                <h5 class="modal-title text-light">Additional Data</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Additional Data</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body bg-dark">
-                <pre id="additionalDataContent" class="text-light bg-secondary p-3 rounded"></pre>
+            <div class="modal-body">
+                <pre id="additionalDataContent" class="p-3 rounded"></pre>
             </div>
         </div>
     </div>

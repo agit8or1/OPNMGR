@@ -91,7 +91,7 @@ require_once __DIR__ . '/inc/header.php';
     
     <div class="row">
         <div class="col-md-6">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h5>Branding Settings</h5>
                 </div>
@@ -153,7 +153,7 @@ require_once __DIR__ . '/inc/header.php';
         </div>
         
         <div class="col-md-6">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h5>Preview</h5>
                 </div>
@@ -176,7 +176,7 @@ require_once __DIR__ . '/inc/header.php';
 
     <div class="row mt-4">
         <div class="col-12">
-            <div class="card card-dark">
+            <div class="card card">
                 <div class="card-header">
                     <h5>Advanced Options</h5>
                 </div>

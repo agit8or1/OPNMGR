@@ -25,9 +25,9 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-12">
-            <div class="card bg-dark border-primary">
+            <div class="card border-primary">
                 <div class="card-header bg-primary">
-                    <h4 class="card-title mb-0 text-white">
+                    <h4 class="card-title mb-0">
                         <i class="fas fa-link me-2"></i>Connect to <?php echo htmlspecialchars($firewall['hostname']); ?>
                     </h4>
                 </div>
@@ -36,7 +36,7 @@ include __DIR__ . '/inc/header.php';
                     <!-- Progress Indicator (Hidden by default) -->
                     <div id="connectionProgress" class="row justify-content-center mb-4" style="display: none;">
                         <div class="col-md-10">
-                            <div class="card bg-secondary border-info">
+                            <div class="card border-info">
                                 <div class="card-body">
                                     <h5 class="text-center text-info mb-4">
                                         <i class="fas fa-spinner fa-spin me-2"></i>
@@ -66,10 +66,10 @@ include __DIR__ . '/inc/header.php';
                     <!-- Secure Proxy Connection -->
                     <div id="connectionOptions" class="row justify-content-center mb-4">
                         <div class="col-md-8">
-                            <div class="card bg-secondary border-success h-100">
+                            <div class="card border-success h-100">
                                 <div class="card-body text-center">
                                     <i class="fas fa-shield-alt text-success fa-3x mb-3"></i>
-                                    <h4 class="text-light">Secure Proxy Connection</h4>
+                                    <h4>Secure Proxy Connection</h4>
                                     <?php if ($firewall['proxy_enabled'] && $firewall['proxy_port']): ?>
                                         <p class="text-success mb-3">
                                             <i class="fas fa-check-circle me-1"></i>
@@ -79,7 +79,7 @@ include __DIR__ . '/inc/header.php';
                                             <i class="fas fa-external-link-alt me-2"></i>Connect Now
                                         </button>
                                         <br><br>
-                                        <small class="text-light">Opens firewall web interface in new window</small>
+                                        <small class="text-muted">Opens firewall web interface in new window</small>
                                         <br><br>
                                         <button class="btn btn-outline-warning btn-sm" onclick="removeProxy()">
                                             <i class="fas fa-times me-1"></i>Disable Proxy
