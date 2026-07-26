@@ -2,11 +2,22 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.9.3](https://img.shields.io/badge/version-3.9.3-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.11.1](https://img.shields.io/badge/version-3.11.1-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
 
 A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
+
+### New in v3.11 — Complete UI Redesign
+
+OPNManager v3.11 features a ground-up UI redesign inspired by Datadog and Grafana:
+
+- **Collapsible icon sidebar** — slim 72px rail that expands on hover, pin to keep open
+- **Firewall health grid dashboard** — at-a-glance health cards for every firewall with status dots, health bars, uptime, and last checkin
+- **Dark + Light themes** — system-preference aware with manual toggle, consistent across all pages
+- **KPI metric strip** — compact pills showing total firewalls, online/offline counts, updates needed, and average health score
+- **Professional design system** — 1,600+ lines of CSS with custom properties, no more inline styles
+- **Security hardening** (v3.10) — 25+ endpoints secured with authentication, CSRF on 19+ forms, dependency updates
 
 ---
 
@@ -62,67 +73,42 @@ If you find OPNManager useful, please consider giving it a star on GitHub — it
 ## Screenshots
 
 ### Login
+Clean, minimal login with dark/light theme support.
+
 ![Login](screenshots/01-login.png)
 
-### Dashboard
+### Dashboard — Firewall Health Grid
+At-a-glance monitoring with KPI strip, health cards per firewall, status chart, and network map.
+
 ![Dashboard](screenshots/02-dashboard.png)
 
+### Dashboard — Full View
+![Dashboard Full](screenshots/02b-dashboard-full.png)
+
 ### Firewall Management
+Sortable, filterable firewall list with health scores and status indicators.
+
 ![Firewalls](screenshots/03-firewalls.png)
 
-### Firewall Details - Overview
-![Firewall Overview](screenshots/04-firewall-overview.png)
+### Firewall Details
+Detailed firewall view with charts, network info, and management tools.
 
-### System Statistics & Charts
-![Charts](screenshots/05-firewall-charts.png)
-
-### Network Diagnostics
-![Network Tools](screenshots/06-firewall-network.png)
-
-### Configuration Backups
-![Backups](screenshots/07-firewall-backups.png)
-
-### Command Log
-![Commands](screenshots/08-firewall-commands.png)
-
-### Security & SSH Keys
-![Security](screenshots/09-firewall-security.png)
-
-### AI Analysis
-![AI](screenshots/10-firewall-ai.png)
-
-### Customer Management
-![Customers](screenshots/11-customers.png)
-
-### Tag Management
-![Tags](screenshots/12-tags.png)
-
-### Queue Management
-![Queue](screenshots/13-queue.png)
-
-### User Administration
-![Users](screenshots/14-users.png)
-
-### System Logs
-![Logs](screenshots/15-logs.png)
-
-### Health Monitor
-![Health Monitor](screenshots/16-health-monitor.png)
+![Firewall Details](screenshots/04-firewall-details.png)
 
 ### Settings
-![Settings](screenshots/17-settings.png)
+System configuration with ACME, alerts, backup, branding, Fail2Ban, and GeoIP.
 
-### User Documentation
-![Documentation](screenshots/18-documentation.png)
+![Settings](screenshots/06-settings.png)
 
-### About & Version Info
-![About](screenshots/19-about.png)
+### Collapsible Sidebar
+Icon-only rail (72px) expands to full menu on hover. Pin to keep open.
 
-### Add Firewall
-![Add Firewall](screenshots/20-add-firewall.png)
+![Sidebar Expanded](screenshots/07-sidebar-expanded.png)
 
-### User Profile
-![Profile](screenshots/21-profile.png)
+### Light Mode
+Full light theme with system-preference detection and manual toggle.
+
+![Light Mode](screenshots/08-light-mode.png)
 
 ---
 
