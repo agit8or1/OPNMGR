@@ -44,18 +44,18 @@ $password = $session['password']; // Root password
             align-items: center;
             height: 100vh;
             margin: 0;
-            background: #1a1a1a;
-            color: #fff;
+            background: var(--bg);
+            color: var(--text-primary);
         }
         .login-box {
             text-align: center;
             padding: 40px;
-            background: #2a2a2a;
+            background: var(--bg-elevated);
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .spinner {
-            border: 4px solid #333;
+            border: 4px solid var(--border);
             border-top: 4px solid #007bff;
             border-radius: 50%;
             width: 40px;
@@ -69,7 +69,7 @@ $password = $session['password']; // Root password
         }
         #status {
             margin-top: 20px;
-            color: #888;
+            color: var(--text-muted);
         }
         .error {
             color: #ff4444;

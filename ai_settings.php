@@ -101,26 +101,22 @@ $available_providers = [
 ?>
 
 <style>
-body {
-    background: #1a1d23;
-    color: #e0e0e0;
-}
 .ai-container {
     max-width: 1200px;
     margin: 30px auto;
     padding: 0 20px;
 }
 .ai-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     border-radius: 8px;
     padding: 30px;
     margin-bottom: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .ai-card h2 {
-    color: #4fc3f7;
-    border-bottom: 3px solid #3498db;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -136,15 +132,15 @@ body {
     margin-top: 20px;
 }
 .provider-card {
-    background: #1a1d23;
-    border: 2px solid #3a3f4b;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
     border-radius: 8px;
     padding: 20px;
     transition: all 0.3s;
     position: relative;
 }
 .provider-card:hover {
-    border-color: #3498db;
+    border-color: var(--accent);
     transform: translateY(-2px);
 }
 .provider-card.active {
@@ -160,16 +156,16 @@ body {
 }
 .provider-icon {
     font-size: 32px;
-    color: #4fc3f7;
+    color: var(--accent);
     margin-right: 15px;
 }
 .provider-name {
     font-size: 18px;
     font-weight: 600;
-    color: #e0e0e0;
+    color: var(--text-primary);
 }
 .provider-model {
-    color: #95a5a6;
+    color: var(--text-muted);
     font-size: 14px;
     margin-bottom: 10px;
 }
@@ -245,15 +241,15 @@ body {
 .form-control {
     width: 100%;
     padding: 12px;
-    background: #1a1d23;
-    border: 1px solid #3a3f4b;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-primary);
     font-size: 14px;
 }
 .form-control:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--accent);
 }
 .modal {
     display: none;
@@ -266,23 +262,23 @@ body {
     z-index: 9999;
 }
 .modal-content {
-    background: #2d3139;
+    background: var(--bg-elevated);
     margin: 50px auto;
     padding: 30px;
     max-width: 600px;
     border-radius: 8px;
 }
 .modal-header {
-    color: #4fc3f7;
+    color: var(--accent);
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--accent);
 }
 .close-modal {
     float: right;
     font-size: 28px;
     cursor: pointer;
-    color: #95a5a6;
+    color: var(--text-muted);
 }
 .close-modal:hover {
     color: #e74c3c;
@@ -311,10 +307,10 @@ body {
 }
 .api-key-display {
     font-family: 'Courier New', monospace;
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 10px;
     border-radius: 4px;
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
     word-break: break-all;
 }
 </style>

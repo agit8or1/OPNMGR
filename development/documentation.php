@@ -13,19 +13,19 @@
 <head>
     <title>Development Documentation - OPNsense Manager</title>
     <style>
-        body { font-family: monospace; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }
+        body { font-family: monospace; background: var(--bg); color: var(--text-primary); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 10px; }
-        h2 { color: #79c0ff; margin-top: 30px; }
-        h3 { color: #a0d8ff; }
-        .section { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin: 15px 0; }
-        .var-block { background: #0d1117; border-left: 3px solid #58a6ff; padding: 10px; margin: 10px 0; }
+        h1 { color: var(--accent); border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        h2 { color: var(--accent); margin-top: 30px; }
+        h3 { color: var(--accent); }
+        .section { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 15px; margin: 15px 0; }
+        .var-block { background: var(--bg); border-left: 3px solid var(--accent); padding: 10px; margin: 10px 0; }
         .important { color: #ff7b72; font-weight: bold; }
         .table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        .table th, .table td { border: 1px solid #30363d; padding: 8px; text-align: left; }
-        .table th { background: #161b22; }
-        code { background: #0d1117; padding: 2px 5px; border-radius: 3px; }
-        pre { background: #161b22; padding: 10px; border-radius: 6px; overflow-x: auto; }
+        .table th, .table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        .table th { background: var(--bg-surface); }
+        code { background: var(--bg); padding: 2px 5px; border-radius: 3px; }
+        pre { background: var(--bg-surface); padding: 10px; border-radius: 6px; overflow-x: auto; }
     </style>
 </head>
 <body>

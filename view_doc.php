@@ -67,30 +67,30 @@ $page_title = basename($file);
     <title><?php echo htmlspecialchars($page_title); ?> - OPNManager</title>
     <style>
         body {
-            background: #1a1d23;
-            color: #e0e0e0;
+            background: var(--bg);
+            color: var(--text-primary);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             padding: 20px;
             max-width: 1200px;
             margin: 0 auto;
         }
-        h1 { color: #4fc3f7; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h1 { color: var(--accent); border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
         h2 { color: #81c784; margin-top: 30px; }
         h3 { color: #ffb74d; margin-top: 20px; }
         h4 { color: #ff8a65; }
         pre {
-            background: #2d3139;
-            border: 1px solid #3a3f4b;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
             border-radius: 4px;
             padding: 15px;
             overflow-x: auto;
         }
         code {
-            background: #2d3139;
+            background: var(--bg-elevated);
             padding: 2px 6px;
             border-radius: 3px;
             font-family: 'Courier New', monospace;
-            color: #64b5f6;
+            color: var(--accent);
         }
         pre code {
             background: none;
@@ -102,13 +102,13 @@ $page_title = basename($file);
         }
         li {
             margin: 8px 0;
-            color: #b0b0b0;
+            color: var(--text-muted);
         }
         strong {
-            color: #fff;
+            color: var(--text-primary);
         }
         a {
-            color: #64b5f6;
+            color: var(--accent);
             text-decoration: none;
         }
         a:hover {
@@ -118,7 +118,7 @@ $page_title = basename($file);
             display: inline-block;
             margin-bottom: 20px;
             padding: 8px 16px;
-            background: #3498db;
+            background: var(--accent);
             color: white;
             border-radius: 4px;
             text-decoration: none;

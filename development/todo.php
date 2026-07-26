@@ -21,47 +21,47 @@ if (!check_authentication()) {
     <title>Development Todo List - OPNsense Manager</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0d1117; color: #c9d1d9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text-primary); }
         .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid #30363d; padding-bottom: 20px; }
-        h1 { color: #58a6ff; font-size: 28px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid var(--border); padding-bottom: 20px; }
+        h1 { color: var(--accent); font-size: 28px; }
         .stats { display: flex; gap: 20px; }
-        .stat { background: #161b22; padding: 10px 15px; border-radius: 6px; text-align: center; }
-        .stat-num { font-size: 20px; font-weight: bold; color: #58a6ff; }
-        .stat-label { font-size: 12px; color: #8b949e; }
-        
+        .stat { background: var(--bg-surface); padding: 10px 15px; border-radius: 6px; text-align: center; }
+        .stat-num { font-size: 20px; font-weight: bold; color: var(--accent); }
+        .stat-label { font-size: 12px; color: var(--text-muted); }
+
         .filters { display: flex; gap: 10px; margin-bottom: 20px; }
-        .filter-btn { padding: 8px 12px; border: 1px solid #30363d; background: #0d1117; color: #c9d1d9; border-radius: 6px; cursor: pointer; }
-        .filter-btn.active { background: #58a6ff; color: #0d1117; border-color: #58a6ff; }
-        
+        .filter-btn { padding: 8px 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text-primary); border-radius: 6px; cursor: pointer; }
+        .filter-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
         .todo-list { display: flex; flex-direction: column; gap: 15px; }
-        .todo-item { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; display: flex; gap: 15px; }
+        .todo-item { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 15px; display: flex; gap: 15px; }
         .todo-item.completed { opacity: 0.6; }
         .todo-item.high-priority { border-left: 4px solid #ff7b72; }
         .todo-item.medium-priority { border-left: 4px solid #d29922; }
-        .todo-item.low-priority { border-left: 4px solid #58a6ff; }
-        
+        .todo-item.low-priority { border-left: 4px solid var(--accent); }
+
         .checkbox { width: 20px; height: 20px; cursor: pointer; flex-shrink: 0; }
-        .checkbox:checked { accent-color: #58a6ff; }
-        
+        .checkbox:checked { accent-color: var(--accent); }
+
         .todo-content { flex: 1; }
-        .todo-title { font-weight: bold; font-size: 14px; color: #c9d1d9; margin-bottom: 5px; }
-        .todo-desc { font-size: 12px; color: #8b949e; line-height: 1.5; }
-        
+        .todo-title { font-weight: bold; font-size: 14px; color: var(--text-primary); margin-bottom: 5px; }
+        .todo-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
         .todo-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
         .badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; }
-        .badge-priority { background: #161b22; border: 1px solid #30363d; }
-        .badge-status { background: #161b22; border: 1px solid #30363d; }
-        .badge-priority.high { background: #ff7b72; color: #0d1117; border: none; }
-        .badge-status.completed { background: #3fb950; color: #0d1117; border: none; }
-        .badge-status.in-progress { background: #58a6ff; color: #0d1117; border: none; }
-        
-        .new-todo { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin-top: 20px; }
+        .badge-priority { background: var(--bg-surface); border: 1px solid var(--border); }
+        .badge-status { background: var(--bg-surface); border: 1px solid var(--border); }
+        .badge-priority.high { background: #ff7b72; color: var(--bg); border: none; }
+        .badge-status.completed { background: #3fb950; color: var(--bg); border: none; }
+        .badge-status.in-progress { background: var(--accent); color: var(--bg); border: none; }
+
+        .new-todo { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 15px; margin-top: 20px; }
         .form-group { margin-bottom: 12px; }
-        .form-group label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 5px; }
-        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-family: monospace; }
+        .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-family: monospace; }
         .form-group textarea { resize: vertical; min-height: 60px; }
-        .btn { padding: 8px 12px; border: 1px solid #30363d; background: #238636; color: #fff; border-radius: 6px; cursor: pointer; }
+        .btn { padding: 8px 12px; border: 1px solid var(--border); background: #238636; color: #fff; border-radius: 6px; cursor: pointer; }
         .btn:hover { background: #2ea043; }
     </style>
 </head>

@@ -21,16 +21,16 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .support-card {
-    background: #1e293b;
-    border: 2px solid #334155;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1rem;
 }
 
 .issue-item {
-    background: #0f172a;
-    border-left: 4px solid #3b82f6;
+    background: var(--bg);
+    border-left: 4px solid var(--accent);
     padding: 1rem;
     margin-bottom: 0.5rem;
     border-radius: 4px;
@@ -38,7 +38,7 @@ include __DIR__ . '/inc/header.php';
 }
 
 .issue-item:hover {
-    background: #334155;
+    background: var(--bg-elevated);
     transform: translateX(5px);
 }
 
@@ -49,8 +49,8 @@ include __DIR__ . '/inc/header.php';
 
 .issue-number {
     font-family: 'Courier New', monospace;
-    background: #1e293b;
-    color: #e2e8f0;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     padding: 0.25rem 0.5rem;
     border-radius: 3px;
     font-size: 0.85rem;
@@ -64,84 +64,72 @@ include __DIR__ . '/inc/header.php';
 }
 
 .form-control-custom {
-    background: #0f172a;
-    border: 2px solid #334155;
-    color: #e2e8f0;
+    background: var(--input-bg);
+    border: 2px solid var(--border);
+    color: var(--text-primary);
 }
 
 .form-control-custom:focus {
-    border-color: #3b82f6;
+    border-color: var(--accent);
     box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
-    background: #1e293b;
+    background: var(--bg-surface);
 }
 
 .help-section {
-    background: #1e293b;
-    border: 2px solid #3b82f6;
+    background: var(--bg-surface);
+    border: 2px solid var(--accent);
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 1rem;
 }
 
 .support-card .card-header {
-    background: #0f172a;
-    color: #e2e8f0;
-    border-bottom: 2px solid #334155;
+    background: var(--bg);
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border);
 }
 
 .support-card .card-header h5,
 .support-card .card-header h6 {
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .support-card .card-body {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .support-card h6 {
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .support-card p,
 .support-card li {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .form-label {
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .form-label strong {
-    color: #f1f5f9;
-}
-
-.text-white, h2.text-white, h5.text-white, h6.text-white {
-    color: #e2e8f0 !important;
-}
-
-.text-muted, small.text-muted {
-    color: #94a3b8 !important;
-}
-
-.text-primary {
-    color: #60a5fa !important;
+    color: var(--text-primary);
 }
 
 .help-section h6 {
-    color: #60a5fa;
+    color: var(--accent);
 }
 
 .help-section p {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .help-section ol,
 .help-section li {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .issue-item h6 {
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .issue-item a {

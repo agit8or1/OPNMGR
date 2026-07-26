@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 include __DIR__ . '/inc/header.php';
 ?>
-<h4 class="text-center text-white mb-2" style="font-weight:600">Two Factor Verification</h4>
+<h4 class="text-center mb-2" style="font-weight:600">Two Factor Verification</h4>
 <div class="card card-dark p-2" style="background:transparent;border:1px solid rgba(255,255,255,0.03)">
   <?php if ($err) echo '<div class="alert alert-danger">'.htmlspecialchars($err).'</div>'; ?>
   <div class="row justify-content-center" style="margin-top:12px">

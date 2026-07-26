@@ -134,10 +134,10 @@ require_once __DIR__ . '/inc/header.php';
         <div class="col-12">
             <div class="card card-dark">
                 <div class="card-body text-center">
-                    <h3 class="text-light mb-3">
+                    <h3 class="mb-3">
                         <i class="fas fa-heart text-danger me-2"></i>Thank You!
                     </h3>
-                    <p class="text-light mb-0">
+                    <p class="mb-0">
                         Your support makes a difference. Thank you for being part of the OPNMGR community.
                     </p>
                 </div>

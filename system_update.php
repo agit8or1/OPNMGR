@@ -102,8 +102,8 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .update-card {
-    background: #1e293b;
-    border: 2px solid #334155;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
     border-radius: 8px;
     padding: 1.5rem;
     margin-bottom: 1rem;
@@ -112,43 +112,31 @@ include __DIR__ . '/inc/header.php';
 .update-card .card-body,
 .update-card .card-header h5,
 .update-card h5 {
-    color: #e2e8f0;
+    color: var(--text-primary);
 }
 
 .update-card .card-header {
-    background: #0f172a;
-    color: #e2e8f0;
-    border-bottom: 2px solid #334155;
+    background: var(--bg);
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--border);
 }
 
 .update-card dt {
-    color: #94a3b8;
+    color: var(--text-muted);
 }
 
 .update-card dd {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .config-section,
 .warning-box {
-    color: #cbd5e1;
+    color: var(--text-muted);
 }
 
 .config-section h5,
 .warning-box h5 {
-    color: #e2e8f0;
-}
-
-.text-white, h2.text-white, h4.text-white, h5.text-white {
-    color: #e2e8f0 !important;
-}
-
-.text-muted, small.text-muted {
-    color: #94a3b8 !important;
-}
-
-.text-primary {
-    color: #60a5fa !important;
+    color: var(--text-primary);
 }
 
 .commit-item {
@@ -162,7 +150,7 @@ include __DIR__ . '/inc/header.php';
 .warning-box ul,
 .warning-box li,
 .warning-box p {
-    color: #1e293b;
+    color: inherit;
 }
 
 .update-log {
@@ -177,8 +165,8 @@ include __DIR__ . '/inc/header.php';
 }
 
 .commit-item {
-    background: #0f172a;
-    border-left: 4px solid #3b82f6;
+    background: var(--bg);
+    border-left: 4px solid var(--accent);
     padding: 1rem;
     margin-bottom: 0.5rem;
     border-radius: 4px;
@@ -186,16 +174,16 @@ include __DIR__ . '/inc/header.php';
 
 .commit-sha {
     font-family: 'Courier New', monospace;
-    background: #1e293b;
-    color: #e2e8f0;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     padding: 0.25rem 0.5rem;
     border-radius: 3px;
     font-size: 0.85rem;
 }
 
 .update-log {
-    background: #1e293b;
-    color: #e2e8f0;
+    background: var(--bg-surface);
+    color: var(--text-primary);
     padding: 1rem;
     border-radius: 6px;
     font-family: 'Courier New', monospace;
@@ -215,7 +203,7 @@ include __DIR__ . '/inc/header.php';
 
 .progress-step {
     padding: 0.6rem 0.8rem;
-    border-left: 3px solid #334155;
+    border-left: 3px solid var(--border);
     margin-left: 0.5rem;
     margin-bottom: 0.25rem;
     color: #94a3b8;

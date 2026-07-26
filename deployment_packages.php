@@ -20,16 +20,12 @@ $page_title = "Deployment Packages";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     <style>
-        body { background-color: #1a1a1a; color: #e0e0e0; }
-        .card { background-color: #2d2d2d; border: 1px solid #404040; }
-        .btn-primary { background-color: #0066cc; border-color: #0066cc; }
-        .btn-primary:hover { background-color: #0052a3; }
-        .btn-danger { background-color: #cc0000; border-color: #cc0000; }
-        .btn-danger:hover { background-color: #990000; }
-        .table { color: #e0e0e0; border-color: #404040; }
-        .table thead { border-color: #404040; }
-        .modal-content { background-color: #2d2d2d; color: #e0e0e0; border: 1px solid #404040; }
-        .code-block { background-color: #1a1a1a; border: 1px solid #404040; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        body { background-color: var(--bg); color: var(--text-primary); }
+        .card { background-color: var(--bg-elevated); border: 1px solid var(--border); }
+        .table { color: var(--text-primary); border-color: var(--border); }
+        .table thead { border-color: var(--border); }
+        .modal-content { background-color: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); }
+        .code-block { background-color: var(--bg-surface); border: 1px solid var(--border); padding: 15px; border-radius: 5px; overflow-x: auto; }
     </style>
 </head>
 <body>

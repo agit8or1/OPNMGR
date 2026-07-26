@@ -432,8 +432,8 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .card-dark {
-  background-color: #1a1a1a;
-  border: 1px solid #333;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
@@ -443,13 +443,13 @@ include __DIR__ . '/inc/header.php';
 }
 
 .card-title {
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
 }
 
 .card-text {
-  color: #adb5bd;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -468,58 +468,6 @@ include __DIR__ . '/inc/header.php';
 .card-dark .btn:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.card-dark .btn-success:hover {
-  background-color: #00c853 !important;
-}
-
-.card-dark .btn-warning:hover {
-  background-color: #ffb300 !important;
-}
-
-.card-dark .btn-primary:hover {
-  background-color: #00d4d4 !important;
-}
-
-.card-dark .btn-info:hover {
-  background-color: #00bcd4 !important;
-}
-
-.card-dark .btn-danger:hover {
-  background-color: #ff5252 !important;
-}
-
-.btn-primary {
-  background-color: #00d4c4;
-  border-color: #00d4c4;
-}
-
-.btn-primary:hover {
-  background-color: #00b8a6;
-  border-color: #00b8a6;
-}
-
-.btn-success {
-  background-color: #28a745;
-  border-color: #28a745;
-}
-
-.btn-success:hover {
-  background-color: #218838;
-  border-color: #218838;
-}
-
-.btn-warning {
-  background-color: #ffc107;
-  border-color: #ffc107;
-  color: #212529;
-}
-
-.btn-warning:hover {
-  background-color: #e0a800;
-  border-color: #d39e00;
-  color: #212529;
 }
 </style>
 

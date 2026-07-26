@@ -41,7 +41,7 @@ include __DIR__ . '/inc/header.php';
         <div class="col-md-9">
             <div class="card" style="background: #2c3e50; border: 1px solid #34495e;">
                 <div class="card-header" style="background: #34495e; border-bottom: 2px solid #3498db;">
-                    <h3 class="card-title text-white">
+                    <h3 class="card-title">
                         <?php
                         // Icon based on category
                         $icon = match($page['category']) {
@@ -101,7 +101,7 @@ include __DIR__ . '/inc/header.php';
                         <!-- Version Information Card -->
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <div class="card bg-dark border-primary">
+                                <div class="card border-primary">
                                     <div class="card-body">
                                         <h5 class="card-title text-primary"><i class="fas fa-code-branch me-2"></i>Application Versions</h5>
                                         <table class="table table-sm table-dark mb-0">
@@ -163,7 +163,7 @@ include __DIR__ . '/inc/header.php';
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="card bg-dark border-success">
+                                <div class="card border-success">
                                     <div class="card-body">
                                         <h5 class="card-title text-success"><i class="fas fa-chart-line me-2"></i>System Status</h5>
                                         <table class="table table-sm table-dark mb-0">
@@ -223,8 +223,8 @@ include __DIR__ . '/inc/header.php';
 
 <style>
 .documentation-content h2 {
-    color: #4fc3f7;
-    border-bottom: 2px solid #3498db;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
     padding-bottom: 10px;
     margin-top: 30px;
     margin-bottom: 20px;
@@ -249,18 +249,18 @@ include __DIR__ . '/inc/header.php';
 .documentation-content p {
     margin-bottom: 15px;
     line-height: 1.6;
-    color: #e8eef2;
+    color: var(--text-primary);
 }
 .documentation-content .lead {
     font-size: 1.15rem;
     font-weight: 300;
-    color: #e0e7f1;
+    color: var(--text-primary);
 }
 .documentation-content code {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 2px 6px;
     border-radius: 3px;
-    color: #4fc3f7;
+    color: var(--accent);
     font-weight: 500;
 }
 .documentation-content table {
@@ -268,12 +268,12 @@ include __DIR__ . '/inc/header.php';
     margin: 20px 0;
 }
 .documentation-content strong, .documentation-content b {
-    color: #f0f4f8;
+    color: var(--text-primary);
 }
 .documentation-content a {
-    color: #4fc3f7;
+    color: var(--accent);
     text-decoration: none;
-    border-bottom: 1px dotted #4fc3f7;
+    border-bottom: 1px dotted var(--accent);
 }
 .documentation-content a:hover {
     color: #81c784;

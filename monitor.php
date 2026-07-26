@@ -10,9 +10,9 @@ header('Content-Type: text/html; charset=UTF-8');
     <title>OPNsense Health Monitor</title>
     <meta http-equiv="refresh" content="30">
     <style>
-        body { font-family: Arial, sans-serif; background: #1a1a1a; color: #fff; padding: 20px; }
+        body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text-primary); padding: 20px; }
         .container { max-width: 800px; margin: 0 auto; }
-        .firewall { background: #2a2a2a; margin: 10px 0; padding: 15px; border-radius: 5px; border-left: 4px solid #4CAF50; }
+        .firewall { background: var(--bg-elevated); margin: 10px 0; padding: 15px; border-radius: 5px; border-left: 4px solid #4CAF50; }
         .firewall.offline { border-left-color: #f44336; }
         .firewall.warning { border-left-color: #ff9800; }
         .status { font-weight: bold; }

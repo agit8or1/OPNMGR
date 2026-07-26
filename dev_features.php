@@ -11,21 +11,17 @@ $changelogEntries = getChangelogEntries(5);
 ?>
 
 <style>
-body {
-    background: #1a1d23;
-    color: #e0e0e0;
-}
 .feature-section {
-    background: #2d3139;
+    background: var(--bg-elevated);
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .feature-section h2 {
-    color: #4fc3f7;
-    border-bottom: 3px solid #3498db;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -56,21 +52,21 @@ body {
 }
 .feature-list li {
     padding: 10px 0;
-    border-bottom: 1px solid #3a3f4b;
-    color: #b0b0b0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
 }
 .feature-list li:last-child {
     border-bottom: none;
 }
 .feature-list li strong {
-    color: #e0e0e0;
+    color: var(--text-primary);
 }
 .feature-list li p {
-    color: #909090;
+    color: var(--text-muted);
     margin-top: 5px;
 }
 .version-tag {
-    color: #78909c;
+    color: var(--text-muted);
     font-size: 12px;
     font-style: italic;
 }
@@ -93,9 +89,6 @@ body {
 }
 .highlight-box ul {
     color: #ffcc80;
-}
-.text-muted {
-    color: #90a4ae !important;
 }
 </style>
 

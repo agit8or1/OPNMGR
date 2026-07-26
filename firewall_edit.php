@@ -110,11 +110,11 @@ include __DIR__ . '/inc/header.php';
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <div class="card bg-dark text-white">
-                <div class="card-header bg-primary text-white">
+            <div class="card">
+                <div class="card-header bg-primary">
                     <h5 class="mb-0"><i class="fas fa-edit"></i> Edit Firewall</h5>
                 </div>
-                <div class="card-body bg-dark">
+                <div class="card-body">
                     <?php if (isset($error)): ?>
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-triangle"></i> <?php echo htmlspecialchars($error); ?>
@@ -158,7 +158,7 @@ include __DIR__ . '/inc/header.php';
                                            value="<?php echo htmlspecialchars($tag['name']); ?>"
                                            id="tag_<?php echo $tag['id']; ?>"
                                            <?php echo in_array($tag['id'], $current_tag_ids) ? 'checked' : ''; ?>>
-                                    <label class="form-check-label text-light" for="tag_<?php echo $tag['id']; ?>">
+                                    <label class="form-check-label" for="tag_<?php echo $tag['id']; ?>">
                                         <span class="badge me-1" style="background-color: <?php echo htmlspecialchars($tag['color']); ?>;">&nbsp;</span>
                                         <?php echo htmlspecialchars($tag['name']); ?>
                                     </label>
@@ -183,11 +183,11 @@ include __DIR__ . '/inc/header.php';
             </div>
 
             <!-- Agent Information (Read-only) -->
-            <div class="card mt-4 bg-dark text-white">
-                <div class="card-header bg-info text-white">
+            <div class="card mt-4">
+                <div class="card-header bg-info">
                     <h6 class="mb-0"><i class="fas fa-info-circle"></i> Agent Information</h6>
                 </div>
-                <div class="card-body bg-dark">
+                <div class="card-body">
                     <div class="row">
                         <div class="col-md-3">
                             <strong>Status:</strong>

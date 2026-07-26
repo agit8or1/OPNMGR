@@ -146,26 +146,22 @@ $stats = db()->query("
 ?>
 
 <style>
-body {
-    background: #1a1d23;
-    color: #e0e0e0;
-}
 .license-container {
     max-width: 1400px;
     margin: 30px auto;
     padding: 0 20px;
 }
 .license-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .license-card h2 {
-    color: #4fc3f7;
-    border-bottom: 3px solid #3498db;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -176,8 +172,8 @@ body {
     margin-bottom: 30px;
 }
 .stat-box {
-    background: #1a1d23;
-    border-left: 4px solid #3498db;
+    background: var(--bg-surface);
+    border-left: 4px solid var(--accent);
     padding: 20px;
     border-radius: 6px;
 }
@@ -193,11 +189,11 @@ body {
 .stat-number {
     font-size: 32px;
     font-weight: bold;
-    color: #4fc3f7;
+    color: var(--accent);
     margin: 10px 0;
 }
 .stat-label {
-    color: #95a5a6;
+    color: var(--text-muted);
     font-size: 14px;
     text-transform: uppercase;
 }
@@ -206,20 +202,20 @@ body {
     margin-top: 15px;
 }
 .instances-table th {
-    background: #1a1d23;
-    color: #4fc3f7;
+    background: var(--bg-surface);
+    color: var(--accent);
     padding: 12px;
     text-align: left;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--accent);
     font-size: 14px;
 }
 .instances-table td {
     padding: 12px;
-    border-bottom: 1px solid #3a3f4b;
+    border-bottom: 1px solid var(--border);
     font-size: 14px;
 }
 .instances-table tr:hover {
-    background: #363a45;
+    background: var(--bg-elevated);
 }
 .status-badge {
     display: inline-block;
@@ -276,15 +272,15 @@ body {
 .form-control {
     width: 100%;
     padding: 10px;
-    background: #1a1d23;
-    border: 1px solid #3a3f4b;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-primary);
     font-size: 14px;
 }
 .form-control:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--accent);
 }
 .modal {
     display: none;
@@ -297,7 +293,7 @@ body {
     z-index: 9999;
 }
 .modal-content {
-    background: #2d3139;
+    background: var(--bg-elevated);
     margin: 50px auto;
     padding: 30px;
     max-width: 600px;
@@ -306,16 +302,16 @@ body {
     overflow-y: auto;
 }
 .modal-header {
-    color: #4fc3f7;
+    color: var(--accent);
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--accent);
 }
 .close-modal {
     float: right;
     font-size: 28px;
     cursor: pointer;
-    color: #95a5a6;
+    color: var(--text-muted);
 }
 .close-modal:hover {
     color: #e74c3c;
@@ -336,13 +332,13 @@ body {
     color: #e74c3c;
 }
 .instance-key {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 12px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
-    color: #4fc3f7;
+    color: var(--accent);
     word-break: break-all;
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
     margin: 10px 0;
 }
 .copy-key-btn {
@@ -360,18 +356,18 @@ body {
     font-size: 13px;
 }
 .checkins-table th {
-    background: #1a1d23;
-    color: #4fc3f7;
+    background: var(--bg-surface);
+    color: var(--accent);
     padding: 10px;
     text-align: left;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--accent);
 }
 .checkins-table td {
     padding: 10px;
-    border-bottom: 1px solid #3a3f4b;
+    border-bottom: 1px solid var(--border);
 }
 .checkins-table tr:hover {
-    background: #363a45;
+    background: var(--bg-elevated);
 }
 </style>
 

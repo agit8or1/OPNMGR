@@ -3026,9 +3026,9 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #firewallTabs .nav-link {
-    color: #95a5a6;
-    background: #2c3e50;
-    border: 1px solid #34495e;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     margin-right: 10px;
     margin-bottom: 8px;
     padding: 10px 15px !important;
@@ -3037,15 +3037,15 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #firewallTabs .nav-link:hover {
-    color: #ecf0f1;
-    background: #34495e;
-    border-color: #3498db;
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border-color: var(--accent);
 }
 
 #firewallTabs .nav-link.active {
-    color: #fff;
-    background: #3498db;
-    border-color: #3498db;
+    color: var(--text-primary);
+    background: var(--accent);
+    border-color: var(--accent);
     font-weight: bold;
 }
 
@@ -3132,12 +3132,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* Command Log Table Styling */
 #commandLogTableBody tr {
-    border-bottom: 1px solid #3a4149;
+    border-bottom: 1px solid var(--border);
     transition: background-color 0.2s ease;
 }
 
 #commandLogTableBody tr:hover {
-    background-color: #353a42;
+    background-color: var(--bg-elevated);
 }
 
 #commandLogTableBody td {
@@ -3147,12 +3147,12 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #commandLogTableBody td:first-child {
-    color: #a0aec0;
+    color: var(--text-muted);
     white-space: nowrap;
 }
 
 #commandLogTableBody td:nth-child(2) {
-    color: #e2e8f0;
+    color: var(--text-primary);
     max-width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3170,22 +3170,22 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 #commandLogTableBody .btn-outline-info:hover {
-    background-color: #3182ce;
-    border-color: #3182ce;
+    background-color: var(--accent);
+    border-color: var(--accent);
 }
 
 .table-responsive {
     border-radius: 4px;
-    border: 1px solid #3a4149;
+    border: 1px solid var(--border);
 }
 
 .table.table-dark thead {
-    background-color: #2d3748;
-    border-bottom: 2px solid #4a5568;
+    background-color: var(--bg-elevated);
+    border-bottom: 2px solid var(--border);
 }
 
 .table.table-dark thead th {
-    color: #cbd5e0;
+    color: var(--text-muted);
     font-size: 0.85rem;
     font-weight: 600;
     padding: 12px 8px;

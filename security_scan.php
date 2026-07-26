@@ -300,7 +300,7 @@ include __DIR__ . '/inc/header.php';
     border-color: var(--accent, #3b82f6);
 }
 .scan-output {
-    background: #0f172a;
+    background: var(--bg-surface);
     border: 1px solid var(--border, rgba(255,255,255,0.08));
     border-radius: 6px;
     padding: 1rem;

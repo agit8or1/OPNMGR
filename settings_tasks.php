@@ -21,32 +21,28 @@ $cron_tasks = getTasks();
 ?>
 
 <style>
-body {
-    background: #1a1d23;
-    color: #e0e0e0;
-}
 .settings-container {
     max-width: 1000px;
     margin: 30px auto;
     padding: 0 20px;
 }
 .settings-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .settings-card h2 {
-    color: #4fc3f7;
-    border-bottom: 3px solid #3498db;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
 .task-item {
-    background: #363a45;
-    border-left: 4px solid #3498db;
+    background: var(--bg-elevated);
+    border-left: 4px solid var(--accent);
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 4px;
@@ -55,11 +51,11 @@ body {
     align-items: center;
 }
 .task-info h4 {
-    color: #4fc3f7;
+    color: var(--accent);
     margin: 0 0 5px 0;
 }
 .task-info p {
-    color: #95a5a6;
+    color: var(--text-muted);
     margin: 0;
     font-size: 14px;
 }
@@ -76,7 +72,7 @@ body {
 .toggle-switch {
     width: 50px;
     height: 25px;
-    background: #555;
+    background: var(--border);
     border-radius: 25px;
     cursor: pointer;
     position: relative;
@@ -118,7 +114,7 @@ body {
     color: white;
 }
 .info-section {
-    background: #1a1d23;
+    background: var(--bg-surface);
     border-left: 4px solid #f39c12;
     padding: 15px;
     margin-top: 20px;
@@ -129,7 +125,7 @@ body {
     margin-top: 0;
 }
 .info-section p {
-    color: #95a5a6;
+    color: var(--text-muted);
     font-size: 14px;
     margin: 10px 0;
 }

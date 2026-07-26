@@ -93,26 +93,22 @@ $stats = db()->query("
 ?>
 
 <style>
-body {
-    background: #1a1d23;
-    color: #e0e0e0;
-}
 .reports-container {
     max-width: 1600px;
     margin: 30px auto;
     padding: 0 20px;
 }
 .reports-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .reports-card h2 {
-    color: #4fc3f7;
-    border-bottom: 3px solid #3498db;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
@@ -123,10 +119,10 @@ body {
     margin-bottom: 30px;
 }
 .stat-box {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 20px;
     border-radius: 6px;
-    border-left: 4px solid #3498db;
+    border-left: 4px solid var(--accent);
 }
 .stat-box.critical { border-left-color: #e74c3c; }
 .stat-box.high { border-left-color: #e67e22; }
@@ -135,11 +131,11 @@ body {
 .stat-number {
     font-size: 32px;
     font-weight: bold;
-    color: #4fc3f7;
+    color: var(--accent);
     margin: 10px 0;
 }
 .stat-label {
-    color: #95a5a6;
+    color: var(--text-muted);
     font-size: 14px;
     text-transform: uppercase;
 }
@@ -148,20 +144,20 @@ body {
     margin-top: 15px;
 }
 .reports-table th {
-    background: #1a1d23;
-    color: #4fc3f7;
+    background: var(--bg-surface);
+    color: var(--accent);
     padding: 12px;
     text-align: left;
-    border-bottom: 2px solid #3498db;
+    border-bottom: 2px solid var(--accent);
     font-size: 14px;
 }
 .reports-table td {
     padding: 12px;
-    border-bottom: 1px solid #3a3f4b;
+    border-bottom: 1px solid var(--border);
     font-size: 14px;
 }
 .reports-table tr:hover {
-    background: #363a45;
+    background: var(--bg-elevated);
     cursor: pointer;
 }
 .grade-badge {
@@ -205,7 +201,7 @@ body {
 .score-bar {
     width: 100%;
     height: 30px;
-    background: #1a1d23;
+    background: var(--bg-surface);
     border-radius: 15px;
     overflow: hidden;
     position: relative;
@@ -232,26 +228,26 @@ body {
     gap: 25px;
 }
 .report-sidebar {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .report-main {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #3a3f4b;
+    border: 1px solid var(--border);
 }
 .section-title {
     color: #81c784;
     font-size: 18px;
     margin: 25px 0 15px 0;
     padding-bottom: 8px;
-    border-bottom: 2px solid #3a3f4b;
+    border-bottom: 2px solid var(--border);
 }
 .finding-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 6px;
@@ -262,13 +258,13 @@ body {
 .finding-card.medium { border-left-color: #f39c12; }
 .finding-card.low { border-left-color: #27ae60; }
 .finding-title {
-    color: #4fc3f7;
+    color: var(--accent);
     font-weight: 600;
     margin-bottom: 8px;
     font-size: 15px;
 }
 .finding-description {
-    color: #95a5a6;
+    color: var(--text-muted);
     margin-bottom: 10px;
     font-size: 14px;
     line-height: 1.5;
@@ -306,30 +302,30 @@ body {
 }
 .form-control {
     padding: 10px;
-    background: #1a1d23;
-    border: 1px solid #3a3f4b;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-primary);
     font-size: 14px;
 }
 .back-link {
-    color: #3498db;
+    color: var(--accent);
     text-decoration: none;
     font-size: 14px;
 }
 .back-link:hover {
     color: #5dade2;
 }
-.finding-card { background: #2d3139; padding: 20px; margin-bottom: 20px; border-radius: 8px; border-left: 5px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: box-shadow 0.3s; } .finding-card:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.3); } .finding-card.critical { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.05); } .finding-card.high { border-left-color: #e67e22; background: rgba(230, 126, 34, 0.05); } .finding-card.medium { border-left-color: #f39c12; background: rgba(243, 156, 18, 0.05); } .finding-card.low { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.05); } .finding-title { color: #4fc3f7; font-weight: 600; margin-bottom: 12px; font-size: 16px; } .finding-description { color: #ccc; margin-bottom: 12px; font-size: 14px; line-height: 1.6; } .finding-category { color: #81c784; font-size: 12px; margin-bottom: 10px; padding: 4px 8px; background: rgba(129, 199, 132, 0.1); border-radius: 3px; display: inline-block; } .finding-recommendation { background: rgba(52, 152, 219, 0.08); padding: 12px; border-radius: 4px; margin-top: 12px; font-size: 13px; color: #ccc; border-left: 3px solid #3498db; line-height: 1.5; } .finding-affected-rules { background: #1a1d23; padding: 12px; border-radius: 4px; margin-top: 12px; border-left: 3px solid #ff5555; font-family: "Courier New", monospace; font-size: 12px; color: #e0e0e0; line-height: 1.4; overflow-x: auto; } .finding-affected-rules strong { color: #ff5555; display: block; margin-bottom: 8px; } .report-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #3a3f4b; } .btn-delete-report { background: #e74c3c; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; transition: all 0.3s; } .btn-delete-report:hover { background: #c0392b; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3); }
+.finding-card { background: var(--bg-elevated); padding: 20px; margin-bottom: 20px; border-radius: 8px; border-left: 5px solid var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: box-shadow 0.3s; } .finding-card:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.3); } .finding-card.critical { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.05); } .finding-card.high { border-left-color: #e67e22; background: rgba(230, 126, 34, 0.05); } .finding-card.medium { border-left-color: #f39c12; background: rgba(243, 156, 18, 0.05); } .finding-card.low { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.05); } .finding-title { color: var(--accent); font-weight: 600; margin-bottom: 12px; font-size: 16px; } .finding-description { color: var(--text-muted); margin-bottom: 12px; font-size: 14px; line-height: 1.6; } .finding-category { color: #81c784; font-size: 12px; margin-bottom: 10px; padding: 4px 8px; background: rgba(129, 199, 132, 0.1); border-radius: 3px; display: inline-block; } .finding-recommendation { background: rgba(52, 152, 219, 0.08); padding: 12px; border-radius: 4px; margin-top: 12px; font-size: 13px; color: var(--text-muted); border-left: 3px solid var(--accent); line-height: 1.5; } .finding-affected-rules { background: var(--bg-surface); padding: 12px; border-radius: 4px; margin-top: 12px; border-left: 3px solid #ff5555; font-family: "Courier New", monospace; font-size: 12px; color: var(--text-primary); line-height: 1.4; overflow-x: auto; } .finding-affected-rules strong { color: #ff5555; display: block; margin-bottom: 8px; } .report-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); } .btn-delete-report { background: #e74c3c; color: white; padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; transition: all 0.3s; } .btn-delete-report:hover { background: #c0392b; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3); }
 
 /* Proper formatted CSS below */
 
 .finding-card {
-    background: #2d3139;
+    background: var(--bg-elevated);
     padding: 20px;
     margin-bottom: 20px;
     border-radius: 8px;
-    border-left: 5px solid #3498db;
+    border-left: 5px solid var(--accent);
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 .finding-card.critical { border-left-color: #e74c3c; background: rgba(231, 76, 60, 0.05); }
@@ -338,21 +334,21 @@ body {
 .finding-card.low { border-left-color: #27ae60; background: rgba(39, 174, 96, 0.05); }
 
 .finding-description {
-    color: #ccc;
+    color: var(--text-muted);
     margin-bottom: 12px;
     font-size: 14px;
     line-height: 1.6;
 }
 
 .finding-affected-rules {
-    background: #1a1d23;
+    background: var(--bg-surface);
     padding: 12px;
     border-radius: 4px;
     margin-top: 12px;
     border-left: 3px solid #ff5555;
     font-family: 'Courier New', monospace;
     font-size: 12px;
-    color: #e0e0e0;
+    color: var(--text-primary);
     line-height: 1.4;
 }
 
@@ -361,7 +357,7 @@ body {
     gap: 10px;
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid #3a3f4b;
+    border-top: 1px solid var(--border);
 }
 
 .btn-delete-report {

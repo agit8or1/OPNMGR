@@ -69,8 +69,8 @@ if (file_exists($logFile)) {
 
 <style>
 .log-viewer {
-    background: #1a1a1a;
-    border: 1px solid #333;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 1rem;
     font-family: 'Courier New', monospace;
