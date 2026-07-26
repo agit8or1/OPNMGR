@@ -60,7 +60,7 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     display: flex;
     flex-direction: column;
     gap: 18px;
-    min-height: calc(100vh - 48px - 48px); /* viewport minus header minus padding */
+    /* no min-height — content determines page length */
 }
 
 /* ── KPI row ── */
@@ -170,10 +170,9 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 /* ── Lower panel: chart + map ── */
 .dash-lower {
     display: grid;
-    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
     gap: 14px;
-    flex: 1;            /* stretch to fill remaining viewport height */
-    min-height: 340px;
+    height: 380px;       /* fixed height — no infinite stretch */
 }
 .dash-chart-panel {
     background: var(--bg-surface);
@@ -182,9 +181,10 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     padding: 18px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
-.dash-chart-panel h6 { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin: 0 0 12px; }
-.dash-chart-panel canvas { flex: 1; min-height: 0; }
+.dash-chart-panel h6 { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin: 0 0 12px; flex-shrink: 0; }
+.dash-chart-panel canvas { max-height: 260px; }
 .dash-map-panel {
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -194,7 +194,7 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     flex-direction: column;
 }
 .dash-map-panel h6 { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); padding: 14px 18px 0; margin: 0; flex-shrink: 0; }
-.dash-map-panel #networkMap { flex: 1; min-height: 280px; width: 100%; }
+.dash-map-panel #networkMap { flex: 1; min-height: 0; width: 100%; }
 
 /* ── Responsive ── */
 @media (max-width: 1200px) {
