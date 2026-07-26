@@ -110,64 +110,62 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     min-width: 150px;
 }
 
-/* ── Firewall health grid ── */
+/* ── Firewall health table ── */
 .dash-section-hdr {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
 }
 .dash-section-hdr h6 { margin: 0; font-weight: 600; font-size: 0.95rem; }
 .dash-section-hdr .count { font-size: 0.75rem; color: var(--text-muted); }
 
-.dash-fw-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 14px;
-}
-.dash-fw-card {
-    display: flex;
-    flex-direction: column;
+.dash-fw-wrap {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 18px;
-    text-decoration: none;
-    color: inherit;
+    overflow: hidden;
+}
+.dash-fw-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.dash-fw-table thead th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface);
+    z-index: 2;
+}
+.dash-fw-table tbody tr {
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.03));
     cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-    min-width: 0;
+    transition: background 0.1s;
 }
-.dash-fw-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--accent);
-    color: inherit;
-    text-decoration: none;
+.dash-fw-table tbody tr:last-child { border-bottom: none; }
+.dash-fw-table tbody tr:hover { background: var(--table-hover, rgba(255,255,255,0.02)); }
+.dash-fw-table td {
+    padding: 10px 14px;
+    vertical-align: middle;
+    white-space: nowrap;
 }
-.dash-fw-hdr {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-.dash-fw-hdr .fw-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.dash-fw-hdr .fa-chevron-right { margin-left: auto; font-size: 0.6rem; color: var(--text-muted); flex-shrink: 0; }
-.dash-fw-sub { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dash-fw-sub .cust-tag { margin-left: 6px; padding: 1px 7px; font-size: 0.65rem; background: var(--sidebar-active); border-radius: 3px; color: var(--accent); }
-.dash-fw-divider { height: 1px; background: var(--border); margin-bottom: 12px; }
-.dash-fw-metrics {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 16px;
-    font-size: 0.8rem;
-}
-.dash-fw-metrics dt { color: var(--text-muted); font-weight: 400; margin: 0; }
-.dash-fw-metrics dd { color: var(--text-primary); font-weight: 500; margin: 0; }
-.dash-fw-health-row { display: flex; align-items: center; gap: 8px; }
-.dash-fw-health-row .health-bar { flex: 1; }
-.dash-fw-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; padding-top: 10px; }
-.dash-fw-badges:empty { display: none; }
+.dash-fw-table td a { color: inherit; text-decoration: none; }
+.dash-fw-table td a:hover { color: var(--accent); }
+.dash-fw-name { font-weight: 600; font-size: 0.85rem; }
+.dash-fw-ip   { color: var(--text-muted); font-size: 0.8rem; font-family: monospace; }
+.dash-fw-cust { font-size: 0.7rem; padding: 1px 7px; background: var(--sidebar-active); border-radius: 3px; color: var(--accent); }
+.dash-fw-health-cell { min-width: 120px; }
+.dash-fw-health-cell .health-bar { width: 60px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.dash-fw-health-pct { font-weight: 600; font-size: 0.8rem; }
+.dash-fw-table .badge { font-size: 0.6rem; padding: 2px 6px; }
 
 /* ── Lower panel: chart + map ── */
 .dash-lower {
@@ -267,48 +265,51 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
       <p style="font-size:0.85rem;margin-top:6px"><a href="/add_firewall_page.php">Add your first firewall</a></p>
     </div>
     <?php else: ?>
-    <div class="dash-fw-grid">
-      <?php foreach ($firewalls as $fw):
-        $health = $fw['health_score'];
-        $healthClass = $health >= 80 ? 'good' : ($health >= 50 ? 'warn' : 'bad');
-        $statusClass = $fw['live_status'];
-        $checkinText = timeAgo($fw['agent_last_checkin'] ?: $fw['last_checkin']);
-        $shortUptime = $fw['uptime'] ?: 'N/A';
-        if (preg_match('/(\d+)\s*days?/', $shortUptime, $m)) $shortUptime = $m[1] . 'd';
-        elseif (preg_match('/(\d+)\s*hours?/', $shortUptime, $m)) $shortUptime = $m[1] . 'h';
-      ?>
-      <a class="dash-fw-card" href="/firewall_details.php?id=<?php echo $fw['id'] ?>">
-        <div class="dash-fw-hdr">
-          <span class="status-dot <?php echo $statusClass ?>"></span>
-          <span class="fw-name"><?php echo htmlspecialchars($fw['hostname'] ?: 'Unnamed') ?></span>
-          <i class="fas fa-chevron-right"></i>
-        </div>
-        <div class="dash-fw-sub">
-          <?php echo htmlspecialchars($fw['wan_ip'] ?: '') ?>
-          <?php if ($fw['customer_name']): ?><span class="cust-tag"><?php echo htmlspecialchars($fw['customer_name']) ?></span><?php endif ?>
-        </div>
-        <div class="dash-fw-divider"></div>
-        <dl class="dash-fw-metrics">
-          <dt>Health</dt>
-          <dd>
-            <div class="dash-fw-health-row">
+    <div class="dash-fw-wrap" <?php if ($total_firewalls > 15): ?>style="max-height:420px;overflow-y:auto"<?php endif ?>>
+      <table class="dash-fw-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Firewall</th>
+            <th>WAN IP</th>
+            <th>Customer</th>
+            <th>Health</th>
+            <th>Uptime</th>
+            <th>Checkin</th>
+            <th>Agent</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($firewalls as $fw):
+            $health = $fw['health_score'];
+            $healthClass = $health >= 80 ? 'good' : ($health >= 50 ? 'warn' : 'bad');
+            $statusClass = $fw['live_status'];
+            $checkinText = timeAgo($fw['agent_last_checkin'] ?: $fw['last_checkin']);
+            $shortUptime = $fw['uptime'] ?: 'N/A';
+            if (preg_match('/(\d+)\s*days?/', $shortUptime, $m)) $shortUptime = $m[1] . 'd';
+            elseif (preg_match('/(\d+)\s*hours?/', $shortUptime, $m)) $shortUptime = $m[1] . 'h';
+          ?>
+          <tr onclick="window.location='/firewall_details.php?id=<?php echo $fw['id'] ?>'">
+            <td><span class="status-dot <?php echo $statusClass ?>"></span></td>
+            <td><a href="/firewall_details.php?id=<?php echo $fw['id'] ?>" class="dash-fw-name"><?php echo htmlspecialchars($fw['hostname'] ?: 'Unnamed') ?></a></td>
+            <td class="dash-fw-ip"><?php echo htmlspecialchars($fw['wan_ip'] ?: '-') ?></td>
+            <td><?php if ($fw['customer_name']): ?><span class="dash-fw-cust"><?php echo htmlspecialchars($fw['customer_name']) ?></span><?php else: ?>-<?php endif ?></td>
+            <td class="dash-fw-health-cell">
               <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>
-              <span><?php echo $health ?>%</span>
-            </div>
-          </dd>
-          <dt>Uptime</dt>
-          <dd><?php echo htmlspecialchars($shortUptime) ?></dd>
-          <dt>Last checkin</dt>
-          <dd><?php echo $checkinText ?></dd>
-          <dt>Agent</dt>
-          <dd>v<?php echo htmlspecialchars($fw['agent_version'] ?: '?') ?></dd>
-        </dl>
-        <div class="dash-fw-badges">
-          <?php if ($fw['reboot_required']): ?><span class="badge" style="background:var(--warning);color:#000;font-size:0.6rem">Reboot</span><?php endif ?>
-          <?php if ($fw['updates_available']): ?><span class="badge" style="background:rgba(59,130,246,0.15);color:var(--accent);font-size:0.6rem">Update</span><?php endif ?>
-        </div>
-      </a>
-      <?php endforeach ?>
+              <span class="dash-fw-health-pct"><?php echo $health ?>%</span>
+            </td>
+            <td><?php echo htmlspecialchars($shortUptime) ?></td>
+            <td><?php echo $checkinText ?></td>
+            <td>v<?php echo htmlspecialchars($fw['agent_version'] ?: '?') ?></td>
+            <td>
+              <?php if ($fw['reboot_required']): ?><span class="badge" style="background:var(--warning);color:#000">Reboot</span><?php endif ?>
+              <?php if ($fw['updates_available']): ?><span class="badge" style="background:rgba(59,130,246,0.15);color:var(--accent)">Update</span><?php endif ?>
+            </td>
+          </tr>
+          <?php endforeach ?>
+        </tbody>
+      </table>
     </div>
     <?php endif ?>
   </div>
