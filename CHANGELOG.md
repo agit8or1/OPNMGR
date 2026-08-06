@@ -6,6 +6,27 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.11.8
+_Released: August 6, 2026_
+
+### Changes
+
+- **Migration Now Drops the Obsolete `alert_recipients` Table** `database/alert_system_schema.sql`
+  v3.11.7 stopped *creating* the table; this release also removes it from databases that still
+  carry it, via `DROP TABLE IF EXISTS alert_recipients;`.
+
+  **This makes the file destructive** — back up before running it. Any rows still in
+  `alert_recipients` are discarded. The file header carries a prominent warning and the cleanup
+  section documents exporting them (`SELECT * FROM alert_recipients;`) and recreating them under
+  Alerts > Notifications first. `DROP TABLE IF EXISTS` makes it a no-op on databases that never
+  had the table, so re-running remains safe.
+
+  Verified across all three paths: an old database holding the table with data (dropped, exit 0),
+  a re-run against the same database (no-op, exit 0), and a fresh install that never had it
+  (exit 0). The five real `alert*` tables are untouched in every case.
+
+---
+
 ## Version 3.11.7
 _Released: August 6, 2026_
 

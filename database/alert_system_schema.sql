@@ -4,14 +4,15 @@
 --
 -- STATUS: historical, for installations predating the alert system.
 -- Fresh installs do NOT need this -- database/schema.sql already contains
--- alert_settings and alert_history. Safe to re-run (all CREATEs are
--- IF NOT EXISTS and all INSERTs are ON DUPLICATE KEY UPDATE).
+-- alert_settings and alert_history. Safe to re-run.
 --
--- NOTE: this file previously also created an alert_recipients table. That table
--- was obsolete -- referenced by no code and absent from the reference
--- installation -- and has been removed. Recipient configuration lives in
--- alert_notifications. If an older database still carries the orphan table it
--- can be dropped by hand:  DROP TABLE IF EXISTS alert_recipients;
+-- !! THIS FILE DROPS A TABLE. Back up your database before running it. !!
+--
+-- This file previously created an alert_recipients table. That table was
+-- obsolete -- referenced by no code and absent from the reference installation
+-- -- and recipient configuration now lives in alert_notifications. As well as
+-- no longer creating it, this migration now DROPS it, discarding any rows it
+-- still holds. See the cleanup section at the end of this file.
 
 -- Table: alert_settings
 -- Stores global configuration for email and Pushover
@@ -56,3 +57,18 @@ INSERT INTO alert_settings (setting_name, setting_value) VALUES
     ('alerts_warning_enabled', 'true'),
     ('alerts_critical_enabled', 'true')
 ON DUPLICATE KEY UPDATE setting_name = setting_name;
+
+-- -----------------------------------------------------------------------------
+-- Cleanup: remove the obsolete alert_recipients table
+-- -----------------------------------------------------------------------------
+-- DESTRUCTIVE. alert_recipients was superseded by alert_notifications and is
+-- read by no code in the application. Dropping it discards any rows it still
+-- holds -- if you configured recipients there before upgrading, export them
+-- first:
+--
+--     SELECT * FROM alert_recipients;
+--
+-- and recreate them under Alerts > Notifications in the web UI.
+--
+-- No-op on databases that never had the table.
+DROP TABLE IF EXISTS alert_recipients;
