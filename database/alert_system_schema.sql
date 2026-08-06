@@ -7,10 +7,11 @@
 -- alert_settings and alert_history. Safe to re-run (all CREATEs are
 -- IF NOT EXISTS and all INSERTs are ON DUPLICATE KEY UPDATE).
 --
--- NOTE: the alert_recipients table below is obsolete. It is referenced by no
--- code in the application and does not exist in the reference installation;
--- recipient configuration now lives in alert_notifications. It is retained
--- only so this file still applies cleanly to an old database.
+-- NOTE: this file previously also created an alert_recipients table. That table
+-- was obsolete -- referenced by no code and absent from the reference
+-- installation -- and has been removed. Recipient configuration lives in
+-- alert_notifications. If an older database still carries the orphan table it
+-- can be dropped by hand:  DROP TABLE IF EXISTS alert_recipients;
 
 -- Table: alert_settings
 -- Stores global configuration for email and Pushover
@@ -21,22 +22,6 @@ CREATE TABLE IF NOT EXISTS alert_settings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_setting_name (setting_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Table: alert_recipients
--- Stores users/recipients who should receive alerts at different levels
-CREATE TABLE IF NOT EXISTS alert_recipients (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
-    pushover_user_key VARCHAR(50),
-    alert_level ENUM('info', 'warning', 'critical') NOT NULL,
-    notification_method ENUM('email', 'pushover', 'both') NOT NULL DEFAULT 'email',
-    enabled TINYINT(1) DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_alert_level (alert_level),
-    INDEX idx_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table: alert_history
@@ -71,8 +56,3 @@ INSERT INTO alert_settings (setting_name, setting_value) VALUES
     ('alerts_warning_enabled', 'true'),
     ('alerts_critical_enabled', 'true')
 ON DUPLICATE KEY UPDATE setting_name = setting_name;
-
--- Sample alert recipient (disabled by default)
-INSERT INTO alert_recipients (name, email, alert_level, notification_method, enabled) VALUES
-    ('Administrator', 'admin@example.com', 'critical', 'email', 0)
-ON DUPLICATE KEY UPDATE name = name;
