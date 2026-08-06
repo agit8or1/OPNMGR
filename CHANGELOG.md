@@ -6,6 +6,23 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.11.7
+_Released: August 6, 2026_
+
+### Changes
+
+- **Removed Obsolete `alert_recipients` Table** `database/alert_system_schema.sql`
+  The table definition and its sample-recipient `INSERT` are gone. Nothing in the codebase
+  referenced the table, and it existed in no database on the reference host — recipient
+  configuration lives in `alert_notifications`. Running this file no longer creates a dead table.
+
+  `database/schema.sql` was unaffected (it never contained the table, having been generated from
+  the reference installation). Existing databases that still carry the orphan table are left
+  untouched; the file header documents the manual `DROP TABLE IF EXISTS alert_recipients;` for
+  anyone who wants to clean it up.
+
+---
+
 ## Version 3.11.6
 _Released: August 6, 2026_
 
