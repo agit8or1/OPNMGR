@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.11.4](https://img.shields.io/badge/version-3.11.4-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.11.5](https://img.shields.io/badge/version-3.11.5-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
 
 A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
 
@@ -142,22 +142,40 @@ Full light theme with system-preference detection and manual toggle.
 # Clone the repository
 cd /var/www
 git clone https://github.com/agit8or1/OPNMGR.git opnsense
+cd /var/www/opnsense
+
+# Install PHP dependencies
+composer install --no-dev
+
+# Import the database schema
+# This creates the `opnsense_fw` database, all tables, and the reference data.
+mysql -u root -p < database/schema.sql
+
+# Create the application database user
+mysql -u root -p -e "
+  CREATE USER 'opnsense_user'@'localhost' IDENTIFIED BY 'your-secure-password';
+  GRANT ALL PRIVILEGES ON opnsense_fw.* TO 'opnsense_user'@'localhost';
+  FLUSH PRIVILEGES;"
+
+# Configure the application
+cp .env.example .env
+# Edit .env and set at minimum DB_HOST, DB_NAME, DB_USER, DB_PASS and APP_URL
+chmod 640 .env
+
+# Create the first administrator account
+php scripts/create_admin.php
 
 # Set proper permissions
 chown -R www-data:www-data /var/www/opnsense
 chmod 755 /var/www/opnsense
 
-# Import database schema
-mysql -u root -p < /var/www/opnsense/database/schema.sql
-
-# Configure database connection
-cp /var/www/opnsense/inc/db.php.example /var/www/opnsense/inc/db.php
-# Edit inc/db.php with your DB_HOST, DB_NAME, DB_USER, DB_PASS
-
 # Configure Apache virtual host and reload
 a2ensite opnmanager
 systemctl reload apache2
 ```
+
+> **Note:** the schema is safe to re-import — every statement is idempotent.
+> To regenerate it from an existing installation, run `scripts/generate_schema.sh`.
 
 ### 2. Firewall Enrollment
 

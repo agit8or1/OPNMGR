@@ -7,7 +7,12 @@ secrets/
 *.secret
 
 # Database
+# Ignore ad-hoc dumps and scratch SQL, but the shipped schema and migrations
+# MUST be committed -- they are required to install the application.
 *.sql
+!database/schema.sql
+!database/migrations/*.sql
+!db/migrations/*.sql
 *.db
 *.sqlite
 database/credentials.php
