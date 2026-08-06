@@ -6,6 +6,25 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.11.6
+_Released: August 6, 2026_
+
+### Changes
+
+- **Published Remaining Upgrade Migrations** `database/alert_system_schema.sql`, `database/migrate_v3.4.0.sql`
+  Both were still excluded by the `*.sql` ignore rule. They are only needed by installations that
+  predate the alert system and agent v3.4.0 respectively — `database/schema.sql` already covers both
+  for fresh installs — but they are now tracked so existing deployments can upgrade from a clone.
+  Each carries a header stating that fresh installs do not need it. The `*.sql` negation was widened
+  to `database/*.sql`, with `database/credentials*.sql` explicitly re-ignored.
+
+  Noted while publishing: the `alert_recipients` table in `alert_system_schema.sql` is obsolete —
+  no PHP file references it and it does not exist in the reference installation (recipient
+  configuration now lives in `alert_notifications`). It is retained so the file still applies
+  cleanly to an old database, and flagged in the file header.
+
+---
+
 ## Version 3.11.5
 _Released: August 6, 2026_
 

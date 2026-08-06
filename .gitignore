@@ -11,8 +11,10 @@ secrets/
 # MUST be committed -- they are required to install the application.
 *.sql
 !database/schema.sql
+!database/*.sql
 !database/migrations/*.sql
 !db/migrations/*.sql
+database/credentials*.sql
 *.db
 *.sqlite
 database/credentials.php
