@@ -2,7 +2,39 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: February 24, 2026
+**Last Updated**: August 6, 2026
+
+---
+
+## Version 3.11.5
+_Released: August 6, 2026_
+
+### Bug Fixes
+
+- **Database Schema Missing From Repository** `.gitignore`, `database/schema.sql` ([#6](https://github.com/agit8or1/OPNMGR/issues/6))
+  A blanket `*.sql` ignore rule meant `database/schema.sql` was never committed, so the install step
+  documented in the README (`mysql -u root -p < database/schema.sql`) failed on every fresh clone.
+  Added negation rules for the shipped schema and migrations, and published a complete, current
+  schema: all 59 tables plus the `v_firewall_wan_status` view and the static reference data
+  (agent command allowlist, feature catalogue). The stale v2.0.0 schema covered only 9 tables.
+  _Fixed by: Claude Code_
+
+- **README Install Steps Referenced Non-Existent Files** `README.md`
+  Quick Start told users to copy `inc/db.php.example`, which does not exist — configuration is via
+  `.env`. Rewritten with the real sequence: composer install, schema import, database user creation,
+  `.env` setup, and admin account creation.
+  _Fixed by: Claude Code_
+
+### New Features
+
+- **First-Admin Bootstrap Script** `scripts/create_admin.php`
+  A fresh install had no way to create the initial administrator. This CLI script creates an admin
+  account interactively (with hidden password entry) or from arguments, using the same
+  `password_hash()` scheme `inc/auth.php` verifies against.
+
+- **Schema Generator** `scripts/generate_schema.sh`
+  Regenerates `database/schema.sql` from a live installation so the published schema cannot drift
+  again. Output is idempotent and carries no user, firewall, credential or customer data.
 
 ---
 
