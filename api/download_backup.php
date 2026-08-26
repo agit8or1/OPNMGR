@@ -4,6 +4,7 @@
  * Serves backup file for download
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/backup_storage.php';
 
 requireLogin();
 
@@ -32,14 +33,23 @@ try {
         exit;
     }
     
-    $backup_dir = '/var/www/opnsense/backups';
-    $backup_path = $backup_dir . '/' . $backup['backup_file'];
-    
-    if (!file_exists($backup_path)) {
+    // resolve_backup_path() knows about both the new out-of-webroot storage and
+    // the legacy /var/www/opnsense/backups directory, and basenames the legacy
+    // filename so a crafted row cannot traverse out of it.
+    $backup_path = resolve_backup_path($backup);
+
+    if ($backup_path === null) {
         http_response_code(404);
         echo 'Backup file not found on disk';
         exit;
     }
+
+    audit_log('backup.download', [
+        'object_type' => 'backup',
+        'object_id'   => (string)$backup_id,
+        'firewall_id' => (int)$backup['firewall_id'],
+        'message'     => 'Configuration backup downloaded',
+    ]);
     
     // Set headers for download
     $filename = $backup['hostname'] . '_' . date('Y-m-d_H-i-s', strtotime($backup['created_at'])) . '.xml';

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: application/json');
 
@@ -35,23 +36,15 @@ if (!$firewall_id && $client_ip !== 'unknown') {
     }
 }
 
-if (!$firewall_id || empty($hardware_id)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Missing authentication']);
-    exit;
-}
 
 // Validate agent identity
-$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-$auth_stmt->execute([$firewall_id]);
-$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-if (!$auth_fw || (
-    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-    exit;
-}
+// Centralised agent authentication: identity resolution, hardware_id
+// pinning, API key verification and HMAC signature checking all live in
+// inc/agent_auth.php. It emits a generic error and exits on failure.
+$authenticated_firewall = authenticateAgentRequest(
+    array_merge(is_array($input) ? $input : [], ['firewall_id' => $firewall_id])
+);
+$firewall_id = (int)$authenticated_firewall['id'];
 
 $tunnel_port = (int)($input['tunnel_port'] ?? 443);
 $auth_token = trim($input['auth_token'] ?? '');

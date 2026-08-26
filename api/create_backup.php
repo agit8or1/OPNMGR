@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/backup_storage.php';
 
 requireLogin();
 
@@ -64,8 +65,10 @@ try {
     $stmt->execute([$firewall_id, $backup_filename]);
     $backup_id = db()->lastInsertId();
     
-    // Simple backup command that creates and uploads the backup file
-    $backup_command = "cp /conf/config.xml /tmp/{$backup_filename} && curl -F 'backup_file=@/tmp/{$backup_filename}' -F 'firewall_id={$firewall_id}' -F 'backup_id={$backup_id}' https://opn.agit8or.net/api/upload_backup.php && rm -f /tmp/{$backup_filename} && echo 'Manual backup created and uploaded: {$backup_filename}'";
+    // Built centrally so the command carries the agent's credentials (without
+    // embedding them in the queued command text) and targets the configured
+    // server URL rather than a hardcoded hostname.
+    $backup_command = build_backup_upload_command($firewall_id, (int)$backup_id, $backup_filename);
     
     $stmt = db()->prepare("
         INSERT INTO firewall_commands (firewall_id, command, description, status, created_at) 

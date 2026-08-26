@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Alert Schema Cleanup — Orphan Table Drop'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Agent Authentication Hardening'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,27 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.12.0',
+            'date' => '2026-08-26',
+            'type' => 'minor',
+            'title' => 'Agent Authentication Hardening & Secret Encryption',
+            'changes' => [
+                'SECURITY: Fixed arbitrary file write in api/upload_backup.php - agent-supplied filenames were written into the web root, where nginx executes .php (remote code execution as www-data)',
+                'SECURITY: Fixed IDOR in api/command_result.php - any authenticated agent could finalise and overwrite the result of another firewall\'s command',
+                'SECURITY: Agent API keys and signing secrets are now issued per firewall and encrypted at rest with XChaCha20-Poly1305 (OPNMGR_MASTER_KEY in .env)',
+                'SECURITY: Optional HMAC-SHA256 request signing for agents with timestamp, nonce replay protection and constant-time comparison',
+                'SECURITY: Centralised all agent authentication in inc/agent_auth.php; 22 endpoints refactored off their hand-rolled hardware_id checks',
+                'SECURITY: Agent authentication failures now return a generic error and no longer log expected hardware IDs',
+                'ADDED: Application audit log (audit_log table) with automatic redaction of credential-bearing metadata',
+                'ADDED: Database migration runner (scripts/migrate.php) with idempotent, checksummed migrations',
+                'ADDED: Security regression test suite (tests/security_test.php)',
+                'FIXED: Configuration backup uploads had been failing since hardware_id authentication was introduced - queued commands sent no credentials, so no backup reached disk after 2026-02-09',
+                'FIXED: api/get_commands.php used a bound parameter for LIMIT, which fails under native prepared statements',
+                'CHANGED: Backups are stored outside the document root with server-generated names, SHA-256 checksums and XML validation',
+                'REMOVED: Hardcoded firewall_id == 21 override that falsified LAN IP, IPv6 and uptime in agent check-ins',
+            ]
+        ],
         [
             'version' => '3.10.0',
             'date' => '2026-07-25',

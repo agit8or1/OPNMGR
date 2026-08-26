@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -14,23 +15,18 @@ $hardware_id = trim($input['hardware_id'] ?? '');
 $status = $input['status'] ?? null;
 $message = $input['message'] ?? null;
 
-if (!$firewall_id || !$status || empty($hardware_id)) {
+if (!$status) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
     exit;
 }
 
-// Validate agent identity
-$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-$auth_stmt->execute([$firewall_id]);
-$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-if (!$auth_fw || (
-    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Authentication failed']);
-    exit;
-}
+// Centralised agent authentication: identity resolution, hardware_id pinning,
+// API key verification and HMAC signature checking all live in inc/agent_auth.php.
+$authenticated_firewall = authenticateAgentRequest(
+    array_merge(is_array($input) ? $input : [], ['firewall_id' => (int)$firewall_id])
+);
+$firewall_id = (int)$authenticated_firewall['id'];
 
 try {
     // Update firewall status based on update progress

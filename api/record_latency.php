@@ -2,6 +2,7 @@
 // API endpoint to record latency measurements from firewalls
 // Called by agent v3.6.1+ via POST
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: application/json');
 
@@ -21,22 +22,14 @@ if (!$input) {
 $firewall_id = (int)($input['firewall_id'] ?? 0);
 $hardware_id = trim($input['hardware_id'] ?? '');
 
-if (!$firewall_id || empty($hardware_id)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Missing authentication']);
-    exit;
-}
 
-$auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-$auth_stmt->execute([$firewall_id]);
-$auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-if (!$auth_fw || (
-    !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-    exit;
-}
+// Centralised agent authentication: identity resolution, hardware_id
+// pinning, API key verification and HMAC signature checking all live in
+// inc/agent_auth.php. It emits a generic error and exits on failure.
+$authenticated_firewall = authenticateAgentRequest(
+    array_merge(is_array($input) ? $input : [], ['firewall_id' => $firewall_id])
+);
+$firewall_id = (int)$authenticated_firewall['id'];
 
 $latency_ms = floatval($input['latency_ms'] ?? 0);
 

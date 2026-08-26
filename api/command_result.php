@@ -1,6 +1,19 @@
 <?php
+/**
+ * Command Result API
+ *
+ * Agents report the outcome of a queued command here.
+ *
+ * The previous implementation authenticated the agent but then ran
+ *   UPDATE firewall_commands SET status=?, result=? WHERE id = ?
+ * with no firewall scoping, so any authenticated agent could finalise - and
+ * write arbitrary output into - a command belonging to any other firewall.
+ * Ownership, terminal-state and status validation now live in
+ * inc/command_results.php and are shared with agent_checkin.php.
+ */
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
-
+require_once __DIR__ . '/../inc/agent_auth.php';
+require_once __DIR__ . '/../inc/command_results.php';
 require_once __DIR__ . '/../inc/logging.php';
 
 header('Content-Type: application/json');
@@ -11,102 +24,63 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+$input = agent_request_input();
+if (!$input) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
+    exit;
+}
+
+$firewall    = authenticateAgentRequest($input);
+$firewall_id = (int)$firewall['id'];
+
+$command_id = (int)($input['command_id'] ?? 0);
+$result     = (string)($input['result'] ?? '');
+
+if ($command_id <= 0 || $result === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Missing required fields']);
+    exit;
+}
+
 try {
-    // Get input data
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (!$input) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
-        exit;
-    }
-    
-    // Validate agent identity
-    $firewall_id = (int)($input['firewall_id'] ?? 0);
-    $hardware_id = trim($input['hardware_id'] ?? '');
+    $accepted = record_agent_command_result(
+        $firewall_id,
+        $command_id,
+        $result,                                   // 'success' | 'failed' | ...
+        (string)($input['output'] ?? ''),
+        [
+            'result_is_base64' => true,
+            'error_output'     => (string)($input['error_output'] ?? ''),
+        ]
+    );
 
-    if (!$firewall_id || empty($hardware_id)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Missing authentication']);
+    if (!$accepted['ok']) {
+        http_response_code($accepted['status']);
+        echo json_encode(['success' => false, 'message' => $accepted['message']]);
         exit;
     }
 
-    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-    $auth_stmt->execute([$firewall_id]);
-    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$auth_fw || (
-        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-    )) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-        exit;
+    $command = $accepted['command'];
+    $log_message = sprintf(
+        'Command completed for firewall %s: %s - Status: %s',
+        $firewall['hostname'] ?? $firewall_id,
+        $command['description'] ?? ('#' . $command_id),
+        $accepted['normalized_status']
+    );
+    if ($accepted['result'] !== '') {
+        $log_message .= ' - Output: ' . substr($accepted['result'], 0, 200);
     }
 
-    $command_id = $input['command_id'] ?? '';
-    $result = $input['result'] ?? '';
-    $output = $input['output'] ?? '';
-    $error_output = $input['error_output'] ?? '';
-    $error_output = $input['error_output'] ?? '';
-    
-    if (empty($command_id) || empty($result)) {
-        echo json_encode(['success' => false, 'message' => 'Missing required fields']);
-        exit;
-    }
-    
-    // Map result to status
-    $status = ($result === 'success' || $result === 'partial') ? 'completed' : 'failed';
-    
-    // Decode output if it's base64 encoded
-    $decoded_output = '';
-    if (!empty($output)) {
-        $decoded_output = base64_decode($output);
-    }
-    
-    
-    // Decode and append error output
-    if (!empty($error_output)) {
-        $decoded_error = base64_decode($error_output);
-        if (!empty($decoded_error)) {
-            $decoded_output .= "\n\n=== STDERR ===\n" . $decoded_error;
-        }
-    }
-    // Update command status in firewall_commands table
-    $stmt = db()->prepare("UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ?");
-    $stmt->execute([$status, $decoded_output ?: $result, $command_id]);
-    
-    if ($stmt->rowCount() > 0) {
-        // Get command details for logging
-        $stmt = db()->prepare("SELECT fc.*, f.hostname 
-                              FROM firewall_commands fc 
-                              JOIN firewalls f ON fc.firewall_id = f.id 
-                              WHERE fc.id = ?");
-        $stmt->execute([$command_id]);
-        $command = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($command) {
-            $log_message = "Command completed for firewall {$command['hostname']}: {$command['description']} - Status: $status";
-            if (!empty($decoded_output)) {
-                $log_message .= " - Output: " . substr($decoded_output, 0, 200);
-            } elseif (!empty($result)) {
-                $log_message .= " - Result: $result";
-            }
-            
-            // Log as ERROR if command failed, INFO if successful
-            if ($status === 'failed') {
-                log_error('command', $log_message, null, $command['firewall_id']);
-            } else {
-                log_info('command', $log_message, null, $command['firewall_id']);
-            }
-        }
-        
-        echo json_encode(['success' => true, 'message' => 'Command result updated']);
+    if ($accepted['normalized_status'] === 'failed') {
+        log_error('command', $log_message, null, $firewall_id);
     } else {
-        echo json_encode(['success' => false, 'message' => 'Command not found or already updated']);
+        log_info('command', $log_message, null, $firewall_id);
     }
-    
+
+    echo json_encode(['success' => true, 'message' => 'Command result updated']);
 } catch (Exception $e) {
-    error_log("command_result.php error: " . $e->getMessage());
+    error_log('command_result.php error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
-?>

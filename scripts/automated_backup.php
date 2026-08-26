@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/backup_storage.php';
 
 error_log("[AUTOMATED_BACKUP] ========================================");
 error_log("[AUTOMATED_BACKUP] Starting automated backup run at " . date('Y-m-d H:i:s'));
@@ -53,8 +54,9 @@ try {
             $backup_id = db()->lastInsertId();
             error_log("[AUTOMATED_BACKUP] Backup entry created with ID: {$backup_id}");
             
-            // Create backup command
-            $backup_command = "cp /conf/config.xml /tmp/{$backup_filename} && curl -F 'backup=@/tmp/{$backup_filename}' -F 'firewall_id={$fw_id}' -F 'backup_id={$backup_id}' https://opn.agit8or.net/api/upload_backup.php && rm -f /tmp/{$backup_filename} && echo 'Automated backup created: {$backup_filename}'";
+            // Create backup command (shared builder: carries agent credentials,
+            // uses the configured server URL, and is the same shape as manual backups)
+            $backup_command = build_backup_upload_command((int)$fw_id, (int)$backup_id, $backup_filename);
             
             error_log("[AUTOMATED_BACKUP] Queueing backup command");
             

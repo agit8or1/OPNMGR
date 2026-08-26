@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
+require_once __DIR__ . '/inc/agent_auth.php';
+require_once __DIR__ . '/inc/command_results.php';
 
 // Endpoint for firewall agent check-ins
 header('Content-Type: application/json');
@@ -11,26 +13,24 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Get JSON input
-$input = json_decode(file_get_contents('php://input'), true);
+// Get JSON input. agent_request_input() caches the raw body so that HMAC
+// signature verification hashes exactly the bytes we received.
+$input = agent_request_input();
 if (!$input) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Invalid JSON input']);
     exit;
 }
 
-$firewall_id = (int)($input['firewall_id'] ?? 0);
-$hardware_id = trim($input['hardware_id'] ?? '');
+// Authenticate once, up front, for every branch of this endpoint.
+// Identity resolution (firewall_id or hardware_id lookup), hardware_id pinning,
+// API key verification and HMAC signature checking all live in inc/agent_auth.php.
+$authenticated_firewall = authenticateAgentRequest($input);
+$firewall_id = (int)$authenticated_firewall['id'];
+$hardware_id = (string)$authenticated_firewall['hardware_id'];
 
-// If firewall_id not provided, try to look up by hardware_id
-if (!$firewall_id && !empty($hardware_id)) {
-    $stmt = db()->prepare('SELECT id FROM firewalls WHERE hardware_id = ?');
-    $stmt->execute([$hardware_id]);
-    $fw = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($fw) {
-        $firewall_id = (int)$fw['id'];
-    }
-}
+// Credentials to hand back if this agent has not yet adopted its API key.
+$agent_credentials = agent_credentials_payload($authenticated_firewall);
 
 // Check if this is a command result report (agent reporting back command execution status)
 $command_id = (int)($input['command_id'] ?? 0);
@@ -38,53 +38,32 @@ $command_status = trim($input['status'] ?? '');
 $command_result = trim($input['result'] ?? '');
 
 if ($command_id > 0 && !empty($command_status)) {
-    // This is a command result report, not a regular check-in
-    // Validate agent identity before processing command results
-    if (!$firewall_id || empty($hardware_id)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Missing firewall_id or hardware_id']);
-        exit;
-    }
-    $auth_stmt = db()->prepare('SELECT hardware_id, api_key FROM firewalls WHERE id = ?');
-    $auth_stmt->execute([$firewall_id]);
-    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$auth_fw || (
-        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-    )) {
-        error_log("Command result REJECTED: auth failed for firewall_id=$firewall_id");
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-        exit;
-    }
-
+    // This is a command result report, not a regular check-in.
     try {
-        // Verify command belongs to this firewall (prevent cross-firewall command manipulation)
-        $cmd_verify = db()->prepare('SELECT firewall_id FROM firewall_commands WHERE id = ?');
-        $cmd_verify->execute([$command_id]);
-        $cmd_owner = $cmd_verify->fetch(PDO::FETCH_ASSOC);
-        if (!$cmd_owner || (int)$cmd_owner['firewall_id'] !== $firewall_id) {
-            error_log("Command result REJECTED: command $command_id does not belong to firewall_id=$firewall_id");
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Command not found for this firewall']);
+        // Ownership, terminal-state and status validation live in one place so
+        // that agent_checkin.php and api/command_result.php cannot drift apart.
+        $accepted = record_agent_command_result(
+            $firewall_id,
+            $command_id,
+            $command_status,
+            $command_result,
+            ['result_is_base64' => true]
+        );
+
+        if (!$accepted['ok']) {
+            http_response_code($accepted['status']);
+            echo json_encode(['success' => false, 'message' => $accepted['message']]);
             exit;
         }
 
-        // Decode base64 result if present
-        if (!empty($command_result)) {
-            $command_result = base64_decode($command_result);
-        }
-
-        // Update command status
-        $stmt = db()->prepare('UPDATE firewall_commands SET status = ?, result = ?, completed_at = NOW() WHERE id = ? AND firewall_id = ?');
-        $stmt->execute([$command_status, $command_result, $command_id, $firewall_id]);
-
-        error_log("Command $command_id completed with status: $command_status");
+        $command_result = $accepted['result'];
+        $command_status = $accepted['normalized_status'];
 
         // Check if this was a speedtest command - parse results into bandwidth_tests
         if ($command_status === 'completed' && !empty($command_result)) {
-            $cmd_stmt = db()->prepare('SELECT firewall_id, command, command_type FROM firewall_commands WHERE id = ?');
-            $cmd_stmt->execute([$command_id]);
-            $cmd_info = $cmd_stmt->fetch(PDO::FETCH_ASSOC);
+            // Reuse the row record_agent_command_result() already verified as
+            // belonging to this firewall rather than re-querying by id alone.
+            $cmd_info = $accepted['command'];
 
             if ($cmd_info && ($cmd_info['command'] === 'run_speedtest' || $cmd_info['command_type'] === 'speedtest')) {
                 $speedtest_data = json_decode($command_result, true);
@@ -145,72 +124,20 @@ $uptime = trim($input['uptime'] ?? '');
 $agent_pid = (int)($input['agent_pid'] ?? 0); // Process ID for duplicate detection
 
 // Validate inputs
-if (!$firewall_id || empty($agent_version)) {
+if (empty($agent_version)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Missing required fields']);
     exit;
 }
 
-// Verify firewall exists and validate agent identity
-$stmt = db()->prepare('SELECT id, hostname, hardware_id, api_key FROM firewalls WHERE id = ?');
-$stmt->execute([$firewall_id]);
-$firewall = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$firewall) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Firewall not found']);
-    exit;
-}
-
-// Validate hardware_id matches the registered firewall
-// This prevents an agent from impersonating another firewall
-if (!empty($firewall['hardware_id']) && !empty($hardware_id)) {
-    if (!hash_equals($firewall['hardware_id'], $hardware_id)) {
-        error_log("Agent checkin REJECTED: hardware_id mismatch for firewall_id=$firewall_id (expected={$firewall['hardware_id']}, got=$hardware_id)");
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-        exit;
-    }
-} elseif (empty($hardware_id)) {
-    // Require hardware_id for all check-ins
-    error_log("Agent checkin REJECTED: no hardware_id provided for firewall_id=$firewall_id");
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Missing hardware_id']);
-    exit;
-}
-
-// Validate api_key if one is configured for this firewall
-if (!empty($firewall['api_key'])) {
-    if (empty($api_key) || !hash_equals($firewall['api_key'], $api_key)) {
-        error_log("Agent checkin REJECTED: api_key mismatch for firewall_id=$firewall_id");
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Authentication failed']);
-        exit;
-    }
-}
+// Identity, hardware_id pinning, API key and HMAC signature were all verified by
+// authenticateAgentRequest() at the top of this file. $firewall is the row it
+// returned, so no endpoint-local credential comparison happens here any more.
+$firewall = $authenticated_firewall;
 
 // Rate limiting removed - Agent v3.0 has built-in PID locking to prevent duplicates
 
 try {
-    // Fixed: Calculate real uptime for firewall 21 instead of hardcoded wrong value
-    if ($firewall_id == 21 && $lan_ip == $wan_ip) {
-        // Override with correct values until agent is updated
-        $lan_ip = "192.168.1.1";  // Correct LAN IP
-        $ipv6_address = "2601:602:9800:1930::1";  // Example IPv6
-        
-        // Calculate REAL uptime - system started at 8:00 AM today
-        $now = new DateTime();
-        $start_today = new DateTime('08:00:00');
-        
-        if ($now < $start_today) {
-            // Handle overnight case - system started yesterday
-            $start_today->sub(new DateInterval('P1D'));
-        }
-        
-        $interval = $start_today->diff($now);
-        $uptime = $interval->h . ' hours, ' . $interval->i . ' minutes';  // REAL uptime
-    }
-    
     // Check if agent reports reboot is required
     // Only update reboot_required if agent explicitly sends it (for newer agents)
     // Otherwise, preserve existing value in database
@@ -590,7 +517,24 @@ try {
         // Log that we're sending requests to agent
         error_log("Agent checkin for firewall $firewall_id: Sending " . count($pending_requests) . " pending proxy requests");
     }
-    
+
+    // Hand the agent its API key and signing secret if it has not adopted them
+    // yet. This is what lets an already-deployed fleet upgrade from
+    // hardware_id-only authentication without a flag day. Once the agent sends
+    // the key back, authentication for this firewall fails closed without it.
+    if (!empty($agent_credentials)) {
+        $response = array_merge($response, $agent_credentials);
+    }
+
+    // Tell the agent what the server expects, so it can self-configure.
+    $response['auth_policy'] = [
+        'mode'                => agent_auth_mode(),
+        'signature_window'    => (int)agent_auth_setting('agent_signature_window', '300'),
+        'api_key_required'    => (bool)($firewall['_auth']['confirmed'] ?? false),
+        'signature_required'  => agent_auth_mode() === 'require_signed'
+            || (agent_auth_mode() === 'prefer_signed' && (int)($firewall['agent_signing_supported'] ?? 0) === 1),
+    ];
+
     echo json_encode($response);
 
 } catch (Exception $e) {

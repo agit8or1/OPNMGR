@@ -41,6 +41,9 @@ require_once BASE_PATH . '/config.php';
 // ---------------------------------------------------------------------------
 require_once __DIR__ . '/version.php';
 
+// Audit trail helpers (audit_log / audit_log_agent)
+require_once __DIR__ . '/audit.php';
+
 // ---------------------------------------------------------------------------
 // 4. Lazy database connection singleton
 // ---------------------------------------------------------------------------

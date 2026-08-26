@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: text/plain');
 // Get firewall ID and validate agent identity
@@ -14,16 +15,13 @@ if (!$firewall_id || empty($hardware_id)) {
 
 // Validate agent identity
 try {
-    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-    $auth_stmt->execute([$firewall_id]);
-    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$auth_fw || (
-        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-    )) {
-        http_response_code(403);
-        echo "ERROR:Authentication failed";
-        exit;
-    }
+    // Centralised agent authentication: identity resolution, hardware_id
+    // pinning, API key verification and HMAC signature checking all live in
+    // inc/agent_auth.php. It emits a generic error and exits on failure.
+    $authenticated_firewall = authenticateAgentRequest(
+        array_merge(is_array($_GET) ? $_GET : [], ['firewall_id' => $firewall_id])
+    );
+    $firewall_id = (int)$authenticated_firewall['id'];
 } catch (Exception $e) {
     http_response_code(500);
     echo "ERROR:Authentication error";

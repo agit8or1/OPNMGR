@@ -1,61 +1,60 @@
 <?php
+/**
+ * Get Commands API
+ *
+ * Agents poll this endpoint for work queued against them. Commands are always
+ * scoped to the authenticated firewall - the firewall_id in the request is only
+ * an identity claim, never an authorization decision.
+ */
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'GET') {
+if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
     exit;
 }
 
+$is_post = $_SERVER['REQUEST_METHOD'] === 'POST';
+$source  = $is_post ? ($_POST ?: agent_request_input()) : $_GET;
+
+// Centralised agent authentication (identity, hardware_id, API key, signature).
+$firewall    = authenticateAgentRequest(is_array($source) ? $source : []);
+$firewall_id = (int)$firewall['id'];
+
+// POST is the agent's normal work-fetch path: only commands already dispatched.
+// GET is the diagnostic view and shows every status.
+$status_filter = $is_post ? 'sent' : null;
+
+$limit = $is_post ? 50 : (int)($_GET['limit'] ?? 10);
+$limit = max(1, min(200, $limit)); // clamp; LIMIT is interpolated below
+
 try {
-    // Support both POST and GET requests
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $firewall_id = $_POST['firewall_id'] ?? null;
-        $hardware_id = trim($_POST['hardware_id'] ?? '');
-        $status_filter = 'sent'; // Original behavior for POST
-        $limit = 50;
+    if ($status_filter !== null) {
+        $stmt = db()->prepare(
+            "SELECT id, command, command_type, description, status, created_at
+               FROM firewall_commands
+              WHERE firewall_id = ? AND status = ?
+              ORDER BY created_at DESC
+              LIMIT {$limit}"
+        );
+        $stmt->execute([$firewall_id, $status_filter]);
     } else {
-        $firewall_id = $_GET['firewall_id'] ?? null;
-        $hardware_id = trim($_GET['hardware_id'] ?? '');
-        $status_filter = null; // Show all statuses for GET
-        $limit = (int)($_GET['limit'] ?? 10);
+        $stmt = db()->prepare(
+            "SELECT id, command, command_type, description, status, created_at
+               FROM firewall_commands
+              WHERE firewall_id = ?
+              ORDER BY created_at DESC
+              LIMIT {$limit}"
+        );
+        $stmt->execute([$firewall_id]);
     }
 
-    $firewall_id = (int)$firewall_id;
-    if (!$firewall_id || empty($hardware_id)) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing authentication']);
-        exit;
-    }
-
-    $auth_stmt = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
-    $auth_stmt->execute([$firewall_id]);
-    $auth_fw = $auth_stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$auth_fw || (
-        !empty($auth_fw['hardware_id']) && !hash_equals($auth_fw['hardware_id'], $hardware_id)
-    )) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Authentication failed']);
-        exit;
-    }
-    
-    // Get commands for this firewall
-    if ($status_filter) {
-        $stmt = db()->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?");
-        $stmt->execute([$firewall_id, $status_filter, $limit]);
-    } else {
-        $stmt = db()->prepare("SELECT id, command, description, status, created_at FROM firewall_commands WHERE firewall_id = ? ORDER BY created_at DESC LIMIT ?");
-        $stmt->execute([$firewall_id, $limit]);
-    }
-    $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo json_encode(['success' => true, 'commands' => $commands]);
-    
+    echo json_encode(['success' => true, 'commands' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 } catch (PDOException $e) {
-    error_log("get_commands.php error: " . $e->getMessage());
+    error_log('get_commands.php error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => 'Internal server error']);
 }
-?>
