@@ -113,6 +113,10 @@ test_*
 debug_*
 temp_*
 *_test.*
+# ...but the committed test suite must ship: CI runs it, and it is the
+# regression guard for the agent authentication and authorization behaviour.
+!tests/
+!tests/*.php
 *_debug.*
 *_broken*
 *.broken
