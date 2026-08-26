@@ -6,6 +6,56 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.15.0
+**Released**: August 26, 2026 | **Agent**: v1.6.0
+
+Incident-based alerting and maintenance windows.
+
+### Added
+
+- **Alerting is now incident-based.** An incident is one ongoing problem: opened
+  when a condition first becomes true, updated while it persists, resolved when
+  it clears. The previous behaviour sent an email whenever a condition was true
+  and a crude 60-minute timer had elapsed, so it could never say "still down",
+  never said "back online", and gave nobody anything to acknowledge.
+
+- **Lifecycle**: OPEN / ACKNOWLEDGED / RESOLVED. Acknowledging stops
+  notification without closing the incident, because the problem is still there.
+  Incidents auto-resolve when the condition actually clears, and the released
+  dedupe key means the same condition recurring later opens a *new* incident
+  rather than reopening the old one - so separate outages stay separate.
+
+- **Notification backoff** of 60m, 120m, 240m with a repeat limit. An offline
+  firewall no longer notifies every couple of minutes forever.
+
+- **17 alert types**: firewall offline, gateway down/degraded/flapping, VPN
+  tunnel down, CARP fault, service stopped, certificate expiring/expired,
+  sustained CPU/memory/disk, configuration drift, backup failure, update
+  failure, outdated agent, and repeated agent authentication failures.
+
+- **Maintenance windows** scoped to a firewall, a site or a whole customer,
+  resolved hierarchically. During a window agents keep checking in, health keeps
+  being collected and displayed, and incidents are still opened and recorded.
+  Only the outbound notification is withheld, and the suppression is written to
+  the incident's event trail. Discarding the events would lose the record of
+  what happened during exactly the period somebody was working on the box.
+
+- `cron/evaluate_alerts.php` asserts the current truth of every condition and is
+  idempotent: running it more often produces the same incidents, not more of
+  them. Installed at five-minute intervals.
+
+- `tests/alerting_test.php` — 49 assertions covering deduplication, the
+  lifecycle, acknowledgement, backoff, scope resolution and suppression.
+
+### Fixed
+
+- The maintenance lookup cache was per-process with no way to invalidate it, so
+  a long-running evaluator, or a window created during a request, would read
+  stale state. It now carries a generation counter that `maintenance_reset_cache()`
+  bumps.
+
+---
+
 ## Version 3.14.0
 **Released**: August 26, 2026 | **Agent**: v1.6.0
 

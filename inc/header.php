@@ -152,6 +152,18 @@ function isActive($page) {
     <!-- MONITORING section -->
     <div class="sidebar-section">
       <div class="sidebar-section-label">Monitoring</div>
+      <?php if (function_exists('can') && can('alert.view')): ?>
+      <a class="sidebar-item <?php echo isActive('incidents.php') ?>" href="/incidents.php">
+        <span class="sidebar-icon"><i class="fas fa-bell"></i></span>
+        <span class="sidebar-label">Incidents</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('maintenance.manage')): ?>
+      <a class="sidebar-item <?php echo isActive('maintenance.php') ?>" href="/maintenance.php">
+        <span class="sidebar-icon"><i class="fas fa-screwdriver-wrench"></i></span>
+        <span class="sidebar-label">Maintenance</span>
+      </a>
+      <?php endif; ?>
       <a class="sidebar-item <?php echo isActive(['alerts.php','alert_history.php']) ?>" href="/alerts.php">
         <span class="sidebar-icon"><i class="fas fa-bell"></i></span>
         <span class="sidebar-label">Alerts</span>

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Config Drift & Firewall Health'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Incident Alerting & Maintenance Windows'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,21 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.15.0',
+            'date' => '2026-08-26',
+            'type' => 'minor',
+            'title' => 'Incident-Based Alerting and Maintenance Windows',
+            'changes' => [
+                'ADDED: Alerting is now incident-based. One incident per ongoing problem, opened when a condition becomes true, updated while it persists and resolved when it clears - replacing "send an email whenever the condition is true and a 60-minute timer elapsed"',
+                'ADDED: Incident lifecycle OPEN / ACKNOWLEDGED / RESOLVED. Acknowledging stops notification without closing the incident; incidents auto-resolve when the condition actually clears',
+                'ADDED: Notification backoff (60m, 120m, 240m) with a repeat limit, so an offline firewall no longer notifies every couple of minutes indefinitely',
+                'ADDED: 17 alert types covering offline, gateways (down/degraded/flapping), VPN tunnels, CARP faults, services, certificate expiry, sustained CPU/memory/disk, config drift, backup and update failure, outdated agents and repeated agent authentication failures',
+                'ADDED: Maintenance windows scoped to a firewall, a site or a whole customer. During a window monitoring, health collection and incident recording all continue; only outbound notification is withheld, and the suppression is recorded as an incident event',
+                'ADDED: cron/evaluate_alerts.php, which asserts current truth for every condition and is idempotent - running it more often produces the same incidents, not more of them',
+                'FIXED: The maintenance lookup cache was per-process with no way to invalidate it, so a long-running evaluator or a window created mid-request would read stale state',
+            ]
+        ],
         [
             'version' => '3.14.0',
             'date' => '2026-08-26',

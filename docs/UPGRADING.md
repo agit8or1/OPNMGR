@@ -18,6 +18,36 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.15.0
+
+Migration 0011 adds the incident and maintenance-window tables. Additive; nothing existing
+changes shape, and the old alert tables are left alone.
+
+Install the evaluator, which both detects conditions and transitions maintenance windows:
+
+```cron
+*/5 * * * * /usr/bin/php /var/www/opnsense/cron/evaluate_alerts.php >> /var/log/opnmgr_alerts.log 2>&1
+```
+
+Check what it would do before letting it notify anyone:
+
+```bash
+php cron/evaluate_alerts.php --dry-run
+```
+
+`cron/check_offline_firewalls.php` is superseded by the evaluator and can be removed from
+cron once you are satisfied with the new behaviour. Leaving both running is harmless but
+will send duplicate offline notifications.
+
+Notification pacing defaults to 60 minutes doubling, four times. Adjust in `settings`:
+
+```sql
+UPDATE settings SET value = '30' WHERE name = 'alert_notify_repeat_minutes';
+UPDATE settings SET value = '6'  WHERE name = 'alert_notify_max_repeats';
+```
+
+---
+
 ## Upgrading to 3.14.0
 
 Migrations 0009 and 0010 add the drift and health tables. They are additive; nothing

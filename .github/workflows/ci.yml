@@ -125,6 +125,9 @@ jobs:
       - name: Health and drift suite
         run: php tests/health_drift_test.php
 
+      - name: Alerting and maintenance suite
+        run: php tests/alerting_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -219,3 +222,4 @@ jobs:
           php tests/security_test.php
           php tests/msp_test.php
           php tests/health_drift_test.php
+          php tests/alerting_test.php

@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.14.0](https://img.shields.io/badge/version-3.14.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.15.0](https://img.shields.io/badge/version-3.15.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -13,7 +13,18 @@ work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.14 — Configuration Drift &amp; Firewall Health
+### New in v3.15 — Incident Alerting &amp; Maintenance Windows
+
+- **Incident-based alerting** — one entry per ongoing problem rather than one per email.
+  Opened when a condition becomes true, updated while it persists, resolved when it
+  clears. OPEN / ACKNOWLEDGED / RESOLVED, with notification backoff so an offline
+  firewall stops notifying every two minutes. 17 alert types across availability,
+  gateways, VPN, HA, services, certificates, resources, drift, backups and agent health.
+- **Maintenance windows** — scoped to a firewall, a site or a whole customer. Monitoring,
+  health collection and incident recording all continue during a window; only outbound
+  notification is withheld, and the suppression is recorded on the incident.
+
+### v3.14 — Configuration Drift &amp; Firewall Health
 
 - **Configuration drift** — mark a configuration backup as the baseline and see, per
   firewall, whether the current configuration still matches it. The comparison is
@@ -149,6 +160,11 @@ Compares each firewall's current configuration against the approved baseline, ig
 serialisation noise and volatile fields.
 
 ![Configuration Drift](screenshots/13-drift.png)
+
+### Incidents
+One entry per ongoing problem, with acknowledgement and a full event trail.
+
+![Incidents](screenshots/14-incidents.png)
 
 ### Audit Log
 Who did what, to which firewall, from where — filterable by action, user, firewall,

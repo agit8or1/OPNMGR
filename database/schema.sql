@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.13.0.
+-- Generated from the reference installation for OPNManager v3.14.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -176,6 +176,56 @@ CREATE TABLE IF NOT EXISTS `alert_history` (
   KEY `idx_sent_at` (`sent_at`),
   CONSTRAINT `alert_history_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `alert_incident_events` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `incident_id` bigint(20) NOT NULL,
+  `event` enum('opened','updated','acknowledged','resolved','notified','suppressed','reopened','escalated') NOT NULL,
+  `detail` varchar(512) DEFAULT NULL,
+  `actor` varchar(64) DEFAULT NULL COMMENT 'Username, or NULL for system',
+  `occurred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_incident` (`incident_id`,`occurred_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `alert_incidents` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `dedupe_key` varchar(191) DEFAULT NULL COMMENT 'Set while active, NULL once resolved, so UNIQUE dedupes only open incidents',
+  `dedupe_source` varchar(191) NOT NULL COMMENT 'The key this incident was raised under, kept for history',
+  `alert_type` varchar(64) NOT NULL COMMENT 'e.g. firewall.offline, gateway.down',
+  `object_key` varchar(128) DEFAULT NULL COMMENT 'Sub-object, e.g. the gateway or tunnel name',
+  `severity` enum('info','warning','critical') NOT NULL DEFAULT 'warning',
+  `status` enum('open','acknowledged','resolved') NOT NULL DEFAULT 'open',
+  `firewall_id` int(11) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `detail` text DEFAULT NULL,
+  `metadata` text DEFAULT NULL COMMENT 'JSON, credential material scrubbed',
+  `first_seen_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_seen_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `resolved_at` timestamp NULL DEFAULT NULL,
+  `occurrence_count` int(11) NOT NULL DEFAULT 1,
+  `acknowledged_at` timestamp NULL DEFAULT NULL,
+  `acknowledged_by` varchar(64) DEFAULT NULL,
+  `acknowledged_note` varchar(255) DEFAULT NULL,
+  `notify_count` int(11) NOT NULL DEFAULT 0,
+  `last_notified_at` timestamp NULL DEFAULT NULL,
+  `suppressed` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 when notification was withheld, e.g. during maintenance',
+  `suppressed_reason` varchar(128) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_active_dedupe` (`dedupe_key`),
+  KEY `idx_status` (`status`),
+  KEY `idx_type` (`alert_type`),
+  KEY `idx_firewall` (`firewall_id`),
+  KEY `idx_customer` (`customer_id`),
+  KEY `idx_first_seen` (`first_seen_at`),
+  KEY `idx_severity` (`severity`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1159,6 +1209,27 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
   KEY `idx_locked_until` (`locked_until`),
   KEY `idx_ip_address` (`ip_address`),
   KEY `idx_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `maintenance_windows` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `scope` enum('firewall','site','customer') NOT NULL,
+  `scope_id` int(11) NOT NULL COMMENT 'firewall_id, site_id or customer_id per scope',
+  `starts_at` datetime NOT NULL,
+  `ends_at` datetime NOT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `status` enum('scheduled','active','completed','cancelled') NOT NULL DEFAULT 'scheduled',
+  `suppress_alerts` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Data collection and health display continue regardless',
+  `created_by_user_id` int(11) DEFAULT NULL,
+  `created_by_username` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_scope` (`scope`,`scope_id`),
+  KEY `idx_window` (`starts_at`,`ends_at`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
