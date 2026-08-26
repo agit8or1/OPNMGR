@@ -2,7 +2,89 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: August 6, 2026
+**Last Updated**: August 26, 2026
+
+---
+
+## Version 3.12.0
+**Released**: August 26, 2026 | **Agent**: v1.5.6
+
+Security release. Full architecture in [SECURITY.md](SECURITY.md).
+
+### Fixed - security
+
+- **Remote code execution.** `api/upload_backup.php` wrote the agent-supplied filename
+  into `/var/www/opnsense/backups`, which is inside the document root and matched by the
+  nginx `location ~ \.php$` block, so an authenticated agent could upload a `.php` file
+  and execute code as `www-data`. Backups now store outside the web root under
+  server-generated names and must parse as an `<opnsense>` configuration.
+- **Cross-firewall IDOR.** `api/command_result.php` authenticated the agent then updated
+  `firewall_commands` with no firewall scoping, letting any agent finalise and overwrite
+  another firewall's command result.
+- **Unauthenticated tunnel access.** `tunnel_proxy.php` authenticated on
+  `ssh_access_sessions.id`, an `AUTO_INCREMENT` integer, while describing it as
+  "unguessable". Sessions now record an owner and a bearer token.
+- **Unsigned update chain.** Agent updates ran `fetch -o - <url> | sh`. Now Ed25519-signed
+  manifest plus SHA-256 per artifact, atomic install and rollback.
+- **Weak agent credential.** `hardware_id` (md5 of hostid or WAN MAC) was the only
+  credential, and `api_key` was unset so its check was a no-op. Per-firewall API keys and
+  HMAC signing secrets, provisioned over the authenticated check-in and pinned on use.
+- Unauthenticated root-executing endpoints removed or authenticated, including 13 stale
+  incident scripts, three of which carried auth keys hardcoded in a public repository.
+- `agent_token` was read but never verified on two telemetry endpoints.
+- Path traversal in `api/repair_status.php` and `api/ssh_install_status.php`.
+- `api/get_client_ip.php` preferred caller-controlled headers over `REMOTE_ADDR`.
+- Maintenance scripts and data directories were web-reachable; `/scripts/*.php` returned
+  its own source and `/backups/*.php` executed.
+- `chmod -R a+r` in the update wrapper made `.env` world-readable on every update, and
+  `chmod 777` made the backups directory world-writable.
+- The screenshot tool in the web root contained the administrator password in plaintext
+  and was publicly served.
+- No CSRF on the login form; `session.cookie_secure` forced on while a plain-HTTP vhost
+  was served; session user agent recorded but never checked.
+
+### Fixed - bugs
+
+- Configuration backup uploads had been failing since 2026-02-09: the queued command
+  carried no credentials, so rows were created nightly but no file reached disk.
+- `api/trigger_agent_update.php` called `verify_session()`, which is defined nowhere, so
+  every agent-update request returned a 500.
+- `api/get_commands.php` bound `LIMIT` as a parameter, which fails under native prepares.
+- `agent_checkin.php` read `$firewall_status` about a hundred lines before it was
+  assigned, clobbering in-progress `updating` state on every check-in.
+- The System Update page compared commit hashes for inequality, so it reported "update
+  available" whenever the checkout was *ahead* of the remote; it also trusted a
+  hand-maintained `COMMIT` file that had drifted from the real HEAD. It now uses git
+  ahead/behind counts and distinguishes up to date, behind, ahead and diverged.
+- `git pull origin main` ran regardless of the checked-out branch, and a failed
+  `git stash` was ignored. Pulls are now fast-forward only on the current branch's
+  upstream and abort on a dirty tree.
+- Database migrations were never applied after an update pull.
+- Removed a hardcoded `firewall_id == 21` branch that falsified LAN IP, IPv6 and uptime.
+
+### Added
+
+- Central agent authentication (`inc/agent_auth.php`), used by 22 endpoints.
+- Optional HMAC-SHA256 signed agent requests with nonce replay protection and a
+  compatibility mode so installed agents are not disconnected.
+- Secret encryption at rest (XChaCha20-Poly1305) keyed from `OPNMGR_MASTER_KEY`.
+- Signed release manifests and a verifying agent installer with rollback.
+- Structured remote operation catalogue with validated parameters
+  (`api/queue_action.php`), alongside an explicitly privileged, audited raw shell path.
+- MSP staff roles (Administrator, Technician, Read Only) defined in one capability matrix.
+- Application audit log with central credential redaction.
+- Database migration runner (`scripts/migrate.php`), idempotent and checksummed.
+- Security regression suite (`tests/security_test.php`, 29 assertions) and GitHub Actions
+  CI covering lint, dependency audit, ShellCheck, the suite, and an upgrade-path job.
+- nginx hardening snippet and a CLI guard for maintenance scripts.
+
+### Changed
+
+- Backups are stored outside the document root with SHA-256 checksums and XML validation.
+- Agent credentials moved to `agent_api_key` / `agent_api_secret`; `api_key` and
+  `api_secret` return to meaning the OPNsense box's own REST API credentials.
+- Documentation describes OPNManager as self-hosted MSP software; customers are
+  organisational containers for grouping firewalls, not accounts.
 
 ---
 
@@ -267,4 +349,3 @@ _Released: September 16, 2025_
 
 
 ---
-

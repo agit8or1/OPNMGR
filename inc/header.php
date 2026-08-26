@@ -84,7 +84,15 @@ function isActive($page) {
         <i class="fas fa-chevron-down" style="font-size:0.6rem;color:var(--text-muted)"></i>
       </button>
       <ul class="dropdown-menu dropdown-menu-end">
+        <li class="dropdown-header small">
+          Signed in as <strong><?php echo htmlentities($_SESSION['username'] ?? '') ?></strong><br>
+          <span class="badge bg-<?php echo function_exists('role_badge_class') ? role_badge_class(current_role()) : 'secondary'; ?>">
+            <?php echo htmlspecialchars(function_exists('role_label') ? role_label(current_role()) : ''); ?>
+          </span>
+        </li>
+        <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item" href="/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
+        <li><a class="dropdown-item" href="/twofactor_setup.php"><i class="fas fa-shield-halved me-2"></i>Two-Factor Auth</a></li>
         <li><hr class="dropdown-divider"></li>
         <li><a class="dropdown-item" href="/logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
       </ul>
@@ -155,20 +163,38 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-mobile-alt"></i></span>
         <span class="sidebar-label">2FA Setup</span>
       </a>
+      <?php if (function_exists('can') && can('audit.view')): ?>
+      <a class="sidebar-item <?php echo isActive('audit_log.php') ?>" href="/audit_log.php">
+        <span class="sidebar-icon"><i class="fas fa-clipboard-list"></i></span>
+        <span class="sidebar-label">Audit Log</span>
+      </a>
+      <?php endif; ?>
       <a class="sidebar-item <?php echo isActive(['documentation.php','doc_viewer.php']) ?>" href="/documentation.php">
         <span class="sidebar-icon"><i class="fas fa-book"></i></span>
         <span class="sidebar-label">Documentation</span>
       </a>
     </div>
 
-    <?php if (isAdmin()): ?>
-    <!-- ADMIN section -->
+    <?php
+    // Each entry is gated on the capability it needs rather than on isAdmin(),
+    // so a technician sees the operational tools they can actually use and a
+    // read-only user is not shown links that would only 403.
+    $show_admin_section = function_exists('can') && (
+        can('user.manage') || can('settings.manage') || can('command.view')
+        || can('health.view') || can('system.maintenance')
+    );
+    ?>
+    <?php if ($show_admin_section): ?>
+    <!-- ADMIN / OPERATIONS section -->
     <div class="sidebar-section">
-      <div class="sidebar-section-label">Admin</div>
+      <div class="sidebar-section-label"><?php echo can('settings.manage') ? 'Admin' : 'Operations'; ?></div>
+      <?php if (can('user.manage')): ?>
       <a class="sidebar-item <?php echo isActive('users.php') ?>" href="/users.php">
         <span class="sidebar-icon"><i class="fas fa-users"></i></span>
         <span class="sidebar-label">Users</span>
       </a>
+      <?php endif; ?>
+      <?php if (can('settings.manage')): ?>
       <a class="sidebar-item <?php echo isActive(['settings.php','branding.php','smtp_settings.php','proxy_settings.php']) ?>" href="/settings.php">
         <span class="sidebar-icon"><i class="fas fa-sliders-h"></i></span>
         <span class="sidebar-label">Settings</span>
@@ -177,14 +203,20 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-list-alt"></i></span>
         <span class="sidebar-label">Logs</span>
       </a>
+      <?php endif; ?>
+      <?php if (can('command.view')): ?>
       <a class="sidebar-item <?php echo isActive('admin_queue.php') ?>" href="/admin_queue.php">
         <span class="sidebar-icon"><i class="fas fa-tasks"></i></span>
         <span class="sidebar-label">Queue</span>
       </a>
+      <?php endif; ?>
+      <?php if (can('health.view')): ?>
       <a class="sidebar-item <?php echo isActive('health_monitor.php') ?>" href="/health_monitor.php">
         <span class="sidebar-icon"><i class="fas fa-heartbeat"></i></span>
         <span class="sidebar-label">Health</span>
       </a>
+      <?php endif; ?>
+      <?php if (can('system.maintenance')): ?>
       <a class="sidebar-item <?php echo isActive(['system_update.php','updates.php']) ?>" href="/system_update.php">
         <span class="sidebar-icon"><i class="fas fa-sync-alt"></i></span>
         <span class="sidebar-label">Update</span>
@@ -193,6 +225,7 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-database"></i></span>
         <span class="sidebar-label">Backup</span>
       </a>
+      <?php endif; ?>
       <a class="sidebar-item <?php echo isActive('about.php') ?>" href="/about.php">
         <span class="sidebar-icon"><i class="fas fa-info-circle"></i></span>
         <span class="sidebar-label">About</span>

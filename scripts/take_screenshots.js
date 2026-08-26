@@ -40,12 +40,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 async function redact(page) {
     await page.evaluate(() => {
+        // The FQDN rule deliberately requires a real TLD suffix. A looser
+        // "word.word.word" pattern also matches dotted identifiers the UI shows
+        // legitimately - audit action names like "agent.auth.failed", capability
+        // names like "backup.restore" - and blanking those makes the captures
+        // useless.
+        const TLD = '(?:com|net|org|io|dev|co|uk|de|fr|nl|us|ca|au|info|biz|local|lan|internal|home|corp)';
         const patterns = [
-            /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,          // IPv4
-            /\b[0-9a-fA-F]{1,4}(:[0-9a-fA-F]{0,4}){2,7}\b/,     // IPv6
-            /\b[a-z0-9-]+\.[a-z0-9-]+\.[a-z]{2,}\b/i,           // FQDN
-            /\b[0-9a-f]{32}\b/i,                                // hardware ids
-            /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, // email
+            /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,               // IPv4
+            // 3+ groups, so a clock time like 17:59:47 is not mistaken for IPv6.
+            /\b(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b/,          // IPv6
+            new RegExp('\\b[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.' + TLD + '\\b', 'i'), // FQDN
+            /\b[0-9a-f]{32}\b/i,                                      // hardware ids
+            /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/,      // email
         ];
 
         const walk = (node) => {
@@ -78,12 +85,22 @@ async function redact(page) {
     });
 }
 
+/**
+ * Force a theme for the capture.
+ *
+ * The app's theme.js reads localStorage ('opnmgr-theme') on load and applies it,
+ * so setting the attribute alone is undone on the next navigation. Write the
+ * stored preference too, then reload so the page renders in that theme from the
+ * start rather than flipping after paint.
+ */
 async function setTheme(page, theme) {
     await page.evaluate((t) => {
+        try { localStorage.setItem('opnmgr-theme', t); } catch (e) { /* private mode */ }
         document.documentElement.setAttribute('data-theme', t);
         document.documentElement.setAttribute('data-bs-theme', t);
     }, theme);
-    await sleep(300);
+    await page.reload({ waitUntil: 'networkidle2' });
+    await sleep(400);
 }
 
 async function capture(page, name, label) {
@@ -113,6 +130,7 @@ async function capture(page, name, label) {
         await page.goto(`${URL}/login.php`, { waitUntil: 'domcontentloaded', timeout: 20000 });
         await setTheme(page, 'dark');
         await capture(page, '01-login.png', 'Login');
+        // setTheme reloads, so re-query the form fields below.
 
         await page.type('#username', USER);
         await page.type('#password', PASS);
@@ -129,7 +147,7 @@ async function capture(page, name, label) {
         const pages = [
             ['/dashboard.php',       '02-dashboard.png',    'Dashboard'],
             ['/firewalls.php',       '03-firewalls.png',    'Firewalls'],
-            ['/customers.php',       '04-customers.php.png','Customers'],
+            ['/customers.php',       '04-customers.png','Customers'],
             ['/alerts.php',          '05-alerts.png',       'Alerts'],
             ['/audit_log.php',       '06-audit-log.png',    'Audit log'],
             ['/users.php',           '07-users.png',        'Users and roles'],

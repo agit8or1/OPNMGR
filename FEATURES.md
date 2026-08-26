@@ -25,7 +25,7 @@ This document provides a comprehensive catalog of all features in OPNManager, or
   - Network interface status
 
 - **Firewall Organization**
-  - Multi-tenant customer grouping
+  - Customer and site grouping for managed firewalls (organisational only; customers do not log in)
   - Color-coded tag system
   - Quick search and filtering
   - Bulk operations support
@@ -600,7 +600,7 @@ ai_scan_findings:
 
 ## 📊 Feature Matrix
 
-| Feature | Status | Version | Multi-Tenant | API | Agent Required |
+| Feature | Status | Version | Customer-scoped | API | Agent Required |
 |---------|--------|---------|--------------|-----|----------------|
 | AI Configuration Scanning | ✅ Production | 2.2.0 | ✅ | ✅ | ✅ |
 | AI Log Analysis | ✅ Production | 2.2.0 | ✅ | ✅ | ✅ |

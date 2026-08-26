@@ -2,22 +2,41 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.11.8](https://img.shields.io/badge/version-3.11.8-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.4.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.12.0](https://img.shields.io/badge/version-3.12.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
 
-A comprehensive web-based management platform for centralized monitoring, configuration, and maintenance of OPNsense firewalls.
+Self-hosted centralized OPNsense management for MSPs and IT teams.
+
+OPNManager runs on your own server and manages the OPNsense firewalls belonging to the
+customers you support. Customers are organisational containers used to group firewalls
+and sites &mdash; they are not accounts and they do not log in. Your own staff sign in and
+work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.11 — Complete UI Redesign
+### New in v3.12 — Agent Authentication & Secret Encryption
 
-OPNManager v3.11 features a ground-up UI redesign inspired by Datadog and Grafana:
+v3.12.0 is a security release. See [SECURITY.md](SECURITY.md) for the full architecture.
 
-- **Collapsible icon sidebar** — slim 72px rail that expands on hover, pin to keep open
-- **Firewall health grid dashboard** — at-a-glance health cards for every firewall with status dots, health bars, uptime, and last checkin
-- **Dark + Light themes** — system-preference aware with manual toggle, consistent across all pages
-- **KPI metric strip** — compact pills showing total firewalls, online/offline counts, updates needed, and average health score
-- **Professional design system** — 1,600+ lines of CSS with custom properties, no more inline styles
-- **Security hardening** (v3.10) — 25+ endpoints secured with authentication, CSRF on 19+ forms, dependency updates
+- **Per-firewall agent credentials** — each firewall gets a 256-bit API key and an HMAC
+  signing secret, provisioned over the authenticated check-in and pinned on first use.
+  `hardware_id` alone (an md5 of the hostid or WAN MAC) is no longer a credential.
+- **Optional signed agent requests** — HMAC-SHA256 over method, path, timestamp, nonce and
+  body hash, with a replay store and constant-time comparison. Deployed in a
+  compatibility mode so an installed fleet upgrades without a flag day.
+- **Secrets encrypted at rest** — XChaCha20-Poly1305 for agent credentials, SSH private
+  keys, SMTP and AI credentials, and MFA recovery codes, keyed from `.env`.
+- **Verified agent updates** — Ed25519-signed release manifest plus SHA-256 per artifact,
+  atomic install and automatic rollback. Verification failure is always fatal.
+- **Structured remote operations** — a validated action catalogue replaces hand-built
+  shell for common tasks. Raw shell remains, as an explicitly privileged, audited path.
+- **MSP staff roles** — Administrator, Technician and Read Only, defined in one
+  capability matrix rather than role strings scattered through the code.
+- **Audit log** — who did what, to which firewall, from where, with credential material
+  stripped centrally.
+- **Database migrations** — `scripts/migrate.php`, idempotent and checksummed.
+
+Previous release, v3.11 — complete UI redesign: collapsible icon sidebar, firewall health
+grid dashboard, dark and light themes, KPI metric strip.
 
 ---
 
@@ -29,7 +48,7 @@ OPNManager v3.11 features a ground-up UI redesign inspired by Datadog and Grafan
 - **Plugin Agent**: Native OPNsense plugin with auto-update support
 - **Health Monitoring**: CPU, memory, disk, uptime, network status
 - **Tag System**: Organize firewalls with color-coded tags
-- **Customer Grouping**: Multi-tenant support with customer organization
+- **Customer & Site Grouping**: Organise managed firewalls by customer organisation and site. Customers do not log in.
 
 ### Network & Traffic Monitoring
 - **WAN Traffic Charts**: Real-time throughput graphs with auto-scaling (Mb/s / Gb/s)
@@ -72,48 +91,51 @@ OPNManager v3.11 features a ground-up UI redesign inspired by Datadog and Grafan
 
 ## Screenshots
 
-### Login
-Clean, minimal login with dark/light theme support.
+Captured from a live installation with `scripts/take_screenshots.js`. Hostnames, IP
+addresses and email addresses are redacted in the rendered page before capture.
 
+### Login
 ![Login](screenshots/01-login.png)
 
-### Dashboard — Firewall Health Grid
-At-a-glance monitoring with KPI strip, health cards per firewall, status chart, and network map.
+### Dashboard
+KPI strip, per-firewall health cards, status chart and network map.
 
 ![Dashboard](screenshots/02-dashboard.png)
 
-### Dashboard — Full View
-![Dashboard Full](screenshots/02b-dashboard-full.png)
-
-### Firewall Management
-Sortable, filterable firewall list with health scores and status indicators.
+### Firewalls
+Sortable, filterable fleet list with health scores and status indicators.
 
 ![Firewalls](screenshots/03-firewalls.png)
 
-### Firewall Details
-Detailed firewall view with charts, network info, and management tools.
+### Customers
+Customer organisations used to group managed firewalls. Customers do not log in.
 
-![Firewall Details](screenshots/04-firewall-details.png)
+![Customers](screenshots/04-customers.png)
+
+### Alerts
+![Alerts](screenshots/05-alerts.png)
+
+### Audit Log
+Who did what, to which firewall, from where — filterable by action, user, firewall,
+result and date range. Credential material is never recorded.
+
+![Audit Log](screenshots/06-audit-log.png)
+
+### Users and Roles
+MSP staff accounts with the Administrator / Technician / Read Only roles.
+
+![Users](screenshots/07-users.png)
 
 ### Settings
-System configuration with ACME, alerts, backup, branding, Fail2Ban, and GeoIP.
+![Settings](screenshots/08-settings.png)
 
-![Settings](screenshots/06-settings.png)
+### About
+![About](screenshots/09-about.png)
 
-### Users
-Admin user management with roles, password changes, and CSRF protection.
+### Light Theme
+Full light theme with system-preference detection and a manual toggle.
 
-![Users](screenshots/05-users.png)
-
-### Collapsed Sidebar
-Icon-only rail (72px) — hover or pin to expand.
-
-![Sidebar Collapsed](screenshots/07-sidebar-collapsed.png)
-
-### Light Mode
-Full light theme with system-preference detection and manual toggle.
-
-![Light Mode](screenshots/08-light-mode.png)
+![Light Theme](screenshots/10-dashboard-light.png)
 
 ---
 
