@@ -586,7 +586,7 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
                 'selfheal_url' => "https://{$server_name}/download_agent.php?selfheal=true&hostname={$hostname}&version={$current_agent_version}",
                 'download_url' => "https://{$server_name}/download_tunnel_agent.php?firewall_id={$firewall_id}",
                 'update_command' => 'fetch -o /tmp/selfheal_agent.sh ' . "\"https://{$server_name}/download_agent.php?selfheal=true&hostname={$hostname}&version={$current_agent_version}\"" . ' && chmod +x /tmp/selfheal_agent.sh && nohup /tmp/selfheal_agent.sh > /tmp/selfheal.log 2>&1 &',
-                'manual_reinstall_command' => 'fetch -o /tmp/reinstall_agent.sh ' . "https://{$server_name}/reinstall_agent.php?firewall_id={$firewall_id}" . ' && chmod +x /tmp/reinstall_agent.sh && /tmp/reinstall_agent.sh'
+                'manual_reinstall_command' => buildAgentReinstallCommand($server_name, $firewall_id)
             ];
         } else {
             // Normal update for other versions (v2.x standalone agents)
@@ -595,7 +595,7 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
                 'latest_version' => $latest_agent_version,
                 'download_url' => "https://{$server_name}/download_tunnel_agent.php?firewall_id={$firewall_id}",
                 'update_command' => 'fetch -o /tmp/update_agent.sh ' . "https://{$server_name}/download/update_agent.sh" . ' && chmod +x /tmp/update_agent.sh && nohup /tmp/update_agent.sh ' . "https://{$server_name}/download_tunnel_agent.php?firewall_id={$firewall_id}" . ' > /dev/null 2>&1 &',
-                'manual_reinstall_command' => 'fetch -o /tmp/reinstall_agent.sh ' . "https://{$server_name}/reinstall_agent.php?firewall_id={$firewall_id}" . ' && chmod +x /tmp/reinstall_agent.sh && /tmp/reinstall_agent.sh'
+                'manual_reinstall_command' => buildAgentReinstallCommand($server_name, $firewall_id)
             ];
         }
     }

@@ -14,6 +14,12 @@
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
+require_once __DIR__ . '/../inc/backup_storage.php';
+
+// Host agents should call back to, from the server_url setting / APP_URL rather
+// than a hostname compiled into this script.
+$reinstall_host = parse_url(opnmgr_server_url(), PHP_URL_HOST) ?: 'opn.agit8or.net';
 require_once __DIR__ . '/../inc/logging.php';
 
 // Configuration
@@ -101,7 +107,7 @@ function queue_emergency_reset($firewall_id) {
                      'ps aux | grep -i agent | grep -v grep | awk \'{print $2}\' | xargs kill -9 2>/dev/null; ' .
                      'rm -rf /tmp/*agent* /usr/local/bin/*agent* /usr/local/opnsense_agent 2>/dev/null; ' .
                      'sleep 5; ' .
-                     'fetch -q -T 30 -o /tmp/reinstall_agent.sh https://opn.agit8or.net/reinstall_agent.php?firewall_id=' . $firewall_id . ' && ' .
+                     buildAgentReinstallCommand($reinstall_host, (int)$firewall_id) . ' && ' .
                      'chmod +x /tmp/reinstall_agent.sh && ' .
                      'sh /tmp/reinstall_agent.sh > /tmp/agent_reinstall.log 2>&1 &';
 
@@ -157,7 +163,8 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
         $ssh_opts = "-i '$ssh_key_path' -o BatchMode=yes -o ConnectTimeout=$timeout -o StrictHostKeyChecking=no";
 
         // Download and execute reinstall script
-        $reset_script = "fetch -q -T 30 -o /tmp/reinstall_agent.sh 'https://opn.agit8or.net/reinstall_agent.php?firewall_id=$firewall_id' && chmod +x /tmp/reinstall_agent.sh && nohup sh /tmp/reinstall_agent.sh > /tmp/agent_reinstall.log 2>&1 &";
+        $reset_script = buildAgentReinstallCommand($reinstall_host, (int)$firewall_id)
+                      . ' > /tmp/agent_reinstall.log 2>&1 &';
 
         $ssh_command = "ssh $ssh_opts root@$target '$reset_script' 2>&1";
 

@@ -1,10 +1,23 @@
 <?php
 /**
- * Queue a custom command for a firewall to execute on next checkin
- * Requires admin authentication and valid CSRF token.
+ * Queue a RAW SHELL command for a firewall to execute on next check-in.
+ *
+ * This is the privileged "Advanced / Raw Command" path. Prefer
+ * api/queue_action.php, which exposes the structured operation catalogue with
+ * validated parameters; this endpoint exists because an MSP administrator
+ * genuinely needs an escape hatch, not as the normal way to do things.
+ *
+ * Requirements enforced here:
+ *   - administrator role (configurable via raw_command_admin_only)
+ *   - the capability can be switched off entirely (raw_command_enabled)
+ *   - valid CSRF token
+ *   - explicit confirmation flag from the caller
+ *   - the command, the user, the source IP, the target firewall and the
+ *     timestamp are all written to the audit log before the agent ever sees it
  */
 
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/agent_commands.php';
 
 header('Content-Type: application/json');
 
@@ -40,6 +53,23 @@ $input = json_decode($input_raw, true);
 $firewall_id = (int)($input['firewall_id'] ?? 0);
 $command = trim($input['command'] ?? '');
 $description = trim($input['description'] ?? '');
+$confirmed = !empty($input['confirm_raw']);
+
+// The capability can be disabled fleet-wide without disabling structured
+// operations. Checked after authentication so it cannot be probed anonymously.
+if (!raw_commands_enabled()) {
+    audit_log('command.raw', [
+        'success'     => false,
+        'firewall_id' => $firewall_id ?: null,
+        'message'     => 'Raw command rejected: the raw shell capability is disabled',
+    ]);
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Raw shell commands are disabled. Use the structured operations instead.',
+    ]);
+    exit;
+}
 
 if (!$firewall_id || !$command) {
     http_response_code(400);
@@ -47,45 +77,42 @@ if (!$firewall_id || !$command) {
     exit;
 }
 
+// Explicit acknowledgement that this is the advanced, unvalidated path. The UI
+// sets this from its confirmation dialog; a stray API call without it fails.
+if (!$confirmed) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Raw shell execution requires explicit confirmation (confirm_raw).',
+        'hint'    => 'Structured operations are available at api/queue_action.php and do not require this.',
+    ]);
+    exit;
+}
+
 try {
-    // Verify firewall exists
-    $stmt = db()->prepare('SELECT hostname FROM firewalls WHERE id = ?');
-    $stmt->execute([$firewall_id]);
-    $firewall = $stmt->fetch();
-    
-    if (!$firewall) {
+    // queue_firewall_command() verifies the firewall exists, records the acting
+    // user / source IP / timestamp against the row, and writes the audit entry
+    // including the command text.
+    $queued = queue_firewall_command(
+        $firewall_id,
+        $command,
+        $description !== '' ? $description : 'Raw shell command',
+        ['is_raw' => true, 'risk' => 'CRITICAL']
+    );
+
+    if (!$queued['ok']) {
         http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Firewall not found']);
+        echo json_encode(['success' => false, 'message' => $queued['error']]);
         exit;
     }
-    
-    // Create firewall_commands table if it doesn't exist
-    db()->exec("CREATE TABLE IF NOT EXISTS firewall_commands (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        firewall_id INT NOT NULL,
-        command TEXT NOT NULL,
-        description VARCHAR(255),
-        status ENUM('pending', 'sent', 'completed', 'failed') DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        sent_at TIMESTAMP NULL,
-        completed_at TIMESTAMP NULL,
-        result TEXT,
-        INDEX(firewall_id),
-        INDEX(status)
-    )");
-    
-    // Insert the command
-    $stmt = db()->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
-    $stmt->execute([$firewall_id, $command, $description]);
-    
-    $command_id = db()->lastInsertId();
-    
+
     echo json_encode([
-        'success' => true,
-        'message' => "Command queued for firewall {$firewall['hostname']}",
-        'command_id' => $command_id
+        'success'    => true,
+        'message'    => "Command queued for firewall {$queued['hostname']}",
+        'command_id' => $queued['command_id'],
+        'raw'        => true,
     ]);
-    
+
 } catch (Exception $e) {
     error_log("queue_command.php error: " . $e->getMessage());
     http_response_code(500);

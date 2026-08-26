@@ -1,13 +1,17 @@
 <?php
+/**
+ * Agent uninstall script.
+ *
+ * Piped into sh as root on the firewall, so it requires full agent
+ * authentication rather than just a firewall_id in the query string.
+ */
+require_once __DIR__ . '/inc/bootstrap_agent.php';
+require_once __DIR__ . '/inc/agent_auth.php';
+
+$firewall = authenticateAgentRequest($_GET);
+$firewall_id = (int)$firewall['id'];
+
 header('Content-Type: text/plain');
-
-// Check if firewall_id is provided
-$firewall_id = $_GET['firewall_id'] ?? null;
-
-if (!$firewall_id) {
-    echo "ERROR: Missing firewall_id parameter\n";
-    exit(1);
-}
 
 // Return uninstall script
 echo '#!/bin/sh

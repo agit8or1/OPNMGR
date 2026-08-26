@@ -1,13 +1,20 @@
 <?php
+/**
+ * Agent reinstall script.
+ *
+ * Served to a firewall which pipes it straight into sh as root, so it is
+ * authenticated exactly like any other agent request. Previously this endpoint
+ * took only firewall_id and required no credentials at all, meaning anyone who
+ * could reach the server could obtain (and, with a guessed id, target) a root
+ * agent-replacement script.
+ */
+require_once __DIR__ . '/inc/bootstrap_agent.php';
+require_once __DIR__ . '/inc/agent_auth.php';
+
+$firewall = authenticateAgentRequest($_GET);
+$firewall_id = (int)$firewall['id'];
+
 header('Content-Type: text/plain');
-
-// Check if firewall_id is provided
-$firewall_id = $_GET['firewall_id'] ?? null;
-
-if (!$firewall_id) {
-    echo "ERROR: Missing firewall_id parameter\n";
-    exit(1);
-}
 
 // Generate the agent script content
 $tunnel_agent_content = file_get_contents('/var/www/opnsense/download/tunnel_agent.sh');

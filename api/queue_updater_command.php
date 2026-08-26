@@ -29,9 +29,20 @@ $authenticated_firewall = authenticateAgentRequest(
 );
 $firewall_id = (int)$authenticated_firewall['id'];
 
-// Validate command type
-$valid_types = ['AGENT_UPDATE', 'SYSTEM_UPDATE', 'COMMAND'];
-if (!in_array($command_type, $valid_types)) {
+// Validate command type.
+//
+// 'COMMAND' (free-form shell) was removed from the agent-facing path: an agent
+// could previously queue arbitrary shell for itself, which turned any leaked
+// agent credential into a persistent command-injection foothold and bypassed
+// the operator audit trail entirely. Raw shell is queued by administrators
+// through api/queue_command.php, which records who asked for it.
+$valid_types = ['AGENT_UPDATE', 'SYSTEM_UPDATE'];
+if (!in_array($command_type, $valid_types, true)) {
+    audit_log_agent('command.queue.rejected', $firewall_id, [
+        'success'  => false,
+        'message'  => 'Agent attempted to queue a disallowed command type',
+        'metadata' => ['command_type' => substr((string)$command_type, 0, 32)],
+    ]);
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid command type']);
     exit;

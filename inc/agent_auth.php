@@ -497,3 +497,41 @@ if (!function_exists('agent_request_input')) {
         return [];
     }
 }
+
+if (!function_exists('buildAgentReinstallCommand')) {
+    /**
+     * Shell command that makes a firewall re-fetch and reinstall its agent.
+     *
+     * reinstall_agent.php and uninstall_agent.php serve scripts that the
+     * firewall pipes into sh as root, so they are authenticated like any other
+     * agent request. The credentials are read on the firewall from the agent's
+     * own files rather than being interpolated into the command, so the command
+     * text - which is stored in firewall_commands and shown in the UI - never
+     * contains a secret.
+     *
+     * @param string $serverHost Hostname the agent should call back to
+     * @param int    $firewallId
+     * @param string $action     'reinstall' or 'uninstall'
+     */
+    function buildAgentReinstallCommand(string $serverHost, int $firewallId, string $action = 'reinstall'): string {
+        $endpoint = $action === 'uninstall' ? 'uninstall_agent.php' : 'reinstall_agent.php';
+        $script   = $action === 'uninstall' ? '/tmp/uninstall_agent.sh' : '/tmp/reinstall_agent.sh';
+
+        // Host comes from SERVER_NAME or configuration, never from a request
+        // header, but strip anything that is not host-safe as a belt-and-braces
+        // guard against it ever being used to inject shell metacharacters.
+        $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', $serverHost);
+        $host = $host !== '' ? $host : 'opn.agit8or.net';
+
+        return sprintf(
+            'HW=$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null); '
+            . 'KEY=$(cat /usr/local/etc/opnmanager_api_key 2>/dev/null); '
+            . 'fetch -q -T 30 -o %s "https://%s/%s?firewall_id=%d&hardware_id=$HW&api_key=$KEY" '
+            . '|| curl -sS -k -o %s "https://%s/%s?firewall_id=%d&hardware_id=$HW&api_key=$KEY"; '
+            . 'chmod +x %s && sh %s',
+            $script, $host, $endpoint, $firewallId,
+            $script, $host, $endpoint, $firewallId,
+            $script, $script
+        );
+    }
+}
