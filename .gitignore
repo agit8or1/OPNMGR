@@ -198,3 +198,7 @@ scripts/capture_authenticated_screenshots.js
 scripts/node_modules/
 scripts/package.json
 scripts/package-lock.json
+
+# Deployment state, not source: written by the updater on each install.
+# system_update.php reads the real git checkout, not this file.
+COMMIT
