@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.11.5.
+-- Generated from the reference installation for OPNManager v3.12.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS `agent_commands` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `agent_request_nonces` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `nonce` varchar(128) NOT NULL,
+  `seen_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_firewall_nonce` (`firewall_id`,`nonce`),
+  KEY `idx_seen_at` (`seen_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Short-lived nonce store; rows older than the signature window are pruned';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `agent_updates` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `firewall_id` int(11) NOT NULL,
@@ -134,7 +146,7 @@ CREATE TABLE IF NOT EXISTS `ai_scan_reports` (
 CREATE TABLE IF NOT EXISTS `ai_settings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `provider` varchar(50) NOT NULL,
-  `api_key` varchar(255) NOT NULL,
+  `api_key` text NOT NULL,
   `model` varchar(100) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
@@ -246,6 +258,33 @@ CREATE TABLE IF NOT EXISTS `approved_commands` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `audit_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `occurred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `actor_type` enum('user','agent','system','anonymous') NOT NULL DEFAULT 'system',
+  `user_id` int(11) DEFAULT NULL,
+  `username` varchar(64) DEFAULT NULL COMMENT 'Denormalised so history survives user deletion',
+  `source_ip` varchar(45) DEFAULT NULL,
+  `action` varchar(64) NOT NULL COMMENT 'Stable machine-readable action key, e.g. command.raw',
+  `object_type` varchar(32) DEFAULT NULL COMMENT 'firewall, customer, site, user, setting, ...',
+  `object_id` varchar(64) DEFAULT NULL,
+  `firewall_id` int(11) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `success` tinyint(1) NOT NULL DEFAULT 1,
+  `message` varchar(512) DEFAULT NULL,
+  `metadata` text DEFAULT NULL COMMENT 'JSON. Never contains passwords, keys or MFA secrets',
+  PRIMARY KEY (`id`),
+  KEY `idx_occurred_at` (`occurred_at`),
+  KEY `idx_action` (`action`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_firewall` (`firewall_id`),
+  KEY `idx_customer` (`customer_id`),
+  KEY `idx_success` (`success`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `backups` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `firewall_id` int(11) DEFAULT NULL,
@@ -254,8 +293,15 @@ CREATE TABLE IF NOT EXISTS `backups` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `backup_type` enum('manual','automated') DEFAULT 'manual',
   `file_size` bigint(20) DEFAULT NULL,
+  `storage_path` varchar(512) DEFAULT NULL COMMENT 'Absolute path outside the document root; NULL means legacy /var/www/opnsense/backups',
+  `checksum_sha256` char(64) DEFAULT NULL,
+  `validated` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 when the stored file parsed as a usable OPNsense config',
+  `validation_error` varchar(255) DEFAULT NULL,
+  `uploaded_at` timestamp NULL DEFAULT NULL COMMENT 'When bytes actually arrived, as opposed to when the row was queued',
+  `source_filename` varchar(255) DEFAULT NULL COMMENT 'Agent-supplied name, kept as a label only; never used as a path',
   PRIMARY KEY (`id`),
-  KEY `firewall_id` (`firewall_id`),
+  KEY `idx_firewall_created` (`firewall_id`,`created_at`),
+  KEY `idx_uploaded_at` (`uploaded_at`),
   CONSTRAINT `backups_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -565,9 +611,19 @@ CREATE TABLE IF NOT EXISTS `firewall_commands` (
   `sent_at` timestamp NULL DEFAULT NULL,
   `completed_at` timestamp NULL DEFAULT NULL,
   `result` text DEFAULT NULL,
+  `action` varchar(64) DEFAULT NULL COMMENT 'Structured action id, e.g. service_restart; NULL for raw shell',
+  `parameters` text DEFAULT NULL COMMENT 'JSON parameters for the structured action, validated server-side',
+  `is_raw` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 = free-form shell (privileged); 0 = structured action',
+  `risk_level` enum('LOW','MEDIUM','HIGH','CRITICAL') NOT NULL DEFAULT 'MEDIUM',
+  `queued_by_user_id` int(11) DEFAULT NULL,
+  `queued_by_username` varchar(64) DEFAULT NULL COMMENT 'Denormalised so the audit trail survives user deletion',
+  `queued_from_ip` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `firewall_id` (`firewall_id`),
-  KEY `status` (`status`)
+  KEY `status` (`status`),
+  KEY `idx_action` (`action`),
+  KEY `idx_is_raw` (`is_raw`),
+  KEY `idx_queued_by` (`queued_by_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -739,12 +795,12 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `last_update_check` timestamp NULL DEFAULT NULL,
   `current_version` text DEFAULT NULL,
   `available_version` text DEFAULT NULL,
-  `api_key` varchar(128) DEFAULT NULL,
+  `api_key` text DEFAULT NULL,
   `ssh_private_key` text DEFAULT NULL,
   `ssh_public_key` text DEFAULT NULL,
   `ssh_tunnel_port` int(11) DEFAULT NULL,
   `web_port` int(11) DEFAULT 443,
-  `api_secret` varchar(128) DEFAULT NULL,
+  `api_secret` text DEFAULT NULL,
   `proxy_port` int(11) DEFAULT NULL,
   `proxy_enabled` tinyint(1) DEFAULT 0,
   `tunnel_active` tinyint(1) DEFAULT 0,
@@ -791,6 +847,18 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `wan_groups` varchar(255) DEFAULT NULL COMMENT 'Comma-separated list of WAN gateway groups',
   `wan_interface_stats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON array of WAN interface statistics' CHECK (json_valid(`wan_interface_stats`)),
   `speedtest_interval_hours` int(11) DEFAULT 4,
+  `api_key_issued_at` timestamp NULL DEFAULT NULL COMMENT 'When the server last provisioned an API key to this agent',
+  `api_key_confirmed` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 once the agent has successfully presented its API key; auth then fails closed',
+  `agent_signing_supported` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 once the agent has sent a valid HMAC-signed request',
+  `agent_last_signed_at` timestamp NULL DEFAULT NULL,
+  `agent_auth_failures` int(11) NOT NULL DEFAULT 0 COMMENT 'Consecutive failed agent authentication attempts; reset on success',
+  `agent_last_auth_failure_at` timestamp NULL DEFAULT NULL,
+  `agent_clock_skew_seconds` int(11) DEFAULT NULL COMMENT 'Last observed difference between agent and server clocks',
+  `last_backup_at` timestamp NULL DEFAULT NULL,
+  `last_backup_status` varchar(32) DEFAULT NULL,
+  `last_backup_error` varchar(255) DEFAULT NULL,
+  `agent_api_key` text DEFAULT NULL COMMENT 'OPNManager agent bearer credential (encrypted at rest)',
+  `agent_api_secret` text DEFAULT NULL COMMENT 'OPNManager agent HMAC signing secret (encrypted at rest)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -967,6 +1035,17 @@ CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `schema_migrations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `migration` varchar(255) NOT NULL,
+  `checksum` char(64) NOT NULL,
+  `applied_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_migration` (`migration`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `settings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(64) NOT NULL,
@@ -1011,10 +1090,14 @@ CREATE TABLE IF NOT EXISTS `ssh_access_sessions` (
   `status` enum('active','expired','closed') DEFAULT 'active',
   `proxy_path` varchar(255) DEFAULT NULL,
   `closed_reason` varchar(255) DEFAULT NULL,
+  `created_by_user_id` int(11) DEFAULT NULL COMMENT 'MSP user who opened the session; NULL for rows predating 3.12.0',
+  `created_by_username` varchar(64) DEFAULT NULL,
+  `access_token` varchar(64) DEFAULT NULL COMMENT 'Unguessable per-session token, required by tunnel_proxy.php',
   PRIMARY KEY (`id`),
   KEY `firewall_id` (`firewall_id`),
   KEY `idx_status` (`status`),
   KEY `idx_expires` (`expires_at`),
+  KEY `idx_created_by` (`created_by_user_id`),
   CONSTRAINT `ssh_access_sessions_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1153,7 +1236,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `twofa_secret` varchar(32) DEFAULT NULL,
   `role` enum('admin','user') DEFAULT 'user',
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `totp_secret` varchar(128) DEFAULT NULL,
+  `totp_secret` text DEFAULT NULL,
   `first_name` varchar(100) DEFAULT NULL,
   `last_name` varchar(100) DEFAULT NULL,
   `recovery_codes` text DEFAULT NULL,

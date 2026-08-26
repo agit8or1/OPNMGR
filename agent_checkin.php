@@ -180,7 +180,18 @@ try {
     
     // Preserve 'updating'/'update_pending' status during check-in - let the update
     // detection logic (below) handle the status transition properly
-    $checkin_status = in_array($firewall_status['status'], ['updating', 'update_pending']) ? $firewall_status['status'] : 'online';
+    // Read the current status before writing it back. $firewall_status is not
+    // populated until the update-check block much further down, so this line
+    // was reading an undefined variable and always falling through to 'online',
+    // clobbering an in-progress 'updating'/'update_pending' state on every
+    // check-in.
+    $status_stmt = db()->prepare('SELECT status FROM firewalls WHERE id = ?');
+    $status_stmt->execute([$firewall_id]);
+    $current_status = (string)($status_stmt->fetchColumn() ?: '');
+
+    $checkin_status = in_array($current_status, ['updating', 'update_pending'], true)
+        ? $current_status
+        : 'online';
 
     if ($agent_sent_reboot_status) {
         // Agent supports reboot detection - update the flag

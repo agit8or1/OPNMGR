@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'security/**', 'feature/**', 'chore/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  php-lint:
+    name: PHP syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, sodium, openssl, xml
+          coverage: none
+
+      - name: Lint every PHP file
+        run: |
+          # backups/ holds ~20k captured firewall configs and vendor/ is third
+          # party; neither is our source.
+          find . -name '*.php' \
+            -not -path './backups/*' \
+            -not -path './vendor/*' \
+            -not -path './node_modules/*' \
+            -not -path './.archive/*' \
+            -print0 | xargs -0 -n1 -P4 php -l
+
+  composer:
+    name: Composer validate and audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+      - name: Audit dependencies for known vulnerabilities
+        run: composer audit --no-interaction || true
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Check shell scripts and the agent
+        run: |
+          # SC2039/SC2166: these target FreeBSD /bin/sh on OPNsense.
+          find . -name '*.sh' \
+            -not -path './backups/*' \
+            -not -path './vendor/*' \
+            -not -path './node_modules/*' \
+            -print0 \
+          | xargs -0 -r shellcheck -s sh -S warning -e SC2039,SC2166 || true
+
+  security-tests:
+    name: Security regression tests
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root
+          MARIADB_DATABASE: opnsense_fw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, sodium, openssl, xml
+          coverage: none
+
+      - name: Configure environment
+        run: |
+          cat > .env <<EOF
+          DB_HOST=127.0.0.1
+          DB_NAME=opnsense_fw
+          DB_USER=root
+          DB_PASS=ci-root
+          APP_ENV=testing
+          EOF
+          php scripts/generate_master_key.php
+          php scripts/sign_release.php --generate-key
+
+      - name: Load schema (clean install path)
+        run: mysql -h 127.0.0.1 -u root -pci-root opnsense_fw < database/schema.sql
+
+      - name: Run migrations (must be a no-op on a fresh schema)
+        run: |
+          php scripts/migrate.php
+          php scripts/migrate.php --status
+
+      - name: Migrations are idempotent
+        run: |
+          php scripts/migrate.php
+          test "$(php scripts/migrate.php --status | grep -c PENDING)" = "0"
+
+      - name: Security regression suite
+        run: php tests/security_test.php
+
+      - name: Release manifest signs and verifies
+        run: |
+          php scripts/sign_release.php --publish
+          php scripts/sign_release.php --verify
+
+  upgrade-path:
+    name: Upgrade from the previous schema
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root
+          MARIADB_DATABASE: opnsense_fw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, sodium, openssl, xml
+          coverage: none
+
+      - name: Load the schema as it was before this branch
+        run: |
+          git show origin/main:database/schema.sql > /tmp/old-schema.sql 2>/dev/null \
+            || git show HEAD~1:database/schema.sql > /tmp/old-schema.sql
+          mysql -h 127.0.0.1 -u root -pci-root opnsense_fw < /tmp/old-schema.sql
+
+      - name: Configure environment
+        run: |
+          cat > .env <<EOF
+          DB_HOST=127.0.0.1
+          DB_NAME=opnsense_fw
+          DB_USER=root
+          DB_PASS=ci-root
+          EOF
+          php scripts/generate_master_key.php
+
+      - name: Migrate the old schema forward
+        run: php scripts/migrate.php
+
+      - name: Secret backfill is idempotent
+        run: |
+          php scripts/encrypt_secrets.php
+          php scripts/encrypt_secrets.php | grep -q '0 value(s) encrypted'
+
+      - name: Security suite passes after upgrade
+        run: php tests/security_test.php
