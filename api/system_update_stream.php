@@ -63,7 +63,13 @@ if ($rc === 0) {
 sendEvent('git_stash', 'Stashing local changes...', 'running');
 $output = [];
 exec($wrapper . ' git-stash 2>&1', $output, $rc);
-sendEvent('git_stash', 'Local changes stashed', 'done');
+if ($rc !== 0) {
+    // A stash failure means the pull would operate on an unexpected tree.
+    sendEvent('git_stash', 'Could not stash local changes: ' . implode(' ', $output), 'error');
+    sendEvent('done', 'Update aborted - the working tree could not be made clean', 'error');
+    exit;
+}
+sendEvent('git_stash', trim(implode(' ', $output)) ?: 'Local changes stashed', 'done');
 
 // Step 4: Git pull
 sendEvent('git_pull', 'Pulling latest code from GitHub...', 'running');
@@ -74,7 +80,7 @@ if ($rc !== 0) {
     sendEvent('done', 'Update failed', 'error');
     exit;
 }
-sendEvent('git_pull', 'Code pulled successfully', 'done');
+sendEvent('git_pull', trim(implode(' ', $output)) ?: 'Code pulled successfully', 'done');
 
 // Step 5: Sync to production
 sendEvent('sync', 'Syncing to production...', 'running');
@@ -86,7 +92,22 @@ if ($rc === 0) {
     sendEvent('sync', 'Sync warning: ' . implode(' ', $output), 'warn');
 }
 
-// Step 6: Post-update script
+// Step 6: Database migrations
+//
+// A pull can ship schema changes. Before 3.12.0 nothing applied them, so the
+// new code ran against the old schema until someone noticed.
+sendEvent('migrate', 'Applying database migrations...', 'running');
+$output = [];
+exec($wrapper . ' migrate 2>&1', $output, $rc);
+if ($rc === 0) {
+    sendEvent('migrate', trim(implode(' ', $output)) ?: 'Database is up to date', 'done');
+} else {
+    sendEvent('migrate', 'Migration failed: ' . implode(' ', $output), 'error');
+    sendEvent('done', 'Update failed during database migration. The database backup taken in step 1 can be restored.', 'error');
+    exit;
+}
+
+// Step 7: Post-update script
 if (file_exists($app_dir . '/scripts/post_update.sh')) {
     sendEvent('post_update', 'Running post-update script...', 'running');
     $output = [];
@@ -100,7 +121,7 @@ if (file_exists($app_dir . '/scripts/post_update.sh')) {
     sendEvent('post_update', 'No post-update script found (skipped)', 'done');
 }
 
-// Step 7: Update COMMIT file
+// Step 8: Update COMMIT file
 sendEvent('version', 'Updating version info...', 'running');
 $output = [];
 exec($wrapper . ' git-commit 2>&1', $output, $rc);

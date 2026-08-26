@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $first = trim($_POST['first_name'] ?? '');
     $last = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
-    $role = in_array($_POST['role'] ?? 'user', ['admin','user']) ? $_POST['role'] : 'user';
+    $role = sanitize_role($_POST['role'] ?? null);
     if ($username === '' || $password === '') { $msg = 'Username and password required'; }
     else {
       $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -35,7 +35,7 @@ include __DIR__ . '/inc/header.php';
   <div class="mb-3"><label class="form-label">Last name</label><input name="last_name" class="form-control"></div>
   <div class="mb-3"><label class="form-label">Email</label><input name="email" class="form-control"></div>
   <div class="mb-3"><label class="form-label">Role</label>
-    <select name="role" class="form-select"><option value="user">user</option><option value="admin">admin</option></select>
+    <select name="role" class="form-select"><?php echo render_role_options('technician'); ?></select>
   </div>
   <button class="btn btn-primary">Create</button>
   <a href="/users.php" class="btn btn-link ms-2">Cancel</a>

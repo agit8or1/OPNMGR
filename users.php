@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $firstName = trim($_POST['first_name']);
         $lastName = trim($_POST['last_name']);
         $email = trim($_POST['email']);
-        $role = $_POST['role'];
+        $role = sanitize_role($_POST['role'] ?? null);
         
         if (empty($username) || empty($password)) {
             $message = '<div class="alert alert-danger">Username and password are required.</div>';
@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lastName = trim($_POST['last_name']);
         $username = trim($_POST['username']);
         $email = trim($_POST['email']);
-        $role = $_POST['role'];
+        $role = sanitize_role($_POST['role'] ?? null);
         $password = $_POST['password'];
         
         if (empty($username)) {
@@ -147,8 +147,7 @@ $users = $stmt->fetchAll();
                             </div>
                             <div class="col-md-1">
                                 <select class="form-select" name="role" required>
-                                    <option value="user">User</option>
-                                    <option value="admin">Admin</option>
+                                    <?php echo render_role_options('technician'); ?>
                                 </select>
                             </div>
                             <div class="col-md-1">
@@ -180,7 +179,7 @@ $users = $stmt->fetchAll();
                                     <td><?php echo htmlspecialchars($user['username']); ?></td>
                                     <td><?php echo htmlspecialchars($user['email'] ?? ''); ?></td>
                                     <td>
-                                        <span class="badge bg-<?php echo $user['role'] === 'admin' ? 'primary' : 'secondary'; ?>">
+                                        <span class="badge bg-<?php echo role_badge_class($user['role']); ?>" title="<?php echo htmlspecialchars(role_description($user['role'])); ?>">
                                             <?php echo ucfirst($user['username'] === $_SESSION['username'] ? $user['role'] . ' (You)' : $user['role']); ?>
                                         </span>
                                     </td>
@@ -243,9 +242,13 @@ $users = $stmt->fetchAll();
                     <div class="mb-3">
                         <label for="editRole" class="form-label fw-bold">Role</label>
                         <select class="form-select" id="editRole" name="role" required>
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
+                            <?php echo render_role_options(); ?>
                         </select>
+                        <div class="form-text">
+                            <strong>Administrator</strong> &ndash; full access including users, settings, secrets, raw shell and restores.<br>
+                            <strong>Technician</strong> &ndash; fleet operations, diagnostics, backups and updates. No application administration.<br>
+                            <strong>Read Only</strong> &ndash; view dashboards, firewalls and reports. Cannot change anything.
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="editPassword" class="form-label fw-bold">New Password (leave blank to keep current)</label>

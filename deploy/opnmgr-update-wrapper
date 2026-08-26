@@ -1,0 +1,142 @@
+#!/bin/bash
+# OPNManager system update wrapper
+#
+# Called by www-data via sudo (see /etc/sudoers.d/opnmgr-update) to perform the
+# git and filesystem operations the web UI cannot do itself.
+#
+# 3.12.0 changes:
+#   * `status` reports branch and ahead/behind counts, so the UI can tell
+#     "behind main" (a real update) apart from "ahead of main" (local work).
+#     The old UI compared commit hashes for inequality and therefore claimed an
+#     update was available whenever the checkout was ahead.
+#   * `git-pull` fast-forwards only, refuses on a dirty or diverged tree, and
+#     never silently merges main into a feature branch.
+#   * `sync` no longer runs `chmod -R a+r` over the production directory, which
+#     made .env world-readable, and no longer chmods backups to 777.
+#   * `migrate` runs pending database migrations after a pull.
+
+set -uo pipefail
+
+GIT_DIR="/home/administrator/opnsense"
+PROD_DIR="/var/www/opnsense"
+BRANCH_DEFAULT="main"
+
+run_git() {
+    sudo -u administrator git -C "$GIT_DIR" "$@"
+}
+
+case "${1:-}" in
+    status)
+        # machine-readable: key=value per line
+        BRANCH=$(run_git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)
+        HEAD_SHA=$(run_git rev-parse --short HEAD 2>/dev/null || echo unknown)
+        run_git fetch --quiet origin 2>/dev/null || true
+
+        UPSTREAM=$(run_git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "origin/${BRANCH_DEFAULT}")
+        UP_SHA=$(run_git rev-parse --short "$UPSTREAM" 2>/dev/null || echo unknown)
+
+        COUNTS=$(run_git rev-list --left-right --count "HEAD...${UPSTREAM}" 2>/dev/null || echo "0	0")
+        AHEAD=$(echo "$COUNTS" | awk '{print $1}')
+        BEHIND=$(echo "$COUNTS" | awk '{print $2}')
+
+        DIRTY=$(run_git status --porcelain 2>/dev/null | wc -l)
+
+        echo "branch=${BRANCH}"
+        echo "head=${HEAD_SHA}"
+        echo "upstream=${UPSTREAM}"
+        echo "upstream_head=${UP_SHA}"
+        echo "ahead=${AHEAD:-0}"
+        echo "behind=${BEHIND:-0}"
+        echo "dirty=${DIRTY:-0}"
+        ;;
+
+    git-pull)
+        cd "$GIT_DIR" || exit 1
+        BRANCH=$(run_git rev-parse --abbrev-ref HEAD)
+        UPSTREAM=$(run_git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "origin/${BRANCH}")
+
+        run_git fetch origin || { echo "fetch failed"; exit 1; }
+
+        COUNTS=$(run_git rev-list --left-right --count "HEAD...${UPSTREAM}" 2>/dev/null || echo "0	0")
+        AHEAD=$(echo "$COUNTS" | awk '{print $1}')
+        BEHIND=$(echo "$COUNTS" | awk '{print $2}')
+
+        if [ "${BEHIND:-0}" = "0" ]; then
+            echo "Already up to date with ${UPSTREAM} (ahead ${AHEAD:-0})."
+            exit 0
+        fi
+
+        if [ "${AHEAD:-0}" != "0" ]; then
+            echo "Refusing to pull: local branch ${BRANCH} is ${AHEAD} commit(s) ahead of ${UPSTREAM}."
+            echo "Push or merge those commits first; an automatic merge here could lose work."
+            exit 1
+        fi
+
+        # Fast-forward only. A non-fast-forward means the histories diverged and
+        # a human needs to look at it.
+        run_git merge --ff-only "$UPSTREAM" 2>&1
+        ;;
+
+    git-stash)
+        cd "$GIT_DIR" || exit 1
+        if [ -z "$(run_git status --porcelain)" ]; then
+            echo "Working tree clean, nothing to stash."
+            exit 0
+        fi
+        run_git stash push -u -m "opnmgr-auto-$(date +%Y%m%d-%H%M%S)" 2>&1
+        ;;
+
+    git-commit)
+        run_git rev-parse --short HEAD 2>&1
+        ;;
+
+    migrate)
+        # Schema changes shipped with a pull must be applied before the new code
+        # serves traffic.
+        cd "$PROD_DIR" || exit 1
+        sudo -u www-data /usr/bin/php "$PROD_DIR/scripts/migrate.php" 2>&1
+        ;;
+
+    sync)
+        rsync -a --delete \
+            --exclude=".git" --exclude="backups" --exclude=".env" \
+            --exclude="keys" --exclude="COMMIT" --exclude="logs" \
+            --exclude="node_modules" \
+            "$GIT_DIR/" "$PROD_DIR/" 2>&1
+
+        chown -R administrator:administrator "$PROD_DIR" 2>/dev/null
+
+        # Readable by the web server, not by everyone. The previous
+        # `chmod -R a+r` made .env world-readable.
+        find "$PROD_DIR" -type d -exec chmod 755 {} + 2>/dev/null
+        find "$PROD_DIR" -type f -exec chmod 644 {} + 2>/dev/null
+
+        # Secrets stay owner+group only.
+        if [ -f "$PROD_DIR/.env" ]; then
+            chown administrator:www-data "$PROD_DIR/.env"
+            chmod 640 "$PROD_DIR/.env"
+        fi
+        if [ -d "$PROD_DIR/keys" ]; then
+            chown -R www-data:www-data "$PROD_DIR/keys"
+            chmod 700 "$PROD_DIR/keys"
+            find "$PROD_DIR/keys" -type f -exec chmod 600 {} + 2>/dev/null
+        fi
+
+        # COMMIT is written by the updater running as www-data.
+        touch "$PROD_DIR/COMMIT"
+        chown www-data:www-data "$PROD_DIR/COMMIT"
+        chmod 644 "$PROD_DIR/COMMIT"
+
+        # Legacy backups directory: readable by the web server only, and never
+        # world-writable (it used to be chmod 777 inside the document root).
+        if [ -d "$PROD_DIR/backups" ]; then
+            chown -R www-data:www-data "$PROD_DIR/backups"
+            chmod 750 "$PROD_DIR/backups"
+        fi
+        ;;
+
+    *)
+        echo "Usage: opnmgr-update-wrapper {status|git-pull|git-stash|git-commit|migrate|sync}"
+        exit 1
+        ;;
+esac

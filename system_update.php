@@ -15,9 +15,48 @@ $commit_log = [];
 $local_commit = 'unknown';
 
 // GitHub configuration
-$github_repo = env('GITHUB_REPO', 'OPNMGR');
+$github_repo = env('GITHUB_REPO', 'OPNMGR'); // case-sensitive: github.com/agit8or1/OPNMGR
 $github_username = env('GITHUB_USERNAME', 'agit8or1');
 // REMOVED: GITHUB_PAT - No longer needed for public repo checks
+
+/**
+ * Read the real state of the git checkout via the privileged wrapper.
+ *
+ * www-data cannot read /home/administrator/opnsense directly, so this goes
+ * through /usr/local/sbin/opnmgr-update-wrapper, which prints key=value lines.
+ *
+ * @return array{ok:bool, branch:string, head:string, upstream:string,
+ *               upstream_head:string, ahead:int, behind:int, dirty:int}
+ */
+function opnmgr_git_status(): array {
+    $result = [
+        'ok' => false, 'branch' => '', 'head' => '', 'upstream' => 'origin/main',
+        'upstream_head' => '', 'ahead' => 0, 'behind' => 0, 'dirty' => 0,
+    ];
+
+    $output = [];
+    $rc = 1;
+    exec('sudo /usr/local/sbin/opnmgr-update-wrapper status 2>/dev/null', $output, $rc);
+
+    if ($rc !== 0 || empty($output)) {
+        return $result;
+    }
+
+    foreach ($output as $line) {
+        if (!str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if (array_key_exists($key, $result)) {
+            $result[$key] = in_array($key, ['ahead', 'behind', 'dirty'], true) ? (int)$value : $value;
+        }
+    }
+
+    $result['ok'] = $result['head'] !== '' && $result['head'] !== 'unknown';
+    return $result;
+}
 
 // Auto-check for updates on page load (not on POST requests)
 $should_check_updates = ($_SERVER['REQUEST_METHOD'] !== 'POST');
@@ -44,28 +83,50 @@ if (isset($_POST['check_updates']) || $should_check_updates) {
         $commit_data = json_decode($response, true);
         $latest_commit = substr($commit_data['sha'], 0, 7);
 
-        // Get local commit from COMMIT file (www-data can't access the git repo directly)
-        $commit_file = __DIR__ . '/COMMIT';
-        if (file_exists($commit_file)) {
-            $local_commit = trim(file_get_contents($commit_file));
+        // Ask git what the checkout actually is, rather than comparing the
+        // COMMIT file against GitHub for inequality.
+        //
+        // The old logic said "update available" whenever the two hashes
+        // differed, which is also true when the checkout is AHEAD of the
+        // remote (working on a branch, or carrying unpushed commits). It also
+        // trusted the COMMIT file, which is written by hand and drifts.
+        $git = opnmgr_git_status();
+        $local_commit = $git['head'] !== '' ? $git['head'] : 'unknown';
+
+        if (!$git['ok']) {
+            $message = 'Unable to read the git checkout. '
+                     . 'Check that /usr/local/sbin/opnmgr-update-wrapper is installed and in sudoers.';
+            $message_type = 'warning';
+        } elseif ($git['behind'] > 0 && $git['ahead'] > 0) {
+            // Diverged: pulling would merge, which this tool will not do
+            // unattended.
+            $message = sprintf(
+                'Branch %s has diverged from %s (%d ahead, %d behind). Resolve this manually with git.',
+                $git['branch'], $git['upstream'], $git['ahead'], $git['behind']
+            );
+            $message_type = 'danger';
+        } elseif ($git['behind'] > 0) {
+            $update_available = true;
+            $message = sprintf(
+                'Update available: %d commit%s behind %s. Current %s, latest %s.',
+                $git['behind'], $git['behind'] === 1 ? '' : 's',
+                $git['upstream'], $git['head'], $git['upstream_head']
+            );
+            $message_type = 'warning';
+        } elseif ($git['ahead'] > 0) {
+            $message = sprintf(
+                'No update available. Branch %s is %d commit%s ahead of %s - this checkout has local work that has not been pushed.',
+                $git['branch'], $git['ahead'], $git['ahead'] === 1 ? '' : 's', $git['upstream']
+            );
+            $message_type = 'info';
         } else {
-            // Fallback: try git directly in case we have access
-            $local_commit_output = [];
-            $return_code = 1;
-            exec('git -C /home/administrator/opnsense rev-parse --short HEAD 2>/dev/null', $local_commit_output, $return_code);
-            $local_commit = ($return_code === 0 && !empty($local_commit_output)) ? trim($local_commit_output[0]) : 'unknown';
+            $message = sprintf('Up to date with %s (%s).', $git['upstream'], $git['head']);
+            $message_type = 'success';
         }
 
-        if ($local_commit !== 'unknown' && $local_commit !== $latest_commit) {
-            $update_available = true;
-            $message = "Update available! Current: {$local_commit}, Latest: {$latest_commit}";
-            $message_type = 'warning';
-        } elseif ($local_commit !== 'unknown') {
-            $message = "You're running the latest version ({$local_commit})";
-            $message_type = 'success';
-        } else {
-            $message = "Unable to determine current version. Git repository may not be initialized.";
-            $message_type = 'warning';
+        if ($git['ok'] && $git['dirty'] > 0) {
+            $message .= sprintf(' %d uncommitted change%s in the working tree will be stashed.',
+                $git['dirty'], $git['dirty'] === 1 ? '' : 's');
         }
 
         // Get recent commits
@@ -353,6 +414,11 @@ include __DIR__ . '/inc/header.php';
                     <div class="progress-step" id="step-sync">
                         <i class="fas fa-circle text-muted me-2 step-icon"></i>
                         <span class="step-label">Sync to production</span>
+                        <span class="step-status ms-2"></span>
+                    </div>
+                    <div class="progress-step" id="step-migrate">
+                        <i class="fas fa-circle text-muted me-2 step-icon"></i>
+                        <span class="step-label">Apply database migrations</span>
                         <span class="step-status ms-2"></span>
                     </div>
                     <div class="progress-step" id="step-post_update">

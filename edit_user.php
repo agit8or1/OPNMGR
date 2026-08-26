@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $first_name = trim($_POST['first_name'] ?? '');
     $last_name = trim($_POST['last_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
-    $role = in_array($_POST['role'] ?? 'user', ['admin','user']) ? $_POST['role'] : 'user';
+    $role = sanitize_role($_POST['role'] ?? null);
     $alert_levels = $_POST['alert_levels'] ?? [];
     $alert_levels_value = !empty($alert_levels) ? implode(',', $alert_levels) : 'warning,critical';
     $stmt = db()->prepare('UPDATE users SET first_name = :fn, last_name = :ln, email = :em, role = :r, alert_levels = :al WHERE id = :id');
@@ -76,7 +76,7 @@ include __DIR__ . '/inc/header.php';
     </div>
     
     <div class="mb-3"><label class="form-label">Role</label>
-      <select name="role" class="form-select"><option value="user" <?php echo $user['role']=='user'?'selected':''; ?>>user</option><option value="admin" <?php echo $user['role']=='admin'?'selected':''; ?>>admin</option></select>
+      <select name="role" class="form-select"><?php echo render_role_options($user['role']); ?></select>
     </div>
     <button class="btn btn-primary">Save</button>
     <a href="/users.php" class="btn btn-link ms-2">Cancel</a>
