@@ -10,10 +10,22 @@
 // Force opcache to reload this file
 clearstatcache(true, __FILE__);
 
-require_once __DIR__ . '/inc/bootstrap_agent.php';
+// bootstrap.php rather than bootstrap_agent.php: this proxy is driven by a
+// signed-in operator's browser, so it needs the session and auth helpers.
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/logging.php';
-// DO NOT include auth.php - it starts sessions which interferes with OPNManager sessions
-// Tunnel proxy uses session ID in URL for auth, not PHP sessions
+
+// Access control.
+//
+// This endpoint previously authenticated callers with nothing but
+// ssh_access_sessions.id, described here as "unguessable". That id is a plain
+// AUTO_INCREMENT integer, so while any session was active an anonymous caller
+// could enumerate it and reach a managed firewall's web UI through the tunnel.
+//
+// A caller must now be a signed-in MSP user, and either own the session or be
+// an administrator. A per-session access_token is accepted as an alternative
+// for callers that genuinely cannot carry a login.
+requireLogin();
 
 // Get session ID from URL first
 $session_id = (int)($_GET['session'] ?? 0);
@@ -29,12 +41,6 @@ if (!$session_id) {
 $path = $_GET['path'] ?? '';
 $is_static = preg_match('/\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i', $path);
 
-// NOTE: We don't require OPNManager login here because:
-// 1. The session ID itself provides security (unguessable, time-limited)
-// 2. Users need to be logged into OPNManager to CREATE the tunnel
-// 3. But once created, the tunnel should work even if OPNManager session expires
-// 4. This allows the firewall's own auth system to handle access control
-
 // Get session from database (include API credentials for authentication)
 $stmt = db()->prepare("
     SELECT s.*, f.hostname as firewall_hostname, f.web_port, f.api_key, f.api_secret
@@ -48,6 +54,29 @@ $session = $stmt->fetch();
 if (!$session) {
     http_response_code(404);
     die('Session not found');
+}
+
+// Ownership check. Sessions created before 3.12.0 have no recorded owner; those
+// stay reachable by any signed-in user so existing tunnels are not orphaned.
+$supplied_token = (string)($_GET['token'] ?? '');
+$session_owner  = $session['created_by_user_id'] ?? null;
+$token_ok       = !empty($session['access_token'])
+                  && $supplied_token !== ''
+                  && hash_equals((string)$session['access_token'], $supplied_token);
+
+if (!$token_ok
+    && $session_owner !== null
+    && (int)$session_owner !== (int)($_SESSION['user_id'] ?? 0)
+    && !isAdmin()) {
+    audit_log('tunnel.proxy.denied', [
+        'success'     => false,
+        'object_type' => 'ssh_session',
+        'object_id'   => (string)$session_id,
+        'firewall_id' => (int)$session['firewall_id'],
+        'message'     => 'User attempted to use a tunnel session opened by another user',
+    ]);
+    http_response_code(403);
+    die('This tunnel session belongs to another user');
 }
 
 // Check if session is still active

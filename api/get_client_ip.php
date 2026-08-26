@@ -8,16 +8,19 @@
 header('Content-Type: text/plain');
 
 // Get the real client IP (accounting for proxies)
-$ip = '';
+// Firewalls call this during enrollment to learn their own WAN address, so it
+// must report what we actually see. Client-Ip and X-Forwarded-For are set by
+// the caller, and were previously preferred over REMOTE_ADDR - meaning the
+// answer could be anything the caller wanted. X-Forwarded-For is now honoured
+// only when the immediate peer is the local reverse proxy.
+$ip     = $_SERVER['REMOTE_ADDR'] ?? '';
+$isLocal = in_array($ip, ['127.0.0.1', '::1'], true);
 
-if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-    $ip = $_SERVER['HTTP_CLIENT_IP'];
-} elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-    // Handle multiple IPs in X-Forwarded-For
-    $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-    $ip = trim($ips[0]);
-} elseif (!empty($_SERVER['REMOTE_ADDR'])) {
-    $ip = $_SERVER['REMOTE_ADDR'];
+if ($isLocal && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    $first = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+    if (filter_var($first, FILTER_VALIDATE_IP)) {
+        $ip = $first;
+    }
 }
 
-echo trim($ip);
+echo filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';

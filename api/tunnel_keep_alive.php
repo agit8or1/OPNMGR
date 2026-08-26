@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
 
+require_once __DIR__ . '/../inc/agent_auth.php';
 header('Content-Type: application/json');
 
 // Accept both GET and POST methods
@@ -25,28 +26,12 @@ if (!$input) {
     $input = [];
 }
 
-// Get firewall ID from input or try to identify by IP
-$firewall_id = (int)($input['firewall_id'] ?? 0);
-$client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-
-// If no firewall_id provided, try to find it by WAN IP
-if (!$firewall_id && $client_ip !== 'unknown') {
-    $stmt = db()->prepare('SELECT id FROM firewalls WHERE wan_ip = ?');
-    $stmt->execute([$client_ip]);
-    $firewall = $stmt->fetch();
-    if ($firewall) {
-        $firewall_id = $firewall['id'];
-    }
-}
+// Agent-authenticated. This endpoint previously identified the caller purely by
+// source IP, which any host sharing or spoofing that address could satisfy.
+$authenticated_firewall = authenticateAgentRequest(is_array($input) ? $input : []);
+$firewall_id = (int)$authenticated_firewall['id'];
 
 $action = trim($input['action'] ?? 'keep_alive');
-
-// Validate inputs
-if (!$firewall_id) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => "Missing firewall_id and couldn't identify by IP: $client_ip"]);
-    exit;
-}
 
 try {
     // Verify firewall exists and is tunnel-enabled

@@ -16,6 +16,7 @@
  * }
  */
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
 header('Content-Type: application/json');
 
@@ -35,9 +36,14 @@ try {
         exit;
     }
     
-    $firewall_id = (int)($input['firewall_id'] ?? 0);
-    $agent_token = $input['agent_token'] ?? '';
     $ping_results = $input['ping_results'] ?? [];
+
+// Agent-authenticated: identity, hardware_id pinning, API key and HMAC
+// signature are all verified by inc/agent_auth.php. The agent_token field this
+// endpoint used to read was never actually checked against anything.
+$authenticated_firewall = authenticateAgentRequest($input);
+$firewall_id = (int)$authenticated_firewall['id'];
+
     
     if (!$firewall_id) {
         http_response_code(400);

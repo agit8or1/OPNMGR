@@ -4,10 +4,39 @@
  * Queues requests for firewall and waits for responses
  */
 
-require_once __DIR__ . '/inc/bootstrap_agent.php';
+// bootstrap.php (not bootstrap_agent.php): this endpoint is driven by a signed-in
+// operator, not by an agent, so it needs the session and auth helpers.
+require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/logging.php';
 
-$firewall_id = (int)($_GET['fw_id'] ?? 21); // Default to firewall 21
+// This queues arbitrary HTTP requests into a managed firewall's own web UI over
+// the tunnel. It had no authentication at all, and defaulted to a hardcoded
+// firewall id when none was supplied.
+requireLogin();
+
+$firewall_id = (int)($_GET['fw_id'] ?? 0);
+if ($firewall_id <= 0) {
+    http_response_code(400);
+    echo 'Missing fw_id';
+    exit;
+}
+
+// Confirm the target exists before anything is queued against it.
+$fw_stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+$fw_stmt->execute([$firewall_id]);
+$fw_row = $fw_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$fw_row) {
+    http_response_code(404);
+    echo 'Firewall not found';
+    exit;
+}
+
+audit_log('proxy.request', [
+    'object_type' => 'firewall',
+    'object_id'   => (string)$firewall_id,
+    'firewall_id' => $firewall_id,
+    'message'     => 'Proxied request into firewall web UI: ' . ($_SERVER['REQUEST_METHOD'] ?? 'GET'),
+]);
 $path = $_SERVER['REQUEST_URI'] ?? '/';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 

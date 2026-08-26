@@ -15,6 +15,14 @@ if (!isset($_SESSION['user_id'])) {
 
 $session_id = $_GET['session_id'] ?? '';
 
+// The session id is interpolated into a filesystem path below, so it is
+// restricted to an opaque token rather than being trusted verbatim.
+if ($session_id !== '' && !preg_match('/^[A-Za-z0-9_-]{1,64}$/', $session_id)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid session ID']);
+    exit;
+}
+
 if (empty($session_id)) {
     echo json_encode(['success' => false, 'error' => 'Invalid session ID']);
     exit;

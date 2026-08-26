@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../inc/bootstrap.php';
+requireLogin();
 /**
  * OPNsense Manager - Development Todo List
  * Track features, bugs, and improvements

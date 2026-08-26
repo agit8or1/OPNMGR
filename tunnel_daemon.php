@@ -5,6 +5,9 @@
  * Monitors database for tunnel requests and establishes SSH reverse tunnels
  */
 
+require_once __DIR__ . '/inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
+
 require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 // Configuration

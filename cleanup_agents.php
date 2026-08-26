@@ -9,6 +9,9 @@
  * Usage: php cleanup_agents.php [firewall_id]
  */
 
+require_once __DIR__ . '/inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
+
 require_once __DIR__ . '/inc/bootstrap_agent.php';
 
 $firewall_id = $argv[1] ?? null;

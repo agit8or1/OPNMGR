@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../inc/bootstrap.php';
+requireLogin();
 /**
  * OPNsense Manager - Variable Documentation & Architecture Guide
  * This page documents all key variables and data structures to prevent bugs

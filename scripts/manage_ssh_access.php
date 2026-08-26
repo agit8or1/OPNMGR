@@ -234,12 +234,22 @@ function request_ssh_access($firewall_id, $duration_minutes = SSH_ACCESS_DURATIO
     
     // Create session record
     $expires_at = date('Y-m-d H:i:s', strtotime("+{$duration_minutes} minutes"));
+    // Record the operator who opened this session and mint a bearer token, so
+    // tunnel_proxy.php can authorise access instead of trusting the row id.
+    $access_token = bin2hex(random_bytes(24));
+
     $stmt = db()->prepare("
         INSERT INTO ssh_access_sessions 
-        (firewall_id, source_ip, tunnel_port, rule_label, expires_at, status) 
-        VALUES (?, ?, ?, ?, ?, 'active')
+        (firewall_id, source_ip, tunnel_port, rule_label, expires_at, status,
+         created_by_user_id, created_by_username, access_token) 
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)
     ");
-    $stmt->execute([$firewall_id, $source_ip, $tunnel_port, null, $expires_at]);
+    $stmt->execute([
+        $firewall_id, $source_ip, $tunnel_port, null, $expires_at,
+        $_SESSION['user_id']  ?? null,
+        $_SESSION['username'] ?? null,
+        $access_token,
+    ]);
     $session_id = db()->lastInsertId();
     
     // Log the tunnel creation

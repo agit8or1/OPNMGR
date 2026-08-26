@@ -43,6 +43,7 @@ const LEGACY_ENDPOINTS = [
     'fix_agent_version.php'      => 'hardcoded auth key "fix_agent_version_2025"',
     'emergency_agent_update.php' => 'superseded by the authenticated agent update endpoint',
     'agent_checkin_debug.php'    => 'debug endpoint',
+    'selfheal_trigger.php'       => 'unauthenticated; interpolated a request parameter into a root-executed script (newline injection), referenced nowhere, targeted an agent version that no longer ships',
 ];
 
 $dryRun = in_array('--dry-run', $argv, true);

@@ -1,17 +1,46 @@
 <?php
+/**
+ * Firewall status summary.
+ *
+ * Was unauthenticated and hardcoded to a single hostname, exposing that
+ * firewall's recent command history and results to anyone who asked.
+ */
+require_once __DIR__ . '/inc/bootstrap.php';
+
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/inc/bootstrap_agent.php';
+requireLogin();
+
+// Target firewall comes from the request; there is no default.
+$requested_id       = (int)($_GET['firewall_id'] ?? 0);
+$requested_hostname = trim($_GET['hostname'] ?? '');
+
+if ($requested_id <= 0 && $requested_hostname === '') {
+    http_response_code(400);
+    echo json_encode(['error' => 'Provide firewall_id or hostname']);
+    exit;
+}
 
 try {
     // Get firewall agent status
-    $stmt = db()->prepare('SELECT id, hostname, last_checkin, agent_version, status FROM firewalls WHERE hostname = ?');
-    $stmt->execute(['home.agit8or.net']);
+    if ($requested_id > 0) {
+        $stmt = db()->prepare('SELECT id, hostname, last_checkin, agent_version, status FROM firewalls WHERE id = ?');
+        $stmt->execute([$requested_id]);
+    } else {
+        $stmt = db()->prepare('SELECT id, hostname, last_checkin, agent_version, status FROM firewalls WHERE hostname = ?');
+        $stmt->execute([$requested_hostname]);
+    }
     $agent_status = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$agent_status) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Firewall not found']);
+        exit;
+    }
     
     // Get updater status
-    $stmt = db()->prepare('SELECT u.*, f.hostname FROM firewall_updaters u JOIN firewalls f ON u.firewall_id = f.id WHERE f.hostname = ?');
-    $stmt->execute(['home.agit8or.net']);
+    $stmt = db()->prepare('SELECT u.*, f.hostname FROM firewall_updaters u JOIN firewalls f ON u.firewall_id = f.id WHERE f.id = ?');
+    $stmt->execute([$agent_status['id']]);
     $updater_status = $stmt->fetch(PDO::FETCH_ASSOC);
     
     // Get recent commands
