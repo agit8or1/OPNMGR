@@ -12,10 +12,10 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'MSP Roles, Customers & Fleet Search'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Config Drift & Firewall Health'); }
 
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 if (!defined('DATABASE_VERSION')) { define('DATABASE_VERSION', '1.4.0'); }
@@ -30,6 +30,22 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.14.0',
+            'date' => '2026-08-26',
+            'type' => 'minor',
+            'title' => 'Configuration Drift and Firewall Health',
+            'changes' => [
+                'ADDED: Configuration drift detection built on the existing backups. Compares a canonical form of the config, so serialisation noise and the <revision> block OPNsense stamps on every save are not reported as changes',
+                'ADDED: Baselines, section-level drift attribution, readable diffs, acknowledgement and promote-to-baseline. Drift is never acted on automatically',
+                'ADDED: OPNsense health telemetry - gateways (status, latency, loss, default, transition history), VPN tunnels (WireGuard/OpenVPN/IPsec with handshake and byte counters), CARP/HA state, services and certificate expiry',
+                'ADDED: Certificate expiry warnings at configurable 30/14/7 day thresholds, and gateway flapping detection',
+                'ADDED: Agent 1.6.0 health collector (health_collect.py). Certificate metadata only; private key material is never read',
+                'FIXED: Gateway latency and loss reported with units ("12.4 ms", "0.0 %") were stored as NULL',
+                'FIXED: The drift differ compared a single repeated element against a list of them field by field, so adding one firewall rule looked like every field of the first rule had been edited',
+                'FIXED: Drift could not find a current configuration on installations with long runs of backup rows whose upload never arrived',
+            ]
+        ],
         [
             'version' => '3.13.0',
             'date' => '2026-08-26',

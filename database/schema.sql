@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.12.0.
+-- Generated from the reference installation for OPNManager v3.13.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -410,6 +410,47 @@ CREATE TABLE IF NOT EXISTS `changelog_entries` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `config_baselines` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `backup_id` int(11) NOT NULL COMMENT 'The backups row declared correct',
+  `config_hash` char(64) NOT NULL COMMENT 'Canonical fingerprint of that config',
+  `section_hashes` text DEFAULT NULL COMMENT 'JSON map of section => hash, for section-level drift',
+  `set_by_user_id` int(11) DEFAULT NULL,
+  `set_by_username` varchar(64) DEFAULT NULL,
+  `set_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `notes` varchar(255) DEFAULT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Superseded baselines are retained for history',
+  PRIMARY KEY (`id`),
+  KEY `idx_firewall_current` (`firewall_id`,`is_current`),
+  KEY `idx_backup` (`backup_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `config_drift` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `baseline_id` int(11) NOT NULL,
+  `current_backup_id` int(11) DEFAULT NULL,
+  `current_hash` char(64) DEFAULT NULL,
+  `status` enum('match','drifted','unknown','error') NOT NULL DEFAULT 'unknown',
+  `sections_changed` text DEFAULT NULL COMMENT 'JSON: added / removed / modified section names',
+  `change_count` int(11) NOT NULL DEFAULT 0,
+  `first_detected_at` timestamp NULL DEFAULT NULL,
+  `last_checked_at` timestamp NULL DEFAULT NULL,
+  `acknowledged_at` timestamp NULL DEFAULT NULL,
+  `acknowledged_by` varchar(64) DEFAULT NULL,
+  `acknowledged_note` varchar(255) DEFAULT NULL,
+  `detail` text DEFAULT NULL COMMENT 'Error text when status = error',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_firewall` (`firewall_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_first_detected` (`first_detected_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Current drift state per firewall; one row per firewall';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `config_snapshots` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `firewall_id` int(11) NOT NULL,
@@ -608,6 +649,44 @@ CREATE TABLE IF NOT EXISTS `firewall_ai_settings` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_carp` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `vhid` varchar(16) NOT NULL,
+  `interface` varchar(64) DEFAULT NULL,
+  `address` varchar(45) DEFAULT NULL,
+  `state` varchar(16) DEFAULT NULL COMMENT 'MASTER, BACKUP, INIT',
+  `advskew` int(11) DEFAULT NULL,
+  `advbase` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fw_vhid` (`firewall_id`,`vhid`),
+  KEY `idx_state` (`state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_certificates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `refid` varchar(64) NOT NULL COMMENT 'OPNsense certificate reference id',
+  `name` varchar(255) DEFAULT NULL,
+  `issuer` varchar(255) DEFAULT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `cert_type` varchar(32) DEFAULT NULL COMMENT 'server, user, ca',
+  `not_before` datetime DEFAULT NULL,
+  `not_after` datetime DEFAULT NULL,
+  `days_remaining` int(11) DEFAULT NULL,
+  `in_use` varchar(255) DEFAULT NULL COMMENT 'Where the certificate is referenced',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fw_cert` (`firewall_id`,`refid`),
+  KEY `idx_expiry` (`not_after`),
+  KEY `idx_days` (`days_remaining`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Certificate METADATA only. No private key material is ever stored here.';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `firewall_commands` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `firewall_id` int(11) NOT NULL,
@@ -637,6 +716,44 @@ CREATE TABLE IF NOT EXISTS `firewall_commands` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_gateway_events` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `gateway_name` varchar(64) NOT NULL,
+  `from_status` varchar(32) DEFAULT NULL,
+  `to_status` varchar(32) DEFAULT NULL,
+  `latency_ms` decimal(8,2) DEFAULT NULL,
+  `loss_percent` decimal(5,2) DEFAULT NULL,
+  `occurred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_fw_time` (`firewall_id`,`occurred_at`),
+  KEY `idx_gateway` (`firewall_id`,`gateway_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_gateways` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `name` varchar(64) NOT NULL,
+  `interface` varchar(64) DEFAULT NULL,
+  `address` varchar(45) DEFAULT NULL,
+  `monitor` varchar(45) DEFAULT NULL,
+  `status` varchar(32) DEFAULT NULL COMMENT 'none/online, down, loss, delay, force_down',
+  `latency_ms` decimal(8,2) DEFAULT NULL,
+  `stddev_ms` decimal(8,2) DEFAULT NULL,
+  `loss_percent` decimal(5,2) DEFAULT NULL,
+  `is_default` tinyint(1) NOT NULL DEFAULT 0,
+  `gateway_group` varchar(64) DEFAULT NULL,
+  `priority` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fw_gateway` (`firewall_id`,`name`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `firewall_latency` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `firewall_id` int(11) NOT NULL,
@@ -646,6 +763,21 @@ CREATE TABLE IF NOT EXISTS `firewall_latency` (
   KEY `idx_firewall_time` (`firewall_id`,`measured_at`),
   CONSTRAINT `firewall_latency_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `name` varchar(64) NOT NULL,
+  `description` varchar(128) DEFAULT NULL,
+  `running` tinyint(1) NOT NULL DEFAULT 0,
+  `enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fw_service` (`firewall_id`,`name`),
+  KEY `idx_running` (`running`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Only services the agent reported as present on that firewall';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -747,6 +879,41 @@ CREATE TABLE IF NOT EXISTS `firewall_updaters` (
   KEY `idx_last_checkin` (`last_checkin`),
   KEY `idx_status` (`status`),
   CONSTRAINT `firewall_updaters_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_vpn_events` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `vpn_type` varchar(16) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `from_status` varchar(32) DEFAULT NULL,
+  `to_status` varchar(32) DEFAULT NULL,
+  `occurred_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_fw_time` (`firewall_id`,`occurred_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `firewall_vpn_tunnels` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `vpn_type` enum('wireguard','openvpn','ipsec') NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `peer` varchar(255) DEFAULT NULL COMMENT 'Peer name or public key fingerprint, never a private key',
+  `endpoint` varchar(255) DEFAULT NULL,
+  `status` varchar(32) DEFAULT NULL COMMENT 'up, down, connecting, disabled',
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `latest_handshake` timestamp NULL DEFAULT NULL COMMENT 'WireGuard',
+  `connected_since` timestamp NULL DEFAULT NULL,
+  `rx_bytes` bigint(20) DEFAULT NULL,
+  `tx_bytes` bigint(20) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fw_vpn` (`firewall_id`,`vpn_type`,`name`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -870,13 +1037,20 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `agent_api_secret` text DEFAULT NULL COMMENT 'OPNManager agent HMAC signing secret (encrypted at rest)',
   `customer_id` int(11) DEFAULT NULL,
   `site_id` int(11) DEFAULT NULL,
+  `carp_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `carp_state` varchar(16) DEFAULT NULL COMMENT 'Overall MASTER/BACKUP for the node',
+  `carp_peer_host` varchar(255) DEFAULT NULL,
+  `carp_sync_status` varchar(32) DEFAULT NULL,
+  `ha_peer_firewall_id` int(11) DEFAULT NULL COMMENT 'Resolved HA partner, used to avoid updating both members at once',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `idx_wake_agent` (`wake_agent`,`wake_requested_at`),
   KEY `idx_wan_interfaces` (`wan_interfaces`),
   KEY `idx_customer_id` (`customer_id`),
-  KEY `idx_site_id` (`site_id`)
+  KEY `idx_site_id` (`site_id`),
+  KEY `idx_carp_state` (`carp_state`),
+  KEY `idx_ha_peer` (`ha_peer_firewall_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

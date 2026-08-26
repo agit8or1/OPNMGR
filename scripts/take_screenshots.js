@@ -151,6 +151,8 @@ async function capture(page, name, label) {
             ['/alerts.php',          '05-alerts.png',       'Alerts'],
             ['/audit_log.php',       '06-audit-log.png',    'Audit log'],
             ['/search.php?q=customer%3AAGIT8OR', '11-search.png', 'Fleet search'],
+            ['/firewall_health.php?firewall=48',  '12-health.png', 'Firewall health'],
+            ['/config_drift.php',                 '13-drift.png',  'Config drift'],
             ['/users.php',           '07-users.png',        'Users and roles'],
             ['/settings.php',        '08-settings.png',     'Settings'],
             ['/about.php',           '09-about.png',        'About'],

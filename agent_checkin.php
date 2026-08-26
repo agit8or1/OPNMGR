@@ -3,6 +3,7 @@ require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 require_once __DIR__ . '/inc/agent_auth.php';
 require_once __DIR__ . '/inc/command_results.php';
+require_once __DIR__ . '/inc/firewall_health.php';
 
 // Endpoint for firewall agent check-ins
 header('Content-Type: application/json');
@@ -231,6 +232,22 @@ try {
     } else {
         // Log successful checkin
         log_info('agent', "Agent checkin: firewall_id=$firewall_id, type=$agent_type, version=$agent_version, wan_ip=$wan_ip", null, $firewall_id);
+    }
+
+    // OPNsense health telemetry (Agent v1.6.0+): gateways, VPN tunnels, CARP,
+    // services and certificates. Absent for older agents, which simply do not
+    // populate those views rather than being treated as "everything is down".
+    if (isset($input['health']) && is_array($input['health'])) {
+        try {
+            $health_stored = health_ingest($firewall_id, $input['health']);
+            if ($health_stored) {
+                error_log('Health ingested for firewall ' . $firewall_id . ': '
+                          . json_encode($health_stored));
+            }
+        } catch (Throwable $e) {
+            // Health is supplementary; never fail a check-in over it.
+            error_log('Health ingest failed for firewall ' . $firewall_id . ': ' . $e->getMessage());
+        }
     }
 
     // Process WAN interface statistics if provided (Agent v3.4.0+)

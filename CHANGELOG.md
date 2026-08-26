@@ -6,6 +6,60 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.14.0
+**Released**: August 26, 2026 | **Agent**: v1.6.0
+
+Configuration drift and OPNsense-specific health.
+
+### Added
+
+- **Configuration drift**, built on the configuration backups the fleet already
+  uploads rather than a parallel snapshot system. An operator marks a backup as
+  the baseline; each firewall's newest backup is compared against it.
+
+  The comparison is semantic, not textual. Two backups of an untouched firewall
+  routinely differ by hundreds of lines purely in serialisation - `<item />`
+  versus `<item/>`, quoting of the XML declaration, indentation - and the
+  `<revision>` block is stamped on every save. Comparing text reports drift on a
+  firewall nobody has touched. The XML is parsed into a canonical form with
+  sibling order normalised and volatile fields removed, then hashed per section.
+  On the reference installation this reduced 782 differing lines between two
+  real backups to a single true finding.
+
+  Section-level attribution, readable diffs that name a changed rule by its
+  description, acknowledgement (which does not move the baseline), and
+  promote-to-baseline. Detecting drift never restores anything.
+
+- **Firewall health**: gateways (status, latency, packet loss, default gateway,
+  and transition history so flapping is visible), VPN tunnels for WireGuard,
+  OpenVPN and IPsec (state, peer, endpoint, latest handshake, byte counters),
+  CARP/HA state rolled up per node with peer resolution, services, and
+  certificate expiry with configurable 30/14/7 day thresholds.
+
+  Only what an agent reported is shown. A firewall that does not run OpenVPN has
+  no OpenVPN row rather than a permanently "stopped" one, and a firewall on an
+  older agent reads as "not reporting health" rather than as a wall of failures.
+
+- **Agent 1.6.0** collects the above via `health_collect.py`. Each collector is
+  independent and degrades to an omitted section rather than failing check-in.
+  Certificate METADATA only: the `<prv>` private key element is never read.
+
+- `tests/health_drift_test.php` — 48 assertions covering canonicalisation, noise
+  rejection, drift attribution, ingestion, transitions, pruning and validation.
+
+### Fixed
+
+- Gateway latency and loss arriving with units (`"12.4 ms"`, `"0.0 %"`) were
+  stored as NULL, because the server required a strictly numeric value.
+- The drift differ compared a single repeated element against a list of them
+  field by field, so adding one firewall rule reported one "modified" line per
+  field of the first rule instead of one addition.
+- Drift could not locate a current configuration on installations with long runs
+  of backup rows whose upload never arrived; the lookup gave up after a fixed
+  window instead of paging back to the newest readable file.
+
+---
+
 ## Version 3.13.0
 **Released**: August 26, 2026 | **Agent**: v1.5.6
 

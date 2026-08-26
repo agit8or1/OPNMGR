@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.13.0](https://img.shields.io/badge/version-3.13.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.14.0](https://img.shields.io/badge/version-3.14.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -13,7 +13,21 @@ work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.13 — MSP Roles, Customers &amp; Fleet Search
+### New in v3.14 — Configuration Drift &amp; Firewall Health
+
+- **Configuration drift** — mark a configuration backup as the baseline and see, per
+  firewall, whether the current configuration still matches it. The comparison is
+  semantic: serialisation noise and the `<revision>` block OPNsense stamps on every save
+  are ignored, so an untouched firewall does not report drift. Diffs name a changed rule
+  by its description; findings can be acknowledged, and a new configuration can be
+  promoted to baseline. Nothing is ever restored automatically.
+- **Firewall health** — gateways with latency, packet loss and flapping detection; VPN
+  tunnels across WireGuard, OpenVPN and IPsec; CARP/HA state; services; and certificate
+  expiry with configurable 30/14/7 day warnings. Only what the agent reports is shown.
+- **Agent 1.6.0** collects the above. Certificate metadata only — private key material is
+  never read.
+
+### v3.13 — MSP Roles, Customers &amp; Fleet Search
 
 - **MSP staff roles** — Administrator, Technician and Read Only, defined once as a
   capability matrix rather than role strings scattered through the code. Navigation and
@@ -124,6 +138,17 @@ One box across the whole fleet. Field qualifiers (`customer:`, `site:`, `tag:`,
 CIDR such as `192.168.22.0/24` matches firewalls with an address inside it.
 
 ![Fleet Search](screenshots/11-search.png)
+
+### Firewall Health
+Gateways, VPN tunnels, CARP/HA, services and certificate expiry, as reported by the agent.
+
+![Firewall Health](screenshots/12-health.png)
+
+### Configuration Drift
+Compares each firewall's current configuration against the approved baseline, ignoring
+serialisation noise and volatile fields.
+
+![Configuration Drift](screenshots/13-drift.png)
 
 ### Audit Log
 Who did what, to which firewall, from where — filterable by action, user, firewall,

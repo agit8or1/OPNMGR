@@ -177,6 +177,18 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-mobile-alt"></i></span>
         <span class="sidebar-label">2FA Setup</span>
       </a>
+      <?php if (function_exists('can') && can('health.view')): ?>
+      <a class="sidebar-item <?php echo isActive('firewall_health.php') ?>" href="/firewall_health.php">
+        <span class="sidebar-icon"><i class="fas fa-heart-pulse"></i></span>
+        <span class="sidebar-label">Health</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('drift.view')): ?>
+      <a class="sidebar-item <?php echo isActive('config_drift.php') ?>" href="/config_drift.php">
+        <span class="sidebar-icon"><i class="fas fa-code-compare"></i></span>
+        <span class="sidebar-label">Config Drift</span>
+      </a>
+      <?php endif; ?>
       <?php if (function_exists('can') && can('audit.view')): ?>
       <a class="sidebar-item <?php echo isActive('audit_log.php') ?>" href="/audit_log.php">
         <span class="sidebar-icon"><i class="fas fa-clipboard-list"></i></span>

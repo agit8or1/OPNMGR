@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.5.6"
+AGENT_VERSION="1.6.0"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
@@ -105,6 +105,31 @@ get_hardware_id() {
 
     log_message "Generated new hardware ID: $new_id"
     echo "$new_id"
+}
+
+
+# Collect OPNsense health telemetry (gateways, VPN, CARP, services, certificates).
+#
+# Delegated to health_collect.py: assembling this much JSON in shell is fragile,
+# and the collector needs to parse configctl output, ifconfig and X.509 dates.
+# Any failure yields an empty object so a health problem never blocks check-in.
+get_health_json() {
+    local script="/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/health_collect.py"
+    local python="/usr/local/bin/python3"
+
+    if [ ! -x "$python" ] || [ ! -f "$script" ]; then
+        echo "{}"
+        return
+    fi
+
+    local out
+    out=$("$python" "$script" 2>/dev/null)
+
+    # Must look like a JSON object before it goes anywhere near the payload.
+    case "$out" in
+        \{*\}) echo "$out" ;;
+        *)      echo "{}" ;;
+    esac
 }
 
 # Read configuration from OPNsense config.xml using xmllint
@@ -1050,6 +1075,13 @@ main() {
             WAN_STATS=$(get_wan_interface_stats "$WAN_IFACES")
             PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
             PAYLOAD="${PAYLOAD},\"wan_interface_stats\":$WAN_STATS}"
+        fi
+
+        # Add OPNsense health telemetry (v1.6.0 feature)
+        HEALTH_JSON=$(get_health_json)
+        if [ "$HEALTH_JSON" != "{}" ]; then
+            PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
+            PAYLOAD="${PAYLOAD},\"health\":$HEALTH_JSON}"
         fi
 
         # Perform check-in

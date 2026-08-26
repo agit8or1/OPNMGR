@@ -122,6 +122,9 @@ jobs:
       - name: MSP model suite (roles, customers/sites, search)
         run: php tests/msp_test.php
 
+      - name: Health and drift suite
+        run: php tests/health_drift_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -215,3 +218,4 @@ jobs:
         run: |
           php tests/security_test.php
           php tests/msp_test.php
+          php tests/health_drift_test.php

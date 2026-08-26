@@ -18,6 +18,34 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.14.0
+
+Migrations 0009 and 0010 add the drift and health tables. They are additive; nothing
+existing changes shape.
+
+Two things need doing by hand after upgrading:
+
+**Set a baseline per firewall.** Drift cannot report anything until you have declared
+which configuration is correct. Go to *Config Drift*, open a firewall and choose a backup
+to promote. Firewalls without a baseline show as "No baseline" rather than as drifted.
+
+**Update agents to 1.6.0** for health telemetry. Older agents keep checking in exactly as
+before and simply report no health sections; the Health page shows them as "not reporting
+health" rather than inventing failures. Queue the update from the firewall's page, or:
+
+```sql
+SELECT hostname, agent_version FROM firewalls ORDER BY agent_version;
+```
+
+Certificate expiry thresholds default to 30/14/7 days and gateway warning thresholds to
+5% loss / 150 ms. Adjust in the `settings` table:
+
+```sql
+UPDATE settings SET value = '45' WHERE name = 'cert_warn_days_medium';
+```
+
+---
+
 ## Upgrading to 3.13.0
 
 Migration 0007 widens the `users.role` enum and maps existing `user` rows to
