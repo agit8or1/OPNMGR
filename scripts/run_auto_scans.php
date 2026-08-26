@@ -1,5 +1,8 @@
 #!/usr/bin/env php
 <?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
 /**
  * Automatic AI Scan Scheduler
  * Runs AI security scans for firewalls with auto_scan_enabled

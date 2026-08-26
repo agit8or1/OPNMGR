@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
 /**
  * Agent Health Monitor
  * Alerts if commands are stuck or firewalls become unreachable

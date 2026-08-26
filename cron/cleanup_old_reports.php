@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
 /**
  * AI Report Housekeeping
  * Deletes AI scan reports older than 30 days

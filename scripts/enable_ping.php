@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
 /**
  * Script to enable ICMP (ping) on OPNsense firewall
  * This script will be executed by the tunnel agent on the firewall

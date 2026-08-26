@@ -1,5 +1,8 @@
 #!/usr/bin/env php
 <?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
 /**
  * Analyze Recent Changes and Generate Release Notes
  * This script looks at git commits, file changes, and patterns to suggest release notes
