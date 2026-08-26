@@ -436,9 +436,18 @@ CREATE TABLE IF NOT EXISTS `customers` (
   `notes` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `code` varchar(32) DEFAULT NULL COMMENT 'Short customer code used in search and reports',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `timezone` varchar(64) DEFAULT NULL,
+  `tags` varchar(255) DEFAULT NULL COMMENT 'Comma-separated labels',
+  `maintenance_window_start` time DEFAULT NULL,
+  `maintenance_window_end` time DEFAULT NULL,
+  `maintenance_window_days` varchar(32) DEFAULT NULL COMMENT 'Comma-separated day numbers, 0=Sunday',
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
-  KEY `idx_customers_name` (`name`)
+  KEY `idx_customers_name` (`name`),
+  KEY `idx_is_active` (`is_active`),
+  KEY `idx_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -859,11 +868,15 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `last_backup_error` varchar(255) DEFAULT NULL,
   `agent_api_key` text DEFAULT NULL COMMENT 'OPNManager agent bearer credential (encrypted at rest)',
   `agent_api_secret` text DEFAULT NULL COMMENT 'OPNManager agent HMAC signing secret (encrypted at rest)',
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `idx_wake_agent` (`wake_agent`,`wake_requested_at`),
-  KEY `idx_wan_interfaces` (`wan_interfaces`)
+  KEY `idx_wan_interfaces` (`wan_interfaces`),
+  KEY `idx_customer_id` (`customer_id`),
+  KEY `idx_site_id` (`site_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1056,6 +1069,28 @@ CREATE TABLE IF NOT EXISTS `settings` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `sites` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `code` varchar(32) DEFAULT NULL,
+  `timezone` varchar(64) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `maintenance_window_start` time DEFAULT NULL,
+  `maintenance_window_end` time DEFAULT NULL,
+  `maintenance_window_days` varchar(32) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_customer_site` (`customer_id`,`name`),
+  KEY `idx_customer` (`customer_id`),
+  CONSTRAINT `fk_sites_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Organisational grouping beneath a customer. Sites do not log in.';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `snyk_scan_results` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `scan_type` enum('dependencies','code','full','container','iac','license') NOT NULL DEFAULT 'full',
@@ -1234,15 +1269,20 @@ CREATE TABLE IF NOT EXISTS `users` (
   `timezone` varchar(50) DEFAULT 'America/Chicago',
   `alert_levels` set('info','warning','critical') DEFAULT 'warning,critical',
   `twofa_secret` varchar(32) DEFAULT NULL,
-  `role` enum('admin','user') DEFAULT 'user',
+  `role` enum('admin','technician','readonly') NOT NULL DEFAULT 'technician' COMMENT 'MSP staff role: admin (full), technician (operations), readonly (view only)',
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `totp_secret` text DEFAULT NULL,
   `first_name` varchar(100) DEFAULT NULL,
   `last_name` varchar(100) DEFAULT NULL,
   `recovery_codes` text DEFAULT NULL,
   `last_login` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `mfa_enforced_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `username` (`username`)
+  UNIQUE KEY `username` (`username`),
+  KEY `idx_role` (`role`),
+  KEY `idx_is_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 SET @saved_cs_client     = @@character_set_client;

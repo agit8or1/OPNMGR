@@ -6,6 +6,57 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.13.0
+**Released**: August 26, 2026 | **Agent**: v1.5.6
+
+MSP operations release: staff roles, the customer/site model and fleet search.
+
+### Added
+
+- **MSP staff roles.** Administrator, Technician and Read Only, defined once in
+  `inc/permissions.php` as a capability-to-roles matrix. Unknown capabilities deny
+  and are logged; a corrupted session role degrades to read-only. Structured
+  commands derive their required capability from the catalogue's risk level, so a
+  technician can restart a service but not reboot a firewall.
+- **Customer and site model.** `Customer -> Site -> Firewall(s)` with real
+  `customer_id` / `site_id` foreign keys. Customers gain a short code, active flag,
+  timezone, tags and a default maintenance window; sites add name, code, timezone,
+  address, notes and their own window. Customers remain organisational containers
+  and have no accounts.
+- **Global fleet search.** Header typeahead plus a results page. Qualifiers
+  `customer:`, `site:`, `tag:`, `version:`, `agent:`, `ip:`, `interface:`, `vpn:`
+  and `status:` combine with AND; a bare CIDR matches addresses inside the range,
+  computed with INET_ATON rather than string prefixes.
+- **Audit log UI** with filters for action, user, firewall, result and date range.
+- `tests/msp_test.php` — 58 assertions covering roles, customers/sites and search.
+
+### Fixed
+
+- The Customers page counted firewalls by matching `customer_name`, which was empty
+  for every firewall linked through `customer_group`, so customers with firewalls
+  reported a count of zero. The delete guard used the same query, so such a customer
+  could be deleted and orphan its firewalls.
+- `customers.php` included the page header before checking authorisation, so the
+  page shell was already on the wire when the login redirect was attempted.
+- `users.php` wrote `$_POST['role']` into the database with no allow-list.
+- System Update reported "update available" whenever the local commit differed from
+  GitHub, including when the checkout was ahead of the remote. It now uses git
+  ahead/behind counts and distinguishes up to date, behind, ahead and diverged.
+- Update pulls ran `git pull origin main` regardless of the checked-out branch,
+  ignored `git stash` failures, and never applied database migrations.
+- The `04-customers.php.png` screenshot filename typo, the redaction patterns that
+  blanked dotted identifiers and clock times, and theme forcing that produced two
+  identical light-mode captures.
+
+### Security
+
+- The update wrapper ran `chmod -R a+r` over the production directory, making `.env`
+  world-readable on every update, and `chmod 777` on the backups directory.
+- The screenshot tool sat in the document root with the administrator password
+  hardcoded in it and was publicly served over HTTPS.
+
+---
+
 ## Version 3.12.0
 **Released**: August 26, 2026 | **Agent**: v1.5.6
 

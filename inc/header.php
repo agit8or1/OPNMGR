@@ -77,6 +77,16 @@ function isActive($page) {
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
       <i class="fas fa-sun"></i>
     </button>
+    <form class="opnmgr-search me-3" action="/search.php" method="get" autocomplete="off" role="search">
+      <div class="position-relative">
+        <i class="fas fa-magnifying-glass opnmgr-search-icon"></i>
+        <input type="text" name="q" id="globalSearch" class="form-control form-control-sm opnmgr-search-input"
+               placeholder="Search fleet&hellip;  customer:Acme  tag:critical  192.168.22.0/24"
+               aria-label="Search the managed fleet">
+        <div id="globalSearchResults" class="opnmgr-search-results d-none"></div>
+      </div>
+    </form>
+
     <div class="dropdown">
       <button class="user-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
         <span class="user-avatar"><?php echo strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?></span>
@@ -113,6 +123,10 @@ function isActive($page) {
     <!-- MAIN section -->
     <div class="sidebar-section">
       <div class="sidebar-section-label">Main</div>
+      <a class="sidebar-item <?php echo isActive('search.php') ?>" href="/search.php">
+        <span class="sidebar-icon"><i class="fas fa-magnifying-glass"></i></span>
+        <span class="sidebar-label">Search</span>
+      </a>
       <a class="sidebar-item <?php echo isActive('dashboard.php') ?>" href="/dashboard.php">
         <span class="sidebar-icon"><i class="fas fa-chart-pie"></i></span>
         <span class="sidebar-label">Dashboard</span>
@@ -253,3 +267,121 @@ function isActive($page) {
 <!-- Not logged in - no sidebar/header, just content -->
 <main class="app-content-full">
 <?php endif; ?>
+
+<style>
+.opnmgr-search { width: 380px; max-width: 38vw; }
+.opnmgr-search-input { padding-left: 30px; }
+.opnmgr-search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: .75rem; color: var(--text-muted, #9aa0a6); pointer-events: none;
+}
+.opnmgr-search-results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1050;
+  max-height: 70vh; overflow-y: auto; border-radius: 8px;
+  background: var(--bg-surface, #1a1d23);
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  box-shadow: 0 8px 28px rgba(0,0,0,.45);
+}
+.opnmgr-search-results .sr-group {
+  padding: 6px 12px; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-muted, #9aa0a6); border-bottom: 1px solid var(--border, rgba(255,255,255,.08));
+}
+.opnmgr-search-results a {
+  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  padding: 8px 12px; text-decoration: none; color: inherit; font-size: .85rem;
+}
+.opnmgr-search-results a:hover, .opnmgr-search-results a.active { background: rgba(255,255,255,.07); }
+.opnmgr-search-results .sr-meta { font-size: .75rem; color: var(--text-muted, #9aa0a6); white-space: nowrap; }
+.sr-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+@media (max-width: 992px) { .opnmgr-search { display: none; } }
+</style>
+<script>
+(function () {
+  var input = document.getElementById('globalSearch');
+  var panel = document.getElementById('globalSearchResults');
+  if (!input || !panel) return;
+
+  var timer = null, controller = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function hide() { panel.classList.add('d-none'); panel.innerHTML = ''; }
+
+  function render(data) {
+    var html = '';
+    if (data.customers && data.customers.length) {
+      html += '<div class="sr-group">Customers</div>';
+      data.customers.forEach(function (c) {
+        html += '<a href="' + esc(c.url) + '"><span><i class="fas fa-building me-2"></i>' +
+                esc(c.name) + '</span><span class="sr-meta">' + c.count + ' firewalls</span></a>';
+      });
+    }
+    if (data.sites && data.sites.length) {
+      html += '<div class="sr-group">Sites</div>';
+      data.sites.forEach(function (s) {
+        html += '<a href="' + esc(s.url) + '"><span><i class="fas fa-location-dot me-2"></i>' +
+                esc(s.customer) + ' / ' + esc(s.name) + '</span><span class="sr-meta">' +
+                s.count + ' firewalls</span></a>';
+      });
+    }
+    if (data.firewalls && data.firewalls.length) {
+      html += '<div class="sr-group">Firewalls' +
+              (data.total > data.firewalls.length ? ' (' + data.firewalls.length + ' of ' + data.total + ')' : '') +
+              '</div>';
+      data.firewalls.forEach(function (f) {
+        var colour = f.status === 'online' ? '#22c55e' : '#ef4444';
+        var where = [f.customer, f.site].filter(Boolean).join(' / ');
+        html += '<a href="' + esc(f.url) + '"><span><span class="sr-dot" style="background:' + colour + '"></span>' +
+                esc(f.hostname) + (where ? ' <span class="sr-meta">' + esc(where) + '</span>' : '') +
+                '</span><span class="sr-meta">' + esc(f.wan_ip || '') + '</span></a>';
+      });
+    }
+    if (!html) {
+      html = '<div class="sr-group">No matches</div>';
+    } else if (data.total > (data.firewalls || []).length) {
+      html += '<a href="/search.php?q=' + encodeURIComponent(input.value) +
+              '"><span><i class="fas fa-arrow-right me-2"></i>See all ' + data.total + ' results</span></a>';
+    }
+    panel.innerHTML = html;
+    panel.classList.remove('d-none');
+  }
+
+  input.addEventListener('input', function () {
+    var q = input.value.trim();
+    if (timer) clearTimeout(timer);
+    if (q.length < 2) { hide(); return; }
+
+    timer = setTimeout(function () {
+      // Abort the previous request so a slow early query cannot overwrite the
+      // results of a later one.
+      if (controller) controller.abort();
+      controller = new AbortController();
+
+      fetch('/api/search.php?q=' + encodeURIComponent(q), {
+        signal: controller.signal,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d && d.success) render(d); })
+        .catch(function () { /* aborted or offline */ });
+    }, 200);
+  });
+
+  input.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  document.addEventListener('click', function (e) {
+    if (!panel.contains(e.target) && e.target !== input) hide();
+  });
+
+  // "/" focuses search, the way most fleet tools behave.
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+})();
+</script>

@@ -18,6 +18,25 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.13.0
+
+Migration 0007 widens the `users.role` enum and maps existing `user` rows to
+`technician` — the closest match to what they could already do. Defaulting them to
+read-only would silently remove access people currently have. Review roles afterwards:
+
+```sql
+SELECT username, role FROM users;
+```
+
+Migration 0008 adds `customer_id` / `site_id` to `firewalls` and backfills them from the
+old `customer_name` / `customer_group` strings, creating any customer rows that were
+implied by a group name but never existed. Both legacy columns are kept and are written
+alongside the foreign keys, so pages that still read them keep working.
+
+Nothing here needs manual intervention; `php scripts/migrate.php` covers it.
+
+---
+
 ## Upgrading to 3.12.0
 
 3.12.0 introduces encrypted secrets, per-firewall agent credentials and signed release

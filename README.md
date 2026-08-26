@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.12.0](https://img.shields.io/badge/version-3.12.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.13.0](https://img.shields.io/badge/version-3.13.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -13,30 +13,33 @@ work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.12 — Agent Authentication & Secret Encryption
+### New in v3.13 — MSP Roles, Customers &amp; Fleet Search
 
-v3.12.0 is a security release. See [SECURITY.md](SECURITY.md) for the full architecture.
+- **MSP staff roles** — Administrator, Technician and Read Only, defined once as a
+  capability matrix rather than role strings scattered through the code. Navigation and
+  actions follow the capability, not the role name.
+- **Customer and site model** — `Customer -> Site -> Firewall(s)`, with real foreign keys
+  replacing the two parallel free-text columns firewalls were previously grouped by.
+  Customers carry a short code, timezone, tags, contact details, an active flag and a
+  default maintenance window. They remain organisational containers: no accounts, no login.
+- **Global fleet search** — header typeahead and a full results page, with field
+  qualifiers and CIDR range matching.
+- **Audit log UI** — filter by action, user, firewall, result and date range.
 
-- **Per-firewall agent credentials** — each firewall gets a 256-bit API key and an HMAC
-  signing secret, provisioned over the authenticated check-in and pinned on first use.
+### v3.12 — Agent Authentication &amp; Secret Encryption
+
+Security release. See [SECURITY.md](SECURITY.md) for the full architecture.
+
+- **Per-firewall agent credentials** — a 256-bit API key and HMAC signing secret per
+  firewall, provisioned over the authenticated check-in and pinned on first use.
   `hardware_id` alone (an md5 of the hostid or WAN MAC) is no longer a credential.
-- **Optional signed agent requests** — HMAC-SHA256 over method, path, timestamp, nonce and
-  body hash, with a replay store and constant-time comparison. Deployed in a
+- **Optional signed agent requests** — HMAC-SHA256 with a replay store, deployed in a
   compatibility mode so an installed fleet upgrades without a flag day.
-- **Secrets encrypted at rest** — XChaCha20-Poly1305 for agent credentials, SSH private
-  keys, SMTP and AI credentials, and MFA recovery codes, keyed from `.env`.
-- **Verified agent updates** — Ed25519-signed release manifest plus SHA-256 per artifact,
-  atomic install and automatic rollback. Verification failure is always fatal.
+- **Secrets encrypted at rest** — XChaCha20-Poly1305, keyed from `.env`.
+- **Verified agent updates** — Ed25519-signed manifest plus SHA-256 per artifact, atomic
+  install and automatic rollback.
 - **Structured remote operations** — a validated action catalogue replaces hand-built
-  shell for common tasks. Raw shell remains, as an explicitly privileged, audited path.
-- **MSP staff roles** — Administrator, Technician and Read Only, defined in one
-  capability matrix rather than role strings scattered through the code.
-- **Audit log** — who did what, to which firewall, from where, with credential material
-  stripped centrally.
-- **Database migrations** — `scripts/migrate.php`, idempotent and checksummed.
-
-Previous release, v3.11 — complete UI redesign: collapsible icon sidebar, firewall health
-grid dashboard, dark and light themes, KPI metric strip.
+  shell. Raw shell remains as an explicitly privileged, audited path.
 
 ---
 
@@ -114,6 +117,13 @@ Customer organisations used to group managed firewalls. Customers do not log in.
 
 ### Alerts
 ![Alerts](screenshots/05-alerts.png)
+
+### Fleet Search
+One box across the whole fleet. Field qualifiers (`customer:`, `site:`, `tag:`,
+`version:`, `agent:`, `ip:`, `interface:`, `vpn:`, `status:`) combine with AND, and a bare
+CIDR such as `192.168.22.0/24` matches firewalls with an address inside it.
+
+![Fleet Search](screenshots/11-search.png)
 
 ### Audit Log
 Who did what, to which firewall, from where — filterable by action, user, firewall,

@@ -150,6 +150,7 @@ async function capture(page, name, label) {
             ['/customers.php',       '04-customers.png','Customers'],
             ['/alerts.php',          '05-alerts.png',       'Alerts'],
             ['/audit_log.php',       '06-audit-log.png',    'Audit log'],
+            ['/search.php?q=customer%3AAGIT8OR', '11-search.png', 'Fleet search'],
             ['/users.php',           '07-users.png',        'Users and roles'],
             ['/settings.php',        '08-settings.png',     'Settings'],
             ['/about.php',           '09-about.png',        'About'],

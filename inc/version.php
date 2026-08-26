@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Agent Authentication Hardening'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'MSP Roles, Customers & Fleet Search'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.4.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2025-10-20'); }
@@ -30,6 +30,26 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.13.0',
+            'date' => '2026-08-26',
+            'type' => 'minor',
+            'title' => 'MSP Staff Roles, Customer/Site Model and Fleet Search',
+            'changes' => [
+                'ADDED: MSP staff roles - Administrator, Technician and Read Only - defined in one capability matrix (inc/permissions.php) rather than role strings scattered through the codebase',
+                'ADDED: Customer and site model. Customer -> Site -> Firewall(s), with customer_id/site_id foreign keys replacing two parallel free-text columns',
+                'ADDED: Global fleet search with field qualifiers (customer:, site:, tag:, version:, agent:, ip:, interface:, vpn:, status:) and CIDR range matching, plus a header typeahead',
+                'ADDED: Searchable audit log UI with filters for action, user, firewall, result and date range',
+                'FIXED: The Customers page counted firewalls by matching customer_name, which was empty for firewalls linked via customer_group, so customers with firewalls showed a count of zero',
+                'FIXED: customers.php included the page header before checking authorisation, so the shell rendered before the login redirect could be sent',
+                'FIXED: The delete guard on customers counted by the same empty column, so a customer with firewalls could be deleted and orphan them',
+                'FIXED: users.php wrote $_POST[\'role\'] into the database with no allow-list',
+                'FIXED: System Update reported an update whenever the local commit differed from GitHub, including when the checkout was ahead; it now uses git ahead/behind counts',
+                'FIXED: Update pulls ran against main regardless of the checked-out branch, ignored git stash failures, and never applied database migrations',
+                'SECURITY: The update wrapper made .env world-readable and the backups directory world-writable on every update',
+                'SECURITY: The screenshot tool in the document root contained the administrator password in plaintext and was publicly served',
+            ]
+        ],
         [
             'version' => '3.12.0',
             'date' => '2026-08-26',

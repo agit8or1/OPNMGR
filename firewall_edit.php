@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/customers.php';
 requireLogin();
 
 // Check if user is logged in
@@ -60,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $hostname = trim($_POST['hostname'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
-    $customer_group = trim($_POST['customer_group'] ?? '');
+    $customer_id = (int)($_POST['customer_id'] ?? 0);
+    $site_id     = (int)($_POST['site_id'] ?? 0);
     $tags_array = $_POST['tags'] ?? [];
     $tags_list = is_array($tags_array) ? array_filter(array_map('trim', $tags_array)) : array_filter(array_map('trim', explode(',', $tags_array)));
 
@@ -71,10 +73,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update firewall basic info (no tag_names column exists)
             $stmt = db()->prepare("
                 UPDATE firewalls
-                SET hostname = ?, notes = ?, customer_group = ?
+                SET hostname = ?, notes = ?
                 WHERE id = ?
             ");
-            $stmt->execute([$hostname, $notes, $customer_group, $firewall_id]);
+            $stmt->execute([$hostname, $notes, $firewall_id]);
+
+            // Customer/site assignment goes through the service layer, which
+            // writes customer_id/site_id, keeps the legacy customer_name and
+            // customer_group strings in step for the pages that still read
+            // them, and rejects a site belonging to a different customer.
+            $assign = save_firewall_assignment(
+                $firewall_id,
+                $customer_id ?: null,
+                $site_id ?: null
+            );
+            if (!$assign['ok']) {
+                $error = $assign['error'];
+                throw new RuntimeException($assign['error']);
+            }
 
             // Handle tags - clear existing and insert checked ones
             $stmt = db()->prepare("DELETE FROM firewall_tags WHERE firewall_id = ?");
@@ -134,15 +150,60 @@ include __DIR__ . '/inc/header.php';
                                 </div>
                             </div>
                             <div class="col-md-6">
+                                <?php
+                                $fw_customer_id = (int)($firewall['customer_id'] ?? 0);
+                                $fw_site_id     = (int)($firewall['site_id'] ?? 0);
+                                $all_sites      = site_list();
+                                $sel_style = 'background-color: rgba(255,255,255,0.15)!important; border-color: rgba(138,180,248,0.5)!important; color: #fff!important; font-weight: 500;';
+                                $lbl_style = 'display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;';
+                                ?>
                                 <div class="mb-3">
-                                    <label for="customer_group" class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Customer Group</label>
-                                    <select class="form-select" id="customer_group" name="customer_group" style="background-color: rgba(255,255,255,0.15)!important; border-color: rgba(138,180,248,0.5)!important; color: #fff!important; font-weight: 500;">
-                                        <option value="">-- Select Customer --</option>
-                                        <?php foreach ($customers as $customer): ?>
-                                            <option value="<?php echo htmlspecialchars($customer['name']); ?>" <?php echo (($firewall["customer_group"] ?? "") === $customer['name']) ? "selected" : ""; ?>><?php echo htmlspecialchars($customer['name']); ?></option>
+                                    <label for="customer_id" class="form-label" style="<?php echo $lbl_style; ?>">Customer</label>
+                                    <select class="form-select" id="customer_id" name="customer_id" style="<?php echo $sel_style; ?>">
+                                        <option value="">-- Unassigned --</option>
+                                        <?php foreach (customer_list() as $customer): ?>
+                                            <option value="<?php echo (int)$customer['id']; ?>"
+                                                <?php echo $fw_customer_id === (int)$customer['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($customer['name']); ?>
+                                                <?php echo $customer['is_active'] ? '' : ' (inactive)'; ?>
+                                            </option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <div class="mb-3">
+                                    <label for="site_id" class="form-label" style="<?php echo $lbl_style; ?>">Site <span class="text-muted" style="font-weight:400">(optional)</span></label>
+                                    <select class="form-select" id="site_id" name="site_id" style="<?php echo $sel_style; ?>">
+                                        <option value="">-- None --</option>
+                                        <?php foreach ($all_sites as $st): ?>
+                                            <option value="<?php echo (int)$st['id']; ?>"
+                                                    data-customer="<?php echo (int)$st['customer_id']; ?>"
+                                                <?php echo $fw_site_id === (int)$st['id'] ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($st['customer_name'] . ' / ' . $st['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="form-text" style="color:#9aa0a6">Sites are managed on the Customers page.</div>
+                                </div>
+                                <script>
+                                // Only offer sites belonging to the selected customer, so an
+                                // impossible pairing cannot be submitted in the first place.
+                                (function () {
+                                  var cust = document.getElementById('customer_id');
+                                  var site = document.getElementById('site_id');
+                                  if (!cust || !site) return;
+                                  function sync() {
+                                    var id = cust.value;
+                                    Array.prototype.forEach.call(site.options, function (o) {
+                                      if (!o.value) return;
+                                      var match = !id || o.dataset.customer === id;
+                                      o.hidden = !match;
+                                      if (!match && o.selected) { site.value = ''; }
+                                    });
+                                  }
+                                  cust.addEventListener('change', sync);
+                                  sync();
+                                })();
+                                </script>
                         </div>                        <div class="mb-3">
                             <label for="notes" class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Notes</label>
                             <textarea class="form-control" id="notes" name="notes" rows="3"

@@ -119,6 +119,9 @@ jobs:
       - name: Security regression suite
         run: php tests/security_test.php
 
+      - name: MSP model suite (roles, customers/sites, search)
+        run: php tests/msp_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -208,5 +211,7 @@ jobs:
           php scripts/encrypt_secrets.php
           php scripts/encrypt_secrets.php | grep -q '0 value(s) encrypted'
 
-      - name: Security suite passes after upgrade
-        run: php tests/security_test.php
+      - name: Suites pass after upgrade
+        run: |
+          php tests/security_test.php
+          php tests/msp_test.php

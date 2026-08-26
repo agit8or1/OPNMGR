@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
-requireAdmin();
+require_permission('customer.view');
 
 if (!isset($_GET['id'])) {
     http_response_code(400);
