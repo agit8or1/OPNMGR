@@ -11,7 +11,7 @@ jobs:
     name: PHP syntax
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -35,7 +35,7 @@ jobs:
     name: Composer validate and audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -52,7 +52,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
@@ -83,7 +83,7 @@ jobs:
           --health-interval=10s --health-timeout=5s --health-retries=10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -121,8 +121,42 @@ jobs:
 
       - name: Release manifest signs and verifies
         run: |
+          # downloads/ is gitignored (release artifacts are large binaries and
+          # are not kept in version control), so CI builds a fixture artifact
+          # and exercises the real sign -> verify -> tamper-detection path
+          # against it.
+          mkdir -p downloads/plugins
+          printf 'AGENT_VERSION="9.9.9"\necho ci-fixture\n' > downloads/agent.sh
+          printf 'ci-fixture-package' > downloads/plugins/os-opnmanager-agent-9.9.9.tar.gz
+          echo '9.9.9' > downloads/AGENT_VERSION.txt
+
           php scripts/sign_release.php --publish
           php scripts/sign_release.php --verify
+
+          # A modified artifact must fail verification. If this passes, the
+          # checksum check is not actually doing anything.
+          printf 'tampered' >> downloads/plugins/os-opnmanager-agent-9.9.9.tar.gz
+          if php scripts/sign_release.php --verify; then
+            echo "FAIL: verification passed after tampering with an artifact"
+            exit 1
+          fi
+          echo "Tampered artifact correctly rejected."
+
+          # A modified manifest body must fail the signature check. Mutate it
+          # through a JSON parse rather than sed, so the test does not silently
+          # pass because the file's formatting changed.
+          php scripts/sign_release.php --publish
+          php -r '
+            $f = "downloads/manifest.json";
+            $e = json_decode(file_get_contents($f), true);
+            $e["manifest"] = str_replace("\"size\":", "\"size\":1", $e["manifest"]);
+            file_put_contents($f, json_encode($e));
+          '
+          if php scripts/sign_release.php --verify; then
+            echo "FAIL: verification passed after tampering with the manifest"
+            exit 1
+          fi
+          echo "Tampered manifest correctly rejected." 
 
   upgrade-path:
     name: Upgrade from the previous schema
@@ -140,7 +174,7 @@ jobs:
           --health-interval=10s --health-timeout=5s --health-retries=10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
