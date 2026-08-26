@@ -302,7 +302,7 @@ if (!function_exists('authenticateAgentRequest')) {
 
         try {
             $stmt = db()->prepare(
-                'SELECT id, hostname, hardware_id, api_key, api_secret,
+                'SELECT id, hostname, hardware_id, agent_api_key, agent_api_secret,
                         api_key_confirmed, agent_signing_supported, agent_auth_failures
                    FROM firewalls WHERE id = ?'
             );
@@ -337,7 +337,7 @@ if (!function_exists('authenticateAgentRequest')) {
         }
 
         // --- api_key ---------------------------------------------------------
-        $storedKey    = opnmgr_decrypt($firewall['api_key'] ?? null) ?? '';
+        $storedKey    = opnmgr_decrypt($firewall['agent_api_key'] ?? null) ?? '';
         $keyConfirmed = (int)($firewall['api_key_confirmed'] ?? 0) === 1;
         $issue        = [];
         $apiKeyUsed   = false;
@@ -351,11 +351,12 @@ if (!function_exists('authenticateAgentRequest')) {
             try {
                 db()->prepare(
                     'UPDATE firewalls
-                        SET api_key = ?, api_secret = ?, api_key_issued_at = NOW(), api_key_confirmed = 0
+                        SET agent_api_key = ?, agent_api_secret = ?,
+                            api_key_issued_at = NOW(), api_key_confirmed = 0
                       WHERE id = ?'
                 )->execute([opnmgr_encrypt($storedKey), opnmgr_encrypt($newSecret), $firewallId]);
 
-                $firewall['api_secret'] = opnmgr_encrypt($newSecret);
+                $firewall['agent_api_secret'] = opnmgr_encrypt($newSecret);
                 $issue = ['api_key' => $storedKey, 'api_secret' => $newSecret];
 
                 audit_log_agent('agent.credentials.provisioned', $firewallId, [
@@ -385,13 +386,13 @@ if (!function_exists('authenticateAgentRequest')) {
         } else {
             // Key issued but not yet adopted by the agent. Re-issue it so an
             // agent that lost its config file can recover.
-            $issue = ['api_key' => $storedKey, 'api_secret' => opnmgr_decrypt($firewall['api_secret'] ?? null) ?? ''];
+            $issue = ['api_key' => $storedKey, 'api_secret' => opnmgr_decrypt($firewall['agent_api_secret'] ?? null) ?? ''];
         }
 
         // --- signature -------------------------------------------------------
         $mode         = agent_auth_mode();
         $signedBefore = (int)($firewall['agent_signing_supported'] ?? 0) === 1;
-        $secret       = opnmgr_decrypt($firewall['api_secret'] ?? null) ?? '';
+        $secret       = opnmgr_decrypt($firewall['agent_api_secret'] ?? null) ?? '';
         $sig          = agent_verify_signature($firewall, $secret);
 
         $signatureRequired = ($opts['require_signature'] ?? false)

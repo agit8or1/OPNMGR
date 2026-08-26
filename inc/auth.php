@@ -53,21 +53,105 @@ if (!defined('OPNMGR_BOOTSTRAPPED')) {
 
 // ── Auth helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Session timeout settings, administrator-configurable.
+ *
+ * Falls back to the compiled defaults when the settings table is unavailable,
+ * so a database hiccup cannot accidentally grant unlimited sessions.
+ *
+ * @return array{idle:int, absolute:int}
+ */
+function sessionTimeouts(): array {
+    static $cache = null;
+    if ($cache !== null) {
+        return $cache;
+    }
+
+    $idle     = defined('SESSION_TIMEOUT') ? SESSION_TIMEOUT : 3600;
+    $absolute = 43200; // 12 hours
+
+    try {
+        $stmt = db()->query(
+            "SELECT `name`,`value` FROM settings
+              WHERE `name` IN ('session_idle_timeout','session_absolute_timeout')"
+        );
+        $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+
+        if (!empty($rows['session_idle_timeout']) && (int)$rows['session_idle_timeout'] >= 60) {
+            $idle = (int)$rows['session_idle_timeout'];
+        }
+        if (!empty($rows['session_absolute_timeout']) && (int)$rows['session_absolute_timeout'] >= 300) {
+            $absolute = (int)$rows['session_absolute_timeout'];
+        }
+    } catch (Throwable $e) {
+        // keep the defaults
+    }
+
+    $cache = ['idle' => $idle, 'absolute' => $absolute];
+    return $cache;
+}
+
+/**
+ * Tear down the current session completely.
+ */
+function destroySession(): void {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies') && isset($_COOKIE[session_name()])) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires'  => time() - 42000,
+            'path'     => $params['path'],
+            'domain'   => $params['domain'],
+            'secure'   => $params['secure'],
+            'httponly' => $params['httponly'],
+            'samesite' => $params['samesite'] ?? 'Lax',
+        ]);
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+}
+
 function isLoggedIn() {
     if (!isset($_SESSION['user_id'])) {
         return false;
     }
 
-    // Enforce session timeout
-    $timeout = defined('SESSION_TIMEOUT') ? SESSION_TIMEOUT : 3600;
-    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $timeout) {
-        $_SESSION = array();
-        session_destroy();
+    $timeouts = sessionTimeouts();
+    $now      = time();
+
+    // Idle timeout
+    if (isset($_SESSION['last_activity']) && ($now - $_SESSION['last_activity']) > $timeouts['idle']) {
+        destroySession();
         return false;
     }
 
-    // Update last activity
-    $_SESSION['last_activity'] = time();
+    // Absolute timeout: a session cannot be kept alive indefinitely by activity.
+    $started = $_SESSION['login_time'] ?? $_SESSION['created_at'] ?? $now;
+    if (($now - $started) > $timeouts['absolute']) {
+        destroySession();
+        return false;
+    }
+
+    // Bind the session to the user agent it was issued to. The values were
+    // already being recorded at login but never checked, so a stolen cookie was
+    // usable from anywhere. Deliberately not binding to IP: mobile and
+    // multi-WAN clients legitimately change address mid-session.
+    if (isset($_SESSION['user_agent'])
+        && !hash_equals($_SESSION['user_agent'], (string)($_SERVER['HTTP_USER_AGENT'] ?? ''))) {
+        error_log('SECURITY: session user-agent mismatch for user_id=' . $_SESSION['user_id'] . ' - session destroyed');
+        destroySession();
+        return false;
+    }
+
+    // Periodically roll the session id so a long-lived session does not keep
+    // the same identifier for its whole life.
+    if (!isset($_SESSION['last_regenerated']) || ($now - $_SESSION['last_regenerated']) > 900) {
+        session_regenerate_id(true);
+        $_SESSION['last_regenerated'] = $now;
+    }
+
+    $_SESSION['last_activity'] = $now;
 
     return true;
 }
@@ -121,26 +205,64 @@ function login($username, $password) {
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['login_time'] = time();
+        $_SESSION['created_at'] = time();
         $_SESSION['last_activity'] = time();
-        $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'];
-        $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+        $_SESSION['last_regenerated'] = time();
+        $_SESSION['ip_address'] = $_SERVER['REMOTE_ADDR'] ?? '';
+        $_SESSION['user_agent'] = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+
+        // Transparently upgrade weaker legacy hashes on successful login.
+        if (password_needs_rehash($user['password'], PASSWORD_DEFAULT)) {
+            try {
+                $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')
+                    ->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+            } catch (Throwable $e) {
+                error_log('OPNMGR: password rehash failed for user ' . $user['id'] . ': ' . $e->getMessage());
+            }
+        }
+
+        try {
+            db()->prepare('UPDATE users SET last_login = NOW() WHERE id = ?')->execute([$user['id']]);
+        } catch (Throwable $e) {
+            // non-fatal
+        }
+
+        if (function_exists('audit_log')) {
+            audit_log('auth.login', [
+                'success'     => true,
+                'object_type' => 'user',
+                'object_id'   => (string)$user['id'],
+                'message'     => 'Successful login',
+            ]);
+        }
 
         return true;
     }
+
+    if (function_exists('audit_log')) {
+        audit_log('auth.login', [
+            'success'  => false,
+            'username' => $username,
+            'user_id'  => null,
+            'actor_type' => 'anonymous',
+            'message'  => 'Failed login attempt',
+        ]);
+    }
+
     return false;
 }
 
 function logout() {
-    // Clear all session variables
-    $_SESSION = array();
-
-    // Delete the session cookie
-    if (isset($_COOKIE[session_name()])) {
-        setcookie(session_name(), '', time() - 3600, '/');
+    if (function_exists('audit_log') && isset($_SESSION['user_id'])) {
+        audit_log('auth.logout', [
+            'success'     => true,
+            'object_type' => 'user',
+            'object_id'   => (string)$_SESSION['user_id'],
+            'message'     => 'User logged out',
+        ]);
     }
 
-    // Destroy the session
-    session_destroy();
+    destroySession();
 
     header('Location: /login.php');
     exit;

@@ -7,6 +7,7 @@
 require_once(__DIR__ . '/../inc/bootstrap_agent.php');
 require_once(__DIR__ . '/../inc/logging.php');
 
+require_once(__DIR__ . '/../inc/secrets.php');
 if (!function_exists('get_firewall_by_id')) {
     function get_firewall_by_id($firewall_id) {
                 $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
@@ -16,8 +17,9 @@ if (!function_exists('get_firewall_by_id')) {
 }
 
 function update_firewall_ssh_key($firewall_id, $private_key_base64, $public_key) {
-        $stmt = db()->prepare("UPDATE firewalls SET ssh_private_key = ?, ssh_public_key = ? WHERE id = ?");
-    return $stmt->execute([$private_key_base64, $public_key, $firewall_id]);
+    // Private key encrypted at rest; the public half is not a secret.
+    $stmt = db()->prepare("UPDATE firewalls SET ssh_private_key = ?, ssh_public_key = ? WHERE id = ?");
+    return $stmt->execute([opnmgr_encrypt($private_key_base64), $public_key, $firewall_id]);
 }
 
 if (!function_exists('queue_command')) {
@@ -148,7 +150,7 @@ function ensure_ssh_key($firewall_id, $force_regenerate = false, $allow_blocking
         $needs_new_key = true;
     } else {
         // Extract key from database and save to file
-        $private_key = base64_decode($firewall['ssh_private_key']);
+        $private_key = base64_decode(get_firewall_ssh_private_key($firewall));
         file_put_contents($key_file, $private_key);
         chmod($key_file, 0600);
 
@@ -253,7 +255,7 @@ if (php_sapi_name() === 'cli' && basename($_SERVER['SCRIPT_FILENAME']) === 'mana
             $key_file = "/etc/opnmgr/keys/id_firewall_{$firewall_id}";
             
             if (!file_exists($key_file) && $firewall['ssh_private_key']) {
-                file_put_contents($key_file, base64_decode($firewall['ssh_private_key']));
+                file_put_contents($key_file, base64_decode(get_firewall_ssh_private_key($firewall)));
                 chmod($key_file, 0600);
             }
             

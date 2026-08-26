@@ -75,10 +75,23 @@ $DB = db();
 // 5. Secure session handling (only if not already started)
 // ---------------------------------------------------------------------------
 if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.cookie_httponly', 1);
-    ini_set('session.cookie_secure', 1);
-    ini_set('session.use_strict_mode', 1);
+    // Detect HTTPS behind the local reverse proxy as well as directly.
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443)
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+    ini_set('session.cookie_httponly', '1');
+    // Only set Secure when the request actually is HTTPS. Setting it
+    // unconditionally silently breaks sessions for anyone reaching the
+    // application over the plain-HTTP vhost.
+    ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+    ini_set('session.use_strict_mode', '1');   // reject attacker-supplied session ids
+    ini_set('session.use_only_cookies', '1');  // never accept a session id from the URL
+    ini_set('session.use_trans_sid', '0');     // never put a session id into URLs
     ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.sid_length', '48');
+    ini_set('session.sid_bits_per_character', '5');
+
     session_start();
 }
 
@@ -86,6 +99,7 @@ if (session_status() === PHP_SESSION_NONE) {
 if (!isset($_SESSION['initiated'])) {
     session_regenerate_id(true);
     $_SESSION['initiated'] = true;
+    $_SESSION['created_at'] = time();
 }
 
 // ---------------------------------------------------------------------------

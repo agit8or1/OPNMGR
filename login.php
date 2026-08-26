@@ -6,14 +6,26 @@ $message = '';
 $bfp = new BruteForceProtection(db());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username']);
-    $password = $_POST['password'];
-    $ip_address = $_SERVER['REMOTE_ADDR'];
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? '';
+
+    // CSRF: stops a third-party page from silently signing a visitor into an
+    // account the attacker controls, which would then have their subsequent
+    // actions attributed to that account.
+    $csrf_ok = csrf_verify($_POST['csrf_token'] ?? '');
+
+    if (!$csrf_ok) {
+        $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i><strong>Session expired</strong><br>Please try signing in again.</div>';
+        error_log("SECURITY: login rejected on CSRF failure - Username: {$username}, IP: {$ip_address}");
+    }
 
     // Check if account is locked out
-    $lockout_status = $bfp->is_locked_out($username, $ip_address);
+    $lockout_status = $csrf_ok ? $bfp->is_locked_out($username, $ip_address) : ['locked' => false];
 
-    if ($lockout_status['locked']) {
+    if (!$csrf_ok) {
+        // Message already set above; fall through to render the form.
+    } elseif ($lockout_status['locked']) {
         $remaining = $lockout_status['remaining_minutes'];
         $message = '<div class="alert alert-danger"><i class="fas fa-lock me-2"></i><strong>Account Locked</strong><br>Too many failed login attempts. Please try again in ' . $remaining . ' minute' . ($remaining > 1 ? 's' : '') . '.</div>';
         error_log("SECURITY: Login attempt on locked account - Username: {$username}, IP: {$ip_address}");
@@ -159,6 +171,7 @@ try {
         <div class="login-card">
             <?php echo $message; ?>
             <form method="post">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                 <div class="mb-3">
                     <label for="username" class="form-label">Username</label>
                     <input type="text" class="form-control" id="username" name="username" required autocomplete="username" placeholder="Enter username">

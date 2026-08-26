@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/secrets.php';
 requireLogin();
 requireAdmin();
 
@@ -7,7 +8,7 @@ $notice = '';
 
 // Load SMTP settings
 try {
-    $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $rows = decrypt_settings_map(db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR));
 } catch (Exception $e) {
     $rows = [];
 }
@@ -34,7 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $smtp_host = trim($_POST['smtp_host'] ?? '');
             $smtp_port = trim($_POST['smtp_port'] ?? '587');
             $smtp_username = trim($_POST['smtp_username'] ?? '');
+            // Blank means 'unchanged': the form never echoes the stored value back.
             $smtp_password = $_POST['smtp_password'] ?? '';
+            if ($smtp_password === '') {
+                $smtp_password = get_secret_setting('smtp_password');
+            }
             $smtp_encryption = $_POST['smtp_encryption'] ?? 'tls';
             $smtp_from_email = trim($_POST['smtp_from_email'] ?? '');
             $smtp_from_name = trim($_POST['smtp_from_name'] ?? 'OPNsense Manager');
@@ -52,14 +57,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     save_setting('smtp_host', $smtp_host);
                     save_setting('smtp_port', $smtp_port);
                     save_setting('smtp_username', $smtp_username);
-                    save_setting('smtp_password', $smtp_password);
+                    save_secret_setting('smtp_password', $smtp_password);  // encrypted at rest
                     save_setting('smtp_encryption', $smtp_encryption);
                     save_setting('smtp_from_email', $smtp_from_email);
                     save_setting('smtp_from_name', $smtp_from_name);
                     
                     $notice = '<div class="alert alert-success">SMTP settings saved successfully!</div>';
                     // Reload settings from database
-                    $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+                    $rows = decrypt_settings_map(db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR));
                     $smtp_host = $rows['smtp_host'] ?? '';
                     $smtp_port = $rows['smtp_port'] ?? '587';
                     $smtp_username = $rows['smtp_username'] ?? '';
@@ -155,7 +160,9 @@ include __DIR__ . '/inc/header.php';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">Password</label>
-                            <input type="password" name="smtp_password" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_password); ?>" placeholder="Your SMTP password">
+                            <input type="password" name="smtp_password" class="form-control form-control-sm" value="" autocomplete="new-password"
+                                   placeholder="<?php echo $smtp_password !== '' ? '\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022} (unchanged)' : 'Your SMTP password'; ?>">
+                            <div class="form-text">Leave blank to keep the stored password.</div>
                         </div>
                     </div>
 

@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
+require_once __DIR__ . '/../inc/secrets.php';
 function fetchFirewallLogs($firewall_id, $log_types = ['filter', 'dhcp', 'system'], $lines = 1000) {
     // Get firewall details
     $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
@@ -115,7 +116,8 @@ function analyzeLogsWithAI($firewall_id, $config_data, $logs, $ai_settings) {
     
     // Call AI provider
     $provider = $ai_settings['provider'];
-    $api_key = $ai_settings['api_key'];
+    // Stored encrypted at rest; legacy plaintext passes through unchanged.
+    $api_key = opnmgr_decrypt((string)$ai_settings['api_key']) ?? '';
     $model = $ai_settings['model'];
     
     switch ($provider) {

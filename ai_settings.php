@@ -1,6 +1,7 @@
 <?php
 // Settings > AI Configuration
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/secrets.php';
 requireLogin();
 $page_title = "AI Configuration";
 include 'inc/header.php';
@@ -26,12 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($existing) {
             // Update existing
             $stmt = db()->prepare("UPDATE ai_settings SET api_key = ?, model = ?, is_active = TRUE, updated_at = NOW() WHERE provider = ?");
-            $stmt->execute([$api_key, $model, $provider]);
+            $stmt->execute([opnmgr_encrypt($api_key), $model, $provider]);
             $message = "AI provider updated successfully!";
         } else {
             // Insert new
             $stmt = db()->prepare("INSERT INTO ai_settings (provider, api_key, model) VALUES (?, ?, ?)");
-            $stmt->execute([$provider, $api_key, $model]);
+            $stmt->execute([$provider, opnmgr_encrypt($api_key), $model]);
             $message = "AI provider added successfully!";
         }
         $message_type = 'success';
@@ -42,8 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $model = $_POST['model'];
         $api_key = $_POST['api_key'];
 
-        $stmt = db()->prepare("UPDATE ai_settings SET model = ?, api_key = ?, updated_at = NOW() WHERE id = ?");
-        $stmt->execute([$model, $api_key, $provider_id]);
+        // Blank means 'leave the stored key alone' - the UI never echoes it back.
+        if ($api_key === '') {
+            $stmt = db()->prepare("UPDATE ai_settings SET model = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$model, $provider_id]);
+        } else {
+            $stmt = db()->prepare("UPDATE ai_settings SET model = ?, api_key = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([$model, opnmgr_encrypt($api_key), $provider_id]);
+        }
         $message = "Provider updated successfully!";
         $message_type = 'success';
     }
@@ -372,7 +379,8 @@ $available_providers = [
                         </div>
                     </div>
                     <div class="api-key-display">
-                        <?= substr($provider['api_key'], 0, 8) ?>...<?= substr($provider['api_key'], -4) ?>
+                        <?php // Masked: the stored key is never sent to the browser. ?>
+                        <?= htmlspecialchars(opnmgr_mask_secret(opnmgr_decrypt($provider['api_key']) ?? '')) ?>
                     </div>
                     <span class="provider-status status-<?= $provider['is_active'] ? 'active' : 'inactive' ?>">
                         <?= $provider['is_active'] ? 'DEFAULT PROVIDER' : 'INACTIVE' ?>

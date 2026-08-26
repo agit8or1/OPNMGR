@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/src/TwoFactorAuth.php';
+require_once __DIR__ . '/inc/secrets.php';
 
 if (empty($_SESSION['user_id'])) {
     header('Location: /login.php'); exit;
@@ -10,7 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = trim($_POST['code'] ?? '');
     $stmt = db()->prepare('SELECT totp_secret FROM users WHERE id = :id');
     $stmt->execute([':id'=>$_SESSION['user_id']]);
-    $s = $stmt->fetchColumn();
+    // The stored TOTP secret is encrypted at rest; opnmgr_decrypt() returns
+    // legacy plaintext unchanged so pre-encryption enrolments keep working.
+    $s = opnmgr_decrypt((string)$stmt->fetchColumn());
     if ($s && TwoFactorAuth::verify($s, $code)) {
         clear2FA();
         header('Location: /dashboard.php'); exit;

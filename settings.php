@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/secrets.php';
 requireLogin();
 requireAdmin();
 
@@ -12,7 +13,9 @@ if (!empty($_GET['notice'])) {
 }
 
 // load settings
-$rows = db()->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+// decrypt_settings_map() transparently decrypts the credential entries;
+// legacy plaintext values pass through unchanged.
+$rows = decrypt_settings_map(db()->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR));
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
 $manager_fqdn = $rows['manager_fqdn'] ?? 'opn.agit8or.net';
 $acme_domain = $rows['acme_domain'] ?? '';
@@ -108,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       save_setting('smtp_host',$smtp_host);
       save_setting('smtp_port',$smtp_port);
       save_setting('smtp_username',$smtp_username);
-      save_setting('smtp_password',$smtp_password);
+      save_secret_setting('smtp_password', $smtp_password);  // encrypted at rest
       save_setting('smtp_encryption',$smtp_encryption);
       $notice = 'SMTP settings saved.';
     }

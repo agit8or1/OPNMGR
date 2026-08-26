@@ -10,6 +10,7 @@ header('Content-Type: application/json');
 require_once '../inc/agent_version.php';
 
 
+require_once __DIR__ . '/../inc/secrets.php';
 if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
@@ -361,7 +362,8 @@ function fetchFirewallLogs($firewall, $log_types = ['filter', 'system', 'resolve
  */
 function performAIAnalysis($ai_settings, $config_data, $firewall, $scan_type, $log_data = null) {
     $provider = $ai_settings['provider'];
-    $api_key = $ai_settings['api_key'];
+    // Stored encrypted at rest; legacy plaintext passes through unchanged.
+    $api_key = opnmgr_decrypt((string)$ai_settings['api_key']) ?? '';
     $model = $ai_settings['model'];
     
     // Build prompt for AI

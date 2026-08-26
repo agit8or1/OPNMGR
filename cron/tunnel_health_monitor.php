@@ -18,6 +18,7 @@
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
 require_once __DIR__ . '/../inc/logging.php';
 
+require_once __DIR__ . '/../inc/secrets.php';
 // Prevent overlapping runs
 $lock_file = '/tmp/tunnel_health_monitor.lock';
 $lock_fp = fopen($lock_file, 'w');
@@ -118,7 +119,7 @@ foreach ($sessions as $session) {
 
         // If no existing key found, write it to the writable location
         if (!$found_existing) {
-            $private_key = base64_decode($session['ssh_private_key']);
+            $private_key = base64_decode(get_firewall_ssh_private_key($session));
             $key_dir = dirname($key_file);
             if (!is_dir($key_dir)) {
                 @mkdir($key_dir, 0700, true);
