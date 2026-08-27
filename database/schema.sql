@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.14.0.
+-- Generated from the reference installation for OPNManager v3.15.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -425,6 +425,41 @@ CREATE TABLE IF NOT EXISTS `bugs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `bulk_operation_targets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `bulk_id` int(11) NOT NULL,
+  `firewall_id` int(11) NOT NULL,
+  `status` enum('queued','succeeded','failed','skipped') NOT NULL DEFAULT 'queued',
+  `command_id` int(11) DEFAULT NULL,
+  `detail` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_bulk` (`bulk_id`),
+  KEY `idx_firewall` (`firewall_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `bulk_operations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `operation` varchar(64) NOT NULL COMMENT 'Action id from the bulk catalogue',
+  `parameters` text DEFAULT NULL COMMENT 'JSON, validated before dispatch',
+  `risk_level` enum('LOW','MEDIUM','HIGH','CRITICAL') NOT NULL DEFAULT 'MEDIUM',
+  `target_count` int(11) NOT NULL DEFAULT 0,
+  `succeeded` int(11) NOT NULL DEFAULT 0,
+  `failed` int(11) NOT NULL DEFAULT 0,
+  `status` enum('running','completed','failed') NOT NULL DEFAULT 'running',
+  `created_by_user_id` int(11) DEFAULT NULL,
+  `created_by_username` varchar(64) DEFAULT NULL,
+  `created_from_ip` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `completed_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_created` (`created_at`),
+  KEY `idx_operation` (`operation`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `change_log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `version` varchar(20) NOT NULL,
@@ -498,6 +533,32 @@ CREATE TABLE IF NOT EXISTS `config_drift` (
   KEY `idx_status` (`status`),
   KEY `idx_first_detected` (`first_detected_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Current drift state per firewall; one row per firewall';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `config_restores` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `backup_id` int(11) NOT NULL COMMENT 'The configuration being restored',
+  `pre_restore_backup_id` int(11) DEFAULT NULL COMMENT 'Snapshot taken before overwriting',
+  `status` enum('pending','pre_backup','dispatched','verifying','succeeded','failed','cancelled') NOT NULL DEFAULT 'pending',
+  `command_id` int(11) DEFAULT NULL,
+  `fetch_token` char(64) DEFAULT NULL COMMENT 'Single-use token the agent presents to fetch the config',
+  `token_used_at` timestamp NULL DEFAULT NULL,
+  `requested_by_user_id` int(11) DEFAULT NULL,
+  `requested_by_username` varchar(64) DEFAULT NULL,
+  `requested_from_ip` varchar(45) DEFAULT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `detail` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `dispatched_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  `checkin_before` timestamp NULL DEFAULT NULL COMMENT 'Last check-in at dispatch, so a later one proves the agent returned',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fetch_token` (`fetch_token`),
+  KEY `idx_firewall` (`firewall_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1092,6 +1153,10 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `carp_peer_host` varchar(255) DEFAULT NULL,
   `carp_sync_status` varchar(32) DEFAULT NULL,
   `ha_peer_firewall_id` int(11) DEFAULT NULL COMMENT 'Resolved HA partner, used to avoid updating both members at once',
+  `update_ring` enum('canary','pilot','production') NOT NULL DEFAULT 'production' COMMENT 'Rollout ring. Not a customer tier.',
+  `last_update_result` varchar(32) DEFAULT NULL,
+  `last_update_error` varchar(255) DEFAULT NULL,
+  `last_update_attempt_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -1100,7 +1165,8 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   KEY `idx_customer_id` (`customer_id`),
   KEY `idx_site_id` (`site_id`),
   KEY `idx_carp_state` (`carp_state`),
-  KEY `idx_ha_peer` (`ha_peer_firewall_id`)
+  KEY `idx_ha_peer` (`ha_peer_firewall_id`),
+  KEY `idx_update_ring` (`update_ring`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1470,6 +1536,50 @@ CREATE TABLE IF NOT EXISTS `todos` (
   KEY `idx_status` (`status`),
   KEY `idx_priority` (`priority`),
   KEY `idx_component` (`component`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `update_campaign_targets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `campaign_id` int(11) NOT NULL,
+  `firewall_id` int(11) NOT NULL,
+  `ring` enum('canary','pilot','production') NOT NULL,
+  `status` enum('pending','holding','dispatched','succeeded','failed','skipped') NOT NULL DEFAULT 'pending',
+  `hold_reason` varchar(255) DEFAULT NULL COMMENT 'Why a target is not being dispatched yet, e.g. HA partner in progress',
+  `command_id` int(11) DEFAULT NULL,
+  `version_before` varchar(64) DEFAULT NULL,
+  `version_after` varchar(64) DEFAULT NULL,
+  `dispatched_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  `result` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_campaign_firewall` (`campaign_id`,`firewall_id`),
+  KEY `idx_campaign_status` (`campaign_id`,`status`),
+  KEY `idx_firewall` (`firewall_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `update_campaigns` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `description` varchar(512) DEFAULT NULL,
+  `target_version` varchar(64) DEFAULT NULL COMMENT 'Informational: what we expect to end up on',
+  `operation` enum('check','install') NOT NULL DEFAULT 'install',
+  `status` enum('draft','running','paused','completed','cancelled') NOT NULL DEFAULT 'draft',
+  `current_ring` enum('canary','pilot','production') DEFAULT NULL,
+  `auto_progress` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Advance to the next ring without a human approving it',
+  `reboot_if_required` tinyint(1) NOT NULL DEFAULT 0,
+  `respect_maintenance` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Only dispatch inside a maintenance window when one is defined',
+  `ha_safe` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Never dispatch to both members of a CARP pair at once',
+  `created_by_user_id` int(11) DEFAULT NULL,
+  `created_by_username` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `started_at` timestamp NULL DEFAULT NULL,
+  `completed_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

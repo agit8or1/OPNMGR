@@ -189,6 +189,24 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-mobile-alt"></i></span>
         <span class="sidebar-label">2FA Setup</span>
       </a>
+      <?php if (function_exists('can') && can('firewall.view')): ?>
+      <a class="sidebar-item <?php echo isActive('fleet_updates.php') ?>" href="/fleet_updates.php">
+        <span class="sidebar-icon"><i class="fas fa-rocket"></i></span>
+        <span class="sidebar-label">Fleet Updates</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('bulk.operate')): ?>
+      <a class="sidebar-item <?php echo isActive('bulk_operations.php') ?>" href="/bulk_operations.php">
+        <span class="sidebar-icon"><i class="fas fa-layer-group"></i></span>
+        <span class="sidebar-label">Bulk Ops</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('config.search')): ?>
+      <a class="sidebar-item <?php echo isActive('config_search.php') ?>" href="/config_search.php">
+        <span class="sidebar-icon"><i class="fas fa-file-magnifying-glass"></i></span>
+        <span class="sidebar-label">Config Search</span>
+      </a>
+      <?php endif; ?>
       <?php if (function_exists('can') && can('health.view')): ?>
       <a class="sidebar-item <?php echo isActive('firewall_health.php') ?>" href="/firewall_health.php">
         <span class="sidebar-icon"><i class="fas fa-heart-pulse"></i></span>

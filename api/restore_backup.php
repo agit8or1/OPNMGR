@@ -1,88 +1,66 @@
 <?php
 /**
- * Restore Backup API
- * Queues a restore command for the specified backup
+ * Restore Backup API.
+ *
+ * Validates, takes a pre-restore snapshot, and queues an agent-authenticated
+ * restore. See inc/config_restore.php for why each step exists.
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/config_restore.php';
 
 header('Content-Type: application/json');
-requireLogin();
-requireAdmin();
+
+require_permission('backup.restore');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
-// Read JSON input
-$input = json_decode(file_get_contents('php://input'), true);
+$input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 
-if (!$input) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid JSON input']);
-    exit;
-}
-
-$backup_id = (int)($input['backup_id'] ?? 0);
-$csrf_token = $input['csrf'] ?? '';
-
-// Validate CSRF token
-if (!csrf_verify($csrf_token)) {
+if (!csrf_verify($input['csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
     http_response_code(403);
-    echo json_encode(['error' => 'CSRF verification failed']);
+    echo json_encode(['success' => false, 'message' => 'CSRF verification failed']);
     exit;
 }
 
-if (!$backup_id) {
+$backupId = (int)($input['backup_id'] ?? 0);
+if ($backupId <= 0) {
     http_response_code(400);
-    echo json_encode(['error' => 'Missing backup ID']);
+    echo json_encode(['success' => false, 'message' => 'Missing backup ID']);
     exit;
 }
 
-try {
-    // Get backup info
-    $stmt = db()->prepare("
-        SELECT b.*, f.hostname 
-        FROM backups b 
-        JOIN firewalls f ON b.firewall_id = f.id 
-        WHERE b.id = ?
-    ");
-    $stmt->execute([$backup_id]);
-    $backup = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$backup) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Backup not found']);
-        exit;
-    }
-    
-    // Queue restore command
-    $restore_command = "curl -o /tmp/restore_config.xml '" . $_SERVER['HTTP_HOST'] . "/api/download_backup.php?id={$backup_id}' && " .
-                      "configctl firmware restore /tmp/restore_config.xml && " .
-                      "rm /tmp/restore_config.xml";
-    
-    $stmt = db()->prepare("
-        INSERT INTO firewall_commands (firewall_id, command, description, status, created_at) 
-        VALUES (?, ?, 'Restore configuration backup', 'pending', NOW())
-    ");
-    $stmt->execute([$backup['firewall_id'], $restore_command]);
-    
-    // Log the restore request
-    $stmt = db()->prepare("
-        INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
-        VALUES (?, 'backup', ?, 'WARNING', NOW())
-    ");
-    $stmt->execute([$backup['firewall_id'], "Configuration restore queued for firewall: " . $backup['hostname']]);
-    
+// A dry run lets the UI show what would happen, and surfaces validation
+// failures before anybody types a confirmation.
+if (!empty($input['validate_only'])) {
+    $check = restore_validate($backupId);
     echo json_encode([
-        'success' => true,
-        'message' => 'Restore command queued for firewall: ' . $backup['hostname']
+        'success'  => $check['ok'],
+        'message'  => $check['ok'] ? 'Backup is valid and the firewall is reachable' : $check['error'],
+        'firewall' => $check['ok'] ? $check['firewall']['hostname'] : null,
+        'confirm_with' => $check['ok'] ? $check['firewall']['hostname'] : null,
     ]);
-    
-} catch (Exception $e) {
-    http_response_code(500);
-    error_log("restore_backup.php error: " . $e->getMessage());
-    echo json_encode(['error' => 'Internal server error']);
+    exit;
 }
-?>
+
+$result = restore_start(
+    $backupId,
+    (string)($input['confirm'] ?? ''),
+    (string)($input['reason'] ?? '')
+);
+
+if (!$result['ok']) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => $result['error']]);
+    exit;
+}
+
+echo json_encode([
+    'success'    => true,
+    'restore_id' => $result['restore_id'],
+    'message'    => 'Pre-restore snapshot and restore queued. '
+                  . 'Success is confirmed only once the agent checks in again.',
+]);

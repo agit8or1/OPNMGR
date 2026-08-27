@@ -128,6 +128,9 @@ jobs:
       - name: Alerting and maintenance suite
         run: php tests/alerting_test.php
 
+      - name: Fleet updates, bulk ops and config search suite
+        run: php tests/fleet_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -223,3 +226,4 @@ jobs:
           php tests/msp_test.php
           php tests/health_drift_test.php
           php tests/alerting_test.php
+          php tests/fleet_test.php

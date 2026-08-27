@@ -18,6 +18,36 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.16.0
+
+Migrations 0012 and 0013 add the campaign, bulk operation and restore-job tables, plus
+`firewalls.update_ring`. All additive.
+
+Every firewall defaults to the **production** ring. Before running a campaign, move a
+small number of low-risk firewalls to canary:
+
+```sql
+UPDATE firewalls SET update_ring = 'canary' WHERE hostname IN ('lab-fw-01');
+```
+
+Or use the ring selector on the Fleet Updates page.
+
+If you run CARP pairs, confirm OPNMGR has paired them — HA safety depends on it:
+
+```sql
+SELECT hostname, carp_state, ha_peer_firewall_id FROM firewalls WHERE carp_enabled = 1;
+```
+
+Pairing is resolved from the CARP peer address the agent reports, so it requires agent
+1.6.0. Until a pair is linked, both members are treated as standalone and could be
+dispatched together.
+
+The restore path changed: `api/download_backup.php` is no longer used by firewalls.
+Restores now go through `api/download_restore_config.php`, authenticated as the agent
+with a single-use token. No action needed beyond deploying the new code.
+
+---
+
 ## Upgrading to 3.15.0
 
 Migration 0011 adds the incident and maintenance-window tables. Additive; nothing existing

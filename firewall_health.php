@@ -171,6 +171,68 @@ include __DIR__ . '/inc/header.php';
     </div>
     <?php endif; ?>
 
+    <?php $agents = agent_health_fleet(); ?>
+    <div class="card mb-3">
+        <div class="card-header py-2"><strong class="small">Agent health</strong></div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead><tr>
+                    <th>Firewall</th><th>Agent</th><th>Last check-in</th><th>Auth</th>
+                    <th>Signing</th><th>Clock skew</th><th>Last update</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($agents as $a): ?>
+                    <tr>
+                        <td class="small"><?php echo htmlspecialchars($a['hostname']); ?>
+                            <span class="text-muted"><?php echo htmlspecialchars($a['customer_name'] ?: ''); ?></span></td>
+                        <td class="small">
+                            <?php echo htmlspecialchars($a['agent_version'] ?: 'unknown'); ?>
+                            <?php if ($a['outdated']): ?>
+                                <span class="badge bg-warning text-dark" title="Latest is <?php echo htmlspecialchars($a['latest_agent_version']); ?>">outdated</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="small">
+                            <?php echo htmlspecialchars(h_age($a['last_checkin'])); ?>
+                            <?php if ($a['overdue']): ?>
+                                <span class="badge bg-danger">overdue</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="small">
+                            <?php if ((int)$a['agent_auth_failures'] > 0): ?>
+                                <span class="badge bg-danger"><?php echo (int)$a['agent_auth_failures']; ?> failures</span>
+                            <?php elseif ((int)$a['api_key_confirmed'] === 1): ?>
+                                <span class="badge bg-success">key pinned</span>
+                            <?php else: ?>
+                                <span class="badge bg-secondary" title="Still authenticating on hardware_id alone">bootstrapping</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="small">
+                            <?php echo (int)$a['agent_signing_supported'] === 1
+                                ? '<span class="badge bg-success">signed</span>'
+                                : '<span class="text-muted">not yet</span>'; ?>
+                        </td>
+                        <td class="small">
+                            <?php if ($a['agent_clock_skew_seconds'] === null): ?>
+                                <span class="text-muted">—</span>
+                            <?php else: ?>
+                                <span class="<?php echo $a['clock_skewed'] ? 'text-danger' : 'text-muted'; ?>">
+                                    <?php echo (int)$a['agent_clock_skew_seconds']; ?>s</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="small text-muted">
+                            <?php echo htmlspecialchars($a['last_update_result'] ?: '—'); ?>
+                            <?php if ($a['last_update_error']): ?>
+                                <div class="text-danger" style="font-size:.7rem">
+                                    <?php echo htmlspecialchars(substr($a['last_update_error'], 0, 60)); ?></div>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="card mb-4">
         <div class="card-header py-2"><strong class="small">Fleet</strong></div>
         <div class="table-responsive">

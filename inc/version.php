@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Incident Alerting & Maintenance Windows'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fleet Updates, Bulk Ops & Config Search'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,22 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.16.0',
+            'date' => '2026-08-27',
+            'type' => 'minor',
+            'title' => 'Fleet Update Management, Bulk Operations and Configuration Search',
+            'changes' => [
+                'ADDED: Fleet update view showing customer, site, current and available version, agent version, update and reboot state per firewall',
+                'ADDED: Update rings (canary, pilot, production) as a rollout mechanism, not customer tiers. Progression is manual unless auto-progress is explicitly enabled, and a ring containing any failure never counts as clean',
+                'ADDED: HA-safe updates. Members of a CARP pair are never dispatched simultaneously, the BACKUP is updated before the MASTER, and the second member is held until the first is back online with CARP settled',
+                'ADDED: Bulk operations across selected firewalls, with typed confirmation phrases that include the target count for high-risk actions. Raw shell is deliberately not a bulk operation',
+                'ADDED: Deterministic fleet configuration search over stored backups, with named checks (SSH on WAN, web GUI on WAN, any-any pass rules, UPnP) plus literal and CIDR matching. No AI required',
+                'ADDED: Agent health view covering version currency, check-in punctuality, authentication state, signing support and clock skew',
+                'SECURITY: The restore path built its download URL from the client-supplied Host header with no scheme, and pointed at a session-protected endpoint a firewall cannot authenticate to. Restores now use an agent-authenticated, single-use token endpoint',
+                'ADDED: Restore safety - the backup is validated and checksum-verified, a pre-restore snapshot is taken first, the firewall hostname must be typed to confirm, and success is only recorded once the agent checks in again after the restore',
+            ]
+        ],
         [
             'version' => '3.15.0',
             'date' => '2026-08-26',

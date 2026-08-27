@@ -27,6 +27,7 @@ require_once __DIR__ . '/../inc/alerting.php';
 require_once __DIR__ . '/../inc/maintenance.php';
 require_once __DIR__ . '/../inc/firewall_health.php';
 require_once __DIR__ . '/../inc/alerts.php';
+require_once __DIR__ . '/../inc/config_restore.php';
 
 $dryRun  = in_array('--dry-run', $argv, true);
 $verbose = in_array('--verbose', $argv, true) || $dryRun;
@@ -71,6 +72,13 @@ maintenance_reset_cache();
 $mw = maintenance_refresh_statuses();
 if ($mw['activated'] || $mw['completed']) {
     say("Maintenance windows: {$mw['activated']} activated, {$mw['completed']} completed");
+}
+
+// Advance any in-flight restores before evaluating health, so a firewall that
+// has just come back is not also reported as offline.
+$rr = restore_reconcile();
+if ($rr['verified'] || $rr['failed']) {
+    say(sprintf('Restores: %d verified, %d failed verification', $rr['verified'], $rr['failed']));
 }
 
 $thresholds = health_thresholds();

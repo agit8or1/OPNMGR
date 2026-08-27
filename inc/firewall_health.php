@@ -771,3 +771,59 @@ if (!function_exists('health_gateway_label')) {
         };
     }
 }
+
+if (!function_exists('agent_health_fleet')) {
+    /**
+     * Agent-side health across the fleet (P2 #22).
+     *
+     * Everything here is already recorded by the check-in path; this assembles
+     * it into the questions an operator actually asks: is the agent current, is
+     * it talking, is its clock sane, is it authenticating, and can it sign.
+     */
+    function agent_health_fleet(): array {
+        try {
+            $latest = '';
+            $manifest = dirname(__DIR__) . '/downloads/manifest.json';
+            if (is_file($manifest)) {
+                require_once __DIR__ . '/agent_update.php';
+                $target = latest_agent_artifact();
+                $latest = $target['ok'] ? $target['version'] : '';
+            }
+
+            $rows = db()->query("
+                SELECT f.id, f.hostname, f.status, f.agent_version, f.last_checkin,
+                       f.checkin_interval, f.agent_auth_failures, f.agent_last_auth_failure_at,
+                       f.agent_signing_supported, f.agent_clock_skew_seconds,
+                       f.api_key_confirmed, f.last_update_result, f.last_update_error,
+                       c.name AS customer_name,
+                       TIMESTAMPDIFF(SECOND, f.last_checkin, NOW()) AS seconds_since_checkin
+                  FROM firewalls f
+                  LEFT JOIN customers c ON c.id = f.customer_id
+                 ORDER BY f.hostname
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as &$r) {
+                $r['latest_agent_version'] = $latest;
+                $r['outdated'] = $latest !== '' && !empty($r['agent_version'])
+                    && version_compare($r['agent_version'], $latest, '<');
+
+                // A check-in more than three intervals late is overdue, not just
+                // slightly behind.
+                $interval = max(60, (int)($r['checkin_interval'] ?: 180));
+                $silent   = $r['seconds_since_checkin'];
+                $r['overdue'] = $silent !== null && (int)$silent > ($interval * 3);
+
+                // Anything beyond a minute of skew will break signed requests
+                // long before it breaks anything else.
+                $skew = $r['agent_clock_skew_seconds'];
+                $r['clock_skewed'] = $skew !== null && abs((int)$skew) > 60;
+            }
+            unset($r);
+
+            return $rows;
+        } catch (Throwable $e) {
+            error_log('OPNMGR: agent_health_fleet failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+}

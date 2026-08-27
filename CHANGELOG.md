@@ -6,6 +6,65 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.16.0
+**Released**: August 27, 2026 | **Agent**: v1.6.0
+
+Fleet update management, bulk operations and configuration search.
+
+### Added
+
+- **Fleet update view**: customer, site, current and available version, agent
+  version, update and reboot state for every managed firewall, filterable by
+  ring and by whether an update is pending.
+
+- **Update rings** (canary, pilot, production). These are a rollout mechanism,
+  not customer tiers: a canary firewall belongs to a customer like any other,
+  and the ring says nothing about that customer's importance. Progression
+  between rings is manual unless a campaign explicitly enables auto-progress,
+  and a ring containing any failure never counts as clean - so automatic
+  progression cannot roll a bad release onward.
+
+- **HA-safe updates.** If two firewalls are a CARP pair, dispatching to both at
+  once takes the customer offline. The dispatcher never dispatches to a firewall
+  whose HA partner is mid-update, prefers the BACKUP member first so the MASTER
+  keeps serving, and holds the second member until the first is back online with
+  CARP settled. When health cannot be confirmed it holds with a stated reason
+  rather than guessing.
+
+- **Bulk operations** across selected firewalls. High-risk actions require
+  typing a confirmation phrase that includes the target count, so confirming a
+  3-firewall reboot does not also confirm a 300-firewall one. Raw shell is
+  deliberately absent from the bulk catalogue: "run this command on every
+  firewall" should not be reachable by accident.
+
+- **Fleet configuration search**, deterministic and reproducible, over the
+  stored configuration backups. Named checks answer the common questions (SSH
+  reachable from WAN, web GUI on WAN, any-to-any pass rules, UPnP enabled, SSH
+  password auth, missing DNS servers), alongside literal and CIDR matching. AI
+  is not in the path.
+
+- **Agent health**: version currency against the published release, check-in
+  punctuality measured against the agent's own interval, authentication state,
+  signing support and clock skew.
+
+### Fixed - security
+
+- The configuration restore path built its download URL from the
+  client-supplied `Host` header, omitted the scheme entirely, and pointed at
+  `download_backup.php`, which requires an operator's browser session that a
+  firewall does not have. Restores now go through an agent-authenticated,
+  single-use token endpoint.
+
+### Added - restore safety
+
+- The backup is validated and checksum-verified before anything is dispatched, a
+  pre-restore snapshot is taken first, the firewall's hostname must be typed to
+  confirm the target, and success is recorded only once the agent has checked in
+  *after* the restore. A restore whose agent does not return within the
+  verification window is failed rather than assumed successful.
+
+---
+
 ## Version 3.15.0
 **Released**: August 26, 2026 | **Agent**: v1.6.0
 

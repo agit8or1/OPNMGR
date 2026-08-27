@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.15.0](https://img.shields.io/badge/version-3.15.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.16.0](https://img.shields.io/badge/version-3.16.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -13,7 +13,22 @@ work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.15 — Incident Alerting &amp; Maintenance Windows
+### New in v3.16 — Fleet Updates, Bulk Operations &amp; Config Search
+
+- **Fleet update management** with rollout rings (canary &rarr; pilot &rarr; production).
+  Rings are a rollout mechanism, not customer tiers, and progression is manual unless
+  explicitly automated. A ring with any failure never counts as clean.
+- **HA-safe updates** — members of a CARP pair are never updated simultaneously. The
+  BACKUP goes first so the MASTER keeps serving, and the second member waits until the
+  first is back with CARP settled.
+- **Bulk operations** with typed confirmation phrases that include the target count.
+  Raw shell is deliberately not a bulk operation.
+- **Fleet configuration search** — deterministic, over stored backups, with named checks
+  such as "SSH reachable from WAN". No AI in the path.
+- **Safer restores** — validated and checksum-verified, a pre-restore snapshot first,
+  hostname typed to confirm, and success only recorded once the agent checks in again.
+
+### v3.15 — Incident Alerting &amp; Maintenance Windows
 
 - **Incident-based alerting** — one entry per ongoing problem rather than one per email.
   Opened when a condition becomes true, updated while it persists, resolved when it
@@ -160,6 +175,16 @@ Compares each firewall's current configuration against the approved baseline, ig
 serialisation noise and volatile fields.
 
 ![Configuration Drift](screenshots/13-drift.png)
+
+### Fleet Updates
+Rollout rings, campaign progress and HA pairing at a glance.
+
+![Fleet Updates](screenshots/16-fleet-updates.png)
+
+### Configuration Search
+Deterministic answers across every stored configuration.
+
+![Configuration Search](screenshots/18-config-search.png)
 
 ### Incidents
 One entry per ongoing problem, with acknowledgement and a full event trail.
