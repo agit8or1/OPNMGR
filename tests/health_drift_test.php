@@ -121,7 +121,10 @@ health_ingest($fwId, [
         ['name' => 'openvpn', 'running' => false],
     ],
     'certificates' => [
-        ['refid' => 'c1', 'name' => 'webgui', 'not_after' => $now + 86400 * 5],
+        // Offset by half a day so floor() lands solidly on 5. Sitting exactly
+        // on the boundary made this flaky: any elapsed time between capturing
+        // $now and the ingest computing time() dropped the result to 4.
+        ['refid' => 'c1', 'name' => 'webgui', 'not_after' => $now + 86400 * 5 + 43200],
         ['refid' => 'c2', 'name' => 'old',    'not_after' => $now - 86400 * 3],
     ],
     'carp' => ['peer_host' => 'peer.example', 'vhids' => [
