@@ -9,17 +9,16 @@ require_once __DIR__ . '/../inc/functions.php';
 
 header('Content-Type: application/json');
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-}
-
-// Check authentication
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Not authenticated']);
-    exit;
-}
-
 $action = $_GET['action'] ?? '';
+
+// Listing tunnels is a read; killing them, resetting everything and reaping
+// zombies all run privileged commands, so they need the capability rather than
+// merely a logged-in session.
+if (in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'], true)) {
+    require_permission('tunnel.close');
+} else {
+    require_permission('firewall.view');
+}
 
 // CSRF validation for state-changing actions
 if (in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'])) {

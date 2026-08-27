@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/firewall_health.php';
+require_once __DIR__ . '/inc/alerting.php';
+require_once __DIR__ . '/inc/maintenance.php';
 require_once __DIR__ . '/inc/health.php';
 requireLogin();
 require_once 'inc/header.php';
@@ -215,6 +218,29 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 
 <div class="dash-wrapper">
 
+<?php
+// Operational roll-ups for the KPI strip. Each tile links to the page that can
+// actually resolve it, so the strip is a triage surface rather than decoration.
+$health_summary = health_fleet_summary();
+$incident_counts = alert_incident_counts();
+$in_maintenance = count(maintenance_firewalls_in_window());
+
+try {
+    $reboot_required = (int)db()->query('SELECT COUNT(*) FROM firewalls WHERE reboot_required = 1')->fetchColumn();
+} catch (Throwable $e) { $reboot_required = 0; }
+
+try {
+    $drift_count = (int)db()->query(
+        "SELECT COUNT(*) FROM config_drift WHERE status = 'drifted' AND acknowledged_at IS NULL"
+    )->fetchColumn();
+} catch (Throwable $e) { $drift_count = 0; }
+
+try {
+    $backup_failures = (int)db()->query(
+        "SELECT COUNT(*) FROM firewalls WHERE last_backup_status = 'failed'"
+    )->fetchColumn();
+} catch (Throwable $e) { $backup_failures = 0; }
+?>
   <!-- ── KPI ROW + REFRESH ── -->
   <div class="dash-toolbar">
     <div class="dash-stats">
@@ -238,6 +264,32 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
         <span class="dash-stat-icon" style="color:<?php echo $healthColor ?>"><i class="fas fa-heart-pulse"></i></span>
         <div class="dash-stat-body"><div class="dash-stat-val" style="color:<?php echo $healthColor ?>"><?php echo $avg_health ?>%</div><div class="dash-stat-lbl">Avg Health</div></div>
       </div>
+
+      <?php
+      // Only surface a tile when it has something to say. A row of zeros is
+      // noise, and the point of the strip is that a non-zero number means
+      // somebody should look at something.
+      $operational_tiles = [
+          ['n' => $reboot_required,                    'lbl' => 'Reboot Req',   'icon' => 'fa-power-off',      'colour' => 'var(--danger)',  'href' => '/fleet_updates.php'],
+          ['n' => $health_summary['gateways_down'],    'lbl' => 'GW Down',      'icon' => 'fa-road-circle-xmark','colour' => 'var(--danger)', 'href' => '/firewall_health.php'],
+          ['n' => $health_summary['vpn_down'],         'lbl' => 'VPN Down',     'icon' => 'fa-shield-halved',  'colour' => 'var(--danger)',  'href' => '/firewall_health.php'],
+          ['n' => $drift_count,                        'lbl' => 'Drift',        'icon' => 'fa-code-compare',   'colour' => 'var(--warning)', 'href' => '/config_drift.php'],
+          ['n' => $backup_failures,                    'lbl' => 'Backup Fail',  'icon' => 'fa-database',       'colour' => 'var(--warning)', 'href' => '/firewalls.php'],
+          ['n' => $health_summary['certs_expiring'] + $health_summary['certs_expired'],
+                                                       'lbl' => 'Certs',        'icon' => 'fa-certificate',    'colour' => 'var(--warning)', 'href' => '/firewall_health.php'],
+          ['n' => $incident_counts['critical'],        'lbl' => 'Critical',     'icon' => 'fa-bell',           'colour' => 'var(--danger)',  'href' => '/incidents.php?severity=critical'],
+          ['n' => $in_maintenance,                     'lbl' => 'Maintenance',  'icon' => 'fa-screwdriver-wrench', 'colour' => 'var(--text-muted)', 'href' => '/maintenance.php'],
+      ];
+      foreach ($operational_tiles as $tile):
+          if ((int)$tile['n'] <= 0) continue; ?>
+        <a class="dash-stat" href="<?php echo htmlspecialchars($tile['href']); ?>">
+          <span class="dash-stat-icon" style="color:<?php echo $tile['colour']; ?>"><i class="fas <?php echo $tile['icon']; ?>"></i></span>
+          <div class="dash-stat-body">
+            <div class="dash-stat-val" style="color:<?php echo $tile['colour']; ?>"><?php echo (int)$tile['n']; ?></div>
+            <div class="dash-stat-lbl"><?php echo htmlspecialchars($tile['lbl']); ?></div>
+          </div>
+        </a>
+      <?php endforeach; ?>
     </div>
     <div class="dash-refresh-ctl">
       <select id="autoRefreshSelect" onchange="setAutoRefresh()">

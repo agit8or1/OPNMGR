@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.16.0](https://img.shields.io/badge/version-3.16.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.17.0](https://img.shields.io/badge/version-3.17.0-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -13,7 +13,20 @@ work across the whole managed fleet, subject to their role.
 
 If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
 
-### New in v3.16 — Fleet Updates, Bulk Operations &amp; Config Search
+### New in v3.17 — AI Redaction, Dashboard Roll-ups &amp; Hardening
+
+- **AI redaction** — configuration is stripped of password hashes, private keys, pre-shared
+  keys, SNMP communities and tokens before any of it reaches an external provider.
+  Redaction cannot be disabled, and an unparseable configuration is refused rather than
+  sent raw.
+- **AI is opt-in and off by default**, behind an explicit disclosure of what is and is not
+  transmitted. Nothing in the product requires it.
+- **Dashboard roll-ups** for reboots, gateways, VPN, drift, backups, certificates,
+  critical incidents and maintenance. Tiles appear only when non-zero.
+- **Version consistency enforced in CI** — `VERSION` is authoritative and derived
+  references cannot drift.
+
+### v3.16 — Fleet Updates, Bulk Operations &amp; Config Search
 
 - **Fleet update management** with rollout rings (canary &rarr; pilot &rarr; production).
   Rings are a rollout mechanism, not customer tiers, and progression is manual unless

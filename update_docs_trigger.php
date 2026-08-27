@@ -65,7 +65,7 @@ $smartSuggestions = [];
 $smartDescription = 'Bug fixes and improvements';
 $analysisScript = __DIR__ . '/scripts/analyze_changes.php';
 if (file_exists($analysisScript)) {
-    $output = shell_exec("php {$analysisScript} 2>&1");
+    $output = shell_exec('php ' . escapeshellarg($analysisScript) . ' 2>&1');
     $analysis = json_decode($output, true);
     if ($analysis && isset($analysis['suggestions'])) {
         $smartSuggestions = $analysis['suggestions'];

@@ -20,6 +20,9 @@ jobs:
           extensions: pdo_mysql, sodium, openssl, xml
           coverage: none
 
+      - name: Version references agree
+        run: php scripts/check_versions.php
+
       - name: Lint every PHP file
         run: |
           # backups/ holds ~20k captured firewall configs and vendor/ is third
@@ -131,6 +134,9 @@ jobs:
       - name: Fleet updates, bulk ops and config search suite
         run: php tests/fleet_test.php
 
+      - name: AI redaction suite
+        run: php tests/ai_redaction_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -227,3 +233,4 @@ jobs:
           php tests/health_drift_test.php
           php tests/alerting_test.php
           php tests/fleet_test.php
+          php tests/ai_redaction_test.php

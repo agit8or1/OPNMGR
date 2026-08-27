@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fleet Updates, Bulk Ops & Config Search'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'AI Redaction, Dashboard & Hardening'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,23 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.17.0',
+            'date' => '2026-08-27',
+            'type' => 'minor',
+            'title' => 'AI Redaction, Dashboard Roll-ups and Final Hardening',
+            'changes' => [
+                'SECURITY: api/ai_scan.php sent the entire raw config.xml to an external AI provider with no redaction whatsoever. An OPNsense configuration carries password hashes, X.509 and WireGuard private keys, IPsec pre-shared keys and SNMP communities - all of it was being transmitted to a third party',
+                'ADDED: inc/ai_redaction.php strips credential material before anything leaves the server. Redaction cannot be disabled; a configuration that will not parse is refused rather than sent raw',
+                'ADDED: AI is opt-in and off by default. An administrator must read a disclosure of exactly what is and is not transmitted before enabling it, and can disable it entirely',
+                'SECURITY: api/tunnel_management.php allowed any signed-in user, including read-only, to kill tunnels and run privileged commands. It now requires the tunnel.close capability',
+                'SECURITY: ai_reports.php called unserialize() on values originating in AI provider responses without restricting classes',
+                'SECURITY: Shell interpolation escaped across system_backup.php, security_scan.php, update_docs_trigger.php and the tunnel scripts',
+                'FIXED: ai_settings.php included the page header before checking authorisation, so the shell rendered before a redirect could be sent',
+                'ADDED: Dashboard KPI tiles for reboots pending, gateways down, VPN down, drift, backup failures, certificate expiry, critical incidents and maintenance. Tiles only appear when non-zero, so a row of numbers means something needs attention',
+                'ADDED: scripts/check_versions.php enforces a single authoritative version source and runs in CI, so README, inc/version.php and the CHANGELOG cannot drift apart again',
+            ]
+        ],
         [
             'version' => '3.16.0',
             'date' => '2026-08-27',

@@ -131,7 +131,7 @@ function get_last_activity($session_id) {
     }
     
     // Get last line of log
-    exec("tail -1 {$log_file}", $output);
+    exec('tail -1 ' . escapeshellarg($log_file), $output);
     
     if (empty($output)) {
         return null;
@@ -230,7 +230,7 @@ function get_available_port() {
     for ($port = 8100; $port < 8200; $port++) {
         if (!in_array($port, $used_ports)) {
             // Check if port is actually free on system
-            exec("ss -tln | grep ':$port '", $output);
+            exec('ss -tln | grep ' . escapeshellarg(":{$port} "), $output);
             if (empty($output)) {
                 return $port;
             }

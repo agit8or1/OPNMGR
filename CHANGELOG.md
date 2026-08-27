@@ -6,6 +6,64 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.17.0
+**Released**: August 27, 2026 | **Agent**: v1.6.0
+
+AI redaction, dashboard roll-ups and the closing security pass.
+
+### Fixed - security
+
+- **Configuration was sent to external AI providers unredacted.**
+  `api/ai_scan.php` put the entire raw `config.xml` into the prompt. An OPNsense
+  configuration carries user password hashes, X.509 private keys, WireGuard
+  private keys, IPsec pre-shared keys, RADIUS and LDAP bind secrets and SNMP
+  community strings. All of it was being transmitted to a third party, and none
+  of it helps a model reason about whether a rule set is safe.
+
+  `inc/ai_redaction.php` now strips credential material first. Structure is
+  preserved so the model still sees that a key exists and where, along with
+  non-secret context such as a certificate's description. Redaction cannot be
+  switched off, and a configuration that fails to parse is refused rather than
+  falling back to the raw document.
+
+- **AI is now opt-in and off by default.** An administrator sees an explicit
+  disclosure of what is and is not transmitted, and must acknowledge it before
+  enabling. Nothing in the product depends on AI: configuration search, security
+  checks, health, updates, drift, alerting and backups all work with it off.
+
+- `api/tunnel_management.php` allowed any signed-in user, including a read-only
+  one, to kill tunnels, reset all sessions and run privileged commands. It now
+  requires the `tunnel.close` capability for state-changing actions.
+
+- `ai_reports.php` called `unserialize()` on values originating in AI provider
+  responses without restricting classes.
+
+- Shell interpolation escaped across `system_backup.php`, `security_scan.php`,
+  `update_docs_trigger.php` and the tunnel management scripts.
+
+- `ai_settings.php` included the page header before checking authorisation, so
+  the page shell was already on the wire when a redirect should have been sent.
+
+### Added
+
+- **Dashboard roll-up tiles**: reboots pending, gateways down, VPN tunnels down,
+  configuration drift, backup failures, certificate expiry, critical incidents
+  and firewalls in maintenance. A tile only appears when its count is non-zero,
+  so the strip stays a triage surface rather than a wall of zeros, and each one
+  links to the page that can resolve it.
+
+- **`scripts/check_versions.php`** enforces a single authoritative version
+  source. `VERSION` and the agent's own `AGENT_VERSION` line are authoritative;
+  the README badge, `inc/version.php` constants and the CHANGELOG heading are
+  derived and checked in CI, so they cannot silently drift apart again. `--fix`
+  rewrites the derived references; a missing CHANGELOG entry is never
+  auto-written.
+
+- `tests/ai_redaction_test.php` — 36 assertions, every one of them about
+  material that must not leave the server.
+
+---
+
 ## Version 3.16.0
 **Released**: August 27, 2026 | **Agent**: v1.6.0
 

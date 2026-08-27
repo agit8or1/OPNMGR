@@ -10,6 +10,7 @@ opnmgr_block_direct_web_access(__FILE__);
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
 require_once __DIR__ . '/../inc/secrets.php';
+require_once __DIR__ . '/../inc/ai_redaction.php';
 function fetchFirewallLogs($firewall_id, $log_types = ['filter', 'dhcp', 'system'], $lines = 1000) {
     // Get firewall details
     $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
@@ -118,10 +119,33 @@ function analyzeLogsWithAI($firewall_id, $config_data, $logs, $ai_settings) {
     $prompt = buildLogAnalysisPrompt($config_data, $logs, $firewall_id);
     
     // Call AI provider
+    if (!ai_enabled()) {
+        error_log('OPNMGR: AI log analysis skipped - AI is disabled');
+        return null;
+    }
+
     $provider = $ai_settings['provider'];
     // Stored encrypted at rest; legacy plaintext passes through unchanged.
     $api_key = opnmgr_decrypt((string)$ai_settings['api_key']) ?? '';
     $model = $ai_settings['model'];
+
+    // Logs are unstructured, so credential-looking values are stripped by
+    // pattern before anything is transmitted.
+    if (is_string($logs)) {
+        $scrubbed = ai_redact_text($logs);
+        $logs = $scrubbed['text'];
+        if ($scrubbed['redactions'] > 0) {
+            error_log(sprintf('OPNMGR: redacted %d value(s) from logs before AI analysis', $scrubbed['redactions']));
+        }
+    }
+    if (is_string($config_data)) {
+        $prepared = ai_prepare_config($config_data, $firewall_id ?? null);
+        if (!$prepared['ok']) {
+            error_log('OPNMGR: refusing to send an unredactable configuration for log analysis');
+            return null;
+        }
+        $config_data = $prepared['xml'];
+    }
     
     switch ($provider) {
         case 'openai':

@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             $sshDir = '/var/www/opnsense/.ssh';
             if (is_dir($sshDir)) {
                 mkdir("{$tempDir}/ssh_keys", 0755, true);
-                exec("cp -r {$sshDir}/* {$tempDir}/ssh_keys/ 2>&1");
+                exec('cp -r ' . escapeshellarg($sshDir) . '/. ' . escapeshellarg($tempDir . '/ssh_keys/') . ' 2>&1');
             }
             
             // Copy SSL certificates
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             foreach ($certDirs as $dir) {
                 if (is_dir($dir)) {
                     $basename = basename($dir);
-                    exec("cp -r {$dir} {$tempDir}/certificates/{$basename} 2>&1");
+                    exec('cp -r ' . escapeshellarg($dir) . ' ' . escapeshellarg($tempDir . '/certificates/' . $basename) . ' 2>&1');
                 }
             }
             
@@ -96,14 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             file_put_contents("{$tempDir}/metadata.json", json_encode($metadata, JSON_PRETTY_PRINT));
             
             // Create tar.gz archive
-            exec("tar -czf {$backupPath} -C /tmp " . basename($tempDir) . " 2>&1", $output, $returnCode);
+            exec('tar -czf ' . escapeshellarg($backupPath) . ' -C /tmp ' . escapeshellarg(basename($tempDir)) . ' 2>&1', $output, $returnCode);
             
             if ($returnCode !== 0) {
                 throw new Exception("Failed to create archive: " . implode("\n", $output));
             }
             
             // Clean up temp directory
-            exec("rm -rf {$tempDir}");
+            exec('rm -rf ' . escapeshellarg($tempDir));
             
             // Clean up old backups (keep last 10)
             $backups = glob("{$backupDir}/opnmanager_backup_*.tar.gz");
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             
             // Clean up on failure
             if (is_dir($tempDir)) {
-                exec("rm -rf {$tempDir}");
+                exec('rm -rf ' . escapeshellarg($tempDir));
             }
             if (file_exists($backupPath)) {
                 unlink($backupPath);
@@ -246,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_backup']) && 
             try {
                 // Extract backup
                 mkdir($tempDir, 0755, true);
-                exec("tar -xzf {$filepath} -C {$tempDir} 2>&1", $output, $returnCode);
+                exec('tar -xzf ' . escapeshellarg($filepath) . ' -C ' . escapeshellarg($tempDir) . ' 2>&1', $output, $returnCode);
                 
                 if ($returnCode !== 0) {
                     throw new Exception("Failed to extract backup: " . implode("\n", $output));
@@ -318,14 +318,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_backup']) && 
                     if (!is_dir($targetSshDir)) {
                         mkdir($targetSshDir, 0700, true);
                     }
-                    exec("cp -r {$sshKeysDir}/* {$targetSshDir}/ 2>&1");
-                    exec("chown -R www-data:www-data {$targetSshDir}");
-                    exec("chmod 700 {$targetSshDir}");
-                    exec("chmod 600 {$targetSshDir}/*");
+                    exec('cp -r ' . escapeshellarg($sshKeysDir) . '/. ' . escapeshellarg($targetSshDir . '/') . ' 2>&1');
+                    exec('chown -R www-data:www-data ' . escapeshellarg($targetSshDir));
+                    exec('chmod 700 ' . escapeshellarg($targetSshDir));
+                    exec('find ' . escapeshellarg($targetSshDir) . ' -type f -exec chmod 600 {} +');
                 }
                 
                 // Clean up
-                exec("rm -rf {$tempDir}");
+                exec('rm -rf ' . escapeshellarg($tempDir));
                 
                 // If this was an uploaded backup, optionally delete it from backups dir
                 // (keeping it so users can see it in the list for future restores)
@@ -340,7 +340,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_backup']) && 
                 
                 // Clean up on failure
                 if (is_dir($tempDir)) {
-                    exec("rm -rf {$tempDir}");
+                    exec('rm -rf ' . escapeshellarg($tempDir));
                 }
                 
                 // Delete uploaded file if restore failed

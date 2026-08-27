@@ -11,7 +11,10 @@ function decodeReportField($value) {
     if (empty($value)) return '';
     if ($value === 'Array') return '';
     if (is_string($value) && strpos($value, 'a:') === 0) {
-        $decoded = @unserialize($value);
+        // allowed_classes => false so only arrays and scalars can come back.
+        // These values originate in AI provider responses; without this an
+        // attacker-influenced payload could instantiate arbitrary classes.
+        $decoded = @unserialize($value, ['allowed_classes' => false]);
         if (is_array($decoded)) {
             return implode("\n• ", array_filter($decoded));
         }

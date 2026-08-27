@@ -18,6 +18,33 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.17.0
+
+No schema changes.
+
+**AI is now off by default, including on installations where it was previously working.**
+That is deliberate: before this release the entire raw `config.xml` — password hashes,
+private keys, pre-shared keys, SNMP communities — was being sent to whichever provider was
+configured, with no redaction. Nobody should be re-enabled into that silently.
+
+To turn it back on, go to *AI Configuration*, read the disclosure of what is and is not
+transmitted, tick both boxes and save. Redaction applies regardless and cannot be
+disabled.
+
+If you would rather leave AI off, nothing else changes: configuration search, security
+checks, health monitoring, update management, drift detection, alerting and backups all
+work without it.
+
+Version consistency is now checked in CI. If you carry local edits to the README badge or
+`inc/version.php`, reconcile them:
+
+```bash
+php scripts/check_versions.php        # report
+php scripts/check_versions.php --fix  # rewrite derived references
+```
+
+---
+
 ## Upgrading to 3.16.0
 
 Migrations 0012 and 0013 add the campaign, bulk operation and restore-job tables, plus

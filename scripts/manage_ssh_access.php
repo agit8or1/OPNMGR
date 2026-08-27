@@ -60,8 +60,8 @@ function find_available_tunnel_port() {
         $nginx_port = $port - 1;
         if (!in_array($port, $all_used) && !in_array($nginx_port, $all_used)) {
             // Double-check both ports with system
-            $check_ssh = shell_exec("ss -tln | grep ':{$port} ' 2>/dev/null");
-            $check_nginx = shell_exec("ss -tln | grep ':{$nginx_port} ' 2>/dev/null");
+            $check_ssh = shell_exec('ss -tln | grep ' . escapeshellarg(":{$port} ") . ' 2>/dev/null');
+            $check_nginx = shell_exec('ss -tln | grep ' . escapeshellarg(":{$nginx_port} ") . ' 2>/dev/null');
             if (empty($check_ssh) && empty($check_nginx)) {
                 return $port;
             } else {

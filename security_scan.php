@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $install_script = __DIR__ . '/scripts/install_snyk.sh';
             $log_file = '/tmp/snyk_install.log';
 
-            exec("sudo $install_script 2>&1", $output, $return_code);
+            exec('sudo ' . escapeshellarg($install_script) . ' 2>&1', $output, $return_code);
 
             if ($return_code === 0) {
                 $config_message = '<strong>Installation successful!</strong><br><br>';
@@ -156,7 +156,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Start background scan runner
                 $runner = __DIR__ . '/snyk_scan_runner.php';
-                exec("php $runner multi $scan_id $types_str > /dev/null 2>&1 &");
+                // $types_str is a comma-joined subset of hardcoded literals and $scan_id is
+                // uniqid() output, but escaping removes the class rather than relying on that.
+                exec('php ' . escapeshellarg($runner) . ' multi ' . escapeshellarg($scan_id)
+                     . ' ' . escapeshellarg($types_str) . ' > /dev/null 2>&1 &');
 
                 header("Location: security_scan.php?monitoring=$scan_id&type=multi&types=$types_str");
                 exit;

@@ -2,9 +2,13 @@
 // Settings > AI Configuration
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/secrets.php';
-requireLogin();
+require_once __DIR__ . '/inc/ai_redaction.php';
+
+// Authorise before any output. inc/header.php was included first, so the page
+// shell was already on the wire by the time a redirect could be sent.
+require_permission('ai.manage');
+
 $page_title = "AI Configuration";
-include 'inc/header.php';
 
 $message = '';
 $message_type = '';
@@ -38,6 +42,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = 'success';
     }
     
+    if (isset($_POST['toggle_ai'])) {
+        // Enabling AI means customer configuration leaves the building, so it
+        // is an explicit acknowledgement rather than a bare toggle.
+        $enable = !empty($_POST['ai_enabled']) ? '1' : '0';
+        if ($enable === '1' && empty($_POST['ack_disclosure'])) {
+            $message = 'Confirm you have read what is transmitted before enabling AI.';
+            $message_type = 'warning';
+        } else {
+            db()->prepare('INSERT INTO settings (`name`,`value`) VALUES ("ai_enabled", ?)
+                           ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)')->execute([$enable]);
+            audit_log('ai.toggle', [
+                'message'  => $enable === '1' ? 'AI analysis enabled' : 'AI analysis disabled',
+                'metadata' => ['enabled' => $enable],
+            ]);
+            $message = $enable === '1'
+                ? 'AI analysis enabled. Configurations are redacted before transmission.'
+                : 'AI analysis disabled. Nothing is sent to any external provider.';
+            $message_type = 'success';
+        }
+    }
+
     if (isset($_POST['edit_provider'])) {
         $provider_id = $_POST['provider_id'];
         $model = $_POST['model'];
@@ -322,7 +347,61 @@ $available_providers = [
 }
 </style>
 
+<?php include __DIR__ . '/inc/header.php'; ?>
+<?php $disclosure = ai_disclosure(); $aiOn = ai_enabled(); ?>
 <div class="ai-container">
+<div class="card mb-3" style="border:1px solid <?php echo $aiOn ? '#f0ad4e' : 'rgba(255,255,255,.12)'; ?>">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <strong class="small"><i class="fa fa-shield-halved me-1"></i>What is transmitted externally</strong>
+        <span class="badge bg-<?php echo $aiOn ? 'warning text-dark' : 'secondary'; ?>">
+            AI is <?php echo $aiOn ? 'ENABLED' : 'disabled'; ?></span>
+    </div>
+    <div class="card-body">
+        <p class="small mb-3">
+            AI features are optional. Configuration search, security checks, health monitoring,
+            update management, drift detection, alerting and backups all work with AI switched off.
+            <?php if ($disclosure['provider']): ?>
+                Analysis currently goes to <strong><?php echo htmlspecialchars($disclosure['provider']); ?></strong><?php
+                if ($disclosure['model']): ?> (<?php echo htmlspecialchars($disclosure['model']); ?>)<?php endif; ?>.
+            <?php endif; ?>
+        </p>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="small fw-bold" style="color:#f0ad4e">Sent to the provider</div>
+                <ul class="small mb-0">
+                    <?php foreach ($disclosure['sent'] as $item): ?>
+                        <li><?php echo htmlspecialchars($item); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <div class="small fw-bold" style="color:#5cb85c">Never sent &mdash; removed before transmission</div>
+                <ul class="small mb-0">
+                    <?php foreach ($disclosure['never_sent'] as $item): ?>
+                        <li><?php echo htmlspecialchars($item); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </div>
+        <form method="post" class="mt-3 d-flex align-items-center gap-3 flex-wrap">
+            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="ai_enabled" id="aiEnabled"
+                       value="1" <?php echo $aiOn ? 'checked' : ''; ?>>
+                <label class="form-check-label small" for="aiEnabled">Enable AI analysis</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="ack_disclosure" id="ackDisc" value="1">
+                <label class="form-check-label small" for="ackDisc">I have read what is transmitted</label>
+            </div>
+            <button class="btn btn-sm btn-primary" name="toggle_ai">Save</button>
+        </form>
+        <div class="small text-muted mt-2">
+            Redaction is applied to every configuration regardless of this setting and cannot be turned off.
+        </div>
+    </div>
+</div>
+
     <?php if ($message): ?>
         <div class="alert alert-<?= $message_type ?>">
             <i class="fa fa-check-circle me-2"></i> <?= htmlspecialchars($message) ?>

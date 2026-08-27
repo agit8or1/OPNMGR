@@ -158,6 +158,7 @@ async function capture(page, name, label) {
             ['/fleet_updates.php',                '16-fleet-updates.png', 'Fleet updates'],
             ['/bulk_operations.php',              '17-bulk-ops.png', 'Bulk operations'],
             ['/config_search.php?q=check%3Assh_on_wan', '18-config-search.png', 'Config search'],
+            ['/ai_settings.php',                  '19-ai-disclosure.png', 'AI disclosure'],
             ['/users.php',           '07-users.png',        'Users and roles'],
             ['/settings.php',        '08-settings.png',     'Settings'],
             ['/about.php',           '09-about.png',        'About'],

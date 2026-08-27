@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/ai_redaction.php';
 
 header('Content-Type: application/json');
 require_once '../inc/agent_version.php';
@@ -61,6 +62,18 @@ try {
     }
     
     // Fetch firewall configuration
+    // AI is opt-in and can be switched off entirely. Nothing else in the
+    // product depends on it: configuration search, security checks, health,
+    // updates, drift, alerting and backups all work without it.
+    if (!ai_enabled()) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'AI analysis is disabled. Enable it in AI Settings after reviewing what is transmitted.',
+        ]);
+        exit;
+    }
+
     $config_data = fetchFirewallConfig($firewall);
 
     if (!$config_data) {
@@ -465,7 +478,20 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
 
     $prompt .= "FIREWALL CONFIGURATION (config.xml):\n";
     $prompt .= "Analyze the following OPNsense configuration XML for security issues, misconfigurations, and best practices:\n\n";
-    $prompt .= $config_data['config_xml'] . "\n\n";
+    // Redact credential material before any of this leaves the server. This is
+    // not optional: an OPNsense configuration carries password hashes, X.509
+    // and WireGuard private keys, IPsec pre-shared keys and SNMP communities,
+    // none of which help a model reason about whether a rule set is safe.
+    $redacted = ai_prepare_config((string)($config_data['config_xml'] ?? ''),
+                                  isset($firewall['id']) ? (int)$firewall['id'] : null);
+
+    if (!$redacted['ok']) {
+        // No fallback to the raw document: a parse failure must not become a
+        // disclosure.
+        throw new RuntimeException('Configuration could not be redacted: ' . $redacted['error']);
+    }
+
+    $prompt .= $redacted['xml'] . "\n\n";
     
     if ($log_data && !empty($log_data)) {
         $prompt .= "LOG FILE ANALYSIS:\n";

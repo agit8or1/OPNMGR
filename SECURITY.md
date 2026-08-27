@@ -224,6 +224,34 @@ execution, so files that web pages legitimately `require_once` keep working.
 
 ---
 
+## AI and external data
+
+AI features are optional and **off by default**. Nothing in OPNManager requires them:
+configuration search, the security checks, health monitoring, update management, drift
+detection, alerting and backups are all deterministic and work with AI disabled.
+
+When AI is enabled, configuration is redacted before any of it leaves the server.
+Redaction is not a setting — it applies to every configuration on every path, and a
+document that fails to parse is refused rather than sent raw, so a parse failure can never
+become a disclosure.
+
+**Never transmitted:** user passwords and hashes, X.509 private keys and certificate
+bodies, WireGuard private and public keys, IPsec pre-shared keys, RADIUS and LDAP bind
+secrets, SNMP communities, API keys and tokens, MFA seeds and recovery codes, authorised
+SSH keys.
+
+**Transmitted:** the rule set, interface and network configuration, service configuration,
+NAT rules, VPN structure without key material, hostname and OPNsense version, and — for
+log analysis — log excerpts with credential-looking values pattern-stripped.
+
+Element structure is preserved through redaction, so the model still sees that a key is
+configured and where, plus non-secret context such as a certificate's description. That is
+what makes an expiry finding readable without disclosing the certificate.
+
+The disclosure is shown in the UI and must be acknowledged before AI can be enabled.
+
+---
+
 ## Audit log
 
 `audit_log` records the timestamp, actor, source IP, action, object, target firewall,
