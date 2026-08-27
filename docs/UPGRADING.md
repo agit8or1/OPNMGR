@@ -92,9 +92,17 @@ Check what it would do before letting it notify anyone:
 php cron/evaluate_alerts.php --dry-run
 ```
 
-`cron/check_offline_firewalls.php` is superseded by the evaluator and can be removed from
-cron once you are satisfied with the new behaviour. Leaving both running is harmless but
-will send duplicate offline notifications.
+`cron/check_offline_firewalls.php` was superseded by the evaluator and has been removed
+in 3.17.1, along with its cron entries. It emailed on a timer with no notion of an ongoing
+problem; the evaluator opens and resolves incidents instead. If you are upgrading from a
+release that still shipped it, confirm it is not still scheduled:
+
+```bash
+sudo crontab -l | grep check_offline_firewalls
+crontab -l | grep check_offline_firewalls
+```
+
+Leaving it running alongside the evaluator sends duplicate offline notifications.
 
 Notification pacing defaults to 60 minutes doubling, four times. Adjust in `settings`:
 

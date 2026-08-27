@@ -31,6 +31,17 @@ define('JQUERY_VERSION', '3.7.1');
 function getChangelogEntries($limit = 10) {
     return [
         [
+            'version' => '3.17.1',
+            'date' => '2026-08-27',
+            'type' => 'patch',
+            'title' => 'Remove the superseded offline-check cron',
+            'changes' => [
+                'REMOVED: cron/check_offline_firewalls.php, superseded by cron/evaluate_alerts.php. It emailed on a timer with no notion of an ongoing problem - it could not say "still down", never said "back online", and gave nobody anything to acknowledge',
+                'REMOVED: its cron entries, which were scheduled in BOTH the root and administrator crontabs at one-minute intervals, so it had been running twice a minute',
+                'REMOVED: its 8.2 MB log file, which it wrote into the cron directory inside the document root',
+            ]
+        ],
+        [
             'version' => '3.17.0',
             'date' => '2026-08-27',
             'type' => 'minor',

@@ -6,6 +6,27 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.17.1
+**Released**: August 27, 2026 | **Agent**: v1.6.0
+
+### Removed
+
+- `cron/check_offline_firewalls.php`, superseded by `cron/evaluate_alerts.php`.
+  It emailed whenever a firewall had been silent longer than a threshold and a
+  60-minute timer had elapsed, with no notion of an ongoing problem: it could
+  not say "still down", never said "back online", and gave nobody anything to
+  acknowledge. The evaluator opens and resolves incidents instead.
+
+  It was scheduled in **both** the root and the administrator crontab at
+  one-minute intervals, so it had been running twice a minute. Both entries are
+  gone, replaced by a dated comment so the removal is discoverable rather than
+  an unexplained gap in the schedule.
+
+  Its 8.2 MB log file, written into the `cron/` directory inside the document
+  root, has been removed with it.
+
+---
+
 ## Version 3.17.0
 **Released**: August 27, 2026 | **Agent**: v1.6.0
 
