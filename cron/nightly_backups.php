@@ -3,129 +3,152 @@
 require_once __DIR__ . '/../inc/cli_guard.php';
 opnmgr_block_direct_web_access(__FILE__);
 /**
- * Nightly Backup Script v3
- * Directly queues backup commands for all active firewalls
+ * Nightly configuration backup, second pass.
+ *
+ * This job used to build its own upload command by hand:
+ *
+ *     curl -k -X POST -F "backup=@$BACKUP_FILE" -F "firewall_id=NN" \
+ *          https://opn.agit8or.net/api/upload_backup.php
+ *
+ * That command carries no agent credentials, and api/upload_backup.php has
+ * required them since 3.12.0 (`authenticateAgentRequest`). Every upload it
+ * queued was therefore rejected. The command also never checked curl's exit
+ * code, so the firewall reported the command as completed, and the job created
+ * no `backups` row - so a rejected upload left no trace anywhere. It ran nightly
+ * in that state for months.
+ *
+ * It now uses build_backup_upload_command(), the same builder behind manual
+ * backups, bulk operations and pre-restore snapshots, which reads the agent's
+ * credential files on the firewall and fails loudly on a non-zero curl exit.
+ *
+ * scripts/automated_backup.php already performs this run at 01:00. This job is
+ * a second pass at 02:00: it skips any firewall that already has a backup row
+ * for today, so it produces nothing when the earlier run worked, and takes a
+ * real backup when it did not.
+ *
+ * Usage:
+ *   php cron/nightly_backups.php            queue for firewalls with no backup today
+ *   php cron/nightly_backups.php --force    queue regardless of today's backups
+ *   php cron/nightly_backups.php --dry-run  report what would be queued
+ *
+ * @since 3.20.3
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/backup_storage.php';
+require_once __DIR__ . '/../inc/agent_commands.php';
 
-$logfile = '/var/www/opnsense/logs/nightly_backups.log';
+$force  = in_array('--force', $argv, true);
+$dryRun = in_array('--dry-run', $argv, true);
 
-function log_message($message) {
+$logfile = __DIR__ . '/../logs/nightly_backups.log';
+
+function log_message(string $message): void {
     global $logfile;
-    $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($logfile, "[$timestamp] $message\n", FILE_APPEND);
-    echo "[$timestamp] $message\n";
+    $line = '[' . date('Y-m-d H:i:s') . "] {$message}\n";
+    @file_put_contents($logfile, $line, FILE_APPEND);
+    echo $line;
 }
 
-log_message("=== Starting Nightly Backup Job (v3 - Direct Command Queue) ===");
+log_message('=== Nightly backup, second pass ===' . ($dryRun ? ' (dry run)' : ''));
 
 try {
-    // Get all active firewalls that have checked in recently
-    $stmt = db()->query("
-        SELECT id, hostname, status, last_checkin
-        FROM firewalls
-        WHERE status = 'online'
-        AND last_checkin > DATE_SUB(NOW(), INTERVAL 6 HOUR)
-        ORDER BY id
-    ");
-    
-    $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Only firewalls whose agent is actually reachable; a queued command for an
+    // offline firewall just sits in the queue until it times out.
+    $firewalls = db()->query("
+        SELECT f.id, f.hostname
+          FROM firewalls f
+          LEFT JOIN firewall_agents fa
+                 ON fa.firewall_id = f.id AND fa.agent_type = 'primary'
+         WHERE COALESCE(fa.last_checkin, f.last_checkin) > DATE_SUB(NOW(), INTERVAL 6 HOUR)
+         ORDER BY f.id
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
     $total = count($firewalls);
-    $queued = 0;
-    $skipped = 0;
-    
-    log_message("Found $total online firewalls");
-    
+    log_message("Reachable firewalls: {$total}");
+
+    $queued = $skipped = $failed = 0;
+
+    $hasBackupToday = db()->prepare(
+        'SELECT COUNT(*) FROM backups WHERE firewall_id = ? AND DATE(created_at) = CURDATE()'
+    );
+    $commandPending = db()->prepare(
+        "SELECT COUNT(*) FROM firewall_commands
+          WHERE firewall_id = ? AND action = 'backup_upload'
+            AND status IN ('pending','sent') AND DATE(created_at) = CURDATE()"
+    );
+
     foreach ($firewalls as $fw) {
-        $firewall_id = $fw['id'];
-        $hostname = $fw['hostname'];
-        
-        log_message("Processing FW #$firewall_id ($hostname)");
-        
-        // Check if backup command already queued today
-        $stmt = db()->prepare("
-            SELECT COUNT(*) as count
-            FROM firewall_commands
-            WHERE firewall_id = ?
-            AND description = 'Automated nightly backup'
-            AND DATE(created_at) = CURDATE()
-        ");
-        $stmt->execute([$firewall_id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($result['count'] > 0) {
-            log_message("  SKIP: Backup command already queued today");
+        $id   = (int)$fw['id'];
+        $name = $fw['hostname'];
+
+        if (!$force) {
+            $hasBackupToday->execute([$id]);
+            if ((int)$hasBackupToday->fetchColumn() > 0) {
+                log_message("  skip {$name}: already has a backup row today");
+                $skipped++;
+                continue;
+            }
+        }
+
+        $commandPending->execute([$id]);
+        if ((int)$commandPending->fetchColumn() > 0) {
+            log_message("  skip {$name}: a backup command is already queued today");
             $skipped++;
             continue;
         }
-        
-        // Queue backup command
-        $backup_command = <<<'BACKUP'
-#!/bin/sh
-# Automated backup via OPNManager
-BACKUP_DIR="/root/backups"
-mkdir -p "$BACKUP_DIR"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/config-$DATE.xml"
 
-# Create backup
-/usr/local/sbin/opnsense-backup backup > "$BACKUP_FILE" 2>&1
+        $filename = sprintf('automated-backup-%d-%s.xml', $id, date('Y-m-d_H-i-s'));
 
-if [ -s "$BACKUP_FILE" ]; then
-    # Backup successful - upload to manager
-    /usr/local/bin/curl -k -X POST \
-        -F "backup=@$BACKUP_FILE" \
-        -F "firewall_id=FIREWALL_ID" \
-        "https://opn.agit8or.net/api/upload_backup.php"
-    
-    # Clean up old backups (keep last 7 days)
-    find "$BACKUP_DIR" -name "config-*.xml" -mtime +7 -delete
-    
-    echo "Backup created: $BACKUP_FILE"
-else
-    echo "ERROR: Backup file is empty"
-    exit 1
-fi
-BACKUP;
-        
-        // Replace placeholder with actual firewall ID
-        $backup_command = str_replace('FIREWALL_ID', $firewall_id, $backup_command);
-        
-        $stmt = db()->prepare('
-            INSERT INTO firewall_commands (firewall_id, command, description, status, created_at)
-            VALUES (?, ?, ?, ?, NOW())
-        ');
-        $stmt->execute([
-            $firewall_id,
-            $backup_command,
-            'Automated nightly backup',
-            'pending'
-        ]);
-        
-        log_message("  SUCCESS: Backup command queued (ID: " . db()->lastInsertId() . ")");
-        $queued++;
-        
-        // Small delay between firewalls
-        usleep(100000); // 0.1 seconds
+        if ($dryRun) {
+            log_message("  would queue {$name}: {$filename}");
+            $queued++;
+            continue;
+        }
+
+        // The row must exist first: the builder embeds its id so the upload can
+        // be matched back to it, and a rejected upload is recorded against it.
+        $ins = db()->prepare(
+            "INSERT INTO backups (firewall_id, backup_file, backup_type, created_at)
+             VALUES (?, ?, 'automated', NOW())"
+        );
+        $ins->execute([$id, $filename]);
+        $backupId = (int)db()->lastInsertId();
+
+        $res = queue_firewall_command(
+            $id,
+            build_backup_upload_command($id, $backupId, $filename),
+            'Automated nightly configuration backup (second pass)',
+            ['action' => 'backup_upload', 'parameters' => ['backup_id' => $backupId],
+             'is_raw' => false, 'risk' => 'LOW']
+        );
+
+        if ($res['ok']) {
+            log_message("  queued {$name}: {$filename} (backup {$backupId}, command {$res['command_id']})");
+            $queued++;
+        } else {
+            // Leaving the row behind would claim a backup that was never attempted.
+            db()->prepare('DELETE FROM backups WHERE id = ?')->execute([$backupId]);
+            log_message("  FAILED {$name}: {$res['error']}");
+            $failed++;
+        }
     }
-    
-    log_message("=== Backup Job Complete ===");
-    log_message("Total: $total, Queued: $queued, Skipped: $skipped");
-    
-    // Log to system_logs table
-    $summary = "Nightly backups: $queued queued, $skipped skipped (Total: $total)";
-    $stmt = db()->prepare("
-        INSERT INTO system_logs (level, category, message, timestamp)
-        VALUES ('INFO', 'backup', ?, NOW())
-    ");
-    $stmt->execute([$summary]);
-    
-    exit(0);
-    
-} catch (Exception $e) {
-    log_message("FATAL ERROR: " . $e->getMessage());
-    log_message("Stack trace: " . $e->getTraceAsString());
+
+    log_message("Done. queued={$queued} skipped={$skipped} failed={$failed} of {$total}");
+
+    if (!$dryRun) {
+        db()->prepare(
+            "INSERT INTO system_logs (category, message, level, timestamp)
+             VALUES ('backup', ?, ?, NOW())"
+        )->execute([
+            "Nightly backup second pass: {$queued} queued, {$skipped} skipped, {$failed} failed of {$total}",
+            $failed > 0 ? 'WARNING' : 'INFO',
+        ]);
+    }
+
+    exit($failed > 0 ? 1 : 0);
+
+} catch (Throwable $e) {
+    log_message('FATAL: ' . $e->getMessage());
     exit(1);
 }
-

@@ -6,6 +6,65 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.3
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Fixed
+
+- **Nightly backups had not reached disk in months, and nothing said so.**
+  `cron/nightly_backups.php` built its own upload command by hand:
+
+  ```sh
+  curl -k -X POST -F "backup=@$BACKUP_FILE" -F "firewall_id=NN" \
+       https://opn.agit8or.net/api/upload_backup.php
+  ```
+
+  That carries no agent credentials, and `api/upload_backup.php` has required
+  them since 3.12.0 (`authenticateAgentRequest`), so every upload it queued was
+  rejected. Three things then hid the failure: the command never checked curl's
+  exit code, so the firewall reported it *completed*; the job created no
+  `backups` row, so a rejected upload left no trace; and the surviving rows came
+  from the other nightly job, which made the backup list look populated. The
+  result was 170 rows describing backups that were never stored, and files on
+  disk stopping dead at 2026-02-09.
+
+  The job now uses `build_backup_upload_command()` — the same builder behind
+  manual backups, bulk operations and pre-restore snapshots, which reads the
+  agent's credential files on the firewall and fails on a non-zero curl exit. It
+  also creates the `backups` row before queueing (so a rejection is recorded
+  against it), routes through `queue_firewall_command()` for audit and risk
+  level, and deletes the row again if queueing fails rather than leaving a claim
+  of a backup that was never attempted. Verified end to end against both live
+  firewalls: files on disk, `validated = 1`, checksums recorded.
+
+- **Two nightly backup jobs were running.** `scripts/automated_backup.php` at
+  01:00 (correct since 3.20.0) and `cron/nightly_backups.php` at 02:00 (broken).
+  Rather than delete one, the 02:00 job is now a genuine second pass: it skips
+  any firewall that already has a backup row for today, so it does nothing when
+  the earlier run worked and takes a real backup when it did not. `--force` and
+  `--dry-run` added.
+
+- **The 170 rows with no file are annotated** rather than deleted, so the gap
+  stays visible in the record instead of disappearing. Retention ages them out.
+
+### Added
+
+- **`scripts/check_backup_health.php`** — the reason this went unnoticed for
+  months is that nothing measured backups, only counted rows. This resolves each
+  firewall's most recent backup to an actual file on disk and reports coverage
+  against a window (`--days`, default 2). Exit 1 if a firewall is uncovered, 2 if
+  rows reference missing files, 0 when clean.
+
+  It distinguishes a *missing* file from an *unreadable* one:
+  `/var/lib/opnmgr/backups` is `www-data:www-data 0750`, so running as another
+  user cannot see the files and would report healthy backups as absent — the
+  dangerous direction to be wrong in. It refuses to answer and exits 3 instead,
+  telling you to re-run as `www-data`. "Uploads failing now" is judged by rows
+  newer than the last successful upload, not a fixed window, so it does not cry
+  wolf for a week after every fix.
+
+---
+
 ## Version 3.20.2
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 
