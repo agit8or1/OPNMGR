@@ -6,6 +6,33 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.7
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Added
+
+- **Backup retention and reaping are now scheduled**, at 03:30 in root's crontab
+  with `--apply`, completing the nightly cycle:
+
+  | | | |
+  |---|---|---|
+  | 01:00 | `scripts/automated_backup.php` | take the backup |
+  | 02:00 | `cron/nightly_backups.php` | second pass, skips firewalls already covered |
+  | 03:30 | `cron/prune_backups.php --apply` | enforce retention, reap fileless rows |
+  | 04:00 | `scripts/check_backup_health.php --log` | verify the result and report |
+
+  Prune runs before the check so the check sees the settled state. Root, because
+  `/var/lib/opnmgr/backups` is `www-data:www-data 0750` and the reap exits 3
+  rather than guessing when it cannot read the store. Failures go to syslog under
+  `backup-prune` as well as the log file.
+
+  `--apply` is destructive by design — the entry carries a comment saying so and
+  naming the settings that govern it. It deletes nothing today: retention is 90
+  days and the oldest backup is 2026-08-27, so the first real deletion is roughly
+  three months out.
+
+---
+
 ## Version 3.20.6
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 
