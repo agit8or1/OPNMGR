@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Real Security Posture'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Trackable Firewall Updates'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,20 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.19.0',
+            'date' => '2026-08-31',
+            'type' => 'minor',
+            'title' => 'Trackable Firewall OS Updates',
+            'changes' => [
+                'FIXED: "Upgrade Firewall OS/Dependencies" left no evidence that anything had happened, so a successful update was indistinguishable from a failed one. The button set a firewalls.update_requested flag and returned success; agent_checkin.php cleared that flag the moment it read it, before the agent had run anything; the agent executed the upgrade with nohup and never reported a result; and no row was written to the command history. Operators reasonably concluded the feature was broken and clicked again, running the upgrade repeatedly. The update is now dispatched as a normal tracked command, so it appears in the command history and its real output and exit status are recorded',
+                'FIXED: agent_checkin.php optimistically set updates_available = 0 and reboot_required = 1 at the moment an update request was handed to the agent, asserting an outcome before any work had been done. A request that never executed still left the server reporting "no updates available, reboot required". Both values are now only ever set from what the agent actually reports',
+                'ADDED: Requesting an update while one is still pending or in flight no longer queues a second one. The endpoint returns the existing command id instead, so repeat clicks are harmless',
+                'CHANGED: The firewall list now shows the queued command number after a successful request, and no longer reloads the page two seconds later - that reload erased the only feedback the operator had been given',
+                'CHANGED: api/update_firewall.php is gated on the update.install capability rather than a blanket admin check, matching the rest of the update paths',
+                'REMOVED: triggerOPNsenseUpdate() and triggerAgentUpdate() in api/update_firewall.php. Both were curl-based helpers that nothing ever called',
+            ],
+        ],
         [
             'version' => '3.18.0',
             'date' => '2026-08-31',

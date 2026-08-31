@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 require_once __DIR__ . '/../inc/logging.php';
-requireLogin();
-requireAdmin();
+require_once __DIR__ . '/../inc/agent_commands.php';
+require_permission('update.install');
 
 header('Content-Type: application/json');
 
@@ -51,178 +51,102 @@ if (!$firewall_id) {
 try {
     // Validate update type
     $allowed_update_types = ['full', 'firmware', 'packages'];
-    if (!in_array($update_type, $allowed_update_types)) {
+    if (!in_array($update_type, $allowed_update_types, true)) {
         $update_type = 'full';
     }
-    
-    // Get firewall details
-    $stmt = db()->prepare("SELECT hostname, ip_address, wan_ip, api_key, api_secret, updates_available FROM firewalls WHERE id = ?");
+
+    $stmt = db()->prepare('SELECT hostname, status, updates_available FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
-    $firewall = $stmt->fetch();
-    
+    $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
+
     if (!$firewall) {
         echo json_encode(['success' => false, 'message' => 'Firewall not found']);
         exit;
     }
-    
-    // Remove the updates_available check - allow manual updates even if no updates detected
-    // This gives administrators flexibility to force updates when needed
-    
-    // Determine firewall IP address and port to use
-    $firewall_ip = $firewall['wan_ip'] ?: $firewall['ip_address'];
-    $firewall_port = 8443; // Default OPNsense port
-    
-    // Check if we have external hostname and port configured
-    $stmt = db()->prepare("SELECT external_hostname, external_port FROM firewalls WHERE id = ?");
-    $stmt->execute([$firewall_id]);
-    $external_config = $stmt->fetch();
-    
-    if ($external_config && $external_config['external_hostname']) {
-        $firewall_ip = $external_config['external_hostname'];
-        $firewall_port = $external_config['external_port'] ?: 8443;
-    }
-    
-    if (!$firewall_ip) {
-        echo json_encode(['success' => false, 'message' => 'No IP address available for firewall']);
-        exit;
-    }
-    
-    // Flag the firewall for update - the standalone updater will handle it
-    // This ensures updates work even if the main agent fails
-    $stmt = db()->prepare("UPDATE firewalls SET 
-        update_requested = 1,
-        update_requested_at = NOW(),
-        update_type = ?,
-        status = 'update_pending'
-        WHERE id = ?");
-    
-    $stmt->execute([$update_type, $firewall_id]);
-    
-    // Log the action
-    log_info('firewall', "Update requested for firewall {$firewall['hostname']} via web interface (type: {$update_type})", 
-        $_SESSION['user_id'] ?? null, $firewall_id, [
-            'action' => 'update_requested',
-            'admin_user' => $_SESSION['username'] ?? 'unknown',
-            'update_type' => $update_type,
-            'method' => 'standalone_updater'
+
+    // Don't queue a second update while one is already outstanding. Without
+    // this, an operator who sees no feedback clicks again - which is exactly
+    // what happened before this endpoint reported anything useful.
+    $pending = db()->prepare(
+        "SELECT id, status, created_at FROM firewall_commands
+          WHERE firewall_id = ? AND action = 'install_updates'
+            AND status IN ('pending','sent')
+          ORDER BY id DESC LIMIT 1"
+    );
+    $pending->execute([$firewall_id]);
+    if ($existing = $pending->fetch(PDO::FETCH_ASSOC)) {
+        echo json_encode([
+            'success'    => true,
+            'already'    => true,
+            'command_id' => (int)$existing['id'],
+            'message'    => sprintf(
+                'An update is already queued for %s (command #%d, %s since %s). '
+                . 'Watch its progress in the command history rather than queueing another.',
+                $firewall['hostname'], (int)$existing['id'], $existing['status'], $existing['created_at']
+            ),
         ]);
-    
-    echo json_encode([
-        'success' => true,
-        'message' => "Update request queued (type: {$update_type}). The standalone updater will process this within 1 minute.",
-        'update_type' => $update_type
-    ]);
-    
-    // If this was a form submission, redirect back
-    if (isset($_POST['action'])) {
-        header('Location: /firewalls.php?success=' . urlencode('Update request queued successfully'));
         exit;
     }
+
+    // Queue a tracked command instead of setting a fire-and-forget flag.
+    //
+    // The previous implementation set firewalls.update_requested = 1 and
+    // returned success. agent_checkin.php then cleared that flag the moment it
+    // read it - before the agent had done anything - and optimistically set
+    // updates_available = 0 and reboot_required = 1. So the request left no
+    // record anywhere, the agent ran it with nohup and never reported a result,
+    // and the UI had nothing to show. The update worked; there was simply no
+    // evidence of it, which is indistinguishable from failure.
+    $built = build_structured_command('install_updates', []);
+    if (!$built['ok']) {
+        echo json_encode(['success' => false, 'message' => $built['error']]);
+        exit;
+    }
+
+    $queued = queue_firewall_command(
+        $firewall_id,
+        $built['command'],
+        sprintf('OPNsense update (%s) requested from the firewall list', $update_type),
+        [
+            'is_raw'     => false,
+            'action'     => 'install_updates',
+            'parameters' => ['update_type' => $update_type],
+            'risk'       => $built['risk'],
+        ]
+    );
+
+    if (!$queued['ok']) {
+        echo json_encode(['success' => false, 'message' => $queued['error']]);
+        exit;
+    }
+
+    db()->prepare('UPDATE firewalls SET last_update_attempt_at = NOW(), last_update_result = "dispatched" WHERE id = ?')
+        ->execute([$firewall_id]);
+
+    log_info('firewall', "OPNsense update queued for {$firewall['hostname']} (type: {$update_type}, command #{$queued['command_id']})",
+        $_SESSION['user_id'] ?? null, $firewall_id, [
+            'action'     => 'update_queued',
+            'admin_user' => $_SESSION['username'] ?? 'unknown',
+            'update_type'=> $update_type,
+            'command_id' => $queued['command_id'],
+        ]);
+
+    echo json_encode([
+        'success'    => true,
+        'command_id' => $queued['command_id'],
+        'message'    => sprintf(
+            'Update queued for %s as command #%d. The agent picks it up on its next check-in '
+            . '(usually within 2 minutes) and the result appears in the command history.',
+            $queued['hostname'], $queued['command_id']
+        ),
+    ]);
 
 } catch (Exception $e) {
-    log_error('firewall', "Failed to initiate update for firewall ID $firewall_id: " . $e->getMessage(),
+    log_error('firewall', "Failed to queue update for firewall ID $firewall_id: " . $e->getMessage(),
         $_SESSION['user_id'] ?? null, $firewall_id);
-    
-    if (isset($_POST['action'])) {
-        header('Location: /firewalls.php?error=' . urlencode('Failed to initiate update'));
-        exit;
-    } else {
-        echo json_encode([
-            'success' => false,
-            'message' => 'Internal server error'
-        ]);
-    }
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }
 
-/**
- * Trigger update using OPNsense API
- */
-function triggerOPNsenseUpdate($firewall_ip, $api_key, $api_secret) {
-    $ch = curl_init();
-    
-    curl_setopt_array($ch, [
-        CURLOPT_URL => "https://$firewall_ip:8443/api/core/firmware/status",
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false,
-        CURLOPT_USERPWD => "$api_key:$api_secret",
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-    ]);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($curl_error) {
-        return ['success' => false, 'message' => "Connection failed: $curl_error"];
-    }
-    
-    if ($http_code !== 200) {
-        return ['success' => false, 'message' => "API call failed with HTTP $http_code"];
-    }
-    
-    // If status check succeeded, trigger the update
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => "https://$firewall_ip:8443/api/core/firmware/update",
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false,
-        CURLOPT_USERPWD => "$api_key:$api_secret",
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-    ]);
-    
-    $update_response = curl_exec($ch);
-    $update_http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($update_http_code === 200) {
-        return ['success' => true, 'message' => 'Update command sent via OPNsense API'];
-    } else {
-        return ['success' => false, 'message' => "Update API call failed with HTTP $update_http_code"];
-    }
-}
-
-/**
- * Trigger update via our agent
- */
-function triggerAgentUpdate($firewall_ip, $firewall_id) {
-    $update_command = [
-        'action' => 'update_system',
-        'firewall_id' => $firewall_id,
-        'timestamp' => time(),
-        'reboot_after' => true
-    ];
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => "https://$firewall_ip/opnsense_agent_update.php",
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => json_encode($update_command),
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json']
-    ]);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($curl_error) {
-        return ['success' => false, 'message' => "Agent connection failed: $curl_error"];
-    }
-    
-    if ($http_code === 200) {
-        return ['success' => true, 'message' => 'Update command sent to firewall agent'];
-    } else {
-        return ['success' => false, 'message' => "Agent communication failed with HTTP $http_code"];
-    }
-}
-?>
+// Note: two curl-based helper functions (triggerOPNsenseUpdate, triggerAgentUpdate)
+// were removed here in 3.19.0. Neither was ever called; updates go through the
+// tracked command queue above.

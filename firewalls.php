@@ -1483,12 +1483,20 @@ function updateFirewall(firewallId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Update the small text to show success
+            // Name the command so the operator has something concrete to follow.
+            // Previously this said "queued" and reloaded into a page showing no
+            // evidence of anything, which reads as failure and invites a repeat
+            // click - the update then runs several times.
             const small = cell.querySelector('small');
-            if (small) small.textContent = 'Waiting for agent pickup...';
-            showToast('Update queued successfully. The firewall will update on next agent check-in.', 'success');
-            // Reload after 2 seconds to show updated status
-            setTimeout(() => location.reload(), 2000);
+            if (small) {
+                small.textContent = data.command_id
+                    ? (data.already ? 'Already queued as #' + data.command_id
+                                    : 'Queued as command #' + data.command_id)
+                    : 'Queued';
+            }
+            showToast(data.message || 'Update queued.', data.already ? 'warning' : 'success');
+            // Leave the row as it is. Reloading here wiped the only feedback the
+            // operator had just been given.
         } else {
             cell.innerHTML = originalCellHTML;
             showToast('Error: ' + (data.message || 'Failed to initiate update'), 'danger');

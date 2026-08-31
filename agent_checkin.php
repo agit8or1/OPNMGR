@@ -437,10 +437,21 @@ try {
     if ($update_info && $update_info['update_requested']) {
         $opnsense_update_requested = true;
         
-        // Clear the update request flag and set status to updating
-        // Also clear updates_available, reset last_update_check to force a fresh check after reboot
-        // Set reboot_required flag (will be cleared when agent reports reboot_required=0 after reboot)
-        $stmt = db()->prepare('UPDATE firewalls SET update_requested = 0, status = \'updating\', updates_available = 0, last_update_check = NULL, reboot_required = 1 WHERE id = ?');
+        // Clear the request flag so it is delivered once, and mark the firewall
+        // as updating.
+        //
+        // Deliberately no longer sets updates_available = 0 or
+        // reboot_required = 1 here. Those asserted an outcome at the moment the
+        // request was handed to the agent, before anything had run - so a
+        // request that never executed still left the server reporting "no
+        // updates available, reboot required", which is worse than saying
+        // nothing. Both are now set from what the agent actually reports.
+        $stmt = db()->prepare(
+            'UPDATE firewalls
+                SET update_requested = 0, status = \'updating\',
+                    last_update_check = NULL, last_update_attempt_at = NOW()
+              WHERE id = ?'
+        );
         $stmt->execute([$firewall_id]);
     }
 
