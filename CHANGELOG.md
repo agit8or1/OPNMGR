@@ -6,6 +6,36 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.8
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Changed
+
+- **`scripts/automated_backup.php` now queues through `queue_firewall_command()`**
+  instead of inserting into `firewall_commands` directly. The direct insert left
+  the primary nightly backup — the one that runs every night — with the weakest
+  audit trail of any command the system issues: no `audit_log` entry at all,
+  recorded as a raw `MEDIUM`-risk shell command rather than the structured
+  `LOW`-risk `backup_upload` action, and with no `parameters`, so the command
+  could not be joined back to the `backups` row it belonged to.
+
+  Both nightly jobs now queue identically:
+
+  ```
+  Automated nightly configuration backup                 backup_upload  is_raw 0  LOW
+  Automated nightly configuration backup (second pass)   backup_upload  is_raw 0  LOW
+  ```
+
+  It also deletes the `backups` row again if queueing fails, matching the second
+  pass — leaving it would claim a backup that was never attempted, which is the
+  false-coverage problem this whole cycle exists to prevent.
+
+  Verified against both live firewalls: commands queued as `backup_upload` with
+  `{"backup_id":N}`, two `command.action` rows added to `audit_log`, and the
+  uploads landed and validated as before.
+
+---
+
 ## Version 3.20.7
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 

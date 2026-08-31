@@ -5,11 +5,19 @@ require_once __DIR__ . '/../inc/cli_guard.php';
 opnmgr_block_direct_web_access(__FILE__);
 /**
  * Automated Backup Script
- * Runs nightly to backup all active firewalls
+ * Runs nightly to backup all active firewalls.
+ *
+ * Queues through queue_firewall_command() rather than inserting into
+ * firewall_commands directly. The direct insert left this - the primary nightly
+ * backup, the one that runs every night - with the weakest audit trail of any
+ * command the system issues: no audit_log entry, recorded as a raw MEDIUM-risk
+ * shell command rather than the structured LOW-risk `backup_upload` action, and
+ * with no `parameters` linking it back to the backups row it belongs to.
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
 require_once __DIR__ . '/../inc/backup_storage.php';
+require_once __DIR__ . '/../inc/agent_commands.php';
 
 error_log("[AUTOMATED_BACKUP] ========================================");
 error_log("[AUTOMATED_BACKUP] Starting automated backup run at " . date('Y-m-d H:i:s'));
@@ -62,14 +70,24 @@ try {
             $backup_command = build_backup_upload_command((int)$fw_id, (int)$backup_id, $backup_filename);
             
             error_log("[AUTOMATED_BACKUP] Queueing backup command");
-            
-            $stmt = db()->prepare("
-                INSERT INTO firewall_commands (firewall_id, command, description, status, created_at)
-                VALUES (?, ?, 'Automated nightly configuration backup', 'pending', NOW())
-            ");
-            $stmt->execute([$fw_id, $backup_command]);
-            $command_id = db()->lastInsertId();
-            
+
+            $queued = queue_firewall_command(
+                (int)$fw_id,
+                $backup_command,
+                'Automated nightly configuration backup',
+                ['action' => 'backup_upload', 'parameters' => ['backup_id' => (int)$backup_id],
+                 'is_raw' => false, 'risk' => 'LOW']
+            );
+
+            if (!$queued['ok']) {
+                // Leaving the row behind would claim a backup that was never
+                // attempted - the false-coverage problem this cycle exists to avoid.
+                db()->prepare('DELETE FROM backups WHERE id = ?')->execute([(int)$backup_id]);
+                throw new RuntimeException('could not queue backup command: ' . $queued['error']);
+            }
+
+            $command_id = $queued['command_id'];
+
             error_log("[AUTOMATED_BACKUP] Command queued with ID: {$command_id}");
             
             // Log to system_logs

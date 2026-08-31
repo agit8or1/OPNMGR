@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.20.7](https://img.shields.io/badge/version-3.20.7-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.20.8](https://img.shields.io/badge/version-3.20.8-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
