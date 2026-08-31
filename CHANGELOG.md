@@ -6,6 +6,35 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.5
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Changed
+
+- **The 170 backup rows with no stored file were removed.** 3.20.3 annotated
+  them instead of deleting them, on the reasoning that the gap should stay
+  visible in the record; with the cause fixed, verified and written up here,
+  keeping 170 rows that describe backups which never existed was worse — the
+  backups list read as 183 backups when 13 were real. Dumped to
+  `backups_db/dangling_backup_rows_*.sql.gz` (170 INSERTs, counted against the
+  pre-delete total) before deletion.
+
+  `backups` is now 13 rows, all 13 resolving to a file on disk, all validated,
+  spanning 2026-08-27 to 2026-08-31 — i.e. every row dates from after the upload
+  fix, which is what honest backup coverage looks like here.
+
+### Known gap
+
+- **Nothing reaps a backup row whose upload never arrives.** `api/upload_backup.php`
+  calls `record_backup_failure()` when an upload is rejected, which annotates the
+  row but keeps it, and `cron/prune_backups.php` prunes only by age. So a
+  firewall that is offline when its backup is queued still leaves a row with no
+  file behind, and those will slowly accumulate again. They are no longer
+  invisible — `scripts/check_backup_health.php` counts rows newer than the last
+  successful upload and exits 2 — but reaping them is not automatic yet.
+
+---
+
 ## Version 3.20.4
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 
