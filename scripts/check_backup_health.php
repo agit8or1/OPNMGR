@@ -20,6 +20,7 @@ opnmgr_block_direct_web_access(__FILE__);
  *   php scripts/check_backup_health.php
  *   php scripts/check_backup_health.php --days=3
  *   php scripts/check_backup_health.php --json
+ *   php scripts/check_backup_health.php --log     also record the verdict in system_logs
  *
  * Exit codes: 0 = every firewall has a recent verified backup, 1 = a firewall
  * is uncovered, 2 = covered but rows reference missing files.
@@ -31,6 +32,10 @@ require_once __DIR__ . '/../inc/bootstrap_agent.php';
 require_once __DIR__ . '/../inc/backup_storage.php';
 
 $asJson = in_array('--json', $argv, true);
+// --log records the verdict in system_logs so a scheduled run surfaces in the
+// app rather than only in a file nobody opens - which is how the upload
+// breakage this check exists for went unnoticed for months.
+$toLog  = in_array('--log', $argv, true);
 $days   = 2;
 foreach ($argv as $arg) {
     if (preg_match('/^--days=(\d+)$/', $arg, $m)) {
@@ -115,6 +120,8 @@ if ($unreadable) {
         . " is not traversable.\n"
         . "Coverage cannot be determined. Re-run as the web server user or root:\n"
         . "  sudo -u www-data php scripts/check_backup_health.php\n");
+    backup_health_log($toLog, 'ERROR',
+        'Backup health check could not read ' . backup_storage_root() . '; coverage unknown');
     exit(3);
 }
 
@@ -126,6 +133,8 @@ if ($asJson) {
         'rows_without_file_7d' => (int)$recentMissing,
         'firewalls'            => $rows,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), "\n";
+    backup_health_log($toLog, $uncovered > 0 ? 'ERROR' : ($recentMissing > 0 ? 'WARNING' : 'INFO'),
+        backup_health_summary($rows, $uncovered, (int)$recentMissing));
     exit($uncovered > 0 ? 1 : ($recentMissing > 0 ? 2 : 0));
 }
 
@@ -158,4 +167,37 @@ if ($missing > 0) {
     }
 }
 
+backup_health_log($toLog, $uncovered > 0 ? 'ERROR' : ($recentMissing > 0 ? 'WARNING' : 'INFO'),
+                  backup_health_summary($rows, $uncovered, (int)$recentMissing));
+
 exit($uncovered > 0 ? 1 : ($recentMissing > 0 ? 2 : 0));
+
+/** One-line verdict, for system_logs and for syslog. */
+function backup_health_summary(array $rows, int $uncovered, int $recentMissing): string {
+    if ($uncovered > 0) {
+        $names = array_column(array_filter($rows, fn($r) => !$r['covered']), 'firewall');
+        return sprintf('Backup coverage: %d of %d firewall(s) have no recent verified backup (%s)',
+                       $uncovered, count($rows), implode(', ', $names));
+    }
+    if ($recentMissing > 0) {
+        return sprintf('Backup coverage: all %d firewall(s) covered, but %d row(s) newer than the '
+                     . 'last successful upload reference a missing file - uploads may be failing',
+                       count($rows), $recentMissing);
+    }
+    return sprintf('Backup coverage: all %d firewall(s) have a recent verified backup', count($rows));
+}
+
+/** Record the verdict in system_logs when asked; never fatal. */
+function backup_health_log(bool $enabled, string $level, string $message): void {
+    if (!$enabled) {
+        return;
+    }
+    try {
+        db()->prepare(
+            "INSERT INTO system_logs (category, message, level, timestamp)
+             VALUES ('backup', ?, ?, NOW())"
+        )->execute([$message, $level]);
+    } catch (Throwable $e) {
+        fwrite(STDERR, 'could not write system_logs entry: ' . $e->getMessage() . "\n");
+    }
+}

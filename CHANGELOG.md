@@ -6,6 +6,24 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.4
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Added
+
+- **The backup coverage check is now scheduled**, at 04:00 in root's crontab,
+  after both backup jobs (01:00 primary, 02:00 second pass). It must run as root
+  or `www-data` — `/var/lib/opnmgr/backups` is `www-data:www-data 0750`, and the
+  check refuses to answer rather than guess without read access.
+
+- **`--log` records the verdict in `system_logs`.** A cron job that only appends
+  to a file nobody opens is the same failure mode this check exists to catch, so
+  the scheduled run writes an INFO/WARNING/ERROR row into the app's own log, and
+  a non-zero exit additionally goes to syslog under the `backup-health` tag. The
+  ERROR message names the uncovered firewalls rather than just counting them.
+
+---
+
 ## Version 3.20.3
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 

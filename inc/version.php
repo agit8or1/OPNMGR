@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Backups That Actually Land'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Check That Speaks Up'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
