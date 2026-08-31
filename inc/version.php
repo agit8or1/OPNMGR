@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-26'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'AI Redaction, Dashboard & Hardening'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Real Security Posture'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,20 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.18.0',
+            'date' => '2026-08-31',
+            'type' => 'minor',
+            'title' => 'Real Security Posture and No Silent Config Staleness',
+            'changes' => [
+                'FIXED: The Security Status panel on the firewall detail page was hardcoded HTML. Every firewall displayed "SSH Access - Enabled - Port 22" and "API Authentication - Enabled" with green ticks regardless of its actual configuration. It is now computed from that firewall\'s own configuration and recorded agent state',
+                'ADDED: SSH exposure distinguishes four states - service disabled, running but no WAN rule permits it, WAN with source restrictions, and open to any source - because those carry very different risk and the old panel showed all four identically',
+                'ADDED: The panel reports root login and password authentication, the WAN rules permitting SSH with their sources, and real agent authentication state including whether the API key is pinned and requests are signed',
+                'FIXED: resolve_backup_path() treated an unreadable backup the same as a missing one, so callers silently fell back to an older configuration. Backups live in a www-data-only directory, so anything running as another user quietly answered from stale data - a six-month-old config was used to answer whether SSH was exposed',
+                'ADDED: drift_config_freshness() reports which configuration an answer came from, whether newer ones were skipped and why, and surfaces it in the UI',
+                'CHANGED: The ssh_on_wan configuration check is split into ssh_open_to_world (a WAN rule from ANY source - the finding that matters) and ssh_on_wan (informational, includes source-restricted management access)',
+            ]
+        ],
         [
             'version' => '3.17.1',
             'date' => '2026-08-27',

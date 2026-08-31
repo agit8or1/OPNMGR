@@ -6,6 +6,50 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.18.0
+**Released**: August 31, 2026 | **Agent**: v1.6.0
+
+### Fixed
+
+- **The Security Status panel was hardcoded.** Every firewall displayed
+  "SSH Access — Enabled — Port 22" and "API Authentication — Enabled" with green
+  ticks, as static HTML, regardless of its configuration. A static green tick on
+  a security panel is worse than no panel, because it gets read as evidence
+  during an audit.
+
+  It is now computed per firewall. SSH exposure distinguishes four states —
+  service disabled, running with no WAN rule permitting it, WAN with source
+  restrictions, and open to any source — because those carry very different risk
+  and the old panel rendered all four identically. The panel also shows root
+  login and password authentication settings, the WAN rules permitting SSH with
+  their sources, and real agent authentication state.
+
+  An unrecognised rule source is treated as open rather than assumed safe:
+  guessing in the permissive direction on a security panel is the wrong way
+  round.
+
+- **Unreadable backups were silently treated as missing.** `resolve_backup_path()`
+  returned null for both, so `drift_latest_backup()` quietly fell back to an
+  older readable configuration. Backups live in a `www-data`-only directory, so
+  anything running as another user answered from stale data with no indication —
+  a configuration six months out of date was used to answer whether SSH was
+  exposed to the internet.
+
+  The two cases are now distinguished, including the case where a file cannot
+  even be stat'd because an ancestor directory is not traversable.
+  `drift_config_freshness()` reports which configuration an answer came from and
+  whether newer ones were skipped, and the UI surfaces it.
+
+### Changed
+
+- The `ssh_on_wan` configuration check is split in two:
+  `ssh_open_to_world` reports WAN rules permitting SSH from **any** source — the
+  finding that actually matters — while `ssh_on_wan` remains informational and
+  includes source-restricted management access. Reporting both identically is
+  how a restricted management rule gets mistaken for an exposed service.
+
+---
+
 ## Version 3.17.1
 **Released**: August 27, 2026 | **Agent**: v1.6.0
 

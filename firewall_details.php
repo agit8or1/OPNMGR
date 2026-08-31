@@ -6,6 +6,7 @@ header('Pragma: no-cache');
 header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/security_posture.php';
 require_once __DIR__ . '/inc/agent_version.php';
 requireLogin();
 
@@ -3471,32 +3472,111 @@ initializeSSHKeys();
                             </div>
                         </div>
                         
-                        <!-- Security Audit Section -->
+                        <!-- Security Status -->
+                        <?php
+                        // Computed from this firewall's own configuration and recorded
+                        // agent state. This panel was previously hardcoded: every
+                        // firewall showed "SSH Access - Enabled - Port 22" with a green
+                        // tick regardless of whether SSH was exposed, disabled, or open
+                        // to the internet.
+                        $posture   = firewall_security_posture((int)$firewall['id']);
+                        $sshP      = $posture['ssh'];
+                        $apiP      = $posture['api'];
+                        $freshP    = $posture['freshness'];
+                        $sshIcon   = ['ok' => 'check-circle', 'warning' => 'triangle-exclamation',
+                                      'critical' => 'circle-exclamation'][$sshP['severity']] ?? 'circle-question';
+                        $apiIcon   = ['ok' => 'check-circle', 'warning' => 'triangle-exclamation',
+                                      'critical' => 'circle-exclamation'][$apiP['severity']] ?? 'circle-question';
+                        ?>
                         <div class="card p-3 border border-warning mb-3">
                             <h6 class="fw-bold mb-2" style="font-size: 1rem;">
                                 <i class="fas fa-shield-alt me-2 text-warning"></i>Security Status
                             </h6>
-                            
+
+                            <?php if (!$freshP['ok'] || $freshP['stale']): ?>
+                            <div class="alert alert-<?php echo $freshP['ok'] ? 'warning' : 'secondary'; ?> py-2 px-3 small mb-2">
+                                <i class="fas fa-clock me-1"></i><?php echo htmlspecialchars($freshP['message']); ?>
+                            </div>
+                            <?php endif; ?>
+
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <div class="card border-secondary">
+                                    <div class="card border-<?php echo posture_badge_class($sshP['severity']); ?>">
                                         <div class="card-body p-2">
                                             <small class="d-block">SSH Access</small>
-                                            <span class="text-success small"><i class="fas fa-check-circle me-1"></i>Enabled</span>
-                                            <small class="text-muted d-block" style="font-size: 0.75rem;">Port 22</small>
+                                            <span class="text-<?php echo posture_badge_class($sshP['severity']); ?> small">
+                                                <i class="fas fa-<?php echo $sshIcon; ?> me-1"></i>
+                                                <?php
+                                                echo htmlspecialchars(match ($sshP['exposure']) {
+                                                    'wan_open'       => 'Exposed to the internet',
+                                                    'wan_restricted' => 'WAN, source-restricted',
+                                                    'lan_only'       => 'Not reachable from WAN',
+                                                    'none'           => 'Service disabled',
+                                                    default          => 'Unknown',
+                                                });
+                                                ?>
+                                            </span>
+                                            <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                                <?php echo htmlspecialchars($sshP['summary']); ?>
+                                            </small>
+                                            <?php if (!empty($sshP['sources'])): ?>
+                                                <small class="text-muted d-block" style="font-size: 0.7rem;">
+                                                    Permitted: <?php echo htmlspecialchars(implode(', ', $sshP['sources'])); ?>
+                                                </small>
+                                            <?php endif; ?>
+                                            <?php if ($sshP['service'] === 'enabled'): ?>
+                                                <small class="d-block mt-1" style="font-size: 0.7rem;">
+                                                    <span class="text-muted">root login</span>
+                                                    <span class="text-<?php echo $sshP['root_login'] ? 'warning' : 'muted'; ?>">
+                                                        <?php echo $sshP['root_login'] ? 'permitted' : 'denied'; ?></span>
+                                                    <span class="text-muted ms-2">password auth</span>
+                                                    <span class="text-<?php echo $sshP['password_auth'] ? 'warning' : 'muted'; ?>">
+                                                        <?php echo $sshP['password_auth'] ? 'permitted' : 'keys only'; ?></span>
+                                                </small>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="card border-secondary">
+                                    <div class="card border-<?php echo posture_badge_class($apiP['severity']); ?>">
                                         <div class="card-body p-2">
-                                            <small class="d-block">API Authentication</small>
-                                            <span class="text-success small"><i class="fas fa-check-circle me-1"></i>Enabled</span>
-                                            <small class="text-muted d-block" style="font-size: 0.75rem;">Token-based auth</small>
+                                            <small class="d-block">Agent Authentication</small>
+                                            <span class="text-<?php echo posture_badge_class($apiP['severity']); ?> small">
+                                                <i class="fas fa-<?php echo $apiIcon; ?> me-1"></i>
+                                                <?php echo htmlspecialchars($apiP['summary']); ?>
+                                            </span>
+                                            <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                                <?php echo htmlspecialchars($apiP['detail']); ?>
+                                            </small>
+                                            <?php if (!empty($apiP['skew']) && abs((int)$apiP['skew']) > 60): ?>
+                                                <small class="text-warning d-block" style="font-size: 0.7rem;">
+                                                    Clock skew <?php echo (int)$apiP['skew']; ?>s
+                                                </small>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <?php if (!empty($sshP['rules'])): ?>
+                            <div class="mt-2">
+                                <small class="text-muted d-block mb-1">WAN rules permitting SSH</small>
+                                <table class="table table-sm mb-0" style="font-size:.75rem">
+                                    <tbody>
+                                    <?php foreach ($sshP['rules'] as $r): ?>
+                                        <tr>
+                                            <td class="text-muted"><?php echo htmlspecialchars($r['interface']); ?></td>
+                                            <td>port <?php echo htmlspecialchars($r['port']); ?></td>
+                                            <td class="<?php echo $r['source'] === 'any' ? 'text-danger fw-bold' : ''; ?>">
+                                                from <?php echo htmlspecialchars($r['source']); ?>
+                                            </td>
+                                            <td class="text-muted"><?php echo htmlspecialchars($r['description']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div><!-- End Security Tab -->
                     

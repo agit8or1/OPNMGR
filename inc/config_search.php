@@ -36,21 +36,69 @@ if (!function_exists('config_search_checks')) {
      */
     function config_search_checks(): array {
         return [
-            'ssh_on_wan' => [
-                'label' => 'SSH reachable from WAN',
-                'describe' => 'A pass rule on a WAN interface targeting port 22.',
+            // Two separate checks, because "a WAN rule mentions port 22" and
+            // "the internet can reach SSH" are very different findings. Reporting
+            // them identically is how a source-restricted management rule gets
+            // mistaken for an exposed service.
+            'ssh_open_to_world' => [
+                'label' => 'SSH open to the internet',
+                'describe' => 'A WAN pass rule permitting port 22 from ANY source. This is the one that matters.',
                 'run' => function (array $cfg): array {
                     $found = [];
                     foreach (config_search_rules($cfg) as $rule) {
+                        if (!empty($rule['disabled'])) {
+                            continue;
+                        }
                         $iface = strtolower((string)($rule['interface'] ?? ''));
                         $port  = (string)($rule['destination']['port'] ?? '');
-                        $type  = strtolower((string)($rule['type'] ?? ''));
-
-                        if ($type === 'pass' && str_contains($iface, 'wan')
-                            && ($port === '22' || $port === 'ssh')) {
-                            $found[] = sprintf('%s rule on %s port %s: %s',
-                                $type, $iface, $port, $rule['descr'] ?? '(no description)');
+                        if (strtolower((string)($rule['type'] ?? '')) !== 'pass'
+                            || !str_contains($iface, 'wan')
+                            || ($port !== '22' && strtolower($port) !== 'ssh')) {
+                            continue;
                         }
+
+                        $src = (array)($rule['source'] ?? []);
+                        $unrestricted = array_key_exists('any', $src)
+                            || (!isset($src['address']) && !isset($src['network']));
+
+                        if ($unrestricted) {
+                            $found[] = sprintf('pass on %s port %s from ANY: %s',
+                                $iface, $port, $rule['descr'] ?? '(no description)');
+                        }
+                    }
+                    return $found;
+                },
+            ],
+            'ssh_on_wan' => [
+                'label' => 'SSH permitted on WAN (any source restriction)',
+                'describe' => 'Any enabled WAN pass rule for port 22, including source-restricted management access. Informational: see ssh_open_to_world for actual exposure.',
+                'run' => function (array $cfg): array {
+                    $found = [];
+                    foreach (config_search_rules($cfg) as $rule) {
+                        if (!empty($rule['disabled'])) {
+                            continue;
+                        }
+                        $iface = strtolower((string)($rule['interface'] ?? ''));
+                        $port  = (string)($rule['destination']['port'] ?? '');
+                        if (strtolower((string)($rule['type'] ?? '')) !== 'pass'
+                            || !str_contains($iface, 'wan')
+                            || ($port !== '22' && strtolower($port) !== 'ssh')) {
+                            continue;
+                        }
+
+                        $src = (array)($rule['source'] ?? []);
+                        if (array_key_exists('any', $src)) {
+                            $source = 'ANY';
+                        } elseif (isset($src['address'])) {
+                            $source = is_array($src['address']) ? implode(', ', $src['address']) : (string)$src['address'];
+                        } elseif (isset($src['network'])) {
+                            $source = is_array($src['network']) ? implode(', ', $src['network']) : (string)$src['network'];
+                        } else {
+                            $source = 'unrecognised source';
+                        }
+
+                        $found[] = sprintf('pass on %s port %s from %s: %s',
+                            $iface, $port, $source, $rule['descr'] ?? '(no description)');
                     }
                     return $found;
                 },

@@ -10,6 +10,7 @@ require_once __DIR__ . '/bootstrap.php';
 require_once TEST_ROOT . '/inc/bootstrap_agent.php';
 require_once TEST_ROOT . '/inc/config_drift.php';
 require_once TEST_ROOT . '/inc/firewall_health.php';
+require_once TEST_ROOT . '/inc/security_posture.php';
 
 $fwId = 0;
 register_shutdown_function(function () use (&$fwId) {
@@ -213,5 +214,115 @@ T::eq('ok', health_cert_severity(365),     'a year out is fine');
 T::eq('unknown', health_cert_severity(null), 'an unknown expiry is unknown');
 
 T::eq('online', health_gateway_label('none'), 'OPNsense "none" is presented as online');
+
+
+// ===========================================================================
+T::group('Backup readability: no silent staleness');
+
+// A row whose file simply does not exist is "missing" - the expected result of
+// an upload that never arrived, and callers should move on.
+$missing = resolve_backup_path_status(['storage_path' => '/nonexistent/dir/nope.xml', 'backup_file' => '']);
+T::eq('missing', $missing['status'], 'a backup with no file anywhere reports missing');
+T::eq(null, $missing['path'], 'and yields no path');
+
+// A file that exists but cannot be read is a permissions problem, NOT a missing
+// backup. Conflating the two is what let a six-month-old config answer a
+// security question without anyone noticing.
+$tmp = sys_get_temp_dir() . '/opnmgr_unreadable_' . getmypid() . '.xml';
+file_put_contents($tmp, '<opnsense/>');
+$readable = resolve_backup_path_status(['storage_path' => $tmp, 'backup_file' => '']);
+T::eq('ok', $readable['status'], 'a readable file reports ok');
+
+if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+    chmod($tmp, 0000);
+    clearstatcache(true, $tmp);
+    $unreadable = resolve_backup_path_status(['storage_path' => $tmp, 'backup_file' => '']);
+    T::eq('unreadable', $unreadable['status'], 'a present but unreadable file reports unreadable, not missing');
+    T::eq(null, $unreadable['path'], 'and still yields no path');
+    chmod($tmp, 0644);
+} else {
+    T::ok(true, 'unreadable-file check skipped (running as root, which can read anything)');
+    T::ok(true, 'unreadable-file path check skipped');
+}
+@unlink($tmp);
+
+$fresh = drift_config_freshness($fwId);
+T::ok(array_key_exists('stale', $fresh),   'freshness reports whether the config is stale');
+T::ok(array_key_exists('used_at', $fresh), 'and which configuration it used');
+T::ok($fresh['message'] !== '',            'and says so in words a person can act on');
+
+// ===========================================================================
+T::group('Security posture is computed, not asserted');
+
+// SSH wide open must be reported as critical.
+$openCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']],
+            'filter' => ['rule' => [
+                ['type' => 'pass', 'interface' => 'wan', 'descr' => 'SSH any',
+                 'destination' => ['port' => '22'], 'source' => ['any' => '']],
+            ]]];
+$p = ssh_posture($openCfg);
+T::eq('wan_open', $p['exposure'], 'a WAN pass rule from any source is exposure wan_open');
+T::eq('critical', $p['severity'], 'and is critical');
+
+// Source-restricted is a different, lesser finding.
+$restrictedCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']],
+                  'filter' => ['rule' => [
+                      ['type' => 'pass', 'interface' => 'wan', 'descr' => 'mgmt',
+                       'destination' => ['port' => '22'], 'source' => ['address' => '203.0.113.9']],
+                  ]]];
+$p = ssh_posture($restrictedCfg);
+T::eq('wan_restricted', $p['exposure'], 'a source-restricted WAN rule is wan_restricted, not open');
+T::eq('warning', $p['severity'], 'and is a warning rather than critical');
+T::eq(['203.0.113.9'], $p['sources'], 'and the permitted source is reported');
+
+// sshd on with no WAN rule is not reachable from the internet.
+$lanCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']], 'filter' => []];
+$p = ssh_posture($lanCfg);
+T::eq('lan_only', $p['exposure'], 'sshd enabled with no WAN rule is lan_only');
+T::eq('ok', $p['severity'], 'and is not a finding');
+
+// A disabled rule permits nothing.
+$disabledCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']],
+                'filter' => ['rule' => [
+                    ['type' => 'pass', 'interface' => 'wan', 'disabled' => '1',
+                     'destination' => ['port' => '22'], 'source' => ['any' => '']],
+                ]]];
+T::eq('lan_only', ssh_posture($disabledCfg)['exposure'], 'a disabled rule does not count as exposure');
+
+// A block rule is not exposure either.
+$blockCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']],
+             'filter' => ['rule' => [
+                 ['type' => 'block', 'interface' => 'wan',
+                  'destination' => ['port' => '22'], 'source' => ['any' => '']],
+             ]]];
+T::eq('lan_only', ssh_posture($blockCfg)['exposure'], 'a block rule is not exposure');
+
+// sshd off outranks everything.
+$offCfg = ['system' => ['ssh' => []], 'filter' => ['rule' => [
+    ['type' => 'pass', 'interface' => 'wan', 'destination' => ['port' => '22'], 'source' => ['any' => '']],
+]]];
+$p = ssh_posture($offCfg);
+T::eq('none', $p['exposure'], 'a disabled SSH service reports exposure none');
+T::eq('ok', $p['severity'], 'and is not a finding regardless of rules');
+
+// An unrecognised source must fail towards "open", never towards "safe".
+$weirdCfg = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '22']],
+             'filter' => ['rule' => [
+                 ['type' => 'pass', 'interface' => 'wan',
+                  'destination' => ['port' => '22'], 'source' => ['something_odd' => 'x']],
+             ]]];
+T::eq('wan_open', ssh_posture($weirdCfg)['exposure'],
+      'an unrecognised source is treated as open, not assumed safe');
+
+// A non-default SSH port is honoured.
+$altPort = ['system' => ['ssh' => ['enabled' => 'enabled', 'port' => '2222']],
+            'filter' => ['rule' => [
+                ['type' => 'pass', 'interface' => 'wan',
+                 'destination' => ['port' => '2222'], 'source' => ['any' => '']],
+            ]]];
+$p = ssh_posture($altPort);
+T::eq('2222', $p['port'], 'a non-default SSH port is read from the config');
+T::eq('wan_open', $p['exposure'], 'and exposure is evaluated against that port');
+
 
 exit(T::summary());

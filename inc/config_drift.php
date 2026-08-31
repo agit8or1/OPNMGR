@@ -482,8 +482,13 @@ if (!function_exists('drift_latest_backup')) {
      *
      * @param int $maxScan Safety bound on how far back to look
      */
-    function drift_latest_backup(int $firewallId, int $maxScan = 500): ?array {
+    function drift_latest_backup(int $firewallId, int $maxScan = 500, ?array &$diag = null): ?array {
         $pageSize = 50;
+        $diag = [
+            'skipped_missing'    => 0,
+            'skipped_unreadable' => 0,
+            'newest_unreadable'  => null,
+        ];
 
         for ($offset = 0; $offset < $maxScan; $offset += $pageSize) {
             $stmt = db()->prepare(
@@ -496,11 +501,37 @@ if (!function_exists('drift_latest_backup')) {
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (!$rows) {
-                return null;
+                break;
             }
+
             foreach ($rows as $row) {
-                if (resolve_backup_path($row) !== null) {
+                $resolved = resolve_backup_path_status($row);
+
+                if ($resolved['status'] === 'ok') {
                     return $row;
+                }
+
+                if ($resolved['status'] === 'unreadable') {
+                    // Present but not readable by this process. Skipping to an
+                    // older backup here would silently answer from stale
+                    // configuration, so this is recorded and shouted about
+                    // rather than absorbed.
+                    $diag['skipped_unreadable']++;
+                    if ($diag['newest_unreadable'] === null) {
+                        $diag['newest_unreadable'] = $row['uploaded_at'] ?: $row['created_at'];
+                        error_log(sprintf(
+                            'OPNMGR: backup %d for firewall %d exists but is not readable by %s - '
+                            . 'falling back to an older configuration. Check permissions on %s',
+                            (int)$row['id'],
+                            $firewallId,
+                            function_exists('posix_getpwuid') && function_exists('posix_geteuid')
+                                ? (posix_getpwuid(posix_geteuid())['name'] ?? 'this user')
+                                : 'this user',
+                            $row['storage_path'] ?: BACKUP_LEGACY_DIR
+                        ));
+                    }
+                } else {
+                    $diag['skipped_missing']++;
                 }
             }
         }
@@ -782,5 +813,73 @@ if (!function_exists('drift_fleet_status')) {
             error_log('OPNMGR: drift_fleet_status failed: ' . $e->getMessage());
             return [];
         }
+    }
+}
+
+if (!function_exists('drift_config_freshness')) {
+    /**
+     * How current the configuration a caller is about to reason from actually is.
+     *
+     * Answers to security questions ("is SSH exposed?") are only as good as the
+     * configuration behind them, so anything presenting such an answer should
+     * show this alongside it.
+     *
+     * @return array{ok:bool, used_at:?string, newest_at:?string, stale:bool,
+     *               unreadable:int, message:string}
+     */
+    function drift_config_freshness(int $firewallId): array {
+        $out = ['ok' => false, 'used_at' => null, 'newest_at' => null,
+                'stale' => false, 'unreadable' => 0, 'message' => ''];
+
+        $diag = null;
+        $used = drift_latest_backup($firewallId, 500, $diag);
+
+        try {
+            $stmt = db()->prepare(
+                'SELECT MAX(COALESCE(uploaded_at, created_at))
+                   FROM backups
+                  WHERE firewall_id = ? AND (storage_path IS NOT NULL OR backup_file IS NOT NULL)'
+            );
+            $stmt->execute([$firewallId]);
+            $out['newest_at'] = $stmt->fetchColumn() ?: null;
+        } catch (Throwable $e) {
+            // non-fatal
+        }
+
+        $out['unreadable'] = (int)($diag['skipped_unreadable'] ?? 0);
+
+        if ($used === null) {
+            $out['message'] = $out['unreadable'] > 0
+                ? 'No readable configuration backup. Files exist but cannot be read - check permissions.'
+                : 'No configuration backup has been received for this firewall yet.';
+            return $out;
+        }
+
+        $out['ok']      = true;
+        $out['used_at'] = $used['uploaded_at'] ?: $used['created_at'];
+
+        if ($out['unreadable'] > 0) {
+            $out['stale']   = true;
+            $out['message'] = sprintf(
+                'Answering from a configuration dated %s. %d newer backup(s) exist but are not readable '
+                . 'by this process - check permissions on the backup directory.',
+                $out['used_at'], $out['unreadable']
+            );
+            return $out;
+        }
+
+        // Flag a config that is old even though nothing was skipped: the agent
+        // may simply have stopped uploading.
+        if ($out['used_at'] !== null && (time() - strtotime($out['used_at'])) > 7 * 86400) {
+            $out['stale']   = true;
+            $out['message'] = sprintf(
+                'The newest configuration backup is from %s, more than a week old.',
+                $out['used_at']
+            );
+            return $out;
+        }
+
+        $out['message'] = 'Configuration from ' . $out['used_at'];
+        return $out;
     }
 }

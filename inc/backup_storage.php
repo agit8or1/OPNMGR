@@ -262,30 +262,111 @@ if (!function_exists('store_firewall_backup')) {
     }
 }
 
+if (!function_exists('backup_path_is_traversable')) {
+    /**
+     * Whether every existing ancestor of a directory can be traversed.
+     *
+     * Returns true when the path chain is fully visible to this process -
+     * meaning a file that is not there is genuinely absent rather than hidden
+     * behind a directory we lack execute permission on.
+     *
+     * @param string $dir Directory to test
+     */
+    function backup_path_is_traversable(string $dir): bool {
+        $seen = 0;
+
+        while ($dir !== '' && $dir !== DIRECTORY_SEPARATOR && $seen++ < 64) {
+            if (is_dir($dir)) {
+                // The nearest existing ancestor decides it.
+                return is_readable($dir) && is_executable($dir);
+            }
+            if (file_exists($dir)) {
+                // Exists but is not a directory: nothing can live under it.
+                return true;
+            }
+
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        // Reached the root without hitting an unreadable directory.
+        return true;
+    }
+}
+
+if (!function_exists('resolve_backup_path_status')) {
+    /**
+     * Locate a backup's bytes, distinguishing "absent" from "cannot read".
+     *
+     * Those two cases need opposite handling. A row with no file is the
+     * expected result of an upload that never arrived, and callers should move
+     * on to an older backup. A file that exists but cannot be read is a
+     * permissions problem on this server, and quietly moving on to an older
+     * backup means answering questions from stale configuration without saying
+     * so - which is how a six-month-old config ended up being used to answer
+     * "is SSH exposed".
+     *
+     * @param array $backup Row from the backups table
+     * @return array{path:?string, status:string} status: ok|missing|unreadable
+     */
+    function resolve_backup_path_status(array $backup): array {
+        $candidates = [];
+
+        $stored = $backup['storage_path'] ?? null;
+        if (is_string($stored) && $stored !== '') {
+            $candidates[] = $stored;
+        }
+
+        // Legacy rows carry only a bare filename in the old document-root
+        // directory. basename() so a crafted database value cannot traverse out.
+        $legacyName = (string)($backup['backup_file'] ?? '');
+        if ($legacyName !== '') {
+            $candidates[] = BACKUP_LEGACY_DIR . '/' . basename($legacyName);
+        }
+
+        $sawUnreadable = false;
+
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                if (is_readable($path)) {
+                    return ['path' => $path, 'status' => 'ok'];
+                }
+                $sawUnreadable = true;
+                continue;
+            }
+
+            // file_exists() returns false for a file inside a directory we lack
+            // execute permission on, so an inaccessible directory is
+            // indistinguishable from a missing file by that test alone. Walk up
+            // to the nearest ancestor we can actually see: if that ancestor
+            // exists but cannot be traversed, this is a permissions problem and
+            // the caller must not quietly drop to an older configuration. If the
+            // whole chain is visible and the file simply is not there, it is
+            // genuinely missing.
+            if (!backup_path_is_traversable(dirname($path))) {
+                $sawUnreadable = true;
+            }
+        }
+
+        return ['path' => null, 'status' => $sawUnreadable ? 'unreadable' : 'missing'];
+    }
+}
+
 if (!function_exists('resolve_backup_path')) {
     /**
-     * Absolute path to a backup row's bytes, or null when the file is gone.
+     * Absolute path to a backup row's bytes, or null when unavailable.
      *
-     * Handles both the new storage_path rows and legacy rows that only have a
-     * bare filename in the old document-root directory. The legacy branch runs
-     * the name through basename() so a crafted database value cannot traverse
-     * out of that directory.
+     * Thin wrapper over resolve_backup_path_status() for callers that only need
+     * the path. Prefer the status form where the difference between a missing
+     * and an unreadable file matters.
      *
      * @param array $backup Row from the backups table
      */
     function resolve_backup_path(array $backup): ?string {
-        $stored = $backup['storage_path'] ?? null;
-        if (is_string($stored) && $stored !== '' && is_file($stored)) {
-            return $stored;
-        }
-
-        $legacyName = (string)($backup['backup_file'] ?? '');
-        if ($legacyName === '') {
-            return null;
-        }
-
-        $legacyPath = BACKUP_LEGACY_DIR . '/' . basename($legacyName);
-        return is_file($legacyPath) ? $legacyPath : null;
+        return resolve_backup_path_status($backup)['path'];
     }
 }
 
