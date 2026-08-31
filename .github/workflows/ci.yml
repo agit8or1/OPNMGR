@@ -137,6 +137,9 @@ jobs:
       - name: AI redaction suite
         run: php tests/ai_redaction_test.php
 
+      - name: Reboot state derivation suite
+        run: php tests/reboot_state_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -234,3 +237,4 @@ jobs:
           php tests/alerting_test.php
           php tests/fleet_test.php
           php tests/ai_redaction_test.php
+          php tests/reboot_state_test.php

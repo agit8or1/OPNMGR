@@ -31,6 +31,18 @@ define('JQUERY_VERSION', '3.7.1');
 function getChangelogEntries($limit = 10) {
     return [
         [
+            'version' => '3.19.2',
+            'date' => '2026-08-31',
+            'type' => 'patch',
+            'title' => 'Reboot State Measured, Not Guessed',
+            'changes' => [
+                'FIXED: reboot_required was never measured. The agent has never reported a reboot flag, so agent_checkin.php preserves the stored value on every check-in and the column was writable only by code that inferred it. fw.agit8or.net asserted "reboot required" continuously from 2026-03-04 across many actual reboots, while home.agit8or.net reported no reboot needed immediately after installing a base and kernel it had not booted into. It is now derived by comparing estimated boot time against the completion of the last update known to have installed successfully',
+                'FIXED: An unreadable uptime no longer clears a real pending reboot. The parser returns null rather than zero for Unknown/empty/unrecognised values, and an indeterminate state leaves the stored value untouched',
+                'FIXED: A failed update is no longer counted as installed. The agent reports every command as completed regardless of outcome, so the derivation requires the OPNMGR_UPDATE_EXIT=0 marker rather than trusting command status',
+                'ADDED: inc/reboot_state.php with tests/reboot_state_test.php (22 assertions), wired into CI',
+            ],
+        ],
+        [
             'version' => '3.19.1',
             'date' => '2026-08-31',
             'type' => 'minor',

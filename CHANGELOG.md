@@ -6,6 +6,55 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.19.2
+**Released**: August 31, 2026 | **Agent**: v1.6.0
+
+### Fixed
+
+- **`reboot_required` was never measured, only guessed** — and was wrong on both
+  production firewalls simultaneously, in opposite directions.
+
+  The agent has never reported a reboot flag; `reboot` appears nowhere in
+  `agent.sh`. So `agent_checkin.php` takes its "agent doesn't support reboot
+  detection — preserve existing value" branch on every single check-in, leaving
+  the column writable only by code that inferred it: the old update path set it
+  to `1` the instant a request was handed to the agent, and the update-recovery
+  branches set it to `0` whenever a firewall reappeared with status `updating`.
+  Neither consulted the firewall.
+
+  The result: `fw.agit8or.net` asserted "reboot required" continuously from
+  2026-03-04 — for roughly six months, across many actual reboots, its uptime at
+  the time of the fix being 13 days — because a March update request set the flag
+  and nothing could ever clear it. Meanwhile `home.agit8or.net` reported *no*
+  reboot needed immediately after installing a new base and kernel, with 187 days
+  of uptime, because the recovery branch had cleared the flag.
+
+  Reboot state is now derived from evidence the system actually has: the agent
+  reports uptime, so the boot time can be estimated and compared against the
+  completion time of the last update known to have installed successfully. A box
+  that booted before that update has not started the new kernel and genuinely
+  needs a reboot; with no successful update on record there is no evidence of a
+  pending reboot and none is claimed.
+
+- **An unreadable uptime no longer clears a real pending reboot.** The parser
+  returns null rather than zero for `Unknown`, empty and unrecognised values —
+  zero would have placed the boot instant at the check-in and silently marked
+  every outstanding reboot as satisfied. When the state cannot be determined the
+  stored value is left alone.
+
+- **A failed update is not counted as installed.** The agent reports every
+  command as `completed` regardless of outcome, so the derivation requires the
+  `OPNMGR_UPDATE_EXIT=0` marker introduced in 3.19.1 rather than trusting command
+  status.
+
+### Added
+
+- `inc/reboot_state.php`, with `tests/reboot_state_test.php` (22 assertions)
+  covering uptime parsing, stale-flag recomputation, failed and unmarked updates,
+  and the unreadable-uptime case. Wired into CI.
+
+---
+
 ## Version 3.19.1
 **Released**: August 31, 2026 | **Agent**: v1.6.0
 

@@ -4,6 +4,7 @@ require_once __DIR__ . '/inc/logging.php';
 require_once __DIR__ . '/inc/agent_auth.php';
 require_once __DIR__ . '/inc/command_results.php';
 require_once __DIR__ . '/inc/agent_commands.php';
+require_once __DIR__ . '/inc/reboot_state.php';
 require_once __DIR__ . '/inc/firewall_health.php';
 
 // Endpoint for firewall agent check-ins
@@ -116,6 +117,15 @@ if ($command_id > 0 && !empty($command_status)) {
             // claiming "no updates available" for an upgrade that never ran.
             db()->prepare('UPDATE firewalls SET last_update_check = NULL WHERE id = ?')
                 ->execute([$firewall_id]);
+
+            // A successful install means the new base/kernel is on disk but not
+            // yet running, so re-derive the reboot state immediately instead of
+            // waiting for the next check-in.
+            try {
+                recompute_reboot_required($firewall_id);
+            } catch (Throwable $e) {
+                error_log("Reboot state recompute failed after update for firewall $firewall_id: " . $e->getMessage());
+            }
 
             error_log("Update result for firewall $firewall_id (command $command_id): $verdict"
                 . ($outcome['known'] ? " (exit {$outcome['exit_code']})" : ' (no exit marker)'));
@@ -259,6 +269,21 @@ try {
     
     if (!$result) {
         error_log("Failed to update firewalls table for firewall $firewall_id: " . print_r($stmt->errorInfo(), true));
+    }
+
+    // Derive reboot_required from the uptime just reported rather than leaving
+    // it frozen. The agent has never sent a reboot flag, so this column was
+    // previously writable only by code that guessed - which left one firewall
+    // asserting "reboot required" continuously from March through many actual
+    // reboots, and another reporting no reboot needed while running a kernel it
+    // had not booted into. Never allowed to break a check-in.
+    try {
+        $reboot_verdict = recompute_reboot_required($firewall_id);
+        if ($reboot_verdict['changed']) {
+            error_log("Firewall $firewall_id reboot_required -> {$reboot_verdict['state']} ({$reboot_verdict['reason']})");
+        }
+    } catch (Throwable $e) {
+        error_log("Reboot state recompute failed for firewall $firewall_id: " . $e->getMessage());
     }
     
     // Also update or insert agent record for historical tracking
@@ -411,7 +436,12 @@ try {
 
             if ($updates_available == 0) {
                 // Update completed (or was already up to date) - return to online
-                $stmt = db()->prepare('UPDATE firewalls SET status = ?, reboot_required = 0 WHERE id = ?');
+                // reboot_required is deliberately not touched here. This branch fires when
+                // a firewall reappears after an update, which says nothing about whether
+                // it has actually booted into the new base/kernel - clearing the flag
+                // here reported "no reboot needed" for a box still running the old one.
+                // recompute_reboot_required() decides it from uptime instead.
+                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
 
                 log_info('firewall', "Update completed for firewall - now running version $current_version",
@@ -434,7 +464,12 @@ try {
                 // The update either completed (after reboot) or failed - recover to online.
                 // opnsense-update -bkf may leave minor patches still available, so
                 // updates_available can still be 1 even after a successful base update.
-                $stmt = db()->prepare('UPDATE firewalls SET status = ?, reboot_required = 0 WHERE id = ?');
+                // reboot_required is deliberately not touched here. This branch fires when
+                // a firewall reappears after an update, which says nothing about whether
+                // it has actually booted into the new base/kernel - clearing the flag
+                // here reported "no reboot needed" for a box still running the old one.
+                // recompute_reboot_required() decides it from uptime instead.
+                $stmt = db()->prepare('UPDATE firewalls SET status = ? WHERE id = ?');
                 $stmt->execute(['online', $firewall_id]);
 
                 log_info('firewall', "Update completed for firewall after {$update_age_minutes}min - version $current_version (minor patches may still be available)",
