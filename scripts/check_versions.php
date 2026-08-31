@@ -52,13 +52,31 @@ if (is_file($agentScript)
     $agentSourceVersion = $m[1];
 }
 
+// `downloads/` is gitignored, so a fresh checkout (CI, a clone) has no release
+// artifacts to read. That is not drift: fall back to the AGENT_VERSION constant,
+// which IS tracked, and skip the checks that only a real release can answer.
+$haveReleases = $agentVersion !== '';
+if (!$haveReleases) {
+    $versionFile = (string)@file_get_contents($root . '/inc/version.php');
+    if (preg_match("/define\('AGENT_VERSION',\s*'([^']+)'\)/", $versionFile, $m)) {
+        $agentVersion = $m[1];
+    }
+}
+
 if ($agentVersion === '') {
-    fwrite(STDERR, "No released agent tarball found in downloads/plugins/\n");
+    fwrite(STDERR, "No released agent tarball in downloads/plugins/ and no "
+                 . "AGENT_VERSION constant in inc/version.php to fall back to\n");
     exit(1);
 }
 
-printf("Authoritative: application %s, agent %s (newest released tarball)\n\n",
-       $appVersion, $agentVersion);
+printf("Authoritative: application %s, agent %s (%s)\n",
+       $appVersion, $agentVersion,
+       $haveReleases ? 'newest released tarball' : 'AGENT_VERSION constant');
+if (!$haveReleases) {
+    echo "No release artifacts in this checkout (downloads/ is gitignored);\n";
+    echo "release-only checks are skipped.\n";
+}
+echo "\n";
 
 $problems = [];
 $fixed    = [];
@@ -164,7 +182,7 @@ check(
 // label by hand, so source can sit at a version already published with different
 // contents - and the next packaging run would then overwrite a released tarball.
 // Whoever cuts that release must bump AGENT_VERSION first.
-if ($agentSourceVersion !== '' && $agentSourceVersion === $agentVersion) {
+if ($haveReleases && $agentSourceVersion !== '' && $agentSourceVersion === $agentVersion) {
     $tarball = $root . '/downloads/plugins/os-opnmanager-agent-' . $agentVersion . '.tar.gz';
     $sourceDir = $root . '/plugin/os-opnmanager-agent/src';
     if (is_file($tarball) && is_dir($sourceDir)) {
@@ -213,7 +231,8 @@ if ($agentSourceVersion !== '' && $agentSourceVersion === $agentVersion) {
 // --- unreleased source bump -------------------------------------------------
 // Never auto-fixed in either direction: the answer is either to package the new
 // agent or to revert the bump, and only a human knows which.
-if ($agentSourceVersion !== '' && version_compare($agentSourceVersion, $agentVersion, '>')) {
+if ($haveReleases && $agentSourceVersion !== ''
+    && version_compare($agentSourceVersion, $agentVersion, '>')) {
     $problems[] = sprintf(
         'agent.sh: source is v%s but the newest released tarball is v%s - either package v%s or revert the bump',
         $agentSourceVersion, $agentVersion, $agentSourceVersion

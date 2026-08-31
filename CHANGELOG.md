@@ -6,6 +6,22 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.2
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Fixed
+
+- **`check_versions.php` could not run in CI.** 3.20.1 made the newest released
+  tarball in `downloads/plugins/` the authority for the agent version — correct
+  locally, but `downloads/` is gitignored, so a fresh checkout has no release
+  artifacts and the check aborted with "No released agent tarball found". It now
+  falls back to the `AGENT_VERSION` constant, which is tracked in git, and skips
+  only the checks a real release can answer (the unreleased-source-bump check and
+  the source-vs-tarball comparison). README, `agent.sh` and CHANGELOG are still
+  validated against it, so version drift is still caught on every push.
+
+---
+
 ## Version 3.20.1
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 
