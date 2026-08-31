@@ -175,7 +175,7 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     display: grid;
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
     gap: 14px;
-    height: 380px;       /* fixed height — no infinite stretch */
+    height: 300px;       /* fixed height — no infinite stretch */
 }
 .dash-chart-panel {
     background: var(--bg-surface);
@@ -197,7 +197,24 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     flex-direction: column;
 }
 .dash-map-panel h6 { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); padding: 14px 18px 0; margin: 0; flex-shrink: 0; }
-.dash-map-panel #networkMap { flex: 1; min-height: 0; width: 100%; }
+.dash-map-panel #networkMap { flex: 1; min-height: 0; width: 100%; background: var(--bg); }
+
+/* Leaflet controls: keep them visible above the dark chrome and on-theme */
+#networkMap .leaflet-control-container { z-index: 500; }
+#networkMap .leaflet-bar a {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-bottom-color: var(--border);
+    font-weight: 600;
+}
+#networkMap .leaflet-bar a:hover { background: var(--bg-elevated); color: var(--accent); }
+#networkMap .leaflet-bar { border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+#networkMap .leaflet-control-attribution {
+    background: rgba(0,0,0,.45);
+    color: #cbd5e1;
+    font-size: 0.6rem;
+}
+#networkMap .leaflet-control-attribution a { color: #93c5fd; }
 
 /* ── Responsive ── */
 @media (max-width: 1200px) {
@@ -423,13 +440,49 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Leaflet map
-    var map = L.map('networkMap', { zoomControl: true }).setView([39.0997, -94.5786], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap', maxZoom: 18
+    var map = L.map('networkMap', {
+        zoomControl: false,
+        scrollWheelZoom: true,
+        minZoom: 2,
+        maxZoom: 16,
+        worldCopyJump: true
+    }).setView([39.0997, -94.5786], 4);
+
+    // Colour basemap (CARTO Voyager) — readable labels, no washed-out grey
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap, &copy; CARTO',
+        subdomains: 'abcd', maxZoom: 16
     }).addTo(map);
 
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // "Fit all" control so you can always get back to every site
+    var FitAll = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function() {
+            var c = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            var a = L.DomUtil.create('a', '', c);
+            a.href = '#'; a.title = 'Fit all locations'; a.innerHTML = '&#9678;';
+            L.DomEvent.on(a, 'click', function(e) {
+                L.DomEvent.stop(e);
+                fitAllMarkers();
+            });
+            return c;
+        }
+    });
+    map.addControl(new FitAll());
+
+    var mapBounds = [];
+    function fitAllMarkers() {
+        if (mapBounds.length > 1) {
+            map.fitBounds(mapBounds, { padding: [40, 40], maxZoom: 9 });
+        } else if (mapBounds.length === 1) {
+            map.setView(mapBounds[0], 9);
+        }
+    }
+
     // Force Leaflet to recalculate size after flex layout settles
-    setTimeout(function(){ map.invalidateSize(); }, 400);
+    setTimeout(function(){ map.invalidateSize(); fitAllMarkers(); }, 400);
     window.addEventListener('resize', function(){ map.invalidateSize(); });
 
     var srvIcon = L.divIcon({ className: 'custom-div-icon',
@@ -442,20 +495,35 @@ document.addEventListener('DOMContentLoaded', function() {
         html: '<div style="background:#ef4444;width:20px;height:20px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center"><i class="fas fa-network-wired" style="color:#fff;font-size:8px"></i></div>',
         iconSize: [20,20], iconAnchor: [10,10] });
 
+    // Nudge markers that land on the same pixel so none are hidden underneath
+    function spread(key, lat, lon, seen) {
+        var k = lat.toFixed(2) + ',' + lon.toFixed(2);
+        var n = seen[k] = (seen[k] || 0) + 1;
+        if (n === 1) return [lat, lon];
+        var ang = (n - 1) * (Math.PI / 3), r = 0.035 * Math.ceil(n / 6);
+        return [lat + r * Math.sin(ang), lon + r * Math.cos(ang)];
+    }
+
     fetch('/api/get_map_locations.php').then(function(r){ return r.json(); }).then(function(data) {
         if (!data.success) return;
-        var bounds = [];
+        var seen = {};
         if (data.server) {
-            bounds.push([data.server.latitude, data.server.longitude]);
-            L.marker([data.server.latitude, data.server.longitude], {icon: srvIcon}).addTo(map)
+            var sp = spread('srv', +data.server.latitude, +data.server.longitude, seen);
+            mapBounds.push(sp);
+            L.marker(sp, {icon: srvIcon, zIndexOffset: 1000}).addTo(map)
                 .bindPopup('<div style="color:#000"><strong>'+data.server.name+'</strong><br><small>'+(data.server.hostname||'')+'</small></div>');
         }
         (data.firewalls||[]).forEach(function(fw) {
-            bounds.push([fw.latitude, fw.longitude]);
-            L.marker([fw.latitude, fw.longitude], {icon: fw.status==='online'?fwOn:fwOff}).addTo(map)
-                .bindPopup('<div style="color:#000"><strong>'+fw.name+'</strong><br>'+(fw.wan_ip||'')+'<br><a href="/firewall_details.php?id='+fw.id+'">Details</a></div>');
+            var p = spread(fw.id, +fw.latitude, +fw.longitude, seen);
+            mapBounds.push(p);
+            var where = [fw.city, fw.country].filter(Boolean).join(', ');
+            L.marker(p, {icon: fw.status==='online'?fwOn:fwOff}).addTo(map)
+                .bindPopup('<div style="color:#000"><strong>'+fw.name+'</strong>'
+                    + (where ? '<br><small>'+where+'</small>' : '')
+                    + '<br>'+(fw.wan_ip||'')
+                    + '<br><a href="/firewall_details.php?id='+fw.id+'">Details</a></div>');
         });
-        if (bounds.length > 1) map.fitBounds(bounds, {padding: [30,30]});
+        fitAllMarkers();
     }).catch(function(err){ console.error('Map error:', err); });
 });
 

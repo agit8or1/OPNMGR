@@ -6,6 +6,32 @@
  */
 
 /**
+ * Cache directory for GeoIP results (falls back to the system temp dir)
+ */
+function geoip_cache_dir() {
+    $dir = __DIR__ . '/../cache/geoip';
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+        $dir = sys_get_temp_dir() . '/opnmgr-geoip';
+        if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+    }
+    return $dir;
+}
+
+function geoip_cache_get($key, $ttl) {
+    $file = geoip_cache_dir() . '/' . md5($key) . '.json';
+    if (!is_readable($file) || (time() - @filemtime($file)) > $ttl) {
+        return null;
+    }
+    $data = json_decode((string)@file_get_contents($file), true);
+    return is_array($data) ? $data : null;
+}
+
+function geoip_cache_put($key, array $value) {
+    $file = geoip_cache_dir() . '/' . md5($key) . '.json';
+    @file_put_contents($file, json_encode($value), LOCK_EX);
+}
+
+/**
  * Lookup location for an IP address
  *
  * @param string $ip_address IP address to lookup
@@ -16,6 +42,12 @@ function geoip_lookup($ip_address) {
     if (empty($ip_address) ||
         filter_var($ip_address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
         return false;
+    }
+
+    // Serve from cache when we looked this IP up recently (7 days)
+    $cached = geoip_cache_get('ip:' . $ip_address, 7 * 86400);
+    if ($cached !== null) {
+        return $cached;
     }
 
     // Use ip-api.com free service
@@ -42,13 +74,17 @@ function geoip_lookup($ip_address) {
         return false;
     }
 
-    return [
+    $result = [
         'latitude' => (float)$data['lat'],
         'longitude' => (float)$data['lon'],
         'city' => $data['city'] ?? '',
         'country' => $data['country'] ?? '',
         'isp' => $data['isp'] ?? ''
     ];
+
+    geoip_cache_put('ip:' . $ip_address, $result);
+
+    return $result;
 }
 
 /**
@@ -140,8 +176,16 @@ function geoip_update_all_firewalls($db) {
  * @return array|false Location data or false
  */
 function geoip_get_server_location() {
+    // Our own location barely moves — cache it for 6 hours
+    $cached = geoip_cache_get('server', 6 * 3600);
+    if ($cached !== null) {
+        return $cached;
+    }
+
     // Get server's public IP
-    $public_ip = @file_get_contents('https://api.ipify.org');
+    $public_ip = @file_get_contents('https://api.ipify.org', false, stream_context_create([
+        'http' => ['timeout' => 5, 'user_agent' => 'OPNManager']
+    ]));
 
     if (!$public_ip) {
         error_log("GeoIP: Failed to get server public IP");
@@ -152,6 +196,7 @@ function geoip_get_server_location() {
 
     if ($location) {
         $location['ip'] = $public_ip;
+        geoip_cache_put('server', $location);
     }
 
     return $location;
