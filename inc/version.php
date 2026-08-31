@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Readable Network Map'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Trackable Firewall Updates'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,21 +30,6 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
-        [
-            'version' => '3.19.3',
-            'date' => '2026-08-31',
-            'type' => 'patch',
-            'title' => 'Readable Network Map',
-            'changes' => [
-                'Dashboard map no longer zooms to street level when all sites sit in one metro — it fits every location at a sane zoom',
-                'Switched to a colour basemap (CARTO Voyager) so the map is legible instead of a flat grey tile',
-                'Restored working zoom controls plus a "fit all" button, and themed them to match the dark UI',
-                'Markers that share a location are fanned out so none stay hidden underneath another',
-                'Popups now show the GeoIP city/country for each firewall',
-                'Shortened the map panel so the dashboard fits without scrolling',
-                'GeoIP lookups are cached (7 days per IP, 6 hours for the server) — the map no longer makes an external call per firewall on every dashboard load',
-            ],
-        ],
         [
             'version' => '3.19.2',
             'date' => '2026-08-31',
