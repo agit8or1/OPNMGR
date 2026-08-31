@@ -55,6 +55,10 @@ backups_db/
 *.tar.gz
 opnsense_backup_*.tar.gz
 *_backup_*.php
+# ...but scripts/ holds real tooling that matches that pattern. The rule is aimed
+# at stray dated copies left at the repo root (about_backup_20251009.php), and it
+# silently swallowed scripts/check_backup_health.php on its first commit.
+!scripts/*_backup_*.php
 
 # Logs
 *.log
