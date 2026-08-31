@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.19.2](https://img.shields.io/badge/version-3.19.2-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.0
+**Status**: Production Stable | **License**: MIT | **Version**: [![v3.20.1](https://img.shields.io/badge/version-3.20.1-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.5.6
 
 Self-hosted centralized OPNsense management for MSPs and IT teams.
 
@@ -63,8 +63,9 @@ If you find OPNManager useful, please consider giving it a star on GitHub — it
 - **Firewall health** — gateways with latency, packet loss and flapping detection; VPN
   tunnels across WireGuard, OpenVPN and IPsec; CARP/HA state; services; and certificate
   expiry with configurable 30/14/7 day warnings. Only what the agent reports is shown.
-- **Agent 1.6.0** collects the above. Certificate metadata only — private key material is
-  never read.
+- **The agent health collector** gathers the above. Certificate metadata only — private
+  key material is never read. Not in a published agent release yet: the collector is in
+  the plugin source and ships with the next agent version.
 
 ### v3.13 — MSP Roles, Customers &amp; Fleet Search
 

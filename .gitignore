@@ -48,6 +48,9 @@ firewall_*_key
 *.save
 backup/
 backups/
+# Operational DB/file rescue dumps taken before destructive cleanups. These hold
+# production rows and OPNsense config.xml, which carries credentials and keys.
+backups_db/
 .archive/
 *.tar.gz
 opnsense_backup_*.tar.gz

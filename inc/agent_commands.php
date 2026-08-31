@@ -253,6 +253,25 @@ if (!function_exists('agent_command_catalog')) {
                 'params'   => [],
                 'build'    => fn(array $p) => '/usr/local/etc/rc.d/opnmanager_agent restart',
             ],
+            'agent_install_verify' => [
+                'label'    => 'Verify agent installation',
+                'category' => 'agent',
+                'risk'     => 'LOW',
+                'params'   => [],
+                // Read-only. The 1.5.5 and 1.5.6 packages shipped without their
+                // etc/ tree, and the installer does not check the cp exit code,
+                // so a fresh install from either leaves the OPNsense plugin hook
+                // and the rc.d startup script absent while appearing to succeed.
+                // Parsed by scripts/check_agent_install.php - keep the marker and
+                // the key=value shape in step with it.
+                'build'    => fn(array $p) =>
+                    'printf \'OPNMGR_INSTALL_PROBE_V1\\n\'; '
+                  . 'for f in /usr/local/etc/inc/plugins.inc.d/opnmanageragent.inc '
+                  . '/usr/local/etc/rc.d/opnmanager_agent; do '
+                  . 'if [ -f "$f" ]; then printf \'%s=present\\n\' "$f"; '
+                  . 'else printf \'%s=MISSING\\n\' "$f"; fi; done; '
+                  . 'printf \'rc_enable=%s\\n\' "$(/usr/sbin/sysrc -n opnmanager_agent_enable 2>/dev/null || echo unset)"',
+            ],
         ];
 
         return $catalog;
@@ -506,4 +525,85 @@ function interpret_update_result(string $result): array {
     // No marker: an older agent, or the box rebooted before it could report.
     // Say so rather than assuming the upgrade worked.
     return ['known' => false, 'exit_code' => null, 'ok' => false];
+}
+
+/**
+ * SQL fragment matching commands that take the firewall down as they run.
+ *
+ * A reboot, halt or poweroff can never report a result: the box stops
+ * executing partway through, so the agent that was going to POST the outcome
+ * dies with it. Any retry logic keyed on "no result within N minutes" will
+ * therefore see these as stuck forever and redeliver them on every check-in -
+ * which is a reboot loop, not a retry. This fragment is how both the settling
+ * and the timeout paths in agent_checkin.php agree on which commands those are.
+ *
+ * Matched against the command text rather than description or risk level,
+ * because those are optional and operator-supplied while the command text is
+ * what actually runs.
+ *
+ * @return string A parenthesised SQL boolean over the `command` column
+ * @since 3.19.5
+ */
+function agent_unacknowledgeable_command_sql(): string {
+    return "(command LIKE '%/sbin/reboot%'"
+         . " OR command LIKE '%/sbin/halt%'"
+         . " OR command LIKE '%/sbin/poweroff%'"
+         . " OR command LIKE '%shutdown -r%'"
+         . " OR command LIKE '%shutdown -h%'"
+         . " OR command LIKE '%shutdown -p%')";
+}
+
+/**
+ * PHP counterpart of agent_unacknowledgeable_command_sql().
+ *
+ * @param string|null $command The queued shell text
+ * @return bool True if the firewall goes down executing it
+ * @since 3.19.5
+ */
+function agent_command_is_unacknowledgeable(?string $command): bool {
+    $c = strtolower((string)$command);
+    if ($c === '') {
+        return false;
+    }
+    foreach (['/sbin/reboot', '/sbin/halt', '/sbin/poweroff',
+              'shutdown -r', 'shutdown -h', 'shutdown -p'] as $needle) {
+        if (strpos($c, $needle) !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Close out down-the-box commands that have been sent and cannot answer.
+ *
+ * Called before the stuck-command timeout resets anything, so a reboot is
+ * settled as done instead of being handed back to the firewall that just
+ * carried it out. The absence of a result is the expected outcome here, not a
+ * failure, so these are marked completed with a note explaining why no output
+ * was ever captured.
+ *
+ * @param int $firewall_id  Firewall whose queue to settle
+ * @param int $timeout_mins How long to wait before concluding it went down
+ * @return int Number of commands settled
+ * @since 3.19.5
+ */
+function settle_unacknowledgeable_commands(int $firewall_id, int $timeout_mins = 10): int {
+    $mins = max(1, $timeout_mins);
+    $sql = "UPDATE firewall_commands
+               SET status = 'completed',
+                   completed_at = NOW(),
+                   result = COALESCE(result, 'No result: the firewall went down executing this command, which is the expected outcome. Settled automatically so it is not redelivered.')
+             WHERE firewall_id = ?
+               AND status = 'sent'
+               AND sent_at < DATE_SUB(NOW(), INTERVAL {$mins} MINUTE)
+               AND " . agent_unacknowledgeable_command_sql();
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$firewall_id]);
+    $n = $stmt->rowCount();
+    if ($n > 0) {
+        error_log("Settled $n unacknowledgeable command(s) for firewall $firewall_id (reboot/halt: no result expected)");
+    }
+    return $n;
 }

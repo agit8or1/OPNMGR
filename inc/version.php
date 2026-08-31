@@ -12,10 +12,16 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Map Rollback'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Scores That Mean Something'); }
 
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
+// AGENT_VERSION is THE single constant for "newest agent available to install".
+// Its value must match the newest released tarball in downloads/plugins/, because
+// that is the only version a firewall can actually be upgraded to - an unreleased
+// source bump here tells every agent to fetch a package that does not exist.
+// inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
+// scripts/check_versions.php enforces this against the released artifact.
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.5.6'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-02-09'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 if (!defined('DATABASE_VERSION')) { define('DATABASE_VERSION', '1.4.0'); }
@@ -30,6 +36,22 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.20.0',
+            'date' => '2026-08-31',
+            'type' => 'minor',
+            'title' => 'No Reboot Loops, Real Retention',
+            'changes' => [
+                'ADDED: Backup retention is now enforced. It has been configurable since 3.12.0 and applied by nothing - backup_retention_days was seeded at 90 and never read, and the settings UI wrote a separate months/count scheme that was also never read, so no backup was ever deleted. Retention is now a window in days enforced by cron/prune_backups.php',
+                'ADDED: backup_retention_min_keep (default 3) never prunes a firewall\'s newest backups whatever their age, so a firewall that has stopped checking in cannot lose every copy of its configuration to an age-only sweep',
+                'ADDED: cron/prune_backups.php reports by default and deletes only with --apply, with --days= and --floor= overrides',
+                'CHANGED: The backup retention dialog now asks for a window in days and a minimum to keep, replacing the two-mode months/count form whose values were never applied',
+                'CHANGED: Migration 0014 removes the superseded months/count settings, carrying an existing time-based policy across as months x 30',
+                'FIXED: A reboot was redelivered on every check-in, turning one reboot request into a reboot loop. checkQueuedCommands() resets any command left in \'sent\' for ten minutes back to \'pending\', assuming no result means the agent never received it. A reboot can never report a result - the firewall stops executing partway through the command - so it was reset and handed back to the box the moment it finished booting. Observed on home.agit8or.net: command 8017 (/sbin/reboot) was queued at 12:28:01 and had already been redelivered at 12:39:25',
+                'FIXED: Commands that take the firewall down (/sbin/reboot, /sbin/halt, /sbin/poweroff, shutdown -r/-h/-p) are now settled as completed when they time out, and excluded from the stuck-command reset in both the general and update-agent paths. A missing result is recorded as the expected outcome rather than read as a delivery failure',
+                'ADDED: settle_unacknowledgeable_commands() in inc/agent_commands.php with tests/agent_command_retry_test.php',
+            ],
+        ],
         [
             'version' => '3.19.4',
             'date' => '2026-08-31',
@@ -151,7 +173,7 @@ function getChangelogEntries($limit = 10) {
                 'ADDED: Baselines, section-level drift attribution, readable diffs, acknowledgement and promote-to-baseline. Drift is never acted on automatically',
                 'ADDED: OPNsense health telemetry - gateways (status, latency, loss, default, transition history), VPN tunnels (WireGuard/OpenVPN/IPsec with handshake and byte counters), CARP/HA state, services and certificate expiry',
                 'ADDED: Certificate expiry warnings at configurable 30/14/7 day thresholds, and gateway flapping detection',
-                'ADDED: Agent 1.6.0 health collector (health_collect.py). Certificate metadata only; private key material is never read',
+                'ADDED: Agent health collector (health_collect.py) in the plugin source, pending an agent release. Certificate metadata only; private key material is never read',
                 'FIXED: Gateway latency and loss reported with units ("12.4 ms", "0.0 %") were stored as NULL',
                 'FIXED: The drift differ compared a single repeated element against a list of them field by field, so adding one firewall rule looked like every field of the first rule had been edited',
                 'FIXED: Drift could not find a current configuration on installations with long runs of backup rows whose upload never arrived',

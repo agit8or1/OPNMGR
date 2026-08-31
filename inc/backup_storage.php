@@ -487,3 +487,203 @@ exit \$RC
 SH;
     }
 }
+
+if (!function_exists('backup_retention_days')) {
+    /**
+     * How many days of backups to keep.
+     *
+     * The `backup_retention_days` setting has existed since 3.12.0 (migration
+     * 0002 seeds it at 90) but nothing has ever read it, and no other code
+     * prunes either - which is why this installation was holding 519 backups
+     * going back to 2025-11-10 under a nominal retention policy. This is now
+     * the single authority on the retention window; the older
+     * `backup_retention_months` value is migrated into it rather than read.
+     *
+     * @return int Days to retain, or 0 when retention is disabled
+     * @since 3.20.0
+     */
+    function backup_retention_days(): int {
+        try {
+            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+            $stmt->execute(['backup_retention_days']);
+            $raw = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('OPNMGR: could not read backup_retention_days: ' . $e->getMessage());
+            return 0; // On error keep everything: deleting on a failed read is unrecoverable.
+        }
+
+        if ($raw === false || trim((string)$raw) === '') {
+            return 90;
+        }
+
+        $days = (int)$raw;
+        if ($days <= 0) {
+            return 0; // Explicitly disabled.
+        }
+        // Clamp rather than trust: this number drives deletions.
+        return max(1, min(3650, $days));
+    }
+}
+
+if (!function_exists('backup_retention_floor')) {
+    /**
+     * Most recent backups per firewall that are never pruned, whatever their age.
+     *
+     * Age alone is an unsafe deletion rule: a firewall that stopped checking in
+     * four months ago has only backups older than the window, and a pure
+     * age sweep would delete every copy of its configuration precisely when it
+     * is least recoverable. The floor guarantees a firewall always retains its
+     * newest backups.
+     *
+     * @since 3.20.0
+     */
+    function backup_retention_floor(): int {
+        try {
+            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+            $stmt->execute(['backup_retention_min_keep']);
+            $raw = $stmt->fetchColumn();
+            if ($raw !== false && trim((string)$raw) !== '') {
+                return max(1, min(100, (int)$raw));
+            }
+        } catch (Throwable $e) {
+            // fall through to default
+        }
+        return 3;
+    }
+}
+
+if (!function_exists('find_expired_backups')) {
+    /**
+     * Backup rows outside the retention window, excluding each firewall's floor.
+     *
+     * Selection and deletion are deliberately separate so the caller can report
+     * exactly what would go before anything does.
+     *
+     * @param int|null $days       Override the configured window
+     * @param int|null $floor      Override the per-firewall floor
+     * @param int|null $firewallId Restrict to one firewall (null = fleet-wide)
+     * @return array<int, array> Backup rows, oldest first
+     * @since 3.20.0
+     */
+    function find_expired_backups(?int $days = null, ?int $floor = null, ?int $firewallId = null): array {
+        $days  = $days  ?? backup_retention_days();
+        $floor = $floor ?? backup_retention_floor();
+
+        if ($days <= 0) {
+            return []; // Retention disabled.
+        }
+
+        // Rank per firewall newest-first, then keep anything within the floor
+        // regardless of age. Done in SQL so the floor is applied atomically with
+        // the age test rather than in two passes that could disagree.
+        $sql = "
+            SELECT id, firewall_id, backup_file, storage_path, created_at, file_size
+              FROM (
+                SELECT b.*,
+                       ROW_NUMBER() OVER (PARTITION BY b.firewall_id ORDER BY b.created_at DESC, b.id DESC) AS rn
+                  FROM backups b
+              ) ranked
+             WHERE rn > ?
+               AND created_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+             . ($firewallId !== null ? " AND firewall_id = ?" : "") . "
+             ORDER BY created_at ASC, id ASC";
+
+        $params = [$floor, $days];
+        if ($firewallId !== null) {
+            $params[] = $firewallId;
+        }
+
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+if (!function_exists('prune_expired_backups')) {
+    /**
+     * Delete backups outside the retention window.
+     *
+     * Removes the bytes first and the row second: a row without a file is a
+     * recorded gap the UI already handles, whereas a file with no row is an
+     * orphan nothing will ever clean up.
+     *
+     * Defaults to a dry run. Callers must opt in to deletion explicitly, so an
+     * accidental invocation reports rather than destroys.
+     *
+     * @param bool     $apply      False (default) to report only
+     * @param int|null $days       Override the configured window
+     * @param int|null $floor      Override the per-firewall floor
+     * @param int|null $firewallId Restrict to one firewall (null = fleet-wide)
+     * @return array{applied:bool, days:int, floor:int, candidates:int, deleted:int, files_removed:int, files_missing:int, bytes:int, errors:string[]}
+     * @since 3.20.0
+     */
+    function prune_expired_backups(bool $apply = false, ?int $days = null, ?int $floor = null, ?int $firewallId = null): array {
+        $days  = $days  ?? backup_retention_days();
+        $floor = $floor ?? backup_retention_floor();
+
+        $report = [
+            'applied'       => $apply,
+            'days'          => $days,
+            'floor'         => $floor,
+            'candidates'    => 0,
+            'deleted'       => 0,
+            'files_removed' => 0,
+            'files_missing' => 0,
+            'bytes'         => 0,
+            'errors'        => [],
+        ];
+
+        if ($days <= 0) {
+            return $report;
+        }
+
+        $rows = find_expired_backups($days, $floor, $firewallId);
+        $report['candidates'] = count($rows);
+
+        foreach ($rows as $row) {
+            $report['bytes'] += (int)($row['file_size'] ?? 0);
+
+            if (!$apply) {
+                continue;
+            }
+
+            $status = resolve_backup_path_status($row);
+
+            // An unreadable file is a permissions fault on this server, not an
+            // expired backup. Dropping the row would strand the bytes on disk
+            // with nothing left pointing at them, so leave the pair intact and
+            // report it.
+            if ($status['status'] === 'unreadable') {
+                $report['errors'][] = "backup {$row['id']}: file unreadable, left in place";
+                continue;
+            }
+
+            if ($status['path'] !== null) {
+                if (@unlink($status['path'])) {
+                    $report['files_removed']++;
+                } else {
+                    $report['errors'][] = "backup {$row['id']}: could not delete {$status['path']}";
+                    continue; // Keep the row so the file is still accounted for.
+                }
+            } else {
+                $report['files_missing']++;
+            }
+
+            try {
+                db()->prepare('DELETE FROM backups WHERE id = ?')->execute([(int)$row['id']]);
+                $report['deleted']++;
+            } catch (Throwable $e) {
+                $report['errors'][] = "backup {$row['id']}: row delete failed: " . $e->getMessage();
+            }
+        }
+
+        if ($apply && $report['deleted'] > 0) {
+            error_log(sprintf(
+                'OPNMGR: pruned %d backup(s) older than %d days (floor %d per firewall)',
+                $report['deleted'], $days, $floor
+            ));
+        }
+
+        return $report;
+    }
+}

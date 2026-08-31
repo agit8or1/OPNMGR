@@ -24,12 +24,11 @@ status_cmd="${name}_status"
 
 opnmanager_agent_start()
 {
+    # Kill any existing agent processes first
+    pkill -9 -f "OPNManagerAgent/agent.sh" 2>/dev/null
+    sleep 1
+
     if [ -f ${pidfile} ]; then
-        pid=$(cat ${pidfile})
-        if kill -0 ${pid} 2>/dev/null; then
-            echo "${name} is already running (pid ${pid})"
-            return 0
-        fi
         rm -f ${pidfile}
     fi
 
@@ -42,13 +41,15 @@ opnmanager_agent_stop()
     if [ -f ${pidfile} ]; then
         pid=$(cat ${pidfile})
         echo "Stopping ${name} (pid ${pid})."
-        kill ${pid} 2>/dev/null
+        kill -TERM ${pid} 2>/dev/null
+        sleep 1
+        kill -KILL ${pid} 2>/dev/null
         rm -f ${pidfile}
-        # Also kill any child processes
-        pkill -f "opnmanager.*agent" 2>/dev/null
-    else
-        echo "${name} is not running."
     fi
+
+    # Aggressively kill ALL agent processes
+    pkill -9 -f "OPNManagerAgent/agent.sh" 2>/dev/null
+    echo "${name} stopped."
 }
 
 opnmanager_agent_status()

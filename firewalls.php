@@ -59,6 +59,21 @@ if (!empty($tag_filter)) {
     $params[] = $tag_filter;
 }
 
+// Determine the latest OPNsense major version across all firewalls for upgrade detection
+$latest_major_version = '';
+try {
+    $ver_stmt = db()->query("SELECT current_version FROM firewalls WHERE current_version IS NOT NULL AND current_version != '' AND current_version != 'Unknown'");
+    $all_versions = $ver_stmt->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($all_versions as $ver) {
+        // Extract major.minor (e.g., "26.1" from "26.1.1")
+        if (version_compare($ver, $latest_major_version, '>')) {
+            $latest_major_version = $ver;
+        }
+    }
+} catch (PDOException $e) {
+    $latest_major_version = '';
+}
+
 // Handle special sorting for health (calculated field)
 if ($sort_by === 'health') {
     // Get all results first without LIMIT for health calculation
@@ -93,7 +108,7 @@ if ($sort_by === 'health') {
         
         // Calculate health scores for sorting
         foreach ($all_firewalls as &$fw) {
-            $fw['health_score'] = calculateHealthScore($fw);
+            $fw['health_score'] = calculateHealthScore($fw, $latest_major_version);
         }
         
         // Sort by health score
@@ -127,21 +142,6 @@ if ($sort_by === 'health') {
         error_log("firewalls.php error: " . $e->getMessage());
         $error = 'An internal error occurred.';
     }
-}
-
-// Determine the latest OPNsense major version across all firewalls for upgrade detection
-$latest_major_version = '';
-try {
-    $ver_stmt = db()->query("SELECT current_version FROM firewalls WHERE current_version IS NOT NULL AND current_version != '' AND current_version != 'Unknown'");
-    $all_versions = $ver_stmt->fetchAll(PDO::FETCH_COLUMN);
-    foreach ($all_versions as $ver) {
-        // Extract major.minor (e.g., "26.1" from "26.1.1")
-        if (version_compare($ver, $latest_major_version, '>')) {
-            $latest_major_version = $ver;
-        }
-    }
-} catch (PDOException $e) {
-    $latest_major_version = '';
 }
 
 // Get all available tags for the filter dropdown
@@ -712,189 +712,13 @@ include __DIR__ . '/inc/header.php';
                                         $current_status = "unknown";
                                     }
                                     
-                                    // Calculate comprehensive health score (0-100)
-                                    // Weights: Connectivity(30) + Agent(20) + Updates(20) + Uptime(15) + Config(15) = 100
-                                    $health_score = 0;
-                                    $health_issues = [];
-                                    $health_details = [];
-
-                                    // Connectivity Score (30 points)
-                                    if ($current_status === 'online') {
-                                        $checkin_field = !empty($firewall['agent_last_checkin']) ? 'agent_last_checkin' : 'last_checkin';
-                                        $checkin_time = strtotime($firewall[$checkin_field]);
-                                        $minutes_ago = (time() - $checkin_time) / 60;
-                                        if ($minutes_ago <= 5) {
-                                            $health_score += 30;
-                                            $health_details[] = "✓ Excellent connectivity (last checkin " . round($minutes_ago, 1) . "m ago)";
-                                        } elseif ($minutes_ago <= 15) {
-                                            $health_score += 27;
-                                            $health_details[] = "✓ Good connectivity (last checkin " . round($minutes_ago, 1) . "m ago)";
-                                        } elseif ($minutes_ago <= 60) {
-                                            $health_score += 20;
-                                            $health_details[] = "✓ Acceptable connectivity (" . round($minutes_ago, 1) . "m ago)";
-                                        } else {
-                                            $health_score += 12;
-                                            $health_issues[] = "⚠ Delayed checkin (" . round($minutes_ago/60, 1) . "h ago)";
-                                        }
-                                    } else {
-                                        $health_issues[] = "✗ Firewall offline";
-                                    }
-
-                                    // Agent Version Score (20 points)
-                                    if (!empty($firewall['agent_version'])) {
-                                        $agent_version = $firewall['agent_version'];
-                                        if (version_compare($agent_version, AGENT_VERSION, '>=')) {
-                                            $health_score += 20;
-                                            $health_details[] = "✓ Agent up to date (v" . $agent_version . ")";
-                                        } elseif (version_compare($agent_version, AGENT_MIN_VERSION, '>=')) {
-                                            $health_score += 18;
-                                            $health_details[] = "✓ Agent supported version (v" . $agent_version . ")";
-                                        } elseif (version_compare($agent_version, '1.0.0', '>=')) {
-                                            $health_score += 14;
-                                            $health_issues[] = "⚠ Agent needs update (v" . $agent_version . ")";
-                                        } else {
-                                            $health_score += 8;
-                                            $health_issues[] = "⚠ Agent severely outdated (v" . $agent_version . ")";
-                                        }
-                                    } else {
-                                        $health_issues[] = "✗ No agent version reported";
-                                    }
-
-                                    // System Updates Score (20 points)
-                                    $fw_upgrade_available = false;
-                                    if (!empty($firewall['current_version']) && !empty($latest_major_version) && $firewall['current_version'] !== 'Unknown') {
-                                        $fw_cur_parts = explode('.', $firewall['current_version']);
-                                        $fw_lat_parts = explode('.', $latest_major_version);
-                                        $fw_cur_major = (isset($fw_cur_parts[0]) ? (int)$fw_cur_parts[0] : 0) * 100 + (isset($fw_cur_parts[1]) ? (int)explode('_', $fw_cur_parts[1])[0] : 0);
-                                        $fw_lat_major = (isset($fw_lat_parts[0]) ? (int)$fw_lat_parts[0] : 0) * 100 + (isset($fw_lat_parts[1]) ? (int)explode('_', $fw_lat_parts[1])[0] : 0);
-                                        if ($fw_lat_major > $fw_cur_major) {
-                                            $fw_upgrade_available = true;
-                                        }
-                                    }
-
-                                    if ($fw_upgrade_available) {
-                                        $health_score += 5;
-                                        $health_issues[] = "⚠ Major upgrade available (v" . htmlspecialchars($firewall['current_version']) . " → " . htmlspecialchars($latest_major_version) . ")";
-                                    } elseif (isset($firewall['updates_available'])) {
-                                        if ($firewall['updates_available'] == 0) {
-                                            $health_score += 20;
-                                            $health_details[] = "✓ System up to date";
-                                        } elseif ($firewall['updates_available'] == 1) {
-                                            $health_score += 10;
-                                            $health_issues[] = "⚠ System updates available";
-                                        } else {
-                                            $health_score += 8;
-                                            $health_issues[] = "⚠ Update status unknown";
-                                        }
-                                    } else {
-                                        $health_score += 8;
-                                        $health_issues[] = "⚠ Update check needed";
-                                    }
-
-                                    // Uptime Score (15 points)
-                                    if (!empty($firewall['uptime'])) {
-                                        $uptime = $firewall['uptime'];
-                                        if (preg_match('/(\d+)\s*days?/', $uptime, $matches) || preg_match('/up\s+(\d+)/', $uptime, $matches)) {
-                                            $days = (int)$matches[1];
-                                            if ($days >= 7) {
-                                                $health_score += 15;
-                                                $health_details[] = "✓ Excellent uptime (" . $days . " days)";
-                                            } elseif ($days >= 3) {
-                                                $health_score += 12;
-                                                $health_details[] = "✓ Good uptime (" . $days . " days)";
-                                            } else {
-                                                $health_score += 8;
-                                                $health_details[] = "⚠ Recent restart (" . $days . " days)";
-                                            }
-                                        } else {
-                                            $health_score += 5;
-                                            $health_issues[] = "⚠ Recent restart (< 1 day)";
-                                        }
-                                    } else {
-                                        $health_issues[] = "✗ No uptime data";
-                                    }
-
-                                    // Configuration Score (15 points)
-                                    // Agent-based management doesn't require OPNsense API creds
-                                    $config_score = 0;
-                                    if (!empty($firewall['version'])) $config_score += 5;
-                                    if (!empty($firewall['wan_ip'])) $config_score += 5;
-                                    if (!empty($firewall['lan_ip'])) $config_score += 5;
-                                    $health_score += $config_score;
-
-                                    if ($config_score >= 15) {
-                                        $health_details[] = "✓ Complete configuration";
-                                    } elseif ($config_score >= 10) {
-                                        $health_details[] = "✓ Basic configuration";
-                                    } else {
-                                        $health_issues[] = "⚠ Configuration incomplete";
-                                    }
-                                    
-                                    // Determine health grade and color with adjusted thresholds
-                                    if ($health_score >= 85) {
-                                        $health_grade = 'A+';
-                                        $health_color = 'bg-success text-white';
-                                        $health_icon = 'fas fa-heart';
-                                    } elseif ($health_score >= 78) {
-                                        $health_grade = 'A';
-                                        $health_color = 'bg-success text-white';
-                                        $health_icon = 'fas fa-thumbs-up';
-                                    } elseif ($health_score >= 70) {
-                                        $health_grade = 'B+';
-                                        $health_color = 'bg-success text-white';
-                                        $health_icon = 'fas fa-check-circle';
-                                    } elseif ($health_score >= 62) {
-                                        $health_grade = 'B';
-                                        $health_color = 'bg-info text-white';
-                                        $health_icon = 'fas fa-check-circle';
-                                    } elseif ($health_score >= 50) {
-                                        $health_grade = 'C+';
-                                        $health_color = 'bg-warning text-white';
-                                        $health_icon = 'fas fa-exclamation-circle';
-                                    } elseif ($health_score >= 40) {
-                                        $health_grade = 'C';
-                                        $health_color = 'bg-warning text-white';
-                                        $health_icon = 'fas fa-exclamation-circle';
-                                    } else {
-                                        $health_grade = 'F';
-                                        $health_color = 'bg-danger text-white';
-                                        $health_icon = 'fas fa-exclamation-triangle';
-                                    }
-                                    
-                                    // Build enhanced health tooltip
-                                    $health_tooltip = "🏥 FIREWALL HEALTH REPORT\n";
-                                    $health_tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
-                                    $health_tooltip .= "📊 Overall Score: " . $health_score . "/100 (Grade " . $health_grade . ")\n\n";
-                                    
-                                    // Add status indicator
-                                    if ($health_score >= 90) {
-                                        $health_tooltip .= "🟢 Status: EXCELLENT - System performing optimally\n";
-                                    } elseif ($health_score >= 80) {
-                                        $health_tooltip .= "🟡 Status: GOOD - Minor issues detected\n";
-                                    } elseif ($health_score >= 70) {
-                                        $health_tooltip .= "🟠 Status: FAIR - Attention recommended\n";
-                                    } elseif ($health_score >= 60) {
-                                        $health_tooltip .= "🔴 Status: POOR - Issues need addressing\n";
-                                    } else {
-                                        $health_tooltip .= "⚫ Status: CRITICAL - Immediate action required\n";
-                                    }
-                                    $health_tooltip .= "\n";
-                                    
-                                    if (!empty($health_details)) {
-                                        $health_tooltip .= "✅ HEALTHY COMPONENTS:\n";
-                                        foreach ($health_details as $detail) {
-                                            $health_tooltip .= "  • " . $detail . "\n";
-                                        }
-                                        $health_tooltip .= "\n";
-                                    }
-                                    
-                                    if (!empty($health_issues)) {
-                                        $health_tooltip .= "⚠️ AREAS FOR IMPROVEMENT:\n";
-                                        foreach ($health_issues as $issue) {
-                                            $health_tooltip .= "  • " . $issue . "\n";
-                                        }
-                                        $health_tooltip .= "\n💡 Tip: Address issues above to improve health score";
-                                    }
+                                    // Comprehensive health score (0-100) - see inc/health.php
+                                    $health_report  = calculateHealthReport($firewall, $latest_major_version);
+                                    $health_score   = $health_report['score'];
+                                    $health_grade   = $health_report['grade'];
+                                    $health_color   = $health_report['color'];
+                                    $health_icon    = $health_report['icon'];
+                                    $health_tooltip = buildHealthTooltip($health_report);
                                     ?>
                                     <span class="badge <?php echo $health_color; ?> hover-tooltip" style="color: #fff !important;" data-tooltip="<?php echo htmlspecialchars(trim($health_tooltip)); ?>">
                                         <i class="<?php echo $health_icon; ?> me-1"></i><?php echo $health_grade; ?>

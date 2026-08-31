@@ -6,8 +6,252 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.1
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Fixed
+
+- **Health scores no longer cancel themselves out.** Both firewalls in the fleet
+  graded A+ 88/100 despite one having a pending system update. The old weighting
+  gave Updates 20 points and Uptime 15, so `fw.agit8or.net` lost 10 for its
+  pending update and won back exactly 10 for its 13-day uptime, landing on the
+  same score as the fully patched `home.agit8or.net` — which was itself penalised
+  10 points for the short uptime that its update reboot had produced. Patch level
+  is now the heaviest component (30) and uptime a minor stability signal (15) that
+  can no longer offset it. Grades were recalibrated so a firewall with pending
+  updates cannot reach an A: the two firewalls now score 98 (A+) and 84 (B+).
+
+- **Uptime parsing only understood `"N days"`.** Anything shorter — `"6 mins"`,
+  `"0d 0h 4m"` — fell through to the catch-all branch worth 5 of 15 points, so
+  every recently rebooted firewall took a silent 10-point hit. The parser now
+  handles `13 days`, `6 mins`, `0d 0h 4m`, `up 5 days, 03:14` and
+  `1 day, 2 hours`, and an unparseable value scores neutrally instead of badly.
+
+- **A long uptime is no longer a bonus.** Over 365 days now scores *below* a
+  normal uptime, since unapplied kernel patches are the usual cause. A pending
+  `reboot_required` is scored explicitly.
+
+- **The health calculation existed twice and the copies disagreed.** `inc/health.php`
+  was used for sorting while a ~180-line inline duplicate in `firewalls.php` was
+  used for display, and only the inline copy checked for major upgrades — so
+  sorting by Health could order rows differently from the numbers beside them.
+  Worse, `firewalls.php` computed `$latest_major_version` *after* the health-sort
+  block, leaving it undefined there. There is now one implementation
+  (`calculateHealthReport()`), used by both `firewalls.php` and `dashboard.php`,
+  and the fleet version is resolved before sorting.
+
+- **Agent version reconciled to a single constant.** `AGENT_VERSION` (1.6.0) and
+  `LATEST_AGENT_VERSION` (1.5.6) were two hand-maintained literals that had
+  drifted apart, so no agent could ever match the target and every firewall was
+  permanently capped at 18 of 20 agent points. `LATEST_AGENT_VERSION` is now an
+  alias of `AGENT_VERSION`, and `AGENT_VERSION` is authoritative for "newest
+  installable agent".
+
+- **Reverted the premature agent bump to 1.6.0.** `plugin/.../agent.sh` declared
+  v1.6.0 and no such tarball was ever published, so the version pointed at a
+  download that does not exist. The label is back to 1.5.6; the health-collector
+  code it was bumped for stays in the plugin source and ships with the next real
+  agent release. `downloads/AGENT_VERSION.txt` read `3.6.0` — an *application*
+  version — and fed the signed release manifest's `agent_version`, advertising an
+  agent that never existed; corrected to 1.5.6. README and the in-app changelog no
+  longer describe the health collector as a shipped agent 1.6.0 feature.
+
+### Changed
+
+- **`scripts/check_versions.php` now takes the newest released tarball in
+  `downloads/plugins/` as the authority for the agent version**, not the
+  in-source `agent.sh`. Pointing the UI at a version that was bumped in source
+  but never packaged tells firewalls to fetch a download that does not exist.
+  The check now also covers the installer's `PLUGIN_VERSION` and
+  `downloads/AGENT_VERSION.txt` (which read `3.6.0`, an application version, and
+  fed the signed release manifest), and reports an unreleased source bump rather
+  than propagating it.
+
+### Added
+
+- **Migration `0015_revalidate_firewall_fks.sql` — forces the database to
+  re-check every foreign key that references `firewalls`.** A `firewall_agents`
+  row was found for firewall 25, deleted months earlier, in a table carrying
+  `ON DELETE CASCADE`. InnoDB enforces that on every ordinary write, so it can
+  only have arrived while `foreign_key_checks` was 0 — a restore or an import.
+  The same event left ~65,000 orphaned telemetry rows for that one firewall in
+  five other tables whose constraints also said it was impossible. MySQL and
+  MariaDB have no `VALIDATE CONSTRAINT`, so a constraint bypassed that way stays
+  permanently unverified; the only way to make the server check is to drop it and
+  add it back with checks on, which is what this does.
+
+  It runs in two phases: phase one counts orphans for all 24 constraints and
+  aborts naming the first offender without touching DDL, so a constraint is never
+  dropped that could not be re-added. Verified against a clone of production —
+  the abort path leaves all 24 constraints intact, delete and update rules come
+  back byte-identical, and a re-run is a no-op.
+
+  Applied on 2026-08-31 after clearing the last orphans. All 24 constraints are
+  back with identical rules, and are now enforced rather than merely declared:
+  deleting a firewall cascades to `firewall_agents` as it should, and inserting a
+  row for a firewall that does not exist is refused with `ERROR 1452`.
+
+- **`ssh_access_sessions` orphans were cleared, not kept.** They were initially
+  exempted in `check_referential_integrity.php` as history worth outliving the
+  firewall. That was wrong on the schema's own terms: the FK is
+  `ON DELETE CASCADE` and `firewall_id` is `NOT NULL`, so the constraint is
+  explicit that those rows die with their firewall, and the exemption would have
+  blocked migration 0015 permanently. 19 rows for deleted firewall 25 (2025-11-10
+  to 11-12) were backed up and removed; 70 rows for live firewalls are untouched.
+  Only `audit_log`, which carries no foreign key at all, is still treated as
+  history.
+
+- **`scripts/check_referential_integrity.php` — the recurring guard.** No
+  constraint definition can stop a *future* restore from bypassing checks again,
+  so revalidating once is not a fix on its own. This reports orphans across every
+  table referencing `firewalls` (`--all` also covers the 21 tables carrying a
+  `firewall_id` with no constraint at all, `firewall_commands` among them), knows
+  that `audit_log` and `ssh_access_sessions` orphans are history rather than
+  defects, and exits 1 on anything actionable. Run it after any restore.
+
+- **`scripts/check_agent_install.php` — flags firewalls whose agent install is
+  missing its `etc/` tree.** A firewall in this state keeps checking in normally,
+  so nothing in the fleet view looks wrong; it needs its own check. The report
+  works out which release was current on each firewall's enrolment date and flags
+  it only when that release was one of the affected packages — in-place upgrades
+  never remove the two files, so only the original install matters. `--probe`
+  queues the new read-only `agent_install_verify` action (LOW risk, no params) to
+  turn that inference into ground truth on the next check-in; `--json` for
+  scripting, exit 1 when anything is confirmed broken.
+
+  The affected-release list is not just hardcoded: the script scans the published
+  tarballs and treats a missing `etc/` tree as affected only where it is a
+  *regression* — a release that lost a directory an earlier one had. Releases
+  before 1.1.1 never carried `etc/` and used a different install layout, so they
+  are correctly ignored. That scan found this same regression had happened once
+  before, in **1.2.7 through 1.3.1**, and was fixed by accident at 1.3.2 without
+  anyone noticing either the break or the repair.
+
+- **`scripts/migrate.php` emitted a comment-only statement in some files.** Its
+  splitter recognises a line comment as `-- ` with a trailing space, so a bare
+  `--` separator line accumulated into the statement buffer instead. Harmless
+  where the header runs into ordinary SQL — MySQL treats a leading `--` line as a
+  comment — but a file whose comment header is followed by `DELIMITER` flushed
+  that buffer on its own, and the server rejects an empty query. Every existing
+  migration has bare `--` lines and would have hit this the moment one of them
+  opened a stored-procedure block. The splitter now drops statements with no SQL
+  left in them; all 16 migration files parse to the same statement counts as
+  before.
+
+### Packaging
+
+- **Rebuilt the 1.5.6 agent tarball with its missing `etc/` tree.** The published
+  1.5.5 and 1.5.6 packages contained only `opnsense/`; every release from 1.3.x
+  through 1.5.4 also shipped `etc/inc/plugins.inc.d/opnmanageragent.inc` and
+  `etc/rc.d/opnmanager_agent`. `install_opnmanager_agent.sh` copies both out of
+  the archive and checks neither `cp` exit code, so a fresh install from 1.5.6
+  carried on past two silent failures, printed a non-fatal
+  `WARNING: Missing files: opnmanageragent.inc`, then ran
+  `sysrc opnmanager_agent_enable="YES"` for a service whose rc.d script had never
+  been installed — no OPNsense plugin hook, no startup script. Existing firewalls
+  were unaffected: they were installed from an earlier package and upgraded in
+  place, which is why the fleet kept checking in normally.
+
+  The rebuild is the published 1.5.6 `opnsense/` tree byte for byte, plus the
+  `etc/` tree from 1.5.4 (identical across 1.5.0-1.5.4). No source code was
+  repackaged, so the unreleased health collector is *not* in it. Verified by
+  replaying the installer's file operations against the new archive: all four
+  copies succeed and the verify step reports nothing missing.
+  sha256 `08df3d2d...905eba6d`, 24439 bytes; the original is kept at
+  `downloads/plugins/archive/os-opnmanager-agent-1.5.6.tar.gz.pre-etc-fix-20260831`
+  (`downloads/` is gitignored, so it is not recoverable from git).
+
+- **`plugin/.../etc/rc.d/opnmanager_agent` was behind the shipped copy.** The
+  hardened start/stop logic (stale-pidfile cleanup, `pkill -9` of orphaned agent
+  processes) went into the package at 1.5.0 but was never written back to source,
+  so the next build from source would have regressed it on every firewall. Source
+  now matches what ships.
+
+---
+
+## Version 3.20.0
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Added
+
+- **Backup retention is now enforced.** It has been configurable since 3.12.0 and
+  applied by nothing. `backup_retention_days` was seeded at 90 by migration 0002
+  and never read by any code; the settings UI wrote a separate
+  `backup_retention_months` / `backup_retention_type` / `backup_min_keep` /
+  `backup_max_keep` scheme that was also never read. Nothing anywhere deleted an
+  old backup, so this installation was holding 519 backups going back to
+  2025-11-10 under a nominal one-month policy.
+
+  Retention is now a window in days (`backup_retention_days`, default 90, 0 to
+  keep indefinitely) enforced by `cron/prune_backups.php`. The superseded
+  months/count settings are removed by migration 0014, which carries an existing
+  time-based policy across as months x 30 rather than silently widening it.
+
+- **`backup_retention_min_keep` (default 3): the newest backups per firewall are
+  never pruned, whatever their age.** Age alone is an unsafe deletion rule - a
+  firewall that stopped checking in four months ago has nothing *but* backups
+  older than the window, so a pure age sweep would delete every copy of its
+  configuration at exactly the moment it is least recoverable.
+
+- `cron/prune_backups.php` reports by default and deletes only with `--apply`,
+  with `--days=` and `--floor=` overrides. Deleting configuration backups is not
+  reversible, so the destructive mode is opt-in even for the scheduled job.
+
+### Changed
+
+- The backup retention settings dialog now asks for a window in days and a
+  minimum to keep, replacing the two-mode months/count form whose values were
+  never applied to anything.
+
+### Fixed
+
+- **A reboot was redelivered on every check-in, so one reboot request became a
+  reboot loop.** `checkQueuedCommands()` resets any command sitting in `sent`
+  for more than ten minutes back to `pending`, on the assumption that no result
+  within that window means the agent never got it. That assumption does not hold
+  for a reboot: the firewall stops executing partway through the command, so the
+  agent that was going to POST the result dies with it. A result therefore never
+  arrives, the command is reset to `pending`, and the firewall is handed its own
+  reboot again the moment it finishes booting.
+
+  Observed on `home.agit8or.net` on 2026-08-31: command 8017 (`/sbin/reboot`) was
+  queued at 12:28:01, and its `sent_at` had already been refreshed to 12:39:25 —
+  a second delivery — with a third due at ~12:49. The duplicate guard in
+  `api/reboot_firewall.php` does not help here, because nothing is queuing a new
+  command; the same row is being reissued.
+
+  Commands that take the box down — `/sbin/reboot`, `/sbin/halt`,
+  `/sbin/poweroff`, `shutdown -r/-h/-p` — are now settled as completed when they
+  time out rather than reset to pending, and are excluded from the timeout reset
+  in both the general and update-agent command paths. The absence of a result is
+  recorded as the expected outcome, with a note saying so, instead of being read
+  as a delivery failure.
+
+### Added
+
+- `agent_command_is_unacknowledgeable()`, `agent_unacknowledgeable_command_sql()`
+  and `settle_unacknowledgeable_commands()` in `inc/agent_commands.php`, with
+  `tests/agent_command_retry_test.php` covering the loop directly.
+
+- `find_expired_backups()` and `prune_expired_backups()` in
+  `inc/backup_storage.php`, both scoped to an optional firewall id, with
+  `tests/backup_retention_test.php`.
+
+---
+
+## Version 3.19.4
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Changed
+
+- Reverted the 3.19.3 dashboard map changes. The new tiles and layout were worse
+  than what they replaced; the network map is back to the OpenStreetMap basemap
+  and its prior sizing.
+
+---
+
 ## Version 3.19.2
-**Released**: August 31, 2026 | **Agent**: v1.6.0
+**Released**: August 31, 2026 | **Agent**: v1.5.6
 
 ### Fixed
 
@@ -56,7 +300,7 @@ All notable changes to OPNManager are documented here.
 ---
 
 ## Version 3.19.1
-**Released**: August 31, 2026 | **Agent**: v1.6.0
+**Released**: August 31, 2026 | **Agent**: v1.5.6
 
 ### Fixed
 
@@ -129,7 +373,7 @@ All notable changes to OPNManager are documented here.
 ---
 
 ## Version 3.18.0
-**Released**: August 31, 2026 | **Agent**: v1.6.0
+**Released**: August 31, 2026 | **Agent**: v1.5.6
 
 ### Fixed
 
@@ -173,7 +417,7 @@ All notable changes to OPNManager are documented here.
 ---
 
 ## Version 3.17.1
-**Released**: August 27, 2026 | **Agent**: v1.6.0
+**Released**: August 27, 2026 | **Agent**: v1.5.6
 
 ### Removed
 
@@ -194,7 +438,7 @@ All notable changes to OPNManager are documented here.
 ---
 
 ## Version 3.17.0
-**Released**: August 27, 2026 | **Agent**: v1.6.0
+**Released**: August 27, 2026 | **Agent**: v1.5.6
 
 AI redaction, dashboard roll-ups and the closing security pass.
 
@@ -252,7 +496,7 @@ AI redaction, dashboard roll-ups and the closing security pass.
 ---
 
 ## Version 3.16.0
-**Released**: August 27, 2026 | **Agent**: v1.6.0
+**Released**: August 27, 2026 | **Agent**: v1.5.6
 
 Fleet update management, bulk operations and configuration search.
 
@@ -311,7 +555,7 @@ Fleet update management, bulk operations and configuration search.
 ---
 
 ## Version 3.15.0
-**Released**: August 26, 2026 | **Agent**: v1.6.0
+**Released**: August 26, 2026 | **Agent**: v1.5.6
 
 Incident-based alerting and maintenance windows.
 
@@ -361,7 +605,7 @@ Incident-based alerting and maintenance windows.
 ---
 
 ## Version 3.14.0
-**Released**: August 26, 2026 | **Agent**: v1.6.0
+**Released**: August 26, 2026 | **Agent**: v1.5.6
 
 Configuration drift and OPNsense-specific health.
 
@@ -394,7 +638,8 @@ Configuration drift and OPNsense-specific health.
   no OpenVPN row rather than a permanently "stopped" one, and a firewall on an
   older agent reads as "not reporting health" rather than as a wall of failures.
 
-- **Agent 1.6.0** collects the above via `health_collect.py`. Each collector is
+- **The agent health collector** (`health_collect.py`, in the plugin source pending
+  an agent release) collects the above. Each collector is
   independent and degrades to an omitted section rather than failing check-in.
   Certificate METADATA only: the `<prv>` private key element is never read.
 

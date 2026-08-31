@@ -137,6 +137,12 @@ jobs:
       - name: AI redaction suite
         run: php tests/ai_redaction_test.php
 
+      - name: Backup retention suite
+        run: php tests/backup_retention_test.php
+
+      - name: Command retry and reboot-loop suite
+        run: php tests/agent_command_retry_test.php
+
       - name: Reboot state derivation suite
         run: php tests/reboot_state_test.php
 

@@ -3,10 +3,13 @@
  * Version consistency check.
  *
  * The VERSION file is the single authoritative source for the application
- * version, and the agent's own AGENT_VERSION line is authoritative for the
- * agent. Everything else - README badge, inc/version.php constants, CHANGELOG
- * heading, plugin metadata - must agree with those rather than being maintained
- * by hand and drifting.
+ * version. For the agent, the authority is the newest RELEASED tarball in
+ * downloads/plugins/ - not the in-source agent.sh - because that is the only
+ * version a firewall can actually be upgraded to. A source bump that was never
+ * packaged is drift, not a release: it makes the UI offer an agent update that
+ * cannot be downloaded. Everything else - README badge, inc/version.php
+ * constants, the installer's PLUGIN_VERSION, the release manifest, CHANGELOG
+ * heading - must agree with those rather than being maintained by hand.
  *
  * Usage:
  *   php scripts/check_versions.php          # report, exit 1 on drift
@@ -32,15 +35,30 @@ if ($appVersion === '') {
     exit(1);
 }
 
-$agentScript = $root . '/plugin/os-opnmanager-agent/src/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh';
+// Newest agent tarball that has actually been published for download.
 $agentVersion = '';
-if (is_file($agentScript)) {
-    if (preg_match('/^AGENT_VERSION="([^"]+)"/m', (string)file_get_contents($agentScript), $m)) {
+foreach (glob($root . '/downloads/plugins/os-opnmanager-agent-*.tar.gz') ?: [] as $tarball) {
+    if (preg_match('/-(\d+\.\d+\.\d+)\.tar\.gz$/', basename($tarball), $m)
+        && ($agentVersion === '' || version_compare($m[1], $agentVersion, '>'))) {
         $agentVersion = $m[1];
     }
 }
 
-printf("Authoritative: application %s, agent %s\n\n", $appVersion, $agentVersion ?: '(unknown)');
+// The in-source agent script, for the unreleased-bump check below.
+$agentScript = $root . '/plugin/os-opnmanager-agent/src/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh';
+$agentSourceVersion = '';
+if (is_file($agentScript)
+    && preg_match('/^AGENT_VERSION="([^"]+)"/m', (string)file_get_contents($agentScript), $m)) {
+    $agentSourceVersion = $m[1];
+}
+
+if ($agentVersion === '') {
+    fwrite(STDERR, "No released agent tarball found in downloads/plugins/\n");
+    exit(1);
+}
+
+printf("Authoritative: application %s, agent %s (newest released tarball)\n\n",
+       $appVersion, $agentVersion);
 
 $problems = [];
 $fixed    = [];
@@ -109,8 +127,9 @@ check(
 );
 
 // --- inc/version.php --------------------------------------------------------
-// APP_VERSION already reads the VERSION file; AGENT_VERSION is a constant and
-// must be kept in step with the agent script.
+// APP_VERSION already reads the VERSION file. AGENT_VERSION is the single
+// constant for the newest installable agent (LATEST_AGENT_VERSION in
+// inc/agent_version.php is just an alias of it) and must match the release.
 check(
     $root . '/inc/version.php',
     "/define\('AGENT_VERSION',\s*'([^']+)'\)/",
@@ -119,6 +138,91 @@ check(
     fn(string $c) => preg_replace("/(define\('AGENT_VERSION',\s*')[^']+('\))/", '${1}' . $agentVersion . '${2}', $c) ?: $c,
     $fix, $problems, $fixed
 );
+
+// --- installer + release manifest -------------------------------------------
+check(
+    $root . '/downloads/plugins/install_opnmanager_agent.sh',
+    '/^PLUGIN_VERSION="([^"]+)"/m',
+    $agentVersion,
+    'PLUGIN_VERSION',
+    fn(string $c) => preg_replace('/(^PLUGIN_VERSION=")[^"]+(")/m', '${1}' . $agentVersion . '${2}', $c) ?: $c,
+    $fix, $problems, $fixed
+);
+
+check(
+    $root . '/downloads/AGENT_VERSION.txt',
+    '/^\s*(\S+)\s*$/',
+    $agentVersion,
+    'published agent version',
+    fn(string $c) => $agentVersion . "\n",
+    $fix, $problems, $fixed
+);
+
+// --- source vs published tarball --------------------------------------------
+// Warning only, never drift: the plugin source legitimately runs ahead of the
+// last package between releases. It exists because agent.sh carries the version
+// label by hand, so source can sit at a version already published with different
+// contents - and the next packaging run would then overwrite a released tarball.
+// Whoever cuts that release must bump AGENT_VERSION first.
+if ($agentSourceVersion !== '' && $agentSourceVersion === $agentVersion) {
+    $tarball = $root . '/downloads/plugins/os-opnmanager-agent-' . $agentVersion . '.tar.gz';
+    $sourceDir = $root . '/plugin/os-opnmanager-agent/src';
+    if (is_file($tarball) && is_dir($sourceDir)) {
+        $prefix = 'phar://' . realpath($tarball) . '/';
+        $packaged = [];
+        try {
+            $phar = new PharData($tarball);
+            foreach (new RecursiveIteratorIterator($phar) as $entry) {
+                if (!$entry->isFile()) continue;
+                $rel = substr($entry->getPathname(), strlen($prefix));
+                $packaged[$rel] = md5_file($entry->getPathname());
+            }
+        } catch (Throwable $e) {
+            $packaged = [];
+        }
+
+        if ($packaged) {
+            $differs = [];
+            $rii = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($sourceDir, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($rii as $file) {
+                if (!$file->isFile()) continue;
+                $rel = substr($file->getPathname(), strlen($sourceDir) + 1);
+                if (strpos($rel, '__pycache__') !== false) continue;
+                if (!isset($packaged[$rel])) {
+                    $differs[] = $rel . ' (not packaged)';
+                } elseif ($packaged[$rel] !== md5_file($file->getPathname())) {
+                    $differs[] = $rel . ' (modified)';
+                }
+            }
+            if ($differs) {
+                sort($differs);
+                printf("  WARNING  %-22s source differs from the published v%s tarball:\n",
+                       'plugin/src', $agentVersion);
+                foreach ($differs as $d) {
+                    printf("           %s\n", $d);
+                }
+                printf("           Bump AGENT_VERSION before packaging - do not republish v%s.\n",
+                       $agentVersion);
+            }
+        }
+    }
+}
+
+// --- unreleased source bump -------------------------------------------------
+// Never auto-fixed in either direction: the answer is either to package the new
+// agent or to revert the bump, and only a human knows which.
+if ($agentSourceVersion !== '' && version_compare($agentSourceVersion, $agentVersion, '>')) {
+    $problems[] = sprintf(
+        'agent.sh: source is v%s but the newest released tarball is v%s - either package v%s or revert the bump',
+        $agentSourceVersion, $agentVersion, $agentSourceVersion
+    );
+    printf("  UNRELEASED agent.sh              AGENT_VERSION = %s (newest release %s)\n",
+           $agentSourceVersion, $agentVersion);
+} elseif ($agentSourceVersion !== '') {
+    printf("  ok       %-22s %s = %s\n", 'agent.sh', 'AGENT_VERSION', $agentSourceVersion);
+}
 
 // --- CHANGELOG --------------------------------------------------------------
 check(

@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.6.0"
+AGENT_VERSION="1.5.6"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
@@ -1077,7 +1077,7 @@ main() {
             PAYLOAD="${PAYLOAD},\"wan_interface_stats\":$WAN_STATS}"
         fi
 
-        # Add OPNsense health telemetry (v1.6.0 feature)
+        # Add OPNsense health telemetry (unreleased; ships with the next agent release)
         HEALTH_JSON=$(get_health_json)
         if [ "$HEALTH_JSON" != "{}" ]; then
             PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')

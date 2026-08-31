@@ -217,5 +217,13 @@ function splitSqlStatements(string $sql): array {
         $statements[] = trim($buffer);
     }
 
-    return array_values(array_filter($statements, fn($s) => trim($s) !== ''));
+    // A leading comment block can survive as its own "statement" when the file
+    // opens with comments and the first directive is DELIMITER: line comments
+    // are only recognised as `-- ` (with a space), so a bare `--` separator line
+    // accumulates into the buffer and is flushed on its own. Sending that to the
+    // server is an "empty query" error, so drop anything with no SQL left in it.
+    return array_values(array_filter($statements, function ($s) {
+        $stripped = preg_replace('/^\s*(--.*|#.*)?$/m', '', $s);
+        return trim((string)$stripped) !== '';
+    }));
 }

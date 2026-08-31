@@ -27,10 +27,12 @@ $smtp_password = $rows['smtp_password'] ?? '';
 $smtp_encryption = $rows['smtp_encryption'] ?? 'tls';
 $proxy_port_start = $rows['proxy_port_start'] ?? '8100';
 $proxy_port_end = $rows['proxy_port_end'] ?? '8199';
-$backup_retention_months = $rows['backup_retention_months'] ?? '2';
-$backup_retention_type = $rows['backup_retention_type'] ?? 'count';
-$backup_min_keep = $rows['backup_min_keep'] ?? '30';
-$backup_max_keep = $rows['backup_max_keep'] ?? '90';
+// Retention is expressed in days and enforced by cron/prune_backups.php. The
+// pre-3.20.0 UI offered months or a backup count, but nothing ever read either
+// setting, so no backup was pruned. Any months value is carried over here.
+$backup_retention_days = $rows['backup_retention_days']
+    ?? (isset($rows['backup_retention_months']) ? (string)((int)$rows['backup_retention_months'] * 30) : '90');
+$backup_retention_min_keep = $rows['backup_retention_min_keep'] ?? '3';
 
 // helpers
 function save_setting($k,$v){
@@ -135,46 +137,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Backup retention settings actions
     if (!empty($_POST['save_backup_retention'])) {
-      error_log("BACKUP RETENTION SAVE: POST data: " . json_encode($_POST));
-      $retention_type = trim($_POST['backup_retention_type'] ?? 'count');
-      error_log("BACKUP RETENTION: type=$retention_type");
-      
-      if ($retention_type === 'time') {
-        $backup_retention_months_input = (int)trim($_POST['backup_retention_months'] ?? '2');
-        
-        // Validate: between 1 and 6 months
-        if ($backup_retention_months_input < 1 || $backup_retention_months_input > 6) {
-          $notice = 'Backup retention must be between 1 and 6 months.';
-        } else {
-          save_setting('backup_retention_type', 'time');
-          save_setting('backup_retention_months', $backup_retention_months_input);
-          $backup_retention_type = 'time';
-          $backup_retention_months = $backup_retention_months_input;
-          header('Location: /settings.php?notice=' . urlencode("Backup retention set to $backup_retention_months_input months."));
-          exit;
-        }
+      $days_input     = (int)trim($_POST['backup_retention_days'] ?? '90');
+      $min_keep_input = (int)trim($_POST['backup_retention_min_keep'] ?? '3');
+
+      // 0 disables retention entirely; anything else must be a sane window.
+      if ($days_input !== 0 && ($days_input < 1 || $days_input > 3650)) {
+        $notice = 'Retention must be between 1 and 3650 days, or 0 to keep backups indefinitely.';
+      } elseif ($min_keep_input < 1 || $min_keep_input > 100) {
+        $notice = 'Minimum backups to keep must be between 1 and 100.';
       } else {
-        // Count-based retention
-        $min_keep = (int)trim($_POST['backup_min_keep'] ?? '30');
-        $max_keep = (int)trim($_POST['backup_max_keep'] ?? '90');
-        
-        // Validate
-        if ($min_keep < 10 || $min_keep > 100) {
-          $notice = 'Minimum backups must be between 10 and 100.';
-        } elseif ($max_keep < 20 || $max_keep > 200) {
-          $notice = 'Maximum backups must be between 20 and 200.';
-        } elseif ($min_keep >= $max_keep) {
-          $notice = 'Minimum must be less than maximum.';
-        } else {
-          save_setting('backup_retention_type', 'count');
-          save_setting('backup_min_keep', $min_keep);
-          save_setting('backup_max_keep', $max_keep);
-          $backup_retention_type = 'count';
-          $backup_min_keep = $min_keep;
-          $backup_max_keep = $max_keep;
-          header('Location: /settings.php?notice=' . urlencode("Backup retention set to keep last $min_keep-$max_keep backups per firewall."));
-          exit;
-        }
+        save_setting('backup_retention_days', $days_input);
+        save_setting('backup_retention_min_keep', $min_keep_input);
+        $backup_retention_days = $days_input;
+        $backup_retention_min_keep = $min_keep_input;
+        $msg = $days_input === 0
+          ? 'Backup retention disabled: backups are kept indefinitely.'
+          : "Backup retention set to $days_input days, always keeping the $min_keep_input newest per firewall.";
+        header('Location: /settings.php?notice=' . urlencode($msg));
+        exit;
       }
     }
     
@@ -592,44 +572,27 @@ include __DIR__ . '/inc/header.php';
           <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
           <div class="alert alert-info bg-opacity-25">
             <i class="fas fa-info-circle me-2"></i>
-            Configure backup retention policy. Choose between time-based (keep for X months) or count-based (keep last N backups per firewall).
+            Backups older than the retention window are deleted by the nightly
+            cleanup. The newest backups for each firewall are always kept,
+            whatever their age.
           </div>
-          
+
           <div class="mb-3">
-            <label class="form-label">Retention Type</label>
-            <select class="form-control border-secondary" name="backup_retention_type" id="backup_retention_type" onchange="toggleRetentionType()">
-              <option value="count" <?php echo $backup_retention_type === 'count' ? 'selected' : ''; ?>>Count-Based (Keep Last N Backups)</option>
-              <option value="time" <?php echo $backup_retention_type === 'time' ? 'selected' : ''; ?>>Time-Based (Keep for X Months)</option>
-            </select>
+            <label for="backup_retention_days" class="form-label">Retention Period (Days)</label>
+            <input type="number" class="form-control border-secondary" id="backup_retention_days" name="backup_retention_days"
+                   value="<?php echo htmlspecialchars($backup_retention_days); ?>"
+                   min="0" max="3650" step="1">
+            <div class="form-text text-light-emphasis">Delete backups older than this many days (1-3650). Set to 0 to keep backups indefinitely.</div>
           </div>
-          
-          <div id="count_retention" style="display: <?php echo $backup_retention_type === 'count' ? 'block' : 'none'; ?>;">
-            <div class="mb-3">
-              <label for="backup_min_keep" class="form-label">Minimum Backups to Keep</label>
-              <input type="number" class="form-control border-secondary" id="backup_min_keep" name="backup_min_keep"
-                     value="<?php echo htmlspecialchars($backup_min_keep); ?>"
-                     min="10" max="100" step="1">
-              <div class="form-text text-light-emphasis">Always keep at least this many backups per firewall (10-100)</div>
-            </div>
-            <div class="mb-3">
-              <label for="backup_max_keep" class="form-label">Maximum Backups to Keep</label>
-              <input type="number" class="form-control border-secondary" id="backup_max_keep" name="backup_max_keep"
-                     value="<?php echo htmlspecialchars($backup_max_keep); ?>"
-                     min="20" max="200" step="1">
-              <div class="form-text text-light-emphasis">Delete oldest backups when count exceeds this (20-200)</div>
-            </div>
+
+          <div class="mb-3">
+            <label for="backup_retention_min_keep" class="form-label">Always Keep Newest</label>
+            <input type="number" class="form-control border-secondary" id="backup_retention_min_keep" name="backup_retention_min_keep"
+                   value="<?php echo htmlspecialchars($backup_retention_min_keep); ?>"
+                   min="1" max="100" step="1">
+            <div class="form-text text-light-emphasis">Never delete this many most-recent backups per firewall, even if they are older than the window (1-100). This is what stops a firewall that has stopped checking in from losing every copy of its configuration.</div>
           </div>
-          
-          <div id="time_retention" style="display: <?php echo $backup_retention_type === 'time' ? 'block' : 'none'; ?>;">
-            <div class="mb-3">
-              <label for="backup_retention_months" class="form-label">Retention Period (Months)</label>
-              <input type="number" class="form-control border-secondary" id="backup_retention_months" name="backup_retention_months"
-                     value="<?php echo htmlspecialchars($backup_retention_months); ?>"
-                     min="1" max="6" step="1">
-              <div class="form-text text-light-emphasis">Keep backups for 1-6 months</div>
-            </div>
-          </div>
-          
+
           <div class="alert alert-warning bg-opacity-25">
             <i class="fas fa-exclamation-triangle me-2"></i>
             <strong>Note:</strong> Old backups will be permanently deleted during nightly cleanup. This helps manage disk space.
@@ -643,24 +606,6 @@ include __DIR__ . '/inc/header.php';
     </div>
   </div>
 </div>
-
-<script>
-function toggleRetentionType() {
-  const type = document.getElementById('backup_retention_type').value;
-  document.getElementById('count_retention').style.display = type === 'count' ? 'block' : 'none';
-  document.getElementById('time_retention').style.display = type === 'time' ? 'block' : 'none';
-}
-
-// Ensure correct fields are shown when modal opens
-document.addEventListener('DOMContentLoaded', function() {
-  const modal = document.getElementById('backupRetentionModal');
-  if (modal) {
-    modal.addEventListener('shown.bs.modal', function() {
-      toggleRetentionType();
-    });
-  }
-});
-</script>
 
 <script>
 // Debug: Test Bootstrap modal functionality

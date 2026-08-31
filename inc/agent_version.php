@@ -1,9 +1,15 @@
 <?php
 // OPNManager Agent Version Configuration
-// Update this when releasing a new agent version
+//
+// LATEST_AGENT_VERSION is a backwards-compatible alias for AGENT_VERSION, which
+// lives in inc/version.php and is the single source of truth for the newest
+// installable agent. These were two hand-maintained literals that drifted apart
+// (1.6.0 vs 1.5.6), so update inc/version.php - never redefine the value here.
 
-define('LATEST_AGENT_VERSION', '1.5.6');
-define('AGENT_DOWNLOAD_URL', 'https://opn.agit8or.net/downloads/plugins/install_opnmanager_agent.sh');
+require_once __DIR__ . '/version.php';
+
+if (!defined('LATEST_AGENT_VERSION')) { define('LATEST_AGENT_VERSION', AGENT_VERSION); }
+if (!defined('AGENT_DOWNLOAD_URL')) { define('AGENT_DOWNLOAD_URL', 'https://opn.agit8or.net/downloads/plugins/install_opnmanager_agent.sh'); }
 
 /**
  * Compare two semantic version strings

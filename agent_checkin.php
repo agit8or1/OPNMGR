@@ -724,8 +724,13 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
  */
 function checkQueuedCommands($firewall_id) {
     try {
+        // A reboot cannot report back - the box stops executing partway through -
+        // so settle those first. Without this the timeout below hands the reboot
+        // straight back to the firewall that just performed it, on every check-in.
+        settle_unacknowledgeable_commands($firewall_id, 10);
+
         // Reset commands stuck in 'sent' status for more than 10 minutes back to 'pending'
-        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND NOT " . agent_unacknowledgeable_command_sql());
         $timeout_stmt->execute([$firewall_id]);
         $reset_count = $timeout_stmt->rowCount();
         if ($reset_count > 0) {
@@ -758,8 +763,12 @@ function checkQueuedCommands($firewall_id) {
  */
 function checkQueuedCommandsForUpdateAgent($firewall_id) {
     try {
+        // Same reasoning as checkQueuedCommands(): an update command that ends in
+        // a reboot never gets to answer, so settle it rather than reissuing it.
+        settle_unacknowledgeable_commands($firewall_id, 10);
+
         // Reset commands stuck in 'sent' status for more than 10 minutes back to 'pending'
-        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND is_update_command = 1 AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+        $timeout_stmt = db()->prepare("UPDATE firewall_commands SET status = 'pending', sent_at = NULL WHERE firewall_id = ? AND status = 'sent' AND is_update_command = 1 AND sent_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND NOT " . agent_unacknowledgeable_command_sql());
         $timeout_stmt->execute([$firewall_id]);
         $reset_count = $timeout_stmt->rowCount();
         if ($reset_count > 0) {

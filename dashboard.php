@@ -28,11 +28,20 @@ if (db()) {
             ORDER BY f.hostname ASC
         ");
         $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Newest OPNsense version in the fleet - used to flag major upgrades
+        $latest_major_version = '';
+        foreach ($firewalls as $fwv) {
+            if (!empty($fwv['current_version']) && $fwv['current_version'] !== 'Unknown'
+                && version_compare($fwv['current_version'], $latest_major_version, '>')) {
+                $latest_major_version = $fwv['current_version'];
+            }
+        }
         $total_firewalls = count($firewalls);
         $health_sum = 0;
 
         foreach ($firewalls as &$fw) {
-            $fw['health_score'] = calculateHealthScore($fw);
+            $fw['health_score'] = calculateHealthScore($fw, $latest_major_version);
             $health_sum += $fw['health_score'];
             $fw['live_status'] = 'offline';
             if (!empty($fw['agent_last_checkin'])) {
