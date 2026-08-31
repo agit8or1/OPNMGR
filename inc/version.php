@@ -31,12 +31,14 @@ define('JQUERY_VERSION', '3.7.1');
 function getChangelogEntries($limit = 10) {
     return [
         [
-            'version' => '3.19.0',
+            'version' => '3.19.1',
             'date' => '2026-08-31',
             'type' => 'minor',
             'title' => 'Trackable Firewall OS Updates',
             'changes' => [
                 'FIXED: "Upgrade Firewall OS/Dependencies" left no evidence that anything had happened, so a successful update was indistinguishable from a failed one. The button set a firewalls.update_requested flag and returned success; agent_checkin.php cleared that flag the moment it read it, before the agent had run anything; the agent executed the upgrade with nohup and never reported a result; and no row was written to the command history. Operators reasonably concluded the feature was broken and clicked again, running the upgrade repeatedly. The update is now dispatched as a normal tracked command, so it appears in the command history and its real output and exit status are recorded',
+                'FIXED: A full upgrade could be killed partway through. The agent runs queued commands as eval \"$cmd\" 2>&1 | head -1000; a real upgrade emits far more than 1000 lines and once head exits the writer receives SIGPIPE. install_updates now redirects the updater output to /var/log/opnmanager_update.log and returns only a bounded tail',
+                'FIXED: The agent hardcodes \"status\":\"completed\" for every command and never transmits an exit code, so a failed upgrade looked identical to a successful one. install_updates now echoes its own exit status as a marker that the server reads to decide the real outcome. An upgrade reporting back without a recognisable marker is recorded as unconfirmed rather than assumed successful',
                 'FIXED: agent_checkin.php optimistically set updates_available = 0 and reboot_required = 1 at the moment an update request was handed to the agent, asserting an outcome before any work had been done. A request that never executed still left the server reporting "no updates available, reboot required". Both values are now only ever set from what the agent actually reports',
                 'ADDED: Requesting an update while one is still pending or in flight no longer queues a second one. The endpoint returns the existing command id instead, so repeat clicks are harmless',
                 'CHANGED: The firewall list now shows the queued command number after a successful request, and no longer reloads the page two seconds later - that reload erased the only feedback the operator had been given',

@@ -121,7 +121,31 @@ if (!function_exists('agent_command_catalog')) {
                 'category' => 'packages',
                 'risk'     => 'HIGH',
                 'params'   => [],
-                'build'    => fn(array $p) => '/usr/local/sbin/opnsense-update -bkp',
+                // Redirect the updater's own output to a log rather than letting
+                // it stream back through the agent.
+                //
+                // The agent executes commands as `eval "$cmd" 2>&1 | head -1000`.
+                // A real upgrade emits far more than 1000 lines (fw48's
+                // 26.1.3 -> 26.1.11 run pulled 99 packages), and when head exits
+                // the writer gets SIGPIPE - which can kill opnsense-update
+                // partway through an upgrade. Writing to a file keeps the
+                // updater's stdout off that pipe entirely, and the bounded tail
+                // below is all that ever reaches head.
+                //
+                // The exit code is captured and echoed as a parseable marker
+                // because the agent hardcodes "status":"completed" when it
+                // reports back, so the transport cannot tell us whether the
+                // upgrade actually succeeded. It is written into the log too, so
+                // the outcome survives a reboot that cuts the report short.
+                'build'    => fn(array $p) =>
+                    'LOG=/var/log/opnmanager_update.log; '
+                    . ': >"$LOG" 2>/dev/null; '
+                    . '/usr/local/sbin/opnsense-update -bkp >>"$LOG" 2>&1; '
+                    . 'rc=$?; '
+                    . 'echo "OPNMGR_UPDATE_EXIT=$rc" >>"$LOG"; '
+                    . 'echo "OPNMGR_UPDATE_EXIT=$rc"; '
+                    . 'echo "--- opnsense-update output (last 80 lines) ---"; '
+                    . 'tail -n 80 "$LOG"',
             ],
 
             // --- diagnostics -------------------------------------------------
@@ -461,4 +485,25 @@ if (!function_exists('raw_commands_enabled')) {
             return true; // fail open on a settings read error, not closed
         }
     }
+}
+
+/**
+ * Determine the real outcome of an install_updates command from its output.
+ *
+ * The agent reports every command as "completed" regardless of exit status, so
+ * a failed upgrade is indistinguishable from a successful one at the transport
+ * level. install_updates therefore echoes its own exit code, which this reads.
+ *
+ * @param string $result Decoded command output
+ * @return array{known:bool, exit_code:?int, ok:bool}
+ * @since 3.19.1
+ */
+function interpret_update_result(string $result): array {
+    if (preg_match('/OPNMGR_UPDATE_EXIT=(\d{1,3})\b/', $result, $m)) {
+        $code = (int)$m[1];
+        return ['known' => true, 'exit_code' => $code, 'ok' => $code === 0];
+    }
+    // No marker: an older agent, or the box rebooted before it could report.
+    // Say so rather than assuming the upgrade worked.
+    return ['known' => false, 'exit_code' => null, 'ok' => false];
 }

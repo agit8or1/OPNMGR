@@ -3,6 +3,7 @@ require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/logging.php';
 require_once __DIR__ . '/inc/agent_auth.php';
 require_once __DIR__ . '/inc/command_results.php';
+require_once __DIR__ . '/inc/agent_commands.php';
 require_once __DIR__ . '/inc/firewall_health.php';
 
 // Endpoint for firewall agent check-ins
@@ -80,6 +81,44 @@ if ($command_id > 0 && !empty($command_status)) {
                     error_log("Speedtest results saved for firewall {$cmd_info['firewall_id']}: down={$speedtest_data['download_mbps']} up={$speedtest_data['upload_mbps']}");
                 }
             }
+        }
+
+        // Interpret the real outcome of an OS update.
+        //
+        // The agent hardcodes "status":"completed" for every command it runs, so
+        // the reported status says only that the agent finished executing - not
+        // that the upgrade succeeded. install_updates echoes its own exit code
+        // for exactly this reason; read it rather than assuming success.
+        $cmd_row = $accepted['command'] ?? null;
+        if ($cmd_row && ($cmd_row['action'] ?? '') === 'install_updates') {
+            $outcome = interpret_update_result((string)$command_result);
+
+            if (!$outcome['known']) {
+                $verdict = 'unconfirmed';
+            } else {
+                $verdict = $outcome['ok'] ? 'success' : 'failed';
+            }
+
+            db()->prepare(
+                'UPDATE firewalls SET last_update_result = ?, last_update_attempt_at = NOW() WHERE id = ?'
+            )->execute([$verdict, $firewall_id]);
+
+            // Reflect a genuine failure in the command row too, so the history
+            // does not show a green "completed" for an upgrade that failed.
+            if ($outcome['known'] && !$outcome['ok']) {
+                db()->prepare("UPDATE firewall_commands SET status = 'failed' WHERE id = ?")
+                    ->execute([$command_id]);
+            }
+
+            // Force a fresh update check instead of asserting what is now
+            // installed. The agent reports the real version on its next
+            // check-in; guessing here is what previously left the server
+            // claiming "no updates available" for an upgrade that never ran.
+            db()->prepare('UPDATE firewalls SET last_update_check = NULL WHERE id = ?')
+                ->execute([$firewall_id]);
+
+            error_log("Update result for firewall $firewall_id (command $command_id): $verdict"
+                . ($outcome['known'] ? " (exit {$outcome['exit_code']})" : ' (no exit marker)'));
         }
 
         echo json_encode(['success' => true, 'message' => 'Command result recorded']);

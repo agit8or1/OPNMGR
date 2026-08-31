@@ -106,7 +106,7 @@ if (!function_exists('record_agent_command_result')) {
 
         // --- ownership -------------------------------------------------------
         $stmt = db()->prepare(
-            'SELECT id, firewall_id, command, command_type, description, status
+            'SELECT id, firewall_id, command, command_type, action, description, status
                FROM firewall_commands
               WHERE id = ?'
         );

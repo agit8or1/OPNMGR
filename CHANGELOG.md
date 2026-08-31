@@ -2,7 +2,80 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: August 26, 2026
+**Last Updated**: August 31, 2026
+
+---
+
+## Version 3.19.1
+**Released**: August 31, 2026 | **Agent**: v1.6.0
+
+### Fixed
+
+- **"Upgrade Firewall OS/Dependencies" left no evidence it had run**, which made
+  a successful upgrade indistinguishable from a failed one.
+
+  The button set a `firewalls.update_requested` flag and immediately returned
+  success, claiming a "standalone updater" would process it within a minute. No
+  standalone updater exists — `firewall_updaters` has never had a row.
+  `agent_checkin.php` then cleared that flag the moment it read it, *before* the
+  agent had run anything, and set `updates_available = 0` and
+  `reboot_required = 1` on the assumption it would work. The agent executed the
+  upgrade detached under `nohup` and never reported a result, and no row was
+  written to `firewall_commands`, so the command history showed nothing at all.
+  The firewall list then reloaded two seconds later into a page with no trace of
+  the request.
+
+  Confirmed on a production firewall: the upgrade genuinely ran and succeeded
+  (26.1.3 → 26.1.11_10), but because nothing surfaced it the operator concluded
+  the feature was broken and clicked three more times, dispatching the upgrade
+  again on each click.
+
+  Updates are now dispatched through the same tracked command queue as every
+  other agent action, so each request produces a command row whose real output
+  and outcome are recorded and visible in the history.
+
+- **A full upgrade could be killed partway through.** The agent executes queued
+  commands as `eval "$cmd" 2>&1 | head -1000`. A real upgrade emits far more than
+  1000 lines — the 26.1.3 → 26.1.11 run pulled 99 packages — and once `head`
+  exits, the writing process receives SIGPIPE. Routing updates through the
+  command queue therefore exposed them to a truncation hazard the old detached
+  path did not have. `install_updates` now redirects the updater's own output to
+  `/var/log/opnmanager_update.log` and returns only a bounded tail, so the
+  updater's stdout never touches that pipe.
+
+- **Every command was reported as successful.** The agent hardcodes
+  `"status":"completed"` when reporting back and never captures or transmits the
+  exit code, so a failed upgrade looked exactly like a successful one.
+  `install_updates` now echoes its own exit status as a parseable marker, which
+  the server reads to decide the real outcome; the marker is written into the log
+  as well, so it survives a reboot that cuts the report short. An upgrade that
+  reports back without a recognisable marker is recorded as `unconfirmed` rather
+  than assumed to have worked.
+
+- **The server asserted post-update state before any work had been done.**
+  `agent_checkin.php` set `updates_available = 0` and `reboot_required = 1` at
+  the moment a request was handed to the agent. A request that never executed
+  still left the server reporting "no updates available, reboot required". Both
+  values now come only from what the agent actually reports.
+
+### Added
+
+- Requesting an update while one is already pending or in flight no longer
+  queues a second one; the endpoint returns the existing command id, so repeat
+  clicks are harmless.
+
+### Changed
+
+- The firewall list shows the queued command number after a successful request
+  and no longer reloads the page two seconds later — that reload erased the only
+  feedback the operator had just been given.
+- `api/update_firewall.php` is gated on the `update.install` capability rather
+  than a blanket admin check, matching the other update paths.
+
+### Removed
+
+- `triggerOPNsenseUpdate()` and `triggerAgentUpdate()` in
+  `api/update_firewall.php` — curl-based helpers that nothing ever called.
 
 ---
 
