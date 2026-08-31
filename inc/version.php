@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Trackable Firewall Updates'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Map Rollback'); }
 
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-08-26'); }
@@ -30,6 +30,16 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.19.4',
+            'date' => '2026-08-31',
+            'type' => 'patch',
+            'title' => 'Map Rollback',
+            'changes' => [
+                'Reverted the 3.19.3 dashboard map changes — the new tiles and layout were worse than what they replaced',
+                'Network map is back to the OpenStreetMap basemap and prior sizing',
+            ],
+        ],
         [
             'version' => '3.19.2',
             'date' => '2026-08-31',
