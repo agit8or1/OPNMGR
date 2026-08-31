@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.17.1.
+-- Generated from the reference installation for OPNManager v3.20.5.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -364,8 +364,8 @@ CREATE TABLE IF NOT EXISTS `bandwidth_test_lock` (
   `locked_at` timestamp NULL DEFAULT current_timestamp(),
   `lock_expires_at` timestamp NULL DEFAULT (current_timestamp() + interval 5 minute),
   PRIMARY KEY (`id`),
-  KEY `firewall_id` (`firewall_id`),
   KEY `idx_lock_expires` (`lock_expires_at`),
+  KEY `bandwidth_test_lock_ibfk_1` (`firewall_id`),
   CONSTRAINT `bandwidth_test_lock_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1440,10 +1440,10 @@ CREATE TABLE IF NOT EXISTS `ssh_access_sessions` (
   `created_by_username` varchar(64) DEFAULT NULL,
   `access_token` varchar(64) DEFAULT NULL COMMENT 'Unguessable per-session token, required by tunnel_proxy.php',
   PRIMARY KEY (`id`),
-  KEY `firewall_id` (`firewall_id`),
   KEY `idx_status` (`status`),
   KEY `idx_expires` (`expires_at`),
   KEY `idx_created_by` (`created_by_user_id`),
+  KEY `ssh_access_sessions_ibfk_1` (`firewall_id`),
   CONSTRAINT `ssh_access_sessions_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

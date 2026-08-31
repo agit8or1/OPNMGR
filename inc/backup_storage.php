@@ -552,6 +552,114 @@ if (!function_exists('backup_retention_floor')) {
     }
 }
 
+if (!function_exists('backup_fileless_grace_hours')) {
+    /**
+     * How long to wait before treating a backup row with no file as dead.
+     *
+     * A row is created when the upload is *queued*, so there is always a window
+     * where the file legitimately does not exist yet. Commands time out after
+     * 10 minutes and agents check in every couple of minutes, so anything still
+     * fileless after the grace window is never going to arrive - the firewall
+     * was offline, or the upload was rejected.
+     *
+     * 0 disables reaping entirely.
+     */
+    function backup_fileless_grace_hours(): int {
+        try {
+            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+            $stmt->execute(['backup_fileless_grace_hours']);
+            $raw = $stmt->fetchColumn();
+            if ($raw !== false && trim((string)$raw) !== '') {
+                return max(0, min(8760, (int)$raw));
+            }
+        } catch (Throwable $e) {
+            // fall through to default
+        }
+        return 48;
+    }
+}
+
+if (!function_exists('reap_fileless_backups')) {
+    /**
+     * Delete backup rows whose upload never arrived.
+     *
+     * `record_backup_failure()` annotates a rejected upload but keeps the row,
+     * and retention prunes only by age, so a firewall that is offline when its
+     * backup is queued leaves a row behind claiming a backup that does not
+     * exist. Left alone these accumulate and inflate the backup count - which is
+     * precisely the false confidence that let a broken uploader run unnoticed
+     * for months (see 3.20.3).
+     *
+     * Only rows whose file is genuinely *missing* are reaped. An `unreadable`
+     * file is a permissions fault on this server; deleting that row would strand
+     * the bytes on disk with nothing pointing at them, so it is reported instead.
+     *
+     * @param bool     $apply false reports without deleting
+     * @param int|null $hours grace window, defaults to the configured value
+     */
+    function reap_fileless_backups(bool $apply = false, ?int $hours = null): array {
+        $hours = $hours ?? backup_fileless_grace_hours();
+
+        $report = [
+            'applied'    => $apply,
+            'hours'      => $hours,
+            'candidates' => 0,
+            'deleted'    => 0,
+            'unreadable' => 0,
+            'errors'     => [],
+            'rows'       => [],
+        ];
+
+        if ($hours <= 0) {
+            return $report;
+        }
+
+        $stmt = db()->prepare(
+            'SELECT b.*, f.hostname
+               FROM backups b
+               LEFT JOIN firewalls f ON f.id = b.firewall_id
+              WHERE b.created_at < DATE_SUB(NOW(), INTERVAL ? HOUR)
+              ORDER BY b.id'
+        );
+        $stmt->execute([$hours]);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $status = resolve_backup_path_status($row)['status'];
+
+            if ($status === 'ok') {
+                continue;
+            }
+            if ($status === 'unreadable') {
+                $report['unreadable']++;
+                $report['errors'][] = "backup {$row['id']}: file unreadable, left in place";
+                continue;
+            }
+
+            $report['candidates']++;
+            $report['rows'][] = [
+                'id'         => (int)$row['id'],
+                'firewall'   => $row['hostname'] ?? ('#' . $row['firewall_id']),
+                'created_at' => $row['created_at'],
+                'file'       => $row['backup_file'],
+                'reason'     => $row['validation_error'] ?: 'upload never arrived',
+            ];
+
+            if (!$apply) {
+                continue;
+            }
+
+            try {
+                db()->prepare('DELETE FROM backups WHERE id = ?')->execute([(int)$row['id']]);
+                $report['deleted']++;
+            } catch (Throwable $e) {
+                $report['errors'][] = "backup {$row['id']}: row delete failed: " . $e->getMessage();
+            }
+        }
+
+        return $report;
+    }
+}
+
 if (!function_exists('find_expired_backups')) {
     /**
      * Backup rows outside the retention window, excluding each firewall's floor.

@@ -6,6 +6,41 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.20.6
+**Released**: August 31, 2026 | **Agent**: v1.5.6
+
+### Added
+
+- **`cron/prune_backups.php` now reaps backup rows whose upload never arrived**,
+  closing the gap recorded in 3.20.5. A row is created when the upload is
+  *queued*, so one still without a file after a grace window (default 48h,
+  `backup_fileless_grace_hours`, migration 0016; 0 disables) is never getting
+  one — the firewall was offline, or the upload was rejected. Previously nothing
+  removed them: `record_backup_failure()` annotates and keeps the row, and
+  retention prunes only by age, so they accumulated and inflated the backup
+  count.
+
+  The pass runs after retention and reports by default like the rest of the
+  script; `--apply` deletes, `--grace=N` overrides the window, `--no-reap` skips
+  it. A dry run names the rows it would remove and why.
+
+- **It refuses to reap when it cannot read the backup store.** Deciding what to
+  delete depends on telling a *missing* file from an *unreadable* one, and
+  `/var/lib/opnmgr/backups` is `www-data:www-data 0750` — run as another user,
+  every backup looks missing and the pass would be deciding blind. It skips and
+  exits 3 with one clear line, rather than emitting a warning per row as the
+  first cut did.
+
+### Fixed
+
+- **`database/schema.sql` regenerated.** Migration 0015 drops and re-adds each
+  foreign key, and MySQL names the backing index after the constraint when it
+  creates one, so three indexes are now `<table>_ibfk_1` rather than
+  `firewall_id`. Functionally irrelevant, but a fresh install loads `schema.sql`
+  and would otherwise diverge from an upgraded one.
+
+---
+
 ## Version 3.20.5
 **Released**: August 31, 2026 | **Agent**: v1.5.6
 
