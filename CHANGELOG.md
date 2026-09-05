@@ -6,6 +6,36 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.21.2
+**Released**: September 5, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **Every firewall reported services as stopped that were never configured.**
+  `collect_services()` walked a hardcoded candidate list and treated a service as
+  installed if `/usr/local/etc/rc.d/<name>` existed — true for everything shipped
+  by an installed package, configured or not — and then hardcoded
+  `"enabled": True` on the result. Since nothing ever set `enabled` to anything
+  else, the fleet view's `enabled = 1 AND running = 0` test collapsed into "not
+  running", so an unconfigured `openvpn`, `strongswan` or `radvd` counted as a
+  stopped service on a perfectly healthy firewall. Both firewalls in the fleet
+  showed "4 stopped" permanently, and every newly enrolled one would have too.
+
+  The collector now reads `configctl service list`, which reports only the
+  services OPNsense actually has configured — that being what "enabled" has to
+  mean. On the live fleet this takes fw48 from four false positives to none, and
+  it surfaces a genuine stopped service on fw51 (`senpai`, the Zenarmor engine)
+  that the candidate list never covered.
+
+  Multi-instance services (`dpinger` per gateway, `wireguard` per tunnel) are
+  reported once per instance and are now merged, counting as up only when every
+  instance is. A service whose status string cannot be parsed is omitted rather
+  than assumed stopped, and an unreadable registry omits the whole section, so
+  the server keeps the last known list instead of concluding every service
+  vanished.
+
+---
+
 ## Version 3.21.1
 **Released**: September 5, 2026 | **Agent**: v1.6.1
 

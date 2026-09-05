@@ -287,72 +287,63 @@ def collect_carp():
 # ---------------------------------------------------------------------------
 # Only services that are meaningful to an MSP. A service that is not installed
 # on this firewall is omitted, not reported as stopped.
-SERVICE_CANDIDATES = [
-    ("unbound", "DNS resolver"),
-    ("dnsmasq", "DNS forwarder"),
-    ("dhcpd", "DHCPv4 server"),
-    ("kea-dhcp4", "Kea DHCPv4"),
-    ("openvpn", "OpenVPN"),
-    ("strongswan", "IPsec"),
-    ("wireguard", "WireGuard"),
-    ("nginx", "Web GUI"),
-    ("lighttpd", "Web GUI"),
-    ("openssh", "SSH"),
-    ("ntpd", "NTP"),
-    ("chronyd", "NTP"),
-    ("syslog-ng", "Syslog"),
-    ("cron", "Cron"),
-    ("configd", "OPNsense configd"),
-    ("suricata", "IDS/IPS"),
-    ("haproxy", "HAProxy"),
-    ("squid", "Proxy"),
-    ("radvd", "Router advertisements"),
-    ("pf", "Packet filter"),
-]
+def _service_running(status):
+    """OPNsense status strings: 'X is running as pid N.', 'X is not running.'"""
+    if not status:
+        return None
+    text = str(status).lower()
+    if "is not running" in text:
+        return False
+    if "is running" in text:
+        return True
+    return None
 
 
 def collect_services():
-    services = []
+    """The services OPNsense itself has configured, and whether each is running.
 
-    for name, description in SERVICE_CANDIDATES:
-        rc_script = f"/usr/local/etc/rc.d/{name}"
-        base_script = f"/etc/rc.d/{name}"
+    `configctl service list` is the authority: it reports only services the
+    firewall actually has configured, which is what "enabled" has to mean here.
+    The previous approach - a hardcoded candidate list probed by testing whether
+    /usr/local/etc/rc.d/<name> exists - reported every service belonging to an
+    installed package, configured or not, so an unconfigured openvpn or radvd
+    appeared as a stopped service on a perfectly healthy firewall.
 
-        installed = os.path.exists(rc_script) or os.path.exists(base_script)
+    Returns None when the registry cannot be read, so the server keeps the last
+    known list rather than concluding every service disappeared.
+    """
+    data = configctl("service", "list")
+    if not isinstance(data, list):
+        return None
 
-        # pf is built into the kernel rather than an rc.d service.
-        if name == "pf":
-            out = run(["pfctl", "-s", "info"]) if have("pfctl") else None
-            if out is None:
-                continue
-            services.append({
-                "name": name,
-                "description": description,
-                "running": "Status: Enabled" in out,
-                "enabled": True,
-            })
+    merged = {}
+    for item in data:
+        if not isinstance(item, dict):
             continue
-
-        if not installed:
+        name = item.get("name")
+        if not name:
             continue
-
-        script = rc_script if os.path.exists(rc_script) else base_script
-        out = run([script, "status"])
-        running = bool(out and re.search(r"\bis running\b", out))
-
-        if not running:
-            # Some rc scripts are quiet; fall back to a process check.
-            pgrep = run(["pgrep", "-x", name])
-            running = bool(pgrep and pgrep.strip())
-
-        services.append({
+        running = _service_running(item.get("status"))
+        if running is None:
+            # Listed but unparseable: reporting it as stopped is the false
+            # positive this function exists to remove.
+            continue
+        name = str(name)[:64]
+        if name in merged:
+            # Multi-instance services (dpinger per gateway, wireguard per
+            # tunnel) appear once per instance; the service is up only if
+            # every instance is.
+            merged[name]["running"] = merged[name]["running"] and running
+            continue
+        merged[name] = {
             "name": name,
-            "description": description,
+            "description": str(item.get("description") or "")[:128] or None,
             "running": running,
+            # Present in the registry means configured on this firewall.
             "enabled": True,
-        })
+        }
 
-    return services
+    return sorted(merged.values(), key=lambda s: s["name"])
 
 
 # ---------------------------------------------------------------------------
