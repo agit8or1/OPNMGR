@@ -53,10 +53,40 @@ This document provides a comprehensive catalog of all features in OPNManager, or
   - Configuration persistence between check-ins
   - IP class-based network estimation fallback
 
+### Firewall Health
+**Status**: ✅ Production | **Version**: 3.14.0+ | **Requires**: Agent 1.6.0+
+
+OPNsense-specific health across the fleet, from telemetry the agent collects out of
+`configctl`, `wg`, `ifconfig` and the on-box certificate store. Only what an agent
+actually reported is shown — a firewall on an older agent reads as "not reporting
+health" rather than as a wall of false failures.
+
+- **Gateways**
+  - Status, latency, jitter (stddev) and packet loss per gateway
+  - Default-gateway identification and priority
+  - Flapping detection across recent check-ins
+
+- **VPN Tunnels**
+  - WireGuard peers (handshake age, transfer counters), OpenVPN and IPsec
+  - Per-tunnel up/down with enabled state honoured
+
+- **Services**
+  - Sourced from `configctl service list`, so only services the firewall
+    actually has configured are counted — not every rc.d script present
+  - Multi-instance services (dpinger per gateway, wireguard per tunnel) merged
+
+- **Certificates**
+  - Expiry with configurable severity thresholds (default 30/14/7 days)
+  - Issuer and subject; private keys are never read
+
+- **CARP / HA**
+  - MASTER/BACKUP/INIT state and sync status
+  - Peer pairing resolved from the reported CARP peer address
+
 ### Unified Agent Architecture
 **Status**: ✅ Production | **Version**: 3.8.0+
 
-**OPNManager Agent (Plugin-based, v1.5.6)**
+**OPNManager Agent (Plugin-based, v1.6.2)**
 - Check-in interval: 2 minutes (configurable per-firewall)
 - Native OPNsense plugin with auto-update support
 - Functions:
@@ -70,6 +100,8 @@ This document provides a comprehensive catalog of all features in OPNManager, or
   - Firewall backup coordination
   - Latency monitoring (ping measurements)
   - Bandwidth testing (iperf3 speed tests)
+  - OPNsense health telemetry (v1.6.0+): gateways, VPN tunnels, CARP state,
+    services and certificate expiry, collected by `health_collect.py`
 - **Technical**: Shell script, runs via cron, PID-based duplicate prevention
 
 ---

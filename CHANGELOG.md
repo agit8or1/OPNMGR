@@ -6,6 +6,31 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.21.3
+**Released**: September 5, 2026 | **Agent**: v1.6.2
+
+### Changed
+
+- **Documented the Firewall Health feature.** It has shipped since 3.14.0 and was
+  described in `README.md`, but `FEATURES.md` — the feature reference — had no
+  section for it at all, and still listed the agent at v1.5.6 with no mention of
+  health telemetry among its functions. Added a Firewall Health section covering
+  gateways, VPN tunnels, services, certificates and CARP, including the service
+  inventory's `configctl service list` source and the note that certificate
+  private keys are never read.
+
+- **The in-app changelog skipped the entire 3.21 line.** `getChangelogEntries()`
+  stopped at 3.20.0, so the release that made the Health page work at all was
+  invisible in the UI. Added a 3.21.0 entry covering the agent 1.6.0 release and
+  the 1.6.1/1.6.2 fixes.
+
+- **`docs/UPGRADING.md` told operators to update agents to 1.6.0** for health
+  telemetry. That is the minimum that reports anything, but 1.6.0 always reported
+  zero gateways and 1.6.1 counted unconfigured services as stopped, so the
+  guidance now names 1.6.2 and says why.
+
+---
+
 ## Version 3.21.2
 **Released**: September 5, 2026 | **Agent**: v1.6.2
 

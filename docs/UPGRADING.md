@@ -124,9 +124,13 @@ Two things need doing by hand after upgrading:
 which configuration is correct. Go to *Config Drift*, open a firewall and choose a backup
 to promote. Firewalls without a baseline show as "No baseline" rather than as drifted.
 
-**Update agents to 1.6.0** for health telemetry. Older agents keep checking in exactly as
-before and simply report no health sections; the Health page shows them as "not reporting
-health" rather than inventing failures. Queue the update from the firewall's page, or:
+**Update agents to 1.6.2** for health telemetry. 1.6.0 is the minimum that reports any
+health at all, but take 1.6.2: 1.6.0 parsed the gateway status shape wrongly and always
+reported zero gateways, and 1.6.1 counted every service belonging to an installed package
+as configured, so unconfigured services showed as stopped. Older agents keep checking in
+exactly as before and simply report no health sections; the Health page shows them as "not
+reporting health" rather than inventing failures. Queue the update from the firewall's
+page, or:
 
 ```sql
 SELECT hostname, agent_version FROM firewalls ORDER BY agent_version;

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-05'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Actually Ships'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Documented At Last'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -41,6 +41,23 @@ define('JQUERY_VERSION', '3.7.1');
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
     return [
+        [
+            'version' => '3.21.0',
+            'date' => '2026-09-05',
+            'type' => 'minor',
+            'title' => 'Health Actually Ships',
+            'changes' => [
+                'ADDED: Agent 1.6.2 released, so the Firewall Health page finally reports. The health collector had sat in the plugin source since 3.17.0 with no tarball to carry it, and the newest published agent was 1.5.6 - so every firewall in the fleet read "Not reporting health - agent 1.5.6 (requires 1.6.0+)". The server side (health_ingest(), the gateway/VPN/service/certificate tables, firewall_health.php) was complete the whole time; only the package was missing',
+                'FIXED: The installer never copied health_collect.py. It installs scripts/*.sh, a glob that silently excludes the collector, so shipping 1.6.0 as-is would have upgraded every agent to a version whose get_health_json() finds no script, returns {}, and reports nothing - the same empty page with a higher version number. The installer now copies and chmods *.py and fails verification when the collector is absent',
+                'FIXED: Gateways always reported as zero. configctl interface gateways status returns a bare object keyed by gateway name, with no envelope; collect_gateways() looked only for an "items" or "gateways" key, found neither, and returned an empty list. It now falls back to any dict-shaped value while still accepting the enveloped and list shapes (agent 1.6.1)',
+                'FIXED: Services showed as stopped that were never configured. The collector treated a service as installed if /usr/local/etc/rc.d/<name> existed - true for anything an installed package ships - and hardcoded enabled=true, so the fleet test enabled=1 AND running=0 collapsed into "not running". An unconfigured openvpn, strongswan or radvd counted as stopped on a healthy firewall, and every newly enrolled firewall would have shown the same. The collector now reads configctl service list, which reports only what OPNsense actually has configured (agent 1.6.2)',
+                'FIXED: Multi-instance services (dpinger per gateway, wireguard per tunnel) are reported once per instance and are now merged, counting as up only when every instance is',
+                'FIXED: "~", how OPNsense writes an unmeasured field, was stored as a gateway address or monitor rather than as null',
+                'FIXED: watchdog.sh shipped in every released tarball but existed nowhere in plugin/, so packaging from source would have quietly dropped it from new installs',
+                'FIXED: downloads/plugins/install_opnmanager_agent.sh is now tracked. downloads/ was gitignored wholesale and that script is authored source with no other copy, so a fix to it lived on the release host and nowhere else',
+                'CHANGED: firewall_health.php renders AGENT_HEALTH_MIN_VERSION instead of two hardcoded "1.6.0" literals',
+            ],
+        ],
         [
             'version' => '3.20.0',
             'date' => '2026-08-31',
