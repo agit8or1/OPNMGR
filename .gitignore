@@ -108,7 +108,15 @@ __pycache__/
 *.tar
 *.rar
 *.7z
-downloads/
+
+# Release artifacts (tarballs, the signed manifest, AGENT_VERSION.txt) are built,
+# not authored, so they stay out of the repo. The plugin installer is the
+# exception: it is source that only lives here, and leaving it ignored meant a
+# fix to it survived on the release host and nowhere else.
+downloads/*
+!downloads/plugins/
+downloads/plugins/*
+!downloads/plugins/install_opnmanager_agent.sh
 
 # Screenshots and images (keep only assets/img/ and screenshots/)
 !screenshots/

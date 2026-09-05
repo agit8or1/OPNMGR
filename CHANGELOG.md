@@ -2,7 +2,54 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: August 31, 2026
+**Last Updated**: September 5, 2026
+
+---
+
+## Version 3.21.0
+**Released**: September 5, 2026 | **Agent**: v1.6.0
+
+### Added
+
+- **Agent 1.6.0 released — health telemetry actually ships.** The health
+  collector had been sitting in `plugin/.../health_collect.py` since 3.17.0 with
+  no tarball to carry it, so every firewall in the fleet reported the same thing:
+  "Not reporting health — agent 1.5.6 (requires 1.6.0+)". The server side was
+  complete the whole time (`health_ingest()`, the `firewall_gateways` /
+  `firewall_vpn_tunnels` / `firewall_services` / `firewall_certificates` tables,
+  `firewall_health.php`); only the package was missing.
+  `downloads/plugins/os-opnmanager-agent-1.6.0.tar.gz` is now built and published,
+  `AGENT_VERSION` and `downloads/AGENT_VERSION.txt` name it, and the release
+  manifest is re-signed, so agents pick it up on their next check-in through the
+  normal update path.
+
+### Fixed
+
+- **The installer never copied the health collector.** It installs
+  `opnsense/scripts/OPNsense/OPNManagerAgent/*.sh` — a glob that silently
+  excludes `health_collect.py`. Shipping the 1.6.0 tarball without fixing this
+  would have upgraded every agent to a version whose `get_health_json()` finds no
+  script, returns `{}`, and reports nothing: the same empty fleet view, now with
+  a higher version number on it. The installer copies and chmods `*.py`, and the
+  post-install verification fails loudly when `health_collect.py` is absent.
+
+- **`watchdog.sh` was missing from the plugin source tree.** It shipped in every
+  released tarball up to 1.5.6 but existed nowhere in `plugin/`, so packaging
+  from source would have quietly dropped it from new installs. Restored from the
+  1.5.6 artifact; a stale `__pycache__/` directory that would have been packaged
+  alongside it is excluded.
+
+- **The plugin installer was gitignored.** `downloads/` was ignored wholesale, and
+  `install_opnmanager_agent.sh` is the only copy of that script — authored source,
+  not a build product — so the fix above would have lived on the release host and
+  nowhere else, and a fresh clone would have had no installer at all. `.gitignore`
+  now excludes the built artifacts (tarballs, `manifest.json`,
+  `AGENT_VERSION.txt`) while tracking the installer.
+
+- **The 1.6.0 health gate is no longer a magic literal.** `firewall_health.php`
+  hardcoded "requires 1.6.0+" in two places, unconnected to the agent version the
+  rest of the application reasons about. Both now render
+  `AGENT_HEALTH_MIN_VERSION`.
 
 ---
 

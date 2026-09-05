@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-08-31'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One Way To Queue A Command'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-05'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Actually Ships'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,9 +20,14 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One Way To Queue
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.5.6'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-02-09'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.0'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-05'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
+
+// First agent release that collects OPNsense health telemetry (gateways, VPN,
+// CARP, services, certificates). Firewalls below this report no health sections
+// and are shown as "not reporting" rather than as a wall of false failures.
+if (!defined('AGENT_HEALTH_MIN_VERSION')) { define('AGENT_HEALTH_MIN_VERSION', '1.6.0'); }
 
 if (!defined('DATABASE_VERSION')) { define('DATABASE_VERSION', '1.4.0'); }
 if (!defined('API_VERSION')) { define('API_VERSION', '1.1.0'); }

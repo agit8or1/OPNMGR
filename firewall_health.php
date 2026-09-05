@@ -6,8 +6,8 @@
  * services and certificate expiry.
  *
  * Only what an agent actually reported is shown. A firewall running an agent
- * older than 1.6.0 reports no health sections and appears as "not reporting"
- * rather than as a wall of false failures.
+ * older than AGENT_HEALTH_MIN_VERSION reports no health sections and appears as
+ * "not reporting" rather than as a wall of false failures.
  */
 
 require_once __DIR__ . '/inc/bootstrap.php';
@@ -263,7 +263,7 @@ include __DIR__ . '/inc/header.php';
                             <td colspan="5" class="small text-muted">
                                 Not reporting health &mdash; agent
                                 <?php echo htmlspecialchars($row['agent_version'] ?: 'unknown'); ?>
-                                (requires 1.6.0+)
+                                (requires <?php echo htmlspecialchars(AGENT_HEALTH_MIN_VERSION); ?>+)
                             </td>
                         <?php else: ?>
                             <td class="small">
@@ -325,7 +325,8 @@ include __DIR__ . '/inc/header.php';
         <div class="card-body">
             <?php if (!$h['gateways'] && !$h['vpn'] && !$h['services'] && !$h['certificates'] && !$h['carp']): ?>
                 <p class="text-muted mb-0">
-                    This firewall has not reported health telemetry. It requires agent 1.6.0 or later
+                    This firewall has not reported health telemetry. It requires agent
+                    <?php echo htmlspecialchars(AGENT_HEALTH_MIN_VERSION); ?> or later
                     (currently <?php echo htmlspecialchars($detail['firewall']['agent_version'] ?: 'unknown'); ?>).
                 </p>
             <?php endif; ?>
