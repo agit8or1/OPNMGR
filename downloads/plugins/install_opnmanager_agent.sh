@@ -3,8 +3,8 @@
 # OPNManager Agent Plugin Installer
 # Downloads and installs the OPNManager agent plugin for OPNsense
 
-PLUGIN_URL="https://opn.agit8or.net/downloads/plugins/os-opnmanager-agent-1.6.0.tar.gz"
-PLUGIN_VERSION="1.6.0"
+PLUGIN_URL="https://opn.agit8or.net/downloads/plugins/os-opnmanager-agent-1.6.1.tar.gz"
+PLUGIN_VERSION="1.6.1"
 INSTALL_DIR="/usr/local"
 
 echo "=========================================="

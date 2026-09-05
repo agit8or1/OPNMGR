@@ -6,6 +6,28 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.21.1
+**Released**: September 5, 2026 | **Agent**: v1.6.1
+
+### Fixed
+
+- **The gateway health section was always empty.** With 1.6.0 deployed, VPN
+  tunnels, services and certificates all reported, but every firewall showed no
+  gateways at all. `configctl interface gateways status` returns the gateways as
+  a bare object keyed by gateway name — `{"WAN_DHCP": {...}, "WAN_DHCP6": {...}}`
+  — with no envelope, and `collect_gateways()` only looked for `items` or
+  `gateways` keys, so it found neither and returned an empty list. It now falls
+  back to treating any dict-shaped value as a gateway, while still accepting the
+  enveloped and list shapes.
+
+- **`~` was stored as a gateway address.** OPNsense writes `~` for a field it did
+  not measure (an IPv6 gateway with no monitor reports `"address":"~"`,
+  `"delay":"~"`). The numeric fields already ignored it by accident, but the text
+  fields did not, so `~` was persisted and rendered as if it were an address.
+  Unmeasured fields are now null.
+
+---
+
 ## Version 3.21.0
 **Released**: September 5, 2026 | **Agent**: v1.6.0
 

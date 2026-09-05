@@ -81,6 +81,11 @@ def collect_gateways():
         items = data.get("items") or data.get("gateways") or []
         if isinstance(items, dict):
             items = list(items.values())
+        # OPNsense returns the gateways as a bare object keyed by gateway name -
+        # {"WAN_DHCP": {...}, "WAN_DHCP6": {...}} - with no envelope at all. Any
+        # dict-shaped value is a gateway; scalar keys are envelope metadata.
+        if not items:
+            items = [v for v in data.values() if isinstance(v, dict)]
     elif isinstance(data, list):
         items = data
 
@@ -88,23 +93,32 @@ def collect_gateways():
         if not isinstance(item, dict):
             continue
 
-        def num(value):
-            """'12.3ms' / '0.0 %' / '' -> float or None."""
+        def text(value):
+            """Field value or None. '~' is how OPNsense writes 'not measured'."""
             if value is None:
                 return None
-            match = re.search(r"[-+]?\d*\.?\d+", str(value))
+            value = str(value).strip()
+            return value if value and value != "~" else None
+
+        def num(value):
+            """'12.3ms' / '0.0 %' / '~' / '' -> float or None."""
+            value = text(value)
+            if value is None:
+                return None
+            match = re.search(r"[-+]?\d*\.?\d+", value)
             return float(match.group(0)) if match else None
 
-        name = item.get("name") or item.get("gateway_name")
+        name = text(item.get("name")) or text(item.get("gateway_name"))
         if not name:
             continue
 
+        status = text(item.get("status_translated")) or text(item.get("status"))
         rows.append({
-            "name": str(name)[:64],
-            "interface": str(item.get("interface") or "")[:64] or None,
-            "address": str(item.get("address") or item.get("gateway") or "")[:45] or None,
-            "monitor": str(item.get("monitor") or "")[:45] or None,
-            "status": str(item.get("status_translated") or item.get("status") or "unknown")[:32].lower(),
+            "name": name[:64],
+            "interface": (text(item.get("interface")) or "")[:64] or None,
+            "address": (text(item.get("address")) or text(item.get("gateway")) or "")[:45] or None,
+            "monitor": (text(item.get("monitor")) or "")[:45] or None,
+            "status": (status or "unknown")[:32].lower(),
             "latency_ms": num(item.get("delay")),
             "stddev_ms": num(item.get("stddev")),
             "loss_percent": num(item.get("loss")),
