@@ -123,10 +123,20 @@ downloads/plugins/*
 # README and docs/SCREENSHOTS.md embed them and they must render on GitHub.
 *.gif
 *.mp4
-!docs/images/github/*.gif
+*.webm
+*.mov
 
-# The walkthrough MP4 is a release asset, not a repository file: it regenerates
-# from scripts/record_demo_walkthrough.js and does not need to sit in history.
+# Capture working files. Raw recordings, generated demo configuration backups and
+# any browser auth state stay out of the repository: the media is republished as
+# release assets, and the rest regenerates from scripts/demo_fixture.php.
+opnmgr-demo-media/
+demo-backups/
+*.raw.webm
+walkthrough.raw.*
+screenshots-raw/
+.auth/
+storageState*.json
+playwright/.auth/
 
 # Test and development files
 test_*
