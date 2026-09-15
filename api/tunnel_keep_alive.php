@@ -67,7 +67,12 @@ try {
             'success' => false,
             'message' => 'Agent version outdated, restart required',
             'agent_restart_required' => true,
-            'restart_command' => 'pkill -f tunnel_agent; fetch -o /tmp/new_agent.sh https://opn.agit8or.net/download/tunnel_agent.sh && chmod +x /tmp/new_agent.sh && /tmp/new_agent.sh &'
+            // /download/tunnel_agent.sh was a path that has never existed on
+            // this server; the file is served from /downloads/. Combined with
+            // the hardcoded host, this restart command could not work anywhere.
+            'restart_command' => 'pkill -f tunnel_agent; fetch -o /tmp/new_agent.sh '
+                . escapeshellarg(opnmgr_server_url() . '/downloads/tunnel_agent.sh')
+                . ' && chmod +x /tmp/new_agent.sh && /tmp/new_agent.sh &'
         ];
     }
 

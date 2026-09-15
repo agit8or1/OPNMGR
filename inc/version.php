@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-15'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Front Door'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Own Address'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,23 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.30.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Your Own Address',
+            'changes' => [
+                'FIXED: 38 files carried the maintainer\'s own hostname and public IP as literals, so a self-hosted install pointed its customers\' firewalls at a server its operator does not control. All of it now resolves through inc/server_identity.php, from the server_url setting, APP_URL, manager_fqdn or config/instance.json',
+                'FIXED: The enrolment script appended a hardcoded SSH public key to root\'s authorized_keys on every firewall it enrolled - and not a dedicated key, but the per-firewall key generated for firewall 21 on one installation. Every deployment authorised a key its operator does not hold for root on its customers\' firewalls. inc/enrollment_key.php generates this installation\'s own key on first use and enrolment refuses without it',
+                'FIXED: The agent download URL, the tunnel proxy URLs, the nginx tunnel certificate paths and server_name, the tunnel health check\'s certificate paths, and the "allow SSH from the manager" rule built by auto-onboarding and setup_permanent_ssh_rule.php were all wrong on any install but one',
+                'FIXED: api/get_map_locations.php labelled the management server with a literal hostname, ssh_access_instructions.php told operators to permit a third party\'s IP through their firewall and trust its SSH key, and api/ai_scan.php told the model that the maintainer\'s IP is a trusted SSH source',
+                'CHANGED: downloads/plugins/install_opnmanager_agent.sh takes OPNMGR_BASE_URL from whoever emits the install command, since a script served as a static file cannot know which host fetched it. It refuses rather than guessing',
+                'FIXED: api/tunnel_keep_alive.php pointed at /download/tunnel_agent.sh; the file is served from /downloads/. Combined with the hardcoded host, the restart command could not work anywhere',
+                'REMOVED: agent_checkin.php queued a reverse-tunnel setup command on every check-in from a firewall with no tunnel. It fetched setup_reverse_proxy.sh, which has never existed here, and piped the resulting error page into sh on the firewall',
+                'CHANGED: Real hostnames and IPs in CHANGELOG.md and the in-app changelog replaced with documentation placeholders. They remain in Git history, which has not been rewritten',
+                'ADDED: tests/server_identity_test.php fails if any installation-specific host, IP or SSH key reappears in a tracked file, and covers the resolver\'s precedence and its unconfigured case',
+            ],
+        ],
         [
             'version' => '3.29.0',
             'date' => '2026-09-15',
@@ -181,7 +198,7 @@ function getChangelogEntries($limit = 10) {
                 'ADDED: cron/prune_backups.php reports by default and deletes only with --apply, with --days= and --floor= overrides',
                 'CHANGED: The backup retention dialog now asks for a window in days and a minimum to keep, replacing the two-mode months/count form whose values were never applied',
                 'CHANGED: Migration 0014 removes the superseded months/count settings, carrying an existing time-based policy across as months x 30',
-                'FIXED: A reboot was redelivered on every check-in, turning one reboot request into a reboot loop. checkQueuedCommands() resets any command left in \'sent\' for ten minutes back to \'pending\', assuming no result means the agent never received it. A reboot can never report a result - the firewall stops executing partway through the command - so it was reset and handed back to the box the moment it finished booting. Observed on home.agit8or.net: command 8017 (/sbin/reboot) was queued at 12:28:01 and had already been redelivered at 12:39:25',
+                'FIXED: A reboot was redelivered on every check-in, turning one reboot request into a reboot loop. checkQueuedCommands() resets any command left in \'sent\' for ten minutes back to \'pending\', assuming no result means the agent never received it. A reboot can never report a result - the firewall stops executing partway through the command - so it was reset and handed back to the box the moment it finished booting. Observed on fw-chi-edge02.northwind.example: command 8017 (/sbin/reboot) was queued at 12:28:01 and had already been redelivered at 12:39:25',
                 'FIXED: Commands that take the firewall down (/sbin/reboot, /sbin/halt, /sbin/poweroff, shutdown -r/-h/-p) are now settled as completed when they time out, and excluded from the stuck-command reset in both the general and update-agent paths. A missing result is recorded as the expected outcome rather than read as a delivery failure',
                 'ADDED: settle_unacknowledgeable_commands() in inc/agent_commands.php with tests/agent_command_retry_test.php',
             ],
@@ -202,7 +219,7 @@ function getChangelogEntries($limit = 10) {
             'type' => 'patch',
             'title' => 'Reboot State Measured, Not Guessed',
             'changes' => [
-                'FIXED: reboot_required was never measured. The agent has never reported a reboot flag, so agent_checkin.php preserves the stored value on every check-in and the column was writable only by code that inferred it. fw.agit8or.net asserted "reboot required" continuously from 2026-03-04 across many actual reboots, while home.agit8or.net reported no reboot needed immediately after installing a base and kernel it had not booted into. It is now derived by comparing estimated boot time against the completion of the last update known to have installed successfully',
+                'FIXED: reboot_required was never measured. The agent has never reported a reboot flag, so agent_checkin.php preserves the stored value on every check-in and the column was writable only by code that inferred it. fw-chi-edge01.northwind.example asserted "reboot required" continuously from 2026-03-04 across many actual reboots, while fw-chi-edge02.northwind.example reported no reboot needed immediately after installing a base and kernel it had not booted into. It is now derived by comparing estimated boot time against the completion of the last update known to have installed successfully',
                 'FIXED: An unreadable uptime no longer clears a real pending reboot. The parser returns null rather than zero for Unknown/empty/unrecognised values, and an indeterminate state leaves the stored value untouched',
                 'FIXED: A failed update is no longer counted as installed. The agent reports every command as completed regardless of outcome, so the derivation requires the OPNMGR_UPDATE_EXIT=0 marker rather than trusting command status',
                 'ADDED: inc/reboot_state.php with tests/reboot_state_test.php (22 assertions), wired into CI',
@@ -480,7 +497,7 @@ function getChangelogEntries($limit = 10) {
                 'FIXED: Redirect handler (line 414) now uses correct protocol',
                 'FIXED: Initial curl_init (line 122) protocol detection',
                 'FIXED: Duplicate SSH tunnel process prevention',
-                'FIXED: Agent stability on home.agit8or.net (FW 48)',
+                'FIXED: Agent stability on fw-chi-edge02.northwind.example (FW 48)',
                 'UPDATED: tunnel_proxy.php to v2.0.2',
                 'UPDATED: Version management - APP_VERSION now reads from VERSION file',
                 'IMPROVED: All version numbers now centralized and non-hardcoded'

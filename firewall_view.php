@@ -316,6 +316,10 @@ include __DIR__ . '/inc/header.php';
 
 <script>
 const firewallId = <?php echo $firewall['id']; ?>;
+// This installation's own address. The uninstall command below used to carry
+// the maintainer's hostname, so an operator copying it would have had their
+// firewall fetch and execute a script from a server they do not control.
+const managerBaseUrl = <?php echo json_encode(opnmgr_server_url()); ?>;
 const csrfToken = '<?php echo csrf_token(); ?>';
 
 function toggleEditMode() {
@@ -324,7 +328,7 @@ function toggleEditMode() {
 
 function uninstallAgent() {
     if (confirm("Are you sure you want to uninstall the agent? This will stop monitoring but keep the firewall entry in the system.")) {
-        const uninstallCommand = `curl -k -s https://opn.agit8or.net/uninstall_agent.php?firewall_id=${firewallId} | sh`;
+        const uninstallCommand = `curl -k -s ${managerBaseUrl}/uninstall_agent.php?firewall_id=${firewallId} | sh`;
         
         // Show the command to the user
         const modal = document.createElement("div");

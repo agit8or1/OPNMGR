@@ -19,7 +19,7 @@ try {
     $server_location = [
         'type' => 'server',
         'name' => 'Management Server',
-        'hostname' => 'opn.agit8or.net',
+        'hostname' => opnmgr_server_host() ?: 'Management Server',
         'latitude' => $server_geoip ? $server_geoip['latitude'] : 39.0997,
         'longitude' => $server_geoip ? $server_geoip['longitude'] : -94.5786,
         'city' => $server_geoip['city'] ?? '',

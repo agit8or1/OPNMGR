@@ -168,6 +168,10 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+// This installation's own hostname. The probe below used to fetch the
+// maintainer's host on the operator's proxy port, so the "connection test"
+// reported on somebody else's server rather than this one.
+const managerHost = <?php echo json_encode(opnmgr_server_host()); ?>;
 function appendResult(message) {
     const results = document.getElementById('test-results');
     results.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
@@ -226,7 +230,7 @@ document.querySelectorAll('.test-connection').forEach(button => {
         appendResult(`Testing connection to ${target} via proxy port ${port}...`);
         
         // Test if we can reach the proxy port
-        fetch(`https://opn.agit8or.net:${port}`, {
+        fetch(`https://${managerHost}:${port}`, {
             method: 'HEAD',
             mode: 'no-cors'
         })

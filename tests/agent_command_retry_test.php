@@ -6,7 +6,7 @@
  * for ten minutes back to 'pending', which is right for a command whose result
  * went missing and catastrophically wrong for a reboot, whose result can never
  * arrive because the box stops executing partway through. That reset handed
- * home.agit8or.net its own reboot again on every check-in.
+ * fw-chi-edge02.northwind.example its own reboot again on every check-in.
  *
  * Run with: php tests/agent_command_retry_test.php
  * Creates and removes its own fixtures.

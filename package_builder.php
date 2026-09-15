@@ -360,7 +360,7 @@ if (is_dir($packages_dir)) {
             </ul>
             <p class="mb-0">
                 <strong>Note:</strong> Deployed servers will use IP addresses until FQDN and ACME SSL are configured.
-                They will check in with opn.agit8or.net every 4 hours for updates and licensing.
+                They check in with this manager at the address configured in Settings.
             </p>
         </div>
         

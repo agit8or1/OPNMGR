@@ -179,6 +179,12 @@ jobs:
       - name: Firewall policy suite
         run: php tests/firewall_policy_test.php
 
+      # No installation-specific host, IP or SSH key may be compiled in. Over
+      # thirty files carried the maintainer's own, which pointed a self-hosted
+      # deployment's firewalls at a server its operator does not control.
+      - name: Server identity suite
+        run: php tests/server_identity_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

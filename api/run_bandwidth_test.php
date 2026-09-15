@@ -65,7 +65,7 @@ try {
     $test_id = db()->lastInsertId();
     
     // Queue agent command to run iperf3 bandwidth test
-    // The agent's run_speedtest function will use iperf3 to test to opn.agit8or.net
+    // The agent's run_speedtest function will use iperf3 to test to this manager
     // Results are returned via agent check-in and recorded in bandwidth_tests table
 
     // Queue command for agent to run built-in speedtest (uses iperf3)

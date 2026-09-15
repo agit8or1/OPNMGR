@@ -201,7 +201,7 @@ curl_setopt_array($ch, [
     CURLOPT_SSL_VERIFYPEER => false,
     CURLOPT_SSL_VERIFYHOST => false,
     // NOTE: NOT using CURLOPT_COOKIEJAR/CURLOPT_COOKIEFILE because of domain mismatch
-    // We manually handle cookies in headers to avoid domain issues (127.0.0.1 vs home.agit8or.net)
+    // We manually handle cookies in headers to avoid domain issues (127.0.0.1 vs the firewall's own hostname)
     
     // Forward request method (but convert HEAD to GET since we need to process the body)
     CURLOPT_CUSTOMREQUEST => ($_SERVER['REQUEST_METHOD'] === 'HEAD' ? 'GET' : $_SERVER['REQUEST_METHOD']),
@@ -330,7 +330,7 @@ if (isset($_SERVER['HTTP_USER_AGENT'])) {
 }
 
 // Manually read and forward cookies from cookie jar
-// This fixes the domain mismatch issue where cookies are for "home.agit8or.net"
+// This fixes the domain mismatch issue where cookies are issued for the firewall's own hostname
 // but curl connects to "127.0.0.1" and won't send them automatically
 if (file_exists($cookie_jar)) {
     $cookie_lines = file($cookie_jar, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -619,7 +619,7 @@ if (empty($content_type) && strlen($response_body) > 100 && stripos($response_bo
 
 if ($is_html || $is_css || $is_js) {
     // Rewrite URLs to go through proxy
-    $proxy_url = "https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&path=";
+    $proxy_url = opnmgr_server_url() . "/tunnel_proxy.php?session={$session_id}&path=";
     
     // Replace various URL patterns (href, src, action attributes)
     // ONLY for HTML - do NOT run on JavaScript as it corrupts template literals
@@ -1013,7 +1013,7 @@ SCRIPT;
 
 // Send response headers (but skip certain headers if we modified the content)
 $content_was_modified = $is_html || $is_css || $is_js;  // Modify HTML, CSS, and JS files
-$proxy_url = "https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&path=";
+$proxy_url = opnmgr_server_url() . "/tunnel_proxy.php?session={$session_id}&path=";
 
 foreach ($response_headers as $header) {
     $header_lower = strtolower($header);

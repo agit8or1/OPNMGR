@@ -393,40 +393,7 @@ if (!function_exists('record_backup_failure')) {
     }
 }
 
-if (!function_exists('opnmgr_server_url')) {
-    /**
-     * Base URL agents should call back to.
-     *
-     * Read from the server_url setting, then APP_URL in .env. The literal
-     * https://opn.agit8or.net that used to be compiled into every queued
-     * command is only a last-resort fallback so existing installs keep working.
-     */
-    function opnmgr_server_url(): string {
-        static $url = null;
-        if ($url !== null) {
-            return $url;
-        }
-
-        $candidate = '';
-        try {
-            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
-            $stmt->execute(['server_url']);
-            $candidate = (string)($stmt->fetchColumn() ?: '');
-        } catch (Throwable $e) {
-            // fall through
-        }
-
-        if ($candidate === '') {
-            $candidate = (string)(getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? ''));
-        }
-        if ($candidate === '' || !filter_var($candidate, FILTER_VALIDATE_URL)) {
-            $candidate = 'https://opn.agit8or.net';
-        }
-
-        $url = rtrim($candidate, '/');
-        return $url;
-    }
-}
+require_once __DIR__ . '/server_identity.php';
 
 if (!function_exists('build_backup_upload_command')) {
     /**

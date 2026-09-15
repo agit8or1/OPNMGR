@@ -276,7 +276,10 @@ if ($atRisk) {
 if ($broken) {
     echo "\nTo repair a broken install, reinstall the agent - the rebuilt v1.5.6\n";
     echo "package now contains the etc/ tree:\n";
-    echo "  fetch -o - https://opn.agit8or.net/downloads/plugins/install_opnmanager_agent.sh | sh\n";
+    $installer = opnmgr_agent_download_url();
+    echo $installer === ''
+        ? "  (set the server_url setting or APP_URL in .env first)\n"
+        : '  fetch -o - ' . $installer . ' | env OPNMGR_BASE_URL=' . opnmgr_server_url() . " sh\n";
     exit(1);
 }
 

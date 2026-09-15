@@ -9,6 +9,7 @@ require_once __DIR__ . '/../inc/ai_redaction.php';
 
 header('Content-Type: application/json');
 require_once '../inc/agent_version.php';
+require_once __DIR__ . '/../inc/firewall_policy.php';
 
 
 require_once __DIR__ . '/../inc/secrets.php';
@@ -439,7 +440,12 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
 
     $prompt .= "**WHAT TO FLAG vs WHAT NOT TO FLAG**:\n";
     $prompt .= "FLAG: SSH open to 0.0.0.0/0 or 'any' source = CRITICAL ISSUE\n";
-    $prompt .= "DO NOT FLAG: SSH restricted to 184.175.206.229 or other specific IPs = SECURE\n";
+    // The manager's own address, not a literal: a scan on any other install
+    // was being told that the maintainer's IP is a trusted SSH source.
+    $manager_ip = opnmgr_manager_address();
+    $prompt .= $manager_ip !== ''
+        ? "DO NOT FLAG: SSH restricted to {$manager_ip} (this manager) or other specific IPs = SECURE\n"
+        : "DO NOT FLAG: SSH restricted to specific IPs = SECURE\n";
     $prompt .= "FLAG: Web interface open to internet without source restrictions = HIGH RISK\n";
     $prompt .= "DO NOT FLAG: Web interface restricted to LAN or specific management IPs = SECURE\n\n";
 

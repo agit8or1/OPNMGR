@@ -723,7 +723,7 @@ function generateDocumentationContent() {
         </ol>
 
         <div class="alert">
-            <strong>📋 Update Policy:</strong> Updates are distributed from the main server (opn.agit8or.net) and must be applied sequentially to maintain system integrity.
+            <strong>📋 Update Policy:</strong> Updates are distributed from this manager and must be applied sequentially to maintain system integrity.
         </div>
     </div>
 

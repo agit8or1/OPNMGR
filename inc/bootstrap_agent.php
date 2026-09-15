@@ -44,6 +44,9 @@ require_once __DIR__ . '/version.php';
 // Audit trail helpers (audit_log / audit_log_agent)
 require_once __DIR__ . '/audit.php';
 
+// Where this installation lives (opnmgr_server_url / opnmgr_server_host)
+require_once __DIR__ . '/server_identity.php';
+
 // ---------------------------------------------------------------------------
 // 4. Lazy database connection singleton
 // ---------------------------------------------------------------------------

@@ -113,6 +113,11 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/permissions.php';
 
 // ---------------------------------------------------------------------------
+// 6c. Where this installation lives (opnmgr_server_url / opnmgr_server_host)
+// ---------------------------------------------------------------------------
+require_once __DIR__ . '/server_identity.php';
+
+// ---------------------------------------------------------------------------
 // 7. CSRF helpers
 // ---------------------------------------------------------------------------
 require_once __DIR__ . '/csrf.php';

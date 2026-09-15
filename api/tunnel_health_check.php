@@ -14,10 +14,19 @@ $response = [
     'errors' => []
 ];
 
-// Check 1: SSL Certificates exist and are readable
-$ssl_paths = [
-    '/etc/letsencrypt/live/opn.agit8or.net/fullchain.pem',
-    '/etc/letsencrypt/live/opn.agit8or.net/privkey.pem'
+// Check 1: SSL Certificates exist and are readable. The certificate directory
+// is named after this installation's own hostname; it used to be the
+// maintainer's, so every other install reported a missing certificate here no
+// matter how its TLS was actually set up.
+$manager_host = opnmgr_server_host();
+if ($manager_host === '') {
+    $response['healthy'] = false;
+    $response['errors'][] = "This manager's URL is not configured, so its certificate "
+                          . 'path cannot be determined. Set the server_url setting or APP_URL in .env.';
+}
+$ssl_paths = $manager_host === '' ? [] : [
+    "/etc/letsencrypt/live/{$manager_host}/fullchain.pem",
+    "/etc/letsencrypt/live/{$manager_host}/privkey.pem"
 ];
 
 $ssl_found = true;

@@ -11,7 +11,9 @@ if (file_exists(__DIR__ . '/config/instance.json')) {
 
 $customer_name = $instance_config['customer_name'] ?? 'Unknown Customer';
 $instance_id = $instance_config['instance_id'] ?? 'unknown';
-$main_server = $instance_config['main_server'] ?? 'opn.agit8or.net';
+// ?: not ??: instance.json ships main_server as an empty string, and an empty
+// string is not null, so ?? would have handed the page a blank server name.
+$main_server = ($instance_config['main_server'] ?? '') ?: opnmgr_server_host();
 
 // Handle update actions
 $message = '';

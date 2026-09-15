@@ -7,9 +7,28 @@
 // (1.6.0 vs 1.5.6), so update inc/version.php - never redefine the value here.
 
 require_once __DIR__ . '/version.php';
+require_once __DIR__ . '/server_identity.php';
 
 if (!defined('LATEST_AGENT_VERSION')) { define('LATEST_AGENT_VERSION', AGENT_VERSION); }
-if (!defined('AGENT_DOWNLOAD_URL')) { define('AGENT_DOWNLOAD_URL', 'https://opn.agit8or.net/downloads/plugins/install_opnmanager_agent.sh'); }
+
+if (!function_exists('opnmgr_agent_download_url')) {
+    /**
+     * Where a firewall fetches the agent installer from.
+     *
+     * This was the constant AGENT_DOWNLOAD_URL, hardcoded to the maintainer's
+     * own host, so every self-hosted install would have told its firewalls to
+     * download the agent from a third party. It is a function now because the
+     * answer depends on configuration that is not loaded yet at include time.
+     *
+     * Returns '' when this installation's URL is not configured; callers must
+     * report that rather than emitting a broken command.
+     */
+    function opnmgr_agent_download_url(): string
+    {
+        $base = opnmgr_server_url();
+        return $base === '' ? '' : $base . '/downloads/plugins/install_opnmanager_agent.sh';
+    }
+}
 
 /**
  * Compare two semantic version strings

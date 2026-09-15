@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/server_identity.php';
 /**
  * OPNMGR Agent Authentication
  *
@@ -522,7 +523,15 @@ if (!function_exists('buildAgentReinstallCommand')) {
         // header, but strip anything that is not host-safe as a belt-and-braces
         // guard against it ever being used to inject shell metacharacters.
         $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', $serverHost);
-        $host = $host !== '' ? $host : 'opn.agit8or.net';
+        if ($host === '') {
+            $host = opnmgr_server_host();
+        }
+        if ($host === '') {
+            throw new RuntimeException(
+                "This manager's URL is not configured, so an agent reinstall command "
+                . 'cannot be built. Set the server_url setting or APP_URL in .env.'
+            );
+        }
 
         return sprintf(
             'HW=$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null); '

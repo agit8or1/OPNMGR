@@ -6,6 +6,99 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.30.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+> **Upgrading**: nothing to migrate. On first enrolment after this release the
+> manager generates its own SSH enrolment key under `/etc/opnmgr/keys/`; that
+> directory must be writable by the web user. Firewalls already enrolled are
+> unaffected — they are managed with per-firewall keys, which this does not touch.
+
+### Fixed
+
+- **This installation's own address is no longer somebody else's.** 38 tracked files
+  carried the maintainer's hostname and public IP as literals. They were not all
+  cosmetic. A self-hosted deployment would have:
+
+  - told its firewalls to download and execute the agent installer from a third
+    party's server (`inc/agent_version.php`, `agent_checkin.php`, `api/ssh_install_agent.php`);
+  - opened each onboarded firewall's WAN SSH port to a third party's IP rather than
+    to the manager doing the onboarding (`api/auto_onboard_firewall.php`,
+    `scripts/setup_permanent_ssh_rule.php`);
+  - looked for its TLS certificate in `/etc/letsencrypt/live/<someone else's domain>/`
+    and reported it missing however its TLS was actually configured
+    (`api/tunnel_health_check.php`, `scripts/manage_nginx_tunnel_proxy.php`, which also
+    emitted an nginx `server_name` for a domain the operator does not own);
+  - handed operators a tunnel URL, an uninstall command and a connection-test probe
+    aimed at a host they do not run (`tunnel_proxy.php`, `start_tunnel_async.php`,
+    `tunnel_direct.php`, `firewall_view.php`, `diagnostics.php`);
+  - told the AI security scan that a specific third-party IP is a trusted SSH source
+    (`api/ai_scan.php`).
+
+  Everything resolves through the new `inc/server_identity.php`, in order: the
+  `server_url` setting, `APP_URL` in `.env`, the `manager_fqdn` setting,
+  `main_server` in `config/instance.json`, then the host of the request being served.
+  There is no compiled-in fallback. When nothing is configured the helpers return an
+  empty string and each caller reports that rather than emitting a URL pointing
+  somewhere wrong.
+
+- **The enrolment script authorised a key the operator does not hold.** `simple_enroll.sh`
+  appended a hardcoded `ssh-ed25519` public key to `/root/.ssh/authorized_keys` on every
+  firewall it enrolled. It was not even a dedicated enrolment key: it was the
+  per-firewall key generated for firewall 21 on one installation. So every other
+  deployment granted root SSH on its customers' firewalls to a key belonging to
+  someone else, and every firewall enrolled by a single installation trusted a key
+  minted for a different firewall.
+
+  `inc/enrollment_key.php` generates this installation's own ed25519 key on first use,
+  outside the document root, and `api/get_enroll_script.php` substitutes it when serving
+  the script — refusing to serve at all if it cannot be produced. Nothing depended on
+  the old key: per-firewall keys are generated after enrolment and deployed through the
+  agent, never over SSH with the enrolment key.
+
+- **`api/tunnel_keep_alive.php`** fetched the agent from `/download/tunnel_agent.sh`.
+  The file is served from `/downloads/`. Together with the hardcoded host, that restart
+  command could not have worked on any installation.
+
+- **`api/repair_agent_ssh.php` and `cleanup_agents.php`** downloaded the agent from
+  `download_tunnel_agent.php`, an endpoint that has never existed in this codebase. Both
+  now use this installation's address and abort on a failed download instead of running
+  whatever came back.
+
+### Changed
+
+- **`downloads/plugins/install_opnmanager_agent.sh` takes `OPNMGR_BASE_URL`** from
+  whoever emits the install command. A script served as a static file cannot know which
+  host fetched it, so it is passed in; the script exits with an explanation rather than
+  guessing. The command shown in Settings, the one `agent_checkin.php` hands to agents,
+  and the SSH installer all set it.
+
+- **`config/instance.json` no longer ships a `main_server`.** It is a template; a real
+  hostname in it was a fallback that silently pointed installations at the wrong server.
+
+- **Real hostnames and IPs in `CHANGELOG.md` and the in-app changelog** replaced with
+  documentation placeholders (RFC 5737 addresses, `.example` hostnames). Entries that
+  contrast two firewalls still read correctly because each maps to a distinct
+  placeholder. **These values remain in Git history**, which has not been rewritten.
+
+### Removed
+
+- **Reverse-tunnel auto-setup in `agent_checkin.php`.** On every check-in from a firewall
+  whose tunnel had never been established, it queued a command that fetched
+  `setup_reverse_proxy.sh` and piped the result into `sh`. That script has never existed
+  in this repository or on the server, so the firewall downloaded an error page and
+  executed it, and the command queue filled with work that could only fail. Tunnels are
+  established on demand through `manage_ssh_tunnel.php`, which is what the UI uses.
+
+### Added
+
+- **`tests/server_identity_test.php`** (19 assertions, in CI). Fails if any
+  installation-specific host, IP or SSH public key reappears in a tracked file, and
+  covers the resolver's precedence, bare hosts, malformed input, and the unconfigured
+  case callers must handle. Verified to fail against the pre-fix tree.
+
+---
+
 ## Version 3.29.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 
@@ -159,7 +252,7 @@ Apply to one firewall you can reach out-of-band before using either across a fle
   enrollment token, and serves it to a firewall. A `simple_*.sh` rule in `.gitignore`
   excluded it, so a clone served an **empty** script.
 
-  Worse, the script hardcoded `MGMT_SERVER_IP="184.175.206.229"` and used it to add a
+  Worse, the script hardcoded `MGMT_SERVER_IP="198.51.100.10"` and used it to add a
   firewall rule permitting SSH to that address. Published as-is, every other
   self-hosted deployment would have opened SSH on its customers' firewalls to somebody
   else's server, while its own manager still could not reach them. The address is now
@@ -739,7 +832,7 @@ Two dead-looking endpoints were deliberately left in place:
 - **Documented that the agent installer fetches its package from the project's
   distribution host.** The one-liner the UI generates is correctly built from the
   operator's own hostname, but `install_opnmanager_agent.sh` has `PLUGIN_URL`
-  hardcoded to `opn.agit8or.net`, so a self-hosted installation does not currently
+  hardcoded to `manager.example`, so a self-hosted installation does not currently
   serve its own agent tarball. Calling a product self-hosted while quietly relying
   on someone else's host is the kind of claim this release is meant to stop making.
   The README now says so and explains how to mirror the package.
@@ -1049,7 +1142,7 @@ Two dead-looking endpoints were deliberately left in place:
 
   ```sh
   curl -k -X POST -F "backup=@$BACKUP_FILE" -F "firewall_id=NN" \
-       https://opn.agit8or.net/api/upload_backup.php
+       https://manager.example/api/upload_backup.php
   ```
 
   That carries no agent credentials, and `api/upload_backup.php` has required
@@ -1121,9 +1214,9 @@ Two dead-looking endpoints were deliberately left in place:
 
 - **Health scores no longer cancel themselves out.** Both firewalls in the fleet
   graded A+ 88/100 despite one having a pending system update. The old weighting
-  gave Updates 20 points and Uptime 15, so `fw.agit8or.net` lost 10 for its
+  gave Updates 20 points and Uptime 15, so `fw-chi-edge01.northwind.example` lost 10 for its
   pending update and won back exactly 10 for its 13-day uptime, landing on the
-  same score as the fully patched `home.agit8or.net` — which was itself penalised
+  same score as the fully patched `fw-chi-edge02.northwind.example` — which was itself penalised
   10 points for the short uptime that its update reboot had produced. Patch level
   is now the heaviest component (30) and uptime a minor stability signal (15) that
   can no longer offset it. Grades were recalibrated so a firewall with pending
@@ -1322,7 +1415,7 @@ Two dead-looking endpoints were deliberately left in place:
   arrives, the command is reset to `pending`, and the firewall is handed its own
   reboot again the moment it finishes booting.
 
-  Observed on `home.agit8or.net` on 2026-08-31: command 8017 (`/sbin/reboot`) was
+  Observed on `fw-chi-edge02.northwind.example` on 2026-08-31: command 8017 (`/sbin/reboot`) was
   queued at 12:28:01, and its `sent_at` had already been refreshed to 12:39:25 —
   a second delivery — with a third due at ~12:49. The duplicate guard in
   `api/reboot_firewall.php` does not help here, because nothing is queuing a new
@@ -1374,10 +1467,10 @@ Two dead-looking endpoints were deliberately left in place:
   branches set it to `0` whenever a firewall reappeared with status `updating`.
   Neither consulted the firewall.
 
-  The result: `fw.agit8or.net` asserted "reboot required" continuously from
+  The result: `fw-chi-edge01.northwind.example` asserted "reboot required" continuously from
   2026-03-04 — for roughly six months, across many actual reboots, its uptime at
   the time of the fix being 13 days — because a March update request set the flag
-  and nothing could ever clear it. Meanwhile `home.agit8or.net` reported *no*
+  and nothing could ever clear it. Meanwhile `fw-chi-edge02.northwind.example` reported *no*
   reboot needed immediately after installing a new base and kernel, with 187 days
   of uptime, because the recovery branch had cleared the flag.
 
@@ -2086,7 +2179,7 @@ _Released: December 11, 2025_
   _Fixed by: Claude Code_
 
 - **OPNsense Agent Stability** `agent`
-  Resolved agent check-in failures on home.agit8or.net (FW 48). Agent was being killed by reinstall commands without proper restart. Implemented proper service restart procedures.
+  Resolved agent check-in failures on fw-chi-edge02.northwind.example (FW 48). Agent was being killed by reinstall commands without proper restart. Implemented proper service restart procedures.
   _Fixed by: Claude Code_
 
 ### 🎨 User Interface

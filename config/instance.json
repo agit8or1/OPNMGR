@@ -1,7 +1,7 @@
 {
     "customer_name": "Default Customer",
     "instance_id": "default-001",
-    "main_server": "opn.agit8or.net",
+    "main_server": "",
     "deployment_date": "2024-01-01",
     "version": "1.0.0",
     "admin_contact": "admin@customer.com",

@@ -12,9 +12,9 @@
  *   - the update-recovery branches set it to 0 whenever a firewall reappeared
  *     with status 'updating'.
  *
- * Neither consulted the firewall. In practice that left fw.agit8or.net
+ * Neither consulted the firewall. In practice that left fw-chi-edge01.northwind.example
  * asserting "reboot required" continuously from 2026-03-04 - through many
- * actual reboots - while home.agit8or.net reported no reboot needed
+ * actual reboots - while fw-chi-edge02.northwind.example reported no reboot needed
  * immediately after installing a new base and kernel it had not booted into.
  *
  * What we can honestly determine: the agent reports uptime, so we can estimate

@@ -28,6 +28,8 @@
  * @since 3.28.0
  */
 
+require_once __DIR__ . '/server_identity.php';
+
 if (!defined('OPNMGR_WEBGUI_MARKER')) {
     define('OPNMGR_WEBGUI_MARKER', 'OPNMANAGER-WEBGUI-LOCKDOWN');
 }
@@ -65,6 +67,15 @@ if (!function_exists('opnmgr_manager_address')) {
             }
         } catch (Throwable $e) {
             // Settings unavailable is not fatal here; fall through.
+        }
+
+        // The configured address of this installation, which is also what a CLI
+        // run has to rely on - SERVER_NAME does not exist outside a request.
+        if (function_exists('opnmgr_server_host')) {
+            $host = opnmgr_server_host();
+            if ($host !== '') {
+                $candidates[] = $host;
+            }
         }
 
         if (!empty($_SERVER['SERVER_NAME'])) {

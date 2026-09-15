@@ -22,7 +22,11 @@ require_once __DIR__ . '/../inc/backup_storage.php';
 
 // Host agents should call back to, from the server_url setting / APP_URL rather
 // than a hostname compiled into this script.
-$reinstall_host = parse_url(opnmgr_server_url(), PHP_URL_HOST) ?: 'opn.agit8or.net';
+$reinstall_host = opnmgr_server_host();
+if ($reinstall_host === '') {
+    fwrite(STDERR, "This manager's URL is not configured; set the server_url setting or APP_URL in .env.\n");
+    exit(1);
+}
 require_once __DIR__ . '/../inc/logging.php';
 
 // Configuration

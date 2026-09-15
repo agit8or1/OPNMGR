@@ -29,6 +29,21 @@ try {
         SUM(CASE WHEN used = 0 AND expires_at > NOW() THEN 1 ELSE 0 END) as active_tokens
         FROM enrollment_tokens")->fetch(PDO::FETCH_ASSOC);
     
+    // Built from this installation's configured address. It was the
+    // maintainer's hostname, typed in, so the enrolment command handed to an
+    // operator pointed every new firewall at somebody else's manager.
+    $base = opnmgr_server_url();
+    if ($base === '') {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error'   => "This manager's URL is not configured, so an enrollment command "
+                       . 'cannot be generated. Set the server_url setting or APP_URL in .env.',
+        ]);
+        exit;
+    }
+    $enrollment_url = $base . '/enroll_firewall.php?action=download&token=' . urlencode($token);
+
     $response = [
         'success' => true,
         'token' => $token,
@@ -36,8 +51,8 @@ try {
         'expires_at' => date('Y-m-d H:i:s', strtotime("+{$days} days")),
         'cleaned_expired' => $cleaned,
         'stats' => $stats,
-        'enrollment_url' => "https://opn.agit8or.net/enroll_firewall.php?action=download&token={$token}",
-        'command' => "wget -q -O /tmp/opnsense_enroll.sh \"https://opn.agit8or.net/enroll_firewall.php?action=download&token={$token}\" && chmod +x /tmp/opnsense_enroll.sh && bash /tmp/opnsense_enroll.sh"
+        'enrollment_url' => $enrollment_url,
+        'command' => "wget -q -O /tmp/opnsense_enroll.sh \"{$enrollment_url}\" && chmod +x /tmp/opnsense_enroll.sh && bash /tmp/opnsense_enroll.sh"
     ];
     
     echo json_encode($response, JSON_PRETTY_PRINT);

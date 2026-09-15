@@ -2,6 +2,16 @@
 require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
+
+// This page told the operator to allow a specific IP through their firewall and
+// to trust a specific SSH key. Both were literals from the maintainer's own
+// installation, so following these instructions on any other deployment opened
+// the firewall to, and authorised the key of, a server the operator does not
+// run. Both now describe this installation.
+require_once __DIR__ . '/inc/firewall_policy.php';
+require_once __DIR__ . '/inc/enrollment_key.php';
+$manager_ip      = opnmgr_manager_address();
+$manager_ssh_key = opnmgr_enrollment_public_key();
 include __DIR__ . '/inc/header.php';
 ?>
 
@@ -37,7 +47,7 @@ include __DIR__ . '/inc/header.php';
                                 <strong>Server IP:</strong>
                             </div>
                             <div class="col-md-8">
-                                <code class="text-info">184.175.206.229</code>
+                                <code class="text-info"><?php echo htmlspecialchars($manager_ip ?: 'not configured'); ?></code>
                             </div>
                         </div>
                         <div class="row mt-2">
@@ -45,7 +55,7 @@ include __DIR__ . '/inc/header.php';
                                 <strong>SSH Public Key:</strong>
                             </div>
                             <div class="col-md-8">
-                                <code class="text-info" style="word-break: break-all;">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOSF41zYTRe76rGOj6Q21S2UJPGMaQy2Fx2RfEDYShkU</code>
+                                <code class="text-info" style="word-break: break-all;"><?php echo htmlspecialchars($manager_ssh_key ?: 'No enrollment key yet - enroll a firewall to generate one'); ?></code>
                             </div>
                         </div>
                     </div>
@@ -110,7 +120,7 @@ include __DIR__ . '/inc/header.php';
                                             </tr>
                                             <tr>
                                                 <td><strong>Source:</strong></td>
-                                                <td><code class="text-warning">184.175.206.229</code> (OPNManager server)</td>
+                                                <td><code class="text-warning"><?php echo htmlspecialchars($manager_ip ?: 'not configured'); ?></code> (OPNManager server)</td>
                                             </tr>
                                             <tr>
                                                 <td><strong>Destination:</strong></td>

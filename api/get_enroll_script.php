@@ -14,10 +14,19 @@ if (!$token) {
     exit;
 }
 
-// Get the panel URL - use SERVER_NAME (from Apache config) instead of HTTP_HOST (user-controlled)
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-$server_name = $_SERVER['SERVER_NAME'] ?? 'opn.agit8or.net';
-$panel_url = $protocol . '://' . $server_name;
+// Get the panel URL from configuration, falling back to SERVER_NAME (from the
+// web server config) rather than HTTP_HOST, which is user-controlled. The old
+// fallback here was the maintainer's own hostname, so a misconfigured install
+// silently enrolled firewalls against somebody else's manager.
+require_once __DIR__ . '/../inc/server_identity.php';
+$panel_url   = opnmgr_server_url();
+$server_name = opnmgr_server_host();
+if ($server_name === '') {
+    http_response_code(500);
+    echo "Error: this manager's URL is not configured.\n";
+    echo "Set the server_url setting, or APP_URL in .env, to this installation's address.\n";
+    exit;
+}
 
 // Read the simple enrollment script
 $script = file_get_contents(__DIR__ . '/../simple_enroll.sh');
@@ -36,7 +45,20 @@ if (!filter_var($mgmt_ip, FILTER_VALIDATE_IP)) {
     exit;
 }
 
+// This installation's own enrollment key, generated on first use. Enrollment
+// must not proceed without it: the alternative is authorising a key the
+// operator does not hold the private half of.
+require_once __DIR__ . '/../inc/enrollment_key.php';
+$server_ssh_key = opnmgr_enrollment_public_key();
+if ($server_ssh_key === '') {
+    http_response_code(500);
+    echo "Error: this manager has no enrollment SSH key and could not generate one.\n";
+    echo "Check that the key directory is writable and that ssh-keygen is installed.\n";
+    exit;
+}
+
 // Replace placeholders
+$script = str_replace('__SERVER_SSH_KEY__', $server_ssh_key, $script);
 $script = str_replace('__PANEL_URL__', $panel_url, $script);
 $script = str_replace('__ENROLLMENT_TOKEN__', $token, $script);
 $script = str_replace('__MGMT_SERVER_IP__', $mgmt_ip, $script);

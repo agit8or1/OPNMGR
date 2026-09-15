@@ -11,7 +11,16 @@ opnmgr_block_direct_web_access(__FILE__);
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
 
-$MANAGER_IP = '184.175.206.229'; // opn.agit8or.net
+// This manager's own address, from configuration. It was typed in as the
+// maintainer's public IP, so running this script anywhere else opened the
+// firewall's SSH port to a third party instead of to the manager.
+require_once __DIR__ . '/../inc/firewall_policy.php';
+$MANAGER_IP = opnmgr_manager_address();
+if ($MANAGER_IP === '') {
+    fwrite(STDERR, "This manager's address could not be determined; set the server_url "
+                 . "setting or APP_URL in .env to a resolvable host.\n");
+    exit(1);
+}
 $RULE_DESCRIPTION = 'Allow SSH from OPNManager - PERMANENT';
 
 echo "Setting up permanent SSH rule...\n";
@@ -34,7 +43,7 @@ $setup_rule_script = <<<'SCRIPT'
 #!/bin/sh
 # Setup permanent SSH rule for OPNManager access
 
-MANAGER_IP="184.175.206.229"
+MANAGER_IP="MGMT_IP_PLACEHOLDER"
 RULE_DESC="Allow SSH from OPNManager - PERMANENT"
 
 # Use OPNsense API to create the rule
@@ -47,7 +56,7 @@ cat > /tmp/add_ssh_rule.php << 'EOF'
 require_once("config.inc");
 require_once("filter.inc");
 
-$manager_ip = "184.175.206.229";
+$manager_ip = "MGMT_IP_PLACEHOLDER";
 $rule_desc = "Allow SSH from OPNManager - PERMANENT";
 
 // Check if rule already exists
@@ -79,7 +88,7 @@ if (!$rule_exists) {
         'descr' => $rule_desc,
         'created' => array(
             'time' => time(),
-            'username' => 'opnmanager@184.175.206.229'
+            'username' => 'opnmanager@' . $MANAGER_IP
         )
     );
     
@@ -104,6 +113,8 @@ rm /tmp/add_ssh_rule.php
 
 echo "Permanent SSH rule setup complete"
 SCRIPT;
+
+$setup_rule_script = str_replace('MGMT_IP_PLACEHOLDER', $MANAGER_IP, $setup_rule_script);
 
 // Queue the setup command
 $stmt = db()->prepare("

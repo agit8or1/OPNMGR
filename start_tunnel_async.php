@@ -55,7 +55,7 @@ try {
             'success' => true,
             'session_id' => $existing['id'],
             'tunnel_port' => $existing['tunnel_port'],
-            'url' => "https://opn.agit8or.net/tunnel_proxy.php?session={$existing['id']}&fresh=1",
+            'url' => opnmgr_server_url() . "/tunnel_proxy.php?session={$existing['id']}&fresh=1",
             'expires_at' => $existing['expires_at'],
             'message' => 'Using existing active tunnel session',
             'reused' => true
@@ -70,7 +70,7 @@ try {
         $session_id = $tunnel_result['session_id'] ?? null;
         if ($session_id) {
             // Use tunnel_proxy.php URL
-            $tunnel_result['url'] = "https://opn.agit8or.net/tunnel_proxy.php?session={$session_id}&fresh=1";
+            $tunnel_result['url'] = opnmgr_server_url() . "/tunnel_proxy.php?session={$session_id}&fresh=1";
             $tunnel_result['reused'] = false;
         }
     }

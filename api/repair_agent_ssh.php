@@ -85,7 +85,7 @@ pkill -f opnsense_agent 2>/dev/null
 sleep 2
 
 echo "Downloading latest agent (v3.8.5)..."
-curl -s -k -o /usr/local/bin/tunnel_agent.sh "https://opn.agit8or.net/download_tunnel_agent.php?firewall_id=FIREWALL_ID_PLACEHOLDER"
+curl -s -k -f -o /usr/local/bin/tunnel_agent.sh "AGENT_DOWNLOAD_URL_PLACEHOLDER"
 
 if [ ! -f /usr/local/bin/tunnel_agent.sh ]; then
     echo "ERROR: Failed to download agent"
@@ -145,6 +145,27 @@ exit 0
 SCRIPT;
 
 // Write repair script to temp file
+// The download URL was the maintainer's own host with an endpoint
+// (download_tunnel_agent.php) that has never existed in this codebase, so this
+// repair could not have worked for anyone and pointed every install at a third
+// party. It now comes from this installation's configured address.
+$agent_url = opnmgr_server_url();
+if ($agent_url === '') {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error'   => "This manager's URL is not configured, so the repair script cannot "
+                   . 'tell the firewall where to download the agent. Set the server_url '
+                   . 'setting or APP_URL in .env.',
+    ]);
+    exit;
+}
+$repair_script = str_replace(
+    'AGENT_DOWNLOAD_URL_PLACEHOLDER',
+    $agent_url . '/downloads/tunnel_agent.sh',
+    $repair_script
+);
+
 $script_file = "/tmp/repair_script_{$session_id}.sh";
 file_put_contents($script_file, $repair_script);
 chmod($script_file, 0755);

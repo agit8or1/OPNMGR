@@ -22,10 +22,20 @@ require_once __DIR__ . '/../inc/bootstrap_agent.php';
 // Use the db() connection from bootstrap
 $pdo = db();
 
+// This installation's own hostname, from configuration. It was the
+// maintainer's, typed in here, so a self-hosted install looked for a
+// certificate directory that does not exist on its server and then emitted an
+// nginx server_name for a domain it does not own.
+$manager_host = opnmgr_server_host();
+if ($manager_host === '') {
+    fwrite(STDERR, "This manager's URL is not configured; set the server_url setting or APP_URL in .env.\n");
+    exit(1);
+}
+
 // SSL certificate paths - check both possible locations
 $ssl_paths = [
-    '/etc/letsencrypt/live/opn.agit8or.net/fullchain.pem',
-    '/var/log/opnmgr/config/live/opn.agit8or.net/fullchain.pem'
+    "/etc/letsencrypt/live/{$manager_host}/fullchain.pem",
+    "/var/log/opnmgr/config/live/{$manager_host}/fullchain.pem"
 ];
 
 $ssl_cert = '';
@@ -49,7 +59,7 @@ if (empty($ssl_cert)) {
 error_log("Using SSL certificates: $ssl_cert");
 
 function create_nginx_config($session_id, $https_port, $http_port, $fw_web_port = 80) {
-    global $ssl_cert, $ssl_key;
+    global $ssl_cert, $ssl_key, $manager_host;
 
     // Use correct upstream protocol based on the firewall's web_port
     $upstream_proto = ((int)$fw_web_port === 443) ? 'https' : 'http';
@@ -59,7 +69,7 @@ function create_nginx_config($session_id, $https_port, $http_port, $fw_web_port 
 # Auto-generated - do not edit manually
 server {
     listen {$https_port} ssl http2;
-    server_name opn.agit8or.net;
+    server_name {$manager_host};
 
     # SSL configuration
     ssl_certificate {$ssl_cert};
@@ -106,7 +116,7 @@ server {
         # The path/domain rewriting prevents cookies from being sent back to the firewall
         # TODO: Find a better solution that doesn't break authentication
         # proxy_cookie_path / /fw/;
-        # proxy_cookie_domain opn.agit8or.net fw-{$session_id}.opn.agit8or.net;
+        # proxy_cookie_domain {$manager_host} fw-{$session_id}.{$manager_host};
         
         # Inject "Tunnel Mode" badge via JavaScript
         sub_filter '</head>' '<script>document.addEventListener("DOMContentLoaded",function(){var e=document.createElement("div");e.innerHTML="🔒 Tunnel Mode";e.style.cssText="position:fixed;top:10px;right:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:12px 20px;border-radius:25px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:999999;display:flex;align-items:center;gap:8px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2);animation:slideIn 0.3s ease-out";var t=document.createElement("style");t.textContent="@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}";document.head.appendChild(t);document.body.appendChild(e)});</script></head>';
@@ -251,7 +261,7 @@ switch ($action) {
         $upstream_proto = ($fw_web_port === 443) ? 'https' : 'http';
 
         if (create_nginx_config($session_id, $https_port, $http_port, $fw_web_port)) {
-            echo "Created nginx proxy: https://opn.agit8or.net:{$https_port} -> {$upstream_proto}://127.0.0.1:{$http_port}\n";
+            echo "Created nginx proxy: https://{$manager_host}:{$https_port} -> {$upstream_proto}://127.0.0.1:{$http_port}\n";
             exit(0);
         } else {
             echo "Failed to create nginx proxy for session {$session_id}\n";

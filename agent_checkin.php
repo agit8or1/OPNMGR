@@ -576,33 +576,30 @@ try {
         $stmt = db()->prepare('UPDATE firewalls SET agent_cleanup_requested = 0 WHERE id = ?');
         $stmt->execute([$firewall_id]);
         
-        // Provide the cleanup script URL
+        // Provide the cleanup script URL, from this installation's configured
+        // address rather than the maintainer's host, which used to be typed in
+        // here and would have sent every self-hosted fleet's firewalls to fetch
+        // and execute a script from somebody else's server.
+        $cleanup_base = opnmgr_server_url();
         $response['agent_cleanup_requested'] = true;
-        $response['agent_cleanup_url'] = 'https://opn.agit8or.net/downloads/cleanup_and_fix_agent.sh';
-        $response['agent_cleanup_command'] = 'fetch -o /tmp/cleanup_fix.sh https://opn.agit8or.net/downloads/cleanup_and_fix_agent.sh && chmod +x /tmp/cleanup_fix.sh && /tmp/cleanup_fix.sh';
-    }
-    
-    // Auto-setup reverse SSH tunnel if not already established
-    $tunnel_check = db()->prepare('SELECT tunnel_active, tunnel_established FROM firewalls WHERE id = ?');
-    $tunnel_check->execute([$firewall_id]);
-    $tunnel_status = $tunnel_check->fetch(PDO::FETCH_ASSOC);
-    
-    // If tunnel has never been established, queue the setup command
-    if ($tunnel_status && !$tunnel_status['tunnel_established']) {
-        // Check if setup command already queued
-        $existing_cmd = db()->prepare('SELECT id FROM firewall_commands WHERE firewall_id = ? AND description = "Auto-setup reverse SSH tunnel" AND status IN ("pending", "sent") LIMIT 1');
-        $existing_cmd->execute([$firewall_id]);
-        
-        if (!$existing_cmd->fetch()) {
-            // Queue the tunnel setup command
-            $tunnel_cmd = "fetch -o /tmp/setup_tunnel.sh https://opn.agit8or.net/setup_reverse_proxy.sh || curl -k -o /tmp/setup_tunnel.sh https://opn.agit8or.net/setup_reverse_proxy.sh && chmod +x /tmp/setup_tunnel.sh && /tmp/setup_tunnel.sh {$firewall_id} > /tmp/tunnel_setup.log 2>&1 && echo '=== SSH PUBLIC KEY ===' && cat /home/tunnel/.ssh/id_rsa.pub";
-            
-            $ins_cmd = db()->prepare('INSERT INTO firewall_commands (firewall_id, command, description) VALUES (?, ?, ?)');
-            $ins_cmd->execute([$firewall_id, $tunnel_cmd, 'Auto-setup reverse SSH tunnel']);
-            
-            error_log("Auto-queued tunnel setup for firewall $firewall_id");
+        if ($cleanup_base === '') {
+            error_log('agent_checkin.php: server URL not configured; cannot send an agent cleanup URL');
+        } else {
+            $cleanup_url = $cleanup_base . '/downloads/cleanup_and_fix_agent.sh';
+            $response['agent_cleanup_url'] = $cleanup_url;
+            $response['agent_cleanup_command'] =
+                'fetch -o /tmp/cleanup_fix.sh ' . escapeshellarg($cleanup_url)
+                . ' && chmod +x /tmp/cleanup_fix.sh && /tmp/cleanup_fix.sh';
         }
     }
+    
+    // Auto-setup of the reverse SSH tunnel used to happen here. It fetched
+    // setup_reverse_proxy.sh from a hardcoded host and piped it into sh on the
+    // firewall, once for every box whose tunnel had never been established.
+    // That script has never existed in this codebase or on the server, so the
+    // command downloaded an error page and executed it, and the queue filled
+    // with work that could only ever fail. Tunnels are established on demand
+    // through manage_ssh_tunnel.php, which is the path the UI actually uses.
     
 
     
@@ -678,8 +675,15 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
     error_log("Agent version check: current='$current_clean' latest='$latest_clean' fw_id=$firewall_id");
     
     if (version_compare($current_clean, $latest_clean, '<')) {
-        // Agent update is available
-        $server_name = 'opn.agit8or.net';
+        // Agent update is available. The host below was the maintainer's own,
+        // typed in here, so every install told its firewalls to fetch agent
+        // updates from a third party. It comes from configuration now; if that
+        // is not set we report no update rather than hand out a wrong URL.
+        $server_name = opnmgr_server_host();
+        if ($server_name === '') {
+            error_log('agent_checkin.php: server URL not configured; cannot offer an agent update');
+            return ['update_available' => false];
+        }
 
         // Check if this is a plugin-based agent (v1.x)
         if (strpos($current_clean, '1.') === 0) {
@@ -687,8 +691,10 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
             return [
                 'update_available' => true,
                 'latest_version' => $latest_agent_version,
-                'update_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh | sh > /tmp/agent_update.log 2>&1 &",
-                'manual_reinstall_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh | sh"
+                'update_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh"
+                                    . " | env OPNMGR_BASE_URL=https://{$server_name} sh > /tmp/agent_update.log 2>&1 &",
+                'manual_reinstall_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh"
+                                    . " | env OPNMGR_BASE_URL=https://{$server_name} sh"
             ];
         } elseif ($current_clean === '2.1.2') {
             // Special self-healing for v2.1.2 agents

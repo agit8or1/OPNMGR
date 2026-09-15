@@ -8,7 +8,7 @@ opnmgr_block_direct_web_access(__FILE__);
  * This job used to build its own upload command by hand:
  *
  *     curl -k -X POST -F "backup=@$BACKUP_FILE" -F "firewall_id=NN" \
- *          https://opn.agit8or.net/api/upload_backup.php
+ *          <manager>/api/upload_backup.php
  *
  * That command carries no agent credentials, and api/upload_backup.php has
  * required them since 3.12.0 (`authenticateAgentRequest`). Every upload it

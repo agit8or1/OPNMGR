@@ -75,8 +75,12 @@ echo "[2/5] Configuring SSH access for remote management..." | tee -a $LOG_FILE
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 
-# Add server's public key to authorized_keys
-SERVER_SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOSF41zYTRe76rGOj6Q21S2UJPGMaQy2Fx2RfEDYShkU opnmgr-server"
+# Add server's public key to authorized_keys. Substituted by
+# api/get_enroll_script.php with the enrollment key of the manager that served
+# this script. It used to be a literal - and not a dedicated key either, but the
+# per-firewall key of one firewall on one installation - so every deployment
+# authorised somebody else's key for root on its customers' firewalls.
+SERVER_SSH_KEY="__SERVER_SSH_KEY__"
 
 if ! grep -q "$SERVER_SSH_KEY" /root/.ssh/authorized_keys 2>/dev/null; then
     echo "$SERVER_SSH_KEY" >> /root/.ssh/authorized_keys

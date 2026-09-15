@@ -3,8 +3,26 @@
 # OPNManager Agent Plugin Installer
 # Downloads and installs the OPNManager agent plugin for OPNsense
 
-PLUGIN_URL="https://opn.agit8or.net/downloads/plugins/os-opnmanager-agent-1.6.2.tar.gz"
 PLUGIN_VERSION="1.6.2"
+
+# Base URL of the manager this firewall belongs to. It is passed in by whatever
+# emitted the install command, because a script served as a static file cannot
+# know which host fetched it. This used to be a hardcoded URL on the
+# maintainer's own server, so every self-hosted deployment had its firewalls
+# download the agent from a third party.
+if [ -z "$OPNMGR_BASE_URL" ] && [ -n "$1" ]; then
+    OPNMGR_BASE_URL="$1"
+fi
+
+if [ -z "$OPNMGR_BASE_URL" ]; then
+    echo "ERROR: OPNMGR_BASE_URL is not set."
+    echo "Install with the command shown in OPNManager under Settings, which sets it,"
+    echo "or run: env OPNMGR_BASE_URL=https://your-manager.example sh install_opnmanager_agent.sh"
+    exit 1
+fi
+
+OPNMGR_BASE_URL="${OPNMGR_BASE_URL%/}"
+PLUGIN_URL="${OPNMGR_BASE_URL}/downloads/plugins/os-opnmanager-agent-${PLUGIN_VERSION}.tar.gz"
 INSTALL_DIR="/usr/local"
 
 echo "=========================================="

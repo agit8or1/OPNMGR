@@ -5,6 +5,7 @@
  * Ensures all required packages and configurations are present
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/firewall_policy.php';
 
 require_once __DIR__ . '/../inc/logging.php';
 
@@ -173,7 +174,16 @@ function check_onboarding_progress($firewall_id) {
  * Generate SSH rule command for OPNsense
  */
 function get_ssh_rule_command() {
-    $mgmt_ip = '184.175.206.229';
+    // This manager's own address, resolved from configuration. It was typed in
+    // as the maintainer's public IP, so onboarding any firewall opened its WAN
+    // SSH port to a third party rather than to the manager running the onboard.
+    $mgmt_ip = opnmgr_manager_address();
+    if ($mgmt_ip === '') {
+        throw new RuntimeException(
+            "This manager's address could not be determined, so an SSH rule cannot be "
+            . 'built. Set the server_url setting or APP_URL in .env to a resolvable host.'
+        );
+    }
 
     $script = <<<'SCRIPT'
 cat > /tmp/add_ssh_rule.php << 'PHPEOF'
@@ -186,7 +196,7 @@ $rule = array(
     'interface' => 'wan',
     'ipprotocol' => 'inet',
     'protocol' => 'tcp',
-    'source' => array('address' => '184.175.206.229'),
+    'source' => array('address' => 'MGMT_IP_PLACEHOLDER'),
     'destination' => array('address' => '(self)', 'port' => '22'),
     'descr' => 'SSH from OPNManager - AUTO CONFIGURED'
 );
@@ -218,7 +228,7 @@ PHPEOF
 php /tmp/add_ssh_rule.php && rm /tmp/add_ssh_rule.php
 SCRIPT;
 
-    return $script;
+    return str_replace('MGMT_IP_PLACEHOLDER', $mgmt_ip, $script);
 }
 
 // CLI usage

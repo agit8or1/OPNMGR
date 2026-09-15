@@ -55,8 +55,18 @@ if (empty(trim($sshpass_check ?? ''))) {
 }
 
 $output_lines = [];
-$server_host = $_SERVER['SERVER_NAME'] ?? 'opn.agit8or.net';
-$plugin_install_cmd = "fetch -o - https://{$server_host}/downloads/plugins/install_opnmanager_agent.sh | sh";
+require_once __DIR__ . '/../inc/agent_version.php';
+$plugin_download_url = opnmgr_agent_download_url();
+if ($plugin_download_url === '') {
+    echo json_encode([
+        'success' => false,
+        'error'   => "This manager's URL is not configured, so the firewall cannot be told "
+                   . 'where to download the agent. Set the server_url setting or APP_URL in .env.',
+    ]);
+    exit;
+}
+$plugin_install_cmd = 'fetch -o - ' . escapeshellarg($plugin_download_url)
+    . ' | env OPNMGR_BASE_URL=' . escapeshellarg(opnmgr_server_url()) . ' sh';
 
 // Build SSH command with timeout
 $ssh_options = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3";

@@ -17,7 +17,8 @@ if (!empty($_GET['notice'])) {
 // legacy plaintext values pass through unchanged.
 $rows = decrypt_settings_map(db()->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR));
 $brand = $rows['brand_name'] ?? 'OPNsense Manager';
-$manager_fqdn = $rows['manager_fqdn'] ?? 'opn.agit8or.net';
+// ?: rather than ??, so a setting saved as an empty string falls back too.
+$manager_fqdn = ($rows['manager_fqdn'] ?? '') ?: opnmgr_server_host();
 $acme_domain = $rows['acme_domain'] ?? '';
 $acme_email = $rows['acme_email'] ?? '';
 $smtp_host = $rows['smtp_host'] ?? '';
@@ -488,10 +489,10 @@ include __DIR__ . '/inc/header.php';
             </label>
             <input type="text" id="manager_fqdn" name="manager_fqdn" class="form-control border-secondary"
                    value="<?php echo htmlspecialchars($manager_fqdn); ?>"
-                   placeholder="opn.agit8or.net">
+                   placeholder="opnmanager.example.com">
             <small class="form-text text-muted d-block mt-2">
               Fully Qualified Domain Name for this manager. Used in agent install commands:<br>
-              <code class="px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | sh</code>
+              <code class="px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=https://<?php echo htmlspecialchars($manager_fqdn); ?> sh</code>
             </small>
           </div>
         </div>

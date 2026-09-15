@@ -39,8 +39,13 @@ if (strtotime($session['expires_at']) < time()) {
     die("Error: Session expired at " . $session['expires_at'] . ". Please create a new tunnel session.");
 }
 
-// Build the direct tunnel URL
-$tunnel_url = "http://opn.agit8or.net:" . $session['tunnel_port'];
+// Build the direct tunnel URL against this installation's own address rather
+// than a hostname typed in here.
+$tunnel_host = opnmgr_server_host();
+if ($tunnel_host === '') {
+    die("Error: this manager's URL is not configured, so a tunnel URL cannot be built.");
+}
+$tunnel_url = 'http://' . $tunnel_host . ':' . $session['tunnel_port'];
 
 ?>
 <!DOCTYPE html>

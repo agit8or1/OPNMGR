@@ -67,7 +67,7 @@ fi
 
 # Download fresh agent with lockfile support
 echo "Downloading fresh agent..." | tee -a "$LOG_FILE"
-curl -k -o /tmp/agent_fresh.sh "https://opn.agit8or.net/download_tunnel_agent.php?firewall_id=FIREWALL_ID_PLACEHOLDER" 2>&1 | tee -a "$LOG_FILE"
+curl -k -fsS -o /tmp/agent_fresh.sh "AGENT_DOWNLOAD_URL_PLACEHOLDER" 2>&1 | tee -a "$LOG_FILE"
 
 if [ -f /tmp/agent_fresh.sh ]; then
     mv /tmp/agent_fresh.sh "$AGENT_PATH"
@@ -101,6 +101,21 @@ BASH;
 
 // Replace firewall ID placeholder
 $cleanup_command = str_replace('FIREWALL_ID_PLACEHOLDER', $firewall_id, $cleanup_command);
+
+// The download URL used to be the maintainer's host with an endpoint
+// (download_tunnel_agent.php) that has never existed here. It comes from this
+// installation's configured address now, and we refuse rather than queue a
+// command that would download nothing and run it.
+$agent_base = opnmgr_server_url();
+if ($agent_base === '') {
+    fwrite(STDERR, "This manager's URL is not configured; set the server_url setting or APP_URL in .env.\n");
+    exit(1);
+}
+$cleanup_command = str_replace(
+    'AGENT_DOWNLOAD_URL_PLACEHOLDER',
+    $agent_base . '/downloads/tunnel_agent.sh',
+    $cleanup_command
+);
 
 if ($is_queue) {
     // Queue the command

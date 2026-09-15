@@ -45,7 +45,7 @@ $fw = ['id' => $fwId, 'uptime' => '13 days', 'last_checkin' => date('Y-m-d H:i:s
 $v  = firewall_reboot_state($fw);
 T::eq('not_pending', $v['state'], 'no update on record means no evidence of a pending reboot');
 
-// This is the fw.agit8or.net case: a flag set in March by code that guessed,
+// This is the fw-chi-edge01.northwind.example case: a flag set in March by code that guessed,
 // on a box that has rebooted many times since.
 db()->prepare('UPDATE firewalls SET reboot_required = 1, uptime = ?, last_checkin = NOW() WHERE id = ?')
     ->execute(['13 days', $fwId]);
