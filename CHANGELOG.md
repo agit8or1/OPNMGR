@@ -6,6 +6,19 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.26.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **CI could not run the new two-factor suite.** 3.26.0 added a test that exercises
+  the QR renderer, but the `security-tests` job never ran `composer install`, so
+  `vendor/autoload.php` did not exist and the job failed at that step. The job now
+  installs the dependencies it needs, and requests the `xmlwriter` extension the SVG
+  backend uses. No product code changed.
+
+---
+
 ## Version 3.26.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

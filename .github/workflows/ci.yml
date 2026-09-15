@@ -91,8 +91,14 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_mysql, sodium, openssl, xml
+          extensions: pdo_mysql, sodium, openssl, xml, xmlwriter
           coverage: none
+
+      # The application needs its Composer dependencies at runtime - the
+      # two-factor enrolment page renders its QR with bacon/bacon-qr-code - so
+      # the suites that exercise those paths need them installed here too.
+      - name: Install Composer dependencies
+        run: composer install --no-dev --no-interaction --no-progress
 
       - name: Configure environment
         run: |
