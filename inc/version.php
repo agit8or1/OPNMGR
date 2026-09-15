@@ -44,6 +44,18 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.38.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'An Endpoint That Never Asked Who You Were',
+            'changes' => [
+                'SECURITY: api/manage_ssh_keys.php gated on check_authentication(), a function defined nowhere, so the expression was always false. GET was never gated at all - the dispatch ran it regardless - and returned SSH key fingerprints, types, bit sizes and timestamps for any firewall id to an unauthenticated caller. Confirmed against production before the fix: HTTP 200 with key metadata, no session',
+                'FIXED: The same always-false expression made POST fail closed, so regenerating or deleting an SSH key returned 401 every time and those actions on the firewall details page have never worked. Reading key metadata now requires firewall.view and changing a key requires firewall.manage, through the application\'s own role checks',
+                'SECURITY: api/updates/check.php and api/updates/download.php took an instance_id, validated nothing, and answered anyone - download returning file contents and SQL statements to apply. They belong to the multi-instance update distribution built alongside the licensing subsystem removed in 3.29.0, and nothing in this codebase calls them. Both require system.maintenance until a machine credential exists',
+                'ADDED: tests/endpoint_authz_test.php fails if any endpoint that touches data does not authenticate its caller - by session, by the agent mechanism, or by an enrolment token. Comments are stripped first, so a file describing these bugs cannot satisfy its own check',
+            ],
+        ],
+        [
             'version' => '3.37.0',
             'date' => '2026-09-15',
             'type' => 'minor',

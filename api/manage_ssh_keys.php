@@ -6,15 +6,30 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 require_once __DIR__ . '/../inc/logging.php';
+require_once __DIR__ . '/../inc/permissions.php';
 
-// Check authentication (for POST requests require it, GET can have fallback)
-$is_authenticated = function_exists('check_authentication') && check_authentication();
+header('Content-Type: application/json');
 
+// This gated on check_authentication(), a function defined nowhere. The
+// expression was therefore always false, with two consequences pulling in
+// opposite directions:
+//
+//   POST failed closed - every regenerate and delete returned 401, so the SSH
+//   key actions on the firewall details page have never worked;
+//
+//   GET was never gated at all. The dispatch below ran it regardless, so
+//   anyone who could reach the server could read SSH key fingerprints, types,
+//   bit sizes and timestamps for any firewall id, unauthenticated.
+//
+// Both halves now go through the application's own role checks: reading key
+// metadata is firewall.view, regenerating or deleting a key is firewall.manage.
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
+    require_permission('firewall.view');
     handle_get_key_status();
 } elseif ($method === 'POST') {
+    require_permission('firewall.manage');
     handle_post_action();
 } else {
     http_response_code(405);
@@ -73,15 +88,8 @@ function handle_get_key_status() {
 }
 
 function handle_post_action() {
-    global $is_authenticated;
-    
-    // POST requires authentication
-    if (!$is_authenticated) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'message' => 'Authentication required for this action']);
-        return;
-    }
-    
+    // Authorisation is enforced by require_permission('firewall.manage') before
+    // dispatch, so reaching here means the caller is allowed to act.
     $input = json_decode(file_get_contents('php://input'), true);
 
     // CSRF validation

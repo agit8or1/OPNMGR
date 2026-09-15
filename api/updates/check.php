@@ -6,8 +6,16 @@
 
 // Include database connection
 require_once __DIR__ . '/../../inc/bootstrap.php';
+require_once __DIR__ . '/../../inc/permissions.php';
 
 header('Content-Type: application/json');
+
+// Took an instance_id and a version, validated neither, and answered anyone.
+// Part of the multi-instance update distribution built alongside the licensing
+// subsystem removed in 3.29.0; nothing in this codebase calls it. A
+// machine-to-machine caller would need a credential of its own, which has never
+// existed here, so until one does this is administrator-only rather than open.
+require_permission('system.maintenance');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

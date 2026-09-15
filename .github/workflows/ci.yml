@@ -218,6 +218,12 @@ jobs:
       - name: Account status suite
         run: php tests/account_status_test.php
 
+      # manage_ssh_keys.php gated on a function defined nowhere: POST failed
+      # closed and GET was not gated at all, returning SSH key fingerprints to
+      # anyone who could reach the server.
+      - name: Endpoint authorisation suite
+        run: php tests/endpoint_authz_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

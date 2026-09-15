@@ -6,6 +6,50 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.38.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Security
+
+- **`api/manage_ssh_keys.php` returned SSH key metadata to anyone.** It gated on
+  `check_authentication()` — a function defined nowhere in this codebase — so the
+  expression was always false. That broke in two directions at once:
+
+  - **GET was never gated.** The dispatch called the handler regardless of the flag, so
+    an unauthenticated request for any `firewall_id` returned that firewall's SSH key
+    fingerprints, key types, bit sizes and timestamps. Confirmed against the running
+    production server before the fix: **HTTP 200 with key metadata and no session**. No
+    private key material was exposed, but it enumerates infrastructure to anyone who can
+    reach the server.
+  - **POST failed closed.** The same always-false flag returned 401 for every
+    `regenerate` and `delete`, so those SSH key actions on the firewall details page have
+    never worked.
+
+  Both halves now go through the application's own role checks: reading key metadata
+  requires `firewall.view`, changing a key requires `firewall.manage`. Verified after the
+  fix: unauthenticated GET is 401, an administrator's GET is 200, a `readonly` role gets
+  200 on read and **403 on regenerate**.
+
+- **`api/updates/check.php` and `api/updates/download.php` answered anyone.** Both took an
+  `instance_id`, validated nothing, and responded — `download.php` returning file contents
+  and SQL statements for the caller to apply. They belong to the multi-instance update
+  distribution built alongside the licensing subsystem removed in 3.29.0, and nothing in
+  this codebase calls either. A machine-to-machine caller would need a credential of its
+  own, which has never existed here, so both now require `system.maintenance` rather than
+  being open.
+
+### Added
+
+- **`tests/endpoint_authz_test.php`** (7 assertions, in CI). Every endpoint that touches
+  data must authenticate its caller — by session, by the agent mechanism
+  (`authenticateAgentRequest()`), or by an enrolment token checked against
+  `enrollment_tokens` with an expiry. Comments are stripped before the check, so a file
+  that *describes* one of these bugs cannot satisfy its own guard, and the suite asserts
+  it examined a plausible number of endpoints so it cannot pass by scanning nothing.
+  Verified to fail against the pre-fix code.
+
+---
+
 ## Version 3.37.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

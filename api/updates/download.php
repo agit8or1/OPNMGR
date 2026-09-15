@@ -6,8 +6,21 @@
 
 // Include database connection
 require_once __DIR__ . '/../../inc/bootstrap.php';
+require_once __DIR__ . '/../../inc/permissions.php';
 
 header('Content-Type: application/json');
+
+// This endpoint took an instance_id, validated nothing, and returned an update
+// package containing file contents and SQL statements for the caller to apply -
+// to anyone who could reach it. The instance_id was read and never checked
+// against anything.
+//
+// It belongs to the multi-instance update distribution built alongside the
+// licensing subsystem removed in 3.29.0, and nothing in this codebase calls it.
+// Machine-to-machine callers would need a credential of their own, which has
+// never existed here; until one does, this is an administrator-only endpoint
+// rather than an open one.
+require_permission('system.maintenance');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
