@@ -149,8 +149,15 @@ require_once __DIR__ . '/inc/header.php';
                             <div class="mb-3">
                                 <label class="form-label">2FA Status</label>
                                 <div>
-                                    <span class="badge bg-<?php echo !empty($user_data['two_factor_secret']) ? 'success' : 'warning'; ?>">
-                                        <?php echo !empty($user_data['two_factor_secret']) ? 'Enabled' : 'Disabled'; ?>
+                                    <?php
+                                    // `totp_secret` is the column twofactor_setup.php writes and
+                                    // verify2fa.php reads. This block tested a name that is not a
+                                    // column in `users`, so the badge read "Disabled" for every
+                                    // account, including ones with two-factor actually enabled.
+                                    $twofa_on = !empty($user_data['totp_secret']);
+                                    ?>
+                                    <span class="badge bg-<?php echo $twofa_on ? 'success' : 'warning'; ?>">
+                                        <?php echo $twofa_on ? 'Enabled' : 'Disabled'; ?>
                                     </span>
                                     <a href="/twofactor_setup.php" class="btn btn-sm btn-primary ms-2">
                                         <i class="fas fa-mobile-alt me-1"></i>Manage 2FA

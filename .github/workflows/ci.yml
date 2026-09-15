@@ -146,6 +146,12 @@ jobs:
       - name: Reboot state derivation suite
         run: php tests/reboot_state_test.php
 
+      # Catches the class of bug where code names a column the schema does not
+      # have. Those names live in SQL strings and array keys, so nothing else in
+      # this pipeline reads them.
+      - name: Schema/code column contract
+        run: php tests/schema_columns_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

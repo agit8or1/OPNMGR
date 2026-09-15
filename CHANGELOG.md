@@ -6,6 +6,92 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.25.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **The on-demand web proxy was broken at both ends.** `firewall_proxy.php` wrote a
+  `request_body` column and read a `status_code` column; `request_queue` has `body`
+  and `response_status`. The INSERT threw, so no request was ever queued, and the
+  polling SELECT threw too. Both now use the columns the table has.
+
+  While fixing it: the status was forwarded as `(int)$response['status_code']`, which
+  on a missing key yields `0`. `http_response_code(0)` is a silent no-op, so a
+  response with no status would have reached the browser as a 200. It now falls back
+  to 502.
+
+- **The profile page reported two-factor as disabled for everyone.** It tested
+  `$user_data['two_factor_secret']`, which is not a column in `users`. The column
+  `twofactor_setup.php` writes and `verify2fa.php` reads is `totp_secret`, so an
+  account with two-factor genuinely enabled was still shown a "Disabled" badge.
+
+- **`firewall_proxy.php`'s header comment contained a spliced copy of its own
+  logic.** The docblock was cut mid-word and a duplicate of the polling and
+  response-forwarding block was pasted inside it, where it sat inert — carrying the
+  same wrong column names. Anyone "restoring" that block would have reintroduced the
+  bug. The comment now describes the file, and the duplicate is gone.
+
+- **`scripts/fetch_logs.php` read a `firewalls.ssh_username` column that has never
+  existed.** A `?? 'root'` masked it, so the behaviour was always correct by
+  accident. It now says `root` outright, which is what every other SSH path here
+  hardcodes.
+
+### Removed
+
+Three endpoints that could only ever throw. Nothing in the tree, the agent source,
+or the released agent tarballs (1.5.6 and 1.6.2 were unpacked and searched) calls
+any of them, and all three are authenticated, so none was an exposure:
+
+- **`agent_selfheal_report.php`** wrote to `agent_selfheal_log`, a table that has
+  never existed in any schema in this repository's history, and updated
+  `firewalls.last_selfheal`, `firewalls.selfheal_status` and
+  `firewall_agents.last_update`, none of which exist either. Repairing it would have
+  meant inventing a schema for a feature nothing uses.
+- **`api/record_speedtest.php`** and **`api/run_speedtest.php`** implemented a
+  pending-then-complete workflow that `firewall_speedtest` cannot express — it has
+  no `status` column — and each carried its own `CREATE TABLE IF NOT EXISTS` with a
+  shape disagreeing with `database/schema.sql`. The table already exists, so the
+  CREATE was a no-op and the INSERT then failed. The working path is unaffected:
+  `api/trigger_speedtest.php` queues the command, `agent_checkin.php` records the
+  result into `bandwidth_tests` (which the detail chart reads), and
+  `api/agent_speedtest_result.php` writes `firewall_speedtest`.
+
+- **The "Send Test Email" button reported failure for emails it had delivered.**
+  `api/test_email.php` wrote the same non-existent `alert_history.recipient_email`
+  column. The send succeeded, the history INSERT threw, and the surrounding handler
+  turned that into `{"success": false, "error": "Internal server error"}` — so the
+  operator was told SMTP was broken when it was working. Recording history is now
+  wrapped so it can never do that again.
+
+  This file was found by the new test, not by reading code: it is **not in the
+  repository**. A `test_*` rule in `.gitignore` was excluding it, along with
+  `api/run_bandwidth_test.php`. Both are endpoints the shipped UI calls
+  (`alerts.php` fetches the first), so a fresh clone 404'd on them. Both are now
+  tracked, and the ignore rules negate them explicitly.
+
+### Added
+
+- **`tests/schema_columns_test.php`, wired into CI.** It parses `database/schema.sql`
+  and every migration, then checks that every column named in a literal INSERT or
+  UPDATE across all tracked PHP actually exists — and that the specific names behind
+  past outages (`recipient_email`, `recipient_emails`, `sent_successfully`,
+  `request_body`, `two_factor_secret`) do not come back. Verified by running it
+  against the pre-fix files: it fails there and passes here.
+
+  This is the check that was missing. Column names live in SQL strings and array
+  keys, which no linter reads, which is why `inc/alerts.php` could write a
+  non-existent column for long enough to silently disable repeat-notification
+  suppression. It earned its place immediately: running it against the deployed
+  copy surfaced `api/test_email.php`, which no amount of reading the repository
+  would have found, because the file was not in the repository.
+
+  It falls back to walking the tree when `git ls-files` returns nothing, so it
+  works against a deployed copy as well as a checkout — which is exactly how that
+  file was caught.
+
+---
+
 ## Version 3.25.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

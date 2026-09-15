@@ -40,7 +40,13 @@ function fetchFirewallLogs($firewall_id, $log_types = ['filter', 'dhcp', 'system
 
 function fetchLogType($firewall, $ssh_key, $log_type, $lines) {
     $ip = $firewall['ip_address'];
-    $username = $firewall['ssh_username'] ?? 'root';
+
+    // `firewalls` has no ssh_username column and never has, so this lookup was
+    // always undefined and the ?? always chose 'root'. Everything else that
+    // reaches a firewall over SSH - scripts/manage_ssh_tunnel.php included -
+    // hardcodes root, which is the account OPNsense provides. Say so, rather
+    // than implying a per-firewall setting exists.
+    $username = 'root';
     
     // Map log types to actual log files
     $log_paths = [

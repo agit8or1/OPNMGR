@@ -1,70 +1,15 @@
 <?php
 /**
  * On-Demand HTTP Proxy for Firewall Access
- * Routes ALL firewall HTTP requeif (!$response) {
-    log_error('proxy', "Request timeout: $method $path (waited ${max_wait}s) - Agent not processing requests", null, $firewall_id);
-    http_response_code(503);
-    ?>
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Connection Timeout</title>
-        <style>
-            body { font-family: Arial; background: #1a1a1a; color: #fff; padding: 40px; text-align: center; }
-            .error-box { max-width: 600px; margin: 0 auto; background: #2a2a2a; padding: 30px; border-radius: 10px; border: 2px solid #dc3545; }
-            h1 { color: #dc3545; margin-bottom: 20px; }
-            .icon { font-size: 64px; margin-bottom: 20px; }
-            .message { margin: 20px 0; line-height: 1.6; }
-            .technical { background: #1a1a1a; padding: 15px; border-radius: 5px; margin-top: 20px; font-size: 12px; color: #888; }
-            .btn { display: inline-block; background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-            .btn:hover { background: #0056b3; }
-        </style>
-    </head>
-    <body>
-        <div class="error-box">
-            <div class="icon">⏱️</div>
-            <h1>Connection Timeout</h1>
-            <div class="message">
-                <p><strong>The firewall agent did not respond within 60 seconds.</strong></p>
-                <p>This means the agent is not processing proxy requests yet.</p>
-                <h3>Current Status:</h3>
-                <ul style="text-align: left; display: inline-block;">
-                    <li>✅ Agent is checking in (v2.4.0)</li>
-                    <li>✅ Firewall is online</li>
-                    <li>❌ Agent doesn't support HTTP proxy yet</li>
-                </ul>
-                <p style="margin-top: 20px;">The request_queue system is ready, but the agent needs to be updated to poll and process queued requests.</p>
-            </div>
-            <div class="technical">
-                <strong>Technical Details:</strong><br>
-                Request ID: <?php echo $request_id; ?><br>
-                Client ID: <?php echo $client_id; ?><br>
-                Firewall: <?php echo htmlspecialchars($firewall['hostname']); ?> (ID: <?php echo $firewall_id; ?>)<br>
-                Timeout: <?php echo $max_wait; ?> seconds
-            </div>
-            <a href="/firewall_details.php?id=<?php echo $firewall_id; ?>" class="btn">← Back to Firewall Details</a>
-        </div>
-        <script>
-            // Auto-close after 10 seconds
-            setTimeout(() => {
-                if (window.opener) {
-                    window.close();
-                } else {
-                    window.location.href = '/firewall_details.php?id=<?php echo $firewall_id; ?>';
-                }
-            }, 10000);
-        </script>
-    </body>
-    </html>
-    <?php
-    exit;
-}
-
-// Log successful response
-log_info('proxy', "Response received: $method $path - Status: {$response['status_code']}, Size: " . strlen($response['response_body']) . " bytes", null, $firewall_id);
-
-// Forward response to clientough agent's request_queue system
- * Scales to unlimited firewalls (no dedicated ports needed)
+ *
+ * Routes firewall HTTP requests through the agent's request_queue table, so
+ * no dedicated port per firewall is needed.
+ *
+ * The header comment used to contain a pasted copy of the polling and
+ * response-forwarding block, spliced into this sentence mid-word. That copy
+ * was inert (it sat inside the comment) but carried the same wrong column
+ * names as the live code below, so anyone 'restoring' it would have
+ * reintroduced the bug. It is gone; the live implementation follows.
  */
 
 require_once __DIR__ . '/inc/bootstrap.php';
@@ -108,7 +53,7 @@ log_info('proxy', "Proxy request initiated: $method $path (firewall_id=$firewall
 
 // Insert into request queue
 $stmt = db()->prepare('
-    INSERT INTO request_queue (firewall_id, client_id, method, path, headers, request_body, status, created_at)
+    INSERT INTO request_queue (firewall_id, client_id, method, path, headers, body, status, created_at)
     VALUES (?, ?, ?, ?, ?, ?, "pending", NOW())
 ');
 $stmt->execute([
@@ -129,13 +74,13 @@ $start_time = time();
 $response = null;
 
 while ((time() - $start_time) < $max_wait) {
-    $stmt = db()->prepare('SELECT status, status_code, response_headers, response_body FROM request_queue WHERE id = ?');
+    $stmt = db()->prepare('SELECT status, response_status, response_headers, response_body FROM request_queue WHERE id = ?');
     $stmt->execute([$request_id]);
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($request['status'] === 'completed') {
         $response = $request;
-        log_info('proxy', "Request completed: $method $path ({$request['status_code']})");
+        log_info('proxy', "Request completed: $method $path ({$request['response_status']})");
         break;
     } elseif ($request['status'] === 'failed') {
         log_error('proxy', "Request failed: $method $path - {$request['response_body']}");
@@ -152,8 +97,10 @@ if (!$response) {
     die("Timeout: Agent did not respond within ${max_wait} seconds. Agent may be offline.");
 }
 
-// Forward response to client
-http_response_code((int)$response['status_code']);
+// Forward response to client. Default to 502 rather than letting (int)null
+// produce 0: http_response_code(0) is a silent no-op, so a missing status
+// would have been served to the browser as 200.
+http_response_code((int)($response['response_status'] ?: 502));
 
 // Set response headers
 if ($response['response_headers']) {

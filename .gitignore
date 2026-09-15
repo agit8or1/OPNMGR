@@ -138,11 +138,19 @@ screenshots-raw/
 storageState*.json
 playwright/.auth/
 
-# Test and development files
+# Test and development files.
+#
+# These patterns are broad on purpose, but they were also swallowing real
+# application endpoints that the shipped UI calls: api/test_email.php (the
+# "Send Test Email" button in alerts.php) and api/run_bandwidth_test.php were
+# both absent from the repository, so a fresh clone 404'd on them. Negate the
+# endpoints that are part of the product.
 test_*
 debug_*
 temp_*
 *_test.*
+!api/test_email.php
+!api/run_bandwidth_test.php
 # ...but the committed test suite must ship: CI runs it, and it is the
 # regression guard for the agent authentication and authorization behaviour.
 !tests/
