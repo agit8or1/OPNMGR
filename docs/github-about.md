@@ -1,11 +1,18 @@
 # GitHub repository presentation
 
-Settings that live in GitHub's own UI rather than in the tree. Apply these on the
-repository page under **About → ⚙**. Nothing here is applied automatically.
+Settings that live in GitHub's own UI rather than in the tree, under
+**About → ⚙** on the repository page.
+
+> **Applied on 2026-09-15 (v3.22.0).** The repository now carries the description,
+> topics and Website setting described below. This file is the record of that
+> intended state, not a to-do list — check it if the settings ever drift, and update
+> it here first if you change them.
+
+Nothing here is applied automatically; GitHub settings are not part of the tree.
 
 ## About description
 
-GitHub allows 350 characters. Use:
+GitHub allows 350 characters. Currently set to this (248 characters):
 
 > Self-hosted OPNsense fleet management for MSPs and IT teams. Monitor firewall and
 > connectivity health, review configuration backups and drift, and roll out updates
@@ -18,7 +25,7 @@ Shorter alternative, if the one above wraps awkwardly in search results:
 
 ## Website
 
-Leave the **Website** field empty.
+The **Website** field is deliberately empty.
 
 The project has no dedicated site. `mspreboot.com` resolves (verified, HTTP 200) but
 is the maintainer's MSP consulting site, not an OPNManager project page, so putting it
@@ -29,7 +36,7 @@ would rather point somewhere, the honest target is the changelog:
 
 ## Topics
 
-Replace the current topic list with:
+The twelve topics currently set:
 
 ```
 opnsense
@@ -46,24 +53,24 @@ mysql
 dashboard
 ```
 
-Changes from what is set today:
+How that differs from the pre-3.22.0 list:
 
 | Topic | Action | Why |
 |---|---|---|
-| `multi-tenant` | **Remove** | Inaccurate and actively misleading. Customers are organisational groupings; they have no accounts and do not log in. There is no tenant isolation to advertise. |
-| `bootstrap` | Remove | A CSS framework detail, not something anyone searches for to find a fleet manager. |
-| `firewall` | Remove | Subsumed by the more specific `firewall-management`. |
-| `ssh-tunnel` | Remove | An implementation detail of one optional feature. |
-| `self-hosted` | **Add** | Primary differentiator and a heavily browsed topic. |
-| `msp` | **Add** | Names the audience the project is positioned for. |
-| `fleet-management` | **Add** | Matches how the product is now described. |
-| `monitoring` | **Add** | Broad topic that carries real search traffic. |
+| `multi-tenant` | **Removed** | Inaccurate and actively misleading. Customers are organisational groupings; they have no accounts and do not log in. There is no tenant isolation to advertise. |
+| `bootstrap` | Removed | A CSS framework detail, not something anyone searches for to find a fleet manager. |
+| `firewall` | Removed | Subsumed by the more specific `firewall-management`. |
+| `ssh-tunnel` | Removed | An implementation detail of one optional feature. |
+| `self-hosted` | **Added** | Primary differentiator and a heavily browsed topic. |
+| `msp` | **Added** | Names the audience the project is positioned for. |
+| `fleet-management` | **Added** | Matches how the product is now described. |
+| `monitoring` | **Added** | Broad topic that carries real search traffic. |
 
 ## Other repository settings
 
-- **Releases** — the newest tag is `v3.11.1` while `main` is at 3.22.0. Tagging the
-  current tree would make the Releases link in the README useful; until then the README
-  says plainly that `main` is what to install.
+- **Releases** — done. v3.22.0 is tagged and is the latest release. It was the first
+  tag since v3.11.1; 3.12 through 3.21 shipped on `main` and exist only in the
+  changelog.
 - **Social preview image** — `docs/images/github/fleet-dashboard.png` works as-is
   (1440×900, close to GitHub's 1280×640 aspect target; it will be letterboxed).
 - **Issue templates** — already present in `.github/ISSUE_TEMPLATE/`.

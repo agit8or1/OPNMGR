@@ -6,6 +6,24 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.22.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Changed
+
+- **`docs/github-about.md` now records applied settings rather than pending ones.**
+  The About description, the twelve topics and the deliberately empty Website field
+  were applied to the repository on 2026-09-15, and v3.22.0 was tagged as the latest
+  release, so the file read as a to-do list describing work already done. It is now
+  the record of the intended state — the thing to check if the settings drift, and
+  the thing to update first if they are changed on purpose.
+
+  Notably `multi-tenant` is gone from the topic list. It advertised tenant isolation
+  the product does not implement: customers are organisational groupings with no
+  accounts and no login.
+
+---
+
 ## Version 3.22.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 
