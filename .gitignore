@@ -118,10 +118,15 @@ downloads/*
 downloads/plugins/*
 !downloads/plugins/install_opnmanager_agent.sh
 
-# Screenshots and images (keep only assets/img/ and screenshots/)
-!screenshots/
+# Screenshots and images. Binary media is ignored by default; the documentation
+# captures under docs/images/github/ are the deliberate exception, because the
+# README and docs/SCREENSHOTS.md embed them and they must render on GitHub.
 *.gif
 *.mp4
+!docs/images/github/*.gif
+
+# The walkthrough MP4 is a release asset, not a repository file: it regenerates
+# from scripts/record_demo_walkthrough.js and does not need to sit in history.
 
 # Test and development files
 test_*

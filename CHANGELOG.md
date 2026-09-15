@@ -6,6 +6,59 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.24.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Added
+
+- **A recorded walkthrough.** `scripts/record_demo_walkthrough.js` drives the demo
+  environment through eight stops — dashboard, fleet list, search, one firewall's
+  health, drift, a rollout in progress, incidents, and the customer/site model — and
+  records it at 1440×900. Sign-in happens before recording starts, so no credential is
+  ever on camera. The README embeds a 5 MB GIF; the MP4 is a release asset, because a
+  2.8 MB binary that regenerates from a script does not need to live in git history
+  forever.
+
+- **`docs/SCREENSHOTS.md`** — the full gallery, sixteen captures with alt text and
+  full-size links. The README keeps its hero and four-shot tour and links here, so the
+  first screen still answers what the product does rather than turning into a contact
+  sheet.
+
+- **Eleven more captures**: the fleet list with tags, fleet search, customers and
+  sites, the fleet-wide health overview, firewall detail statistics, backup history,
+  maintenance windows, bulk operations, the audit log, staff roles, and the light theme.
+
+### Changed
+
+- **The demo fixture now seeds staff, tags, alerting and agent registrations.** Four
+  pages were worth capturing but rendered empty or misleading without them:
+
+  - `firewall_agents` rows. `firewalls.php` and the dashboard read check-in state from
+    that table first and only fall back to `firewalls.last_checkin`, so the fleet list
+    showed every device as "Never" checked in while the dashboard showed them online.
+  - Five MSP staff across the admin, technician and readonly roles, so the capability
+    model is visible rather than a single account.
+  - Five colour-coded tags applied across the fleet, which also gives fleet search
+    something real to match on.
+  - Seven alert triggers and seven notification records.
+
+### Notes
+
+Two pages are deliberately absent from the gallery, and both are worth fixing:
+
+- **`alert_history.php` renders every alert as "Failed / 0 recipient(s)" on any
+  installation.** It selects `alert_history.*` and then reads `$alert['recipient_emails']`
+  and `$alert['sent_successfully']`, neither of which is a column in that table, so the
+  status test is always falsy. This is not a demo artefact — a real installation shows
+  the same thing.
+
+- **`alerts.php` carries a Pushover-token-shaped string as the `placeholder` attribute
+  of an empty input.** Nothing is stored and nothing leaks, but it reads as a live
+  credential in a screenshot, and it is worth confirming it was never a real token
+  before it stays in a public repository.
+
+---
+
 ## Version 3.23.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

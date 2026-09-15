@@ -35,14 +35,28 @@ fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TARGETS = [
+  // README: hero and the four-shot tour.
   { file: 'fleet-dashboard',  url: '/dashboard.php' },
   { file: 'firewall-health',  url: '/firewall_health.php?firewall=4',
     scrollTo: 'fw-dal-edge01.northwind.example' },
-  { file: 'firewall-detail',  url: '/firewall_details.php?id=4', scroll: 1400 },
-  { file: 'backup-history',   url: '/firewall_details.php?id=4', tab: 'Backups' },
   { file: 'config-drift',     url: '/config_drift.php' },
   { file: 'fleet-updates',    url: '/fleet_updates.php' },
   { file: 'incidents',        url: '/incidents.php' },
+
+  // docs/SCREENSHOTS.md: the fuller gallery.
+  { file: 'fleet-firewalls',  url: '/firewalls.php' },
+  { file: 'customers',        url: '/customers.php' },
+  { file: 'fleet-search',     url: '/search.php?q=tag%3Acritical-site' },
+  { file: 'health-overview',  url: '/firewall_health.php' },
+  { file: 'firewall-detail',  url: '/firewall_details.php?id=4' },
+  { file: 'backup-history',   url: '/firewall_details.php?id=4', tab: 'Backups' },
+  { file: 'maintenance',      url: '/maintenance.php' },
+  { file: 'bulk-operations',  url: '/bulk_operations.php' },
+  { file: 'alerts',           url: '/alerts.php' },
+  { file: 'alert-history',    url: '/alert_history.php' },
+  { file: 'audit-log',        url: '/audit_log.php' },
+  { file: 'users-roles',      url: '/users.php' },
+  { file: 'dashboard-light',  url: '/dashboard.php', theme: 'light' },
 ];
 
 (async () => {
@@ -72,7 +86,17 @@ const TARGETS = [
   }
 
   for (const t of TARGETS) {
+    const theme = t.theme || 'dark';
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
+    await page.evaluateOnNewDocument((th) => {
+      try { localStorage.setItem('opnmgr-theme', th); } catch (e) { /* ignore */ }
+    }, theme);
     await page.goto(URL + t.url, { waitUntil: 'networkidle2', timeout: 45000 });
+    await page.evaluate((th) => {
+      try { localStorage.setItem('opnmgr-theme', th); } catch (e) { /* ignore */ }
+      document.documentElement.setAttribute('data-theme', th);
+      document.documentElement.setAttribute('data-bs-theme', th);
+    }, theme);
     await sleep(2600);
 
     if (t.tab) {

@@ -88,7 +88,8 @@ $tables = [
     'firewall_gateways', 'firewall_vpn_tunnels', 'firewall_services',
     'firewall_certificates', 'firewall_carp', 'firewall_wan_interfaces',
     'firewall_system_stats', 'firewall_traffic_stats', 'firewall_latency',
-    'audit_log', 'firewalls', 'sites', 'customers',
+    'audit_log', 'firewall_tags', 'tags', 'alert_history', 'alert_triggers',
+    'firewall_agents', 'firewalls', 'sites', 'customers',
 ];
 $db->exec('SET FOREIGN_KEY_CHECKS=0');
 foreach ($tables as $t) {
@@ -236,6 +237,29 @@ $db->prepare('UPDATE firewalls SET ha_peer_firewall_id = ?, carp_peer_host = ?, 
    ->execute([$a, 'fw-chi-edge01.northwind.example', 'in sync', $b]);
 
 $ids = array_values($fwIds);
+
+// ---------------------------------------------------------------------------
+// Agent registration rows. firewalls.php and the dashboard read check-in state
+// from here first and fall back to firewalls.last_checkin, so without these the
+// fleet list renders every device as "Never" checked in.
+// ---------------------------------------------------------------------------
+
+$insAgent = $db->prepare(
+    'INSERT INTO firewall_agents
+        (firewall_id, agent_version, agent_type, last_checkin, status, latency_ms,
+         wan_ip, lan_ip, lan_gateway, ipv6_address, opnsense_version)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($fleet as $n => $f) {
+    [$host,$cc,$sc,$wan,$lanNet,$ver,$agent,$status,$secs] = $f;
+    $lanIp = preg_replace('/\.0\/24$/', '.1', $lanNet);
+    $insAgent->execute([
+        $ids[$n], $agent, 'primary', $ts("-{$secs} seconds"), $status,
+        round(8 + ($n * 3) % 22 + 0.4, 2),
+        $wan, $lanIp, $lanIp, '2001:db8:' . dechex(1000 + $n) . '::1', $ver,
+    ]);
+}
+echo "  agent registrations " . count($fleet) . "\n";
 
 // ---------------------------------------------------------------------------
 // Health telemetry: gateways, VPN tunnels, services, certificates, CARP.
@@ -655,6 +679,108 @@ foreach ($auditActions as $i => $act) {
     ]);
 }
 echo "  maintenance/audit  3 windows, " . count($auditActions) . " audit entries\n";
+
+// ---------------------------------------------------------------------------
+// MSP staff accounts. Three roles, so the capability model is visible.
+// Passwords are a fixed throwaway string; this database is never an install.
+// ---------------------------------------------------------------------------
+
+$db->prepare("DELETE FROM users WHERE username <> 'demo'")->execute();
+
+$staff = [
+    ['r.okonkwo',  'Rina',   'Okonkwo',  'admin',      'Network Operations Lead'],
+    ['t.lindqvist','Tomas',  'Lindqvist','technician', 'Senior Network Engineer'],
+    ['p.mensah',   'Priya',  'Mensah',   'technician', 'Network Engineer'],
+    ['j.calder',   'Jules',  'Calder',   'readonly',   'Service Desk'],
+];
+$insUser = $db->prepare(
+    'INSERT INTO users (username, password, email, first_name, last_name, role,
+                        timezone, is_active, last_login, created_at)
+     VALUES (?,?,?,?,?,?,?,1,?,?)'
+);
+foreach ($staff as $i => $u) {
+    $insUser->execute([
+        $u[0],
+        password_hash('demo-fixture-only-' . bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
+        $u[0] . '@example.com', $u[1], $u[2], $u[3],
+        'America/New_York',
+        $ts('-' . (2 + $i * 7) . ' hours'),
+        $ts('-' . (120 + $i * 30) . ' days'),
+    ]);
+}
+echo "  staff accounts     " . (count($staff) + 1) . " across admin/technician/readonly\n";
+
+// ---------------------------------------------------------------------------
+// Tags.
+// ---------------------------------------------------------------------------
+
+$tags = [
+    ['critical-site', '#ef4444'], ['ha-pair', '#8b5cf6'], ['lte-backup', '#f59e0b'],
+    ['pci-scope', '#10b981'], ['remote-hands', '#3b82f6'],
+];
+$insTag = $db->prepare('INSERT INTO tags (name, color) VALUES (?,?)');
+$tagIds = [];
+foreach ($tags as $t) { $insTag->execute($t); $tagIds[$t[0]] = (int) $db->lastInsertId(); }
+
+$insFwTag = $db->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?,?)');
+$tagPlan = [
+    0 => ['critical-site', 'ha-pair'], 1 => ['critical-site', 'ha-pair'],
+    2 => ['lte-backup'],  3 => ['lte-backup', 'remote-hands'],
+    4 => ['pci-scope', 'critical-site'], 5 => ['pci-scope'],
+    6 => ['critical-site'], 7 => ['pci-scope'], 8 => ['remote-hands'],
+    9 => ['critical-site'], 10 => [],
+];
+foreach ($tagPlan as $idx => $names) {
+    foreach ($names as $n) { $insFwTag->execute([$ids[$idx], $tagIds[$n]]); }
+}
+echo "  tags               " . count($tags) . " applied across the fleet\n";
+
+// ---------------------------------------------------------------------------
+// Alert configuration and notification history.
+// ---------------------------------------------------------------------------
+
+$triggers = [
+    ['Firewall offline',        'firewall_down',  'No agent check-in within the threshold', 1, '5',  5,  2],
+    ['Gateway packet loss',     'gateway_loss',   'Sustained loss on a monitored gateway',   1, '2',  15, 5],
+    ['Certificate expiring',    'cert_expiring',  'Certificate within the warning window',   1, '30', null, 1440],
+    ['Disk usage high',         'low_disk',       'Root filesystem above the threshold',     1, '85', 30, 15],
+    ['Configuration drift',     'config_changed', 'Current config differs from baseline',    1, null, null, 60],
+    ['Backup failed',           'backup_failed',  'Scheduled backup did not complete',       1, null, null, 60],
+    ['Agent below minimum',     'agent_outdated', 'Agent older than the supported minimum',  0, null, null, 1440],
+];
+$insTrig = $db->prepare(
+    'INSERT INTO alert_triggers (trigger_name, trigger_type, description, enabled,
+                                 threshold_value, threshold_duration, check_interval)
+     VALUES (?,?,?,?,?,?,?)'
+);
+foreach ($triggers as $t) { $insTrig->execute($t); }
+
+$insHist = $db->prepare(
+    'INSERT INTO alert_history (alert_level, alert_type, firewall_id, subject, message,
+                                recipients_count, notification_method, sent_at, status)
+     VALUES (?,?,?,?,?,?,?,?,?)'
+);
+$history = [
+    ['critical','firewall_offline', 8, 'fw-tac-edge01 has not checked in',
+     'No agent check-in for 47 minutes.', 3, 'email', '-40 minutes', 'sent'],
+    ['critical','vpn_down',         8, 'WireGuard tunnel wg-hub is down',
+     'No handshake for 3 hours.', 3, 'both', '-2 hours', 'sent'],
+    ['warning','gateway_loss',      3, 'WAN2_LTE degraded on fw-dal-edge01',
+     'Latency 148.7 ms, loss 2.4%.', 2, 'email', '-8 hours', 'sent'],
+    ['warning','cert_expiring',     3, 'Certificate webgui-3 expires in 6 days',
+     'Renew before expiry.', 2, 'email', '-26 hours', 'sent'],
+    ['warning','config_changed',    3, 'Configuration drift on fw-dal-edge01',
+     '4 changes across filter and nat.', 2, 'email', '-30 hours', 'sent'],
+    ['info','backup_completed',  null, 'Nightly backup completed',
+     '11 of 11 firewalls backed up.', 1, 'email', '-6 hours', 'sent'],
+    ['warning','cert_expiring',     0, 'Certificate webgui-0 expires in 11 days',
+     'Renew before expiry.', 2, 'email', '-14 hours', 'partial'],
+];
+foreach ($history as $h) {
+    $insHist->execute([$h[0], $h[1], $h[2] === null ? null : $ids[$h[2]], $h[3], $h[4],
+        $h[5], $h[6], $ts($h[7]), $h[8]]);
+}
+echo "  alerting           " . count($triggers) . " triggers, " . count($history) . " notifications\n";
 
 // ---------------------------------------------------------------------------
 // Verify the fixture issued no commands.
