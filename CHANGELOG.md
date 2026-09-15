@@ -6,6 +6,74 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.28.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Added
+
+- **Web GUI IP Lockdown and Secure Outbound Lockdown now do something.** Both were
+  UI controls with nothing behind them — one fatal on save, the other fatal on load —
+  and both are now implemented end to end.
+
+  They are applied the way every other firewall change already is: a policy script is
+  queued through `queue_firewall_command()`, the agent executes it on its next
+  check-in, and the result is audited. That needs no agent release and no new
+  credentials on the firewall — the previous design wanted per-firewall OPNsense API
+  keys and an SSH tunnel for every change.
+
+  `inc/firewall_policy.php` generates the scripts. Every one of them:
+
+  - backs up `/conf/config.xml` before touching it;
+  - marks every rule it writes, and removes only rules carrying that marker — so it
+    is idempotent, disabling is exact, and a human-written rule is never touched;
+  - validates the resulting XML and refuses to install it if it will not parse;
+  - reloads the filter, and **restores the backup if the reload is rejected**, so a
+    firewall is never left running a rule set it could not load.
+
+  **Web GUI IP Lockdown** restricts the GUI on WAN to an explicit list, on the port
+  the firewall actually uses. LAN is never restricted, and this manager's own address
+  is always permitted and listed first, so a typo cannot cut the platform off from
+  the firewall it manages. If the manager's address cannot be determined the policy
+  is refused rather than applied without it, and the save says so. Unparseable
+  entries are reported instead of silently dropped — a list the operator believes is
+  permitted, minus a typo, is how someone gets locked out.
+
+  **Secure Outbound Lockdown** does what the UI has always described: permits DNS to
+  the firewall and HTTP/HTTPS out, blocks and logs the rest on LAN. Because that
+  stops mail, VPN and NTP on a customer network, enabling it now requires typing
+  `RESTRICT <hostname>`; a toggle click is not enough consent. It is also
+  admin-only, where before any signed-in user could have flipped it.
+
+- **`tests/firewall_policy_test.php`, wired into CI.** It does not only inspect the
+  generated text: it runs the real scripts against a sample configuration containing
+  a human-written rule and a stale rule from a previous run, then asserts the human
+  rule survived, the stale one was replaced, applying twice does not accumulate
+  rules, disabling removes every managed rule and nothing else, and a malformed
+  result is refused rather than installed.
+
+  Two defects were found this way and fixed before release: the backup path was
+  hardcoded rather than derived from the configuration being edited, and an early
+  assertion miscounted because `<rule>` also appears inside the script's own `awk`
+  program.
+
+### Fixed
+
+- **The walkthrough video link was broken.** The README pointed at
+  `releases/latest`, which was correct when the media was attached to the newest
+  release and wrong the moment any later release was published without it — which
+  happened five times. Every video link is now pinned to the `v3.25.0` assets, which
+  is where the media lives, and all of them were checked for a 200.
+
+### Known limitation
+
+The lockdown policies have not been run against a live OPNsense firewall as part of
+this change. The generator is tested by executing the real scripts against a sample
+configuration, and the scripts protect themselves with a backup, XML validation and
+a rollback on reload failure — but the effect on a production firewall is untested.
+Apply to one firewall you can reach out-of-band before using either across a fleet.
+
+---
+
 ## Version 3.27.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

@@ -32,11 +32,10 @@ connectivity problem, reviewing what changed against an approved baseline, plann
 a ringed update, and the customer and site model — with a theme switch part way
 through.
 
-[![Play the OPNManager walkthrough: fleet dashboard, incident triage, configuration diff, update rollout and customer grouping](images/github/walkthrough-poster.png)](https://github.com/agit8or1/OPNMGR/releases/latest)
+[![Play the OPNManager walkthrough: fleet dashboard, incident triage, configuration diff, update rollout and customer grouping](images/github/walkthrough-poster.png)](https://github.com/agit8or1/OPNMGR/releases/download/v3.25.0/opnmanager-walkthrough-1080p.mp4)
 
-**[▶ Download the walkthrough from the latest release](https://github.com/agit8or1/OPNMGR/releases/latest)** —
-`opnmanager-walkthrough-1080p.mp4`, with a short highlight clip, a transcript and a
-WebVTT caption file alongside it. The captions are also in
+**[▶ Watch the walkthrough](https://github.com/agit8or1/OPNMGR/releases/download/v3.25.0/opnmanager-walkthrough-1080p.mp4)** — 3m42s, 1080p MP4 (11 MB).
+A **[40-second highlight](https://github.com/agit8or1/OPNMGR/releases/download/v3.25.0/opnmanager-highlight-1080p.mp4)** is alongside it. The captions are also in
 [`docs/walkthrough.vtt`](walkthrough.vtt) and the script in
 [`docs/walkthrough-script.md`](walkthrough-script.md).
 

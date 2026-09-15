@@ -112,6 +112,20 @@ try {
 // Show success message after redirect
 if (isset($_GET['updated']) && $_GET['updated'] == '1') {
     $notice = 'Configuration updated successfully. Tags and settings have been saved.';
+
+    // The Web GUI restriction is queued separately and can decline to apply.
+    // Say so rather than letting the save look wholly successful.
+    $warn = (string) ($_GET['policy_warn'] ?? '');
+    if ($warn === 'no_manager_address') {
+        $notice .= ' Web GUI restriction was NOT applied: this server could not determine its '
+                 . 'own address, and applying the rule without it would lock OPNManager out of '
+                 . 'the firewall. Set the manager FQDN in Settings.';
+    } elseif (str_starts_with($warn, 'unparsed:')) {
+        $notice .= ' Web GUI restriction was NOT applied: could not parse '
+                 . htmlspecialchars(substr($warn, 9)) . '. No rules were changed.';
+    } elseif ($warn === 'queue_failed') {
+        $notice .= ' Web GUI restriction could not be queued; no rules were changed.';
+    }
 }
 
 // Handle configuration updates
@@ -169,19 +183,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 
             error_log("Tags saved for FW$id: " . implode(', ', $tags_list) . " (" . count($tags_list) . " tags)");
 
-            // The Web GUI IP list is recorded only. It used to require_once
-            // scripts/queue_command.php here, a file that has never existed in
-            // this repository, so changing the field produced a fatal error and
-            // the save died after the UPDATE had already committed. There is
-            // nothing to call in its place: configure_webgui_access.sh does not
-            // exist either, and the agent has no handler for it, so no command
-            // could be queued that any firewall would act on.
+            // Apply the Web GUI access restriction when the list changes.
+            // Queued through the agent like every other firewall change; it
+            // takes effect on the next check-in.
+            if ($allowed_webgui_ips !== ($firewall['allowed_webgui_ips'] ?? '')) {
+                require_once __DIR__ . '/inc/agent_commands.php';
+                require_once __DIR__ . '/inc/firewall_policy.php';
+
+                $parsed = policy_parse_ip_list($allowed_webgui_ips);
+
+                if ($parsed['rejected']) {
+                    // Refuse rather than silently dropping an entry: a list the
+                    // operator believes is permitted, minus a typo, is how you
+                    // lock somebody out.
+                    $policy_warning = 'unparsed:' . implode(' ', array_slice($parsed['rejected'], 0, 5));
+                } else {
+                    $manager_ip = opnmgr_manager_address();
+                    $gui_port   = (int) ($firewall['web_port'] ?? 443);
+
+                    try {
+                        $script = policy_webgui_lockdown_script(
+                            $parsed['ips'], $manager_ip, $gui_port, $parsed['ips'] !== []
+                        );
+                    } catch (RuntimeException $e) {
+                        // No manager address means the permit list could not
+                        // include us, which is the lockout this guards against.
+                        error_log('Web GUI lockdown refused for firewall ' . $id . ': ' . $e->getMessage());
+                        $policy_warning = 'no_manager_address';
+                        $script = null;
+                    }
+
+                    $queued = $script === null ? ['ok' => true] : queue_firewall_command(
+                        $id,
+                        $script,
+                        $parsed['ips'] === []
+                            ? 'Remove Web GUI access restriction'
+                            : 'Restrict Web GUI access to ' . count($parsed['ips']) . ' address(es)',
+                        [
+                            'is_raw'     => true,
+                            'risk'       => 'HIGH',
+                            'action'     => 'policy.webgui_lockdown',
+                            'parameters' => ['addresses' => $parsed['ips'], 'port' => $gui_port],
+                        ]
+                    );
+
+                    if (!($queued['ok'] ?? false)) {
+                        error_log('Web GUI lockdown could not be queued for firewall ' . $id
+                                . ': ' . ($queued['error'] ?? 'unknown'));
+                        $policy_warning = 'queue_failed';
+                    }
+                }
+            }
 
             // Log the update
             error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, speedtest_interval={$speedtest_interval}h, customer_group=$customer_group, tags=" . implode(',', $tags_list) . ", webgui_ips=$allowed_webgui_ips");
 
             // Redirect to same page to show updated data (Post/Redirect/Get pattern)
-            header('Location: /firewall_details.php?id=' . $id . '&updated=1');
+            $redirect = '/firewall_details.php?id=' . $id . '&updated=1';
+            if (isset($policy_warning) && $policy_warning !== '') {
+                $redirect .= '&policy_warn=' . urlencode($policy_warning);
+            }
+            header('Location: ' . $redirect);
             exit;
         } catch (Exception $e) {
             error_log("firewall_details.php error: " . $e->getMessage());
@@ -760,17 +822,19 @@ include __DIR__ . '/inc/header.php';
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="allowed_webgui_ips" class="form-label fw-bold">
-                                                    <i class="fas fa-note-sticky me-2" style="color: #17a2b8;"></i>Web GUI IP Notes
+                                                    <i class="fas fa-shield-alt me-2" style="color: #17a2b8;"></i>Web GUI IP Lockdown
                                                 </label>
                                                 <input type="text" name="allowed_webgui_ips" id="allowed_webgui_ips" class="form-control"
                                                        value="<?php echo htmlspecialchars($firewall['allowed_webgui_ips'] ?? ''); ?>"
                                                        placeholder="192.168.1.100, 10.0.0.50">
                                                 <small class="d-block mt-2">
-                                                    <span class="badge bg-warning text-dark">Recorded only</span>
-                                                    <strong class="d-block mt-2">This list is stored against the firewall for your
-                                                    reference. It is not pushed to the firewall and does not restrict anything.</strong>
-                                                    Apply web GUI access restrictions on the firewall itself, under
-                                                    <em>Firewall &rarr; Rules</em>. Comma-separated IP addresses.
+                                                    <strong>Restricts the firewall's web GUI on WAN to these addresses.</strong><br>
+                                                    &check; Comma-separated addresses or CIDRs (e.g. 203.0.113.10, 198.51.100.0/24)<br>
+                                                    &check; This management server is always permitted, so a typo here cannot
+                                                    cut OPNManager off from the firewall<br>
+                                                    &check; LAN access is never restricted by this setting<br>
+                                                    &check; Leave empty to remove the restriction<br>
+                                                    <span class="text-muted">Applied by the agent on its next check-in.</span>
                                                 </small>
                                             </div>
                                         </div>
@@ -3223,13 +3287,34 @@ document.getElementById('secure_outbound_toggle').addEventListener('change', fun
     const originalText = this.nextElementSibling.textContent;
     this.nextElementSibling.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Applying configuration...';
     
-    // Send configuration to server
+    // Send configuration to server. Enabling requires the typed phrase the
+    // endpoint asks for, because this blocks mail, VPN and NTP on a customer
+    // network until it is removed - a single click is not enough consent.
     const formData = new FormData();
     formData.append('firewall_id', firewallId);
     formData.append('enable', isEnabled ? 1 : 0);
-    
+    formData.append('csrf_token', '<?php echo htmlspecialchars(csrf_token()); ?>');
+
+    if (isEnabled) {
+        const phrase = 'RESTRICT <?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>';
+        const typed = prompt(
+            'This blocks all outbound traffic from LAN except HTTP, HTTPS and DNS to the ' +
+            'firewall. Mail, VPN, NTP and similar will stop working until it is removed.\n\n' +
+            'Type the following to confirm:\n' + phrase
+        );
+        if (typed !== phrase) {
+            this.checked = !isEnabled;
+            this.disabled = false;
+            this.nextElementSibling.innerHTML = originalText;
+            if (typed !== null) { alert('Confirmation did not match. Nothing was changed.'); }
+            return;
+        }
+        formData.append('confirm', typed);
+    }
+
     fetch('/api/apply_secure_lockdown.php', {
         method: 'POST',
+        credentials: 'same-origin',
         body: formData
     })
     .then(response => response.json())
