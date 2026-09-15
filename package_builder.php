@@ -15,8 +15,6 @@ $exclude_patterns = [
     
     // Development tools (these stay on primary only)
     'package_builder.php',
-    'license_server.php',
-    'api/license_checkin.php',
     
     // Development menu items - ALL excluded from deployment
     'dev_info.php',

@@ -432,43 +432,6 @@ ai_scan_findings:
 - Config flag: `IS_PRIMARY_SERVER` (default: false)
 - Generated location: `/deployment/packages/`
 
-### Licensing System
-**Status**: ✅ Production | **Version**: 2.2.0+
-
-- **License Tiers**
-  - **Trial**: 2 firewalls, 30 days, no support
-  - **Starter**: 5 firewalls, $49/month
-  - **Professional**: 25 firewalls, $149/month, email support
-  - **Enterprise**: 100 firewalls, $399/month, priority support
-  - **Unlimited**: Unlimited firewalls, custom pricing, dedicated support
-
-- **License Management**
-  - Instance registration
-  - License key generation
-  - Firewall count enforcement
-  - Expiration tracking
-  - Usage reporting
-
-- **Check-In System**
-  - Deployed instances check-in every 4 hours
-  - License validation per check-in
-  - Firewall count verification
-  - Auto-update checking
-  - Version compatibility checking
-
-- **Enforcement**
-  - Firewall limit exceeded warnings
-  - Grace period support
-  - License expiration notifications
-  - Feature degradation on expired license
-
-**Technical Implementation**:
-- Tables: `licenses`, `licensed_servers`, `deployment_packages`
-- Check-in endpoint: `/api/instance_checkin.php`
-- Validation: Firewall count vs license max_firewalls
-- Cron: Deployed instances run check-in cron every 4 hours
-- UI: `/deployment/licenses.php`
-
 ### Update Distribution
 **Status**: ✅ Production | **Version**: 2.2.0+
 

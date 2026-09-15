@@ -44,6 +44,18 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.29.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Licence Server Is Gone',
+            'changes' => [
+                'REMOVED: The licensing subsystem. OPNManager is MIT licensed and self-hosted, and the project describes these tools as having no licence server - but the repository shipped one, and it did not work: license_server.php queried tables that scripts/migrate.php never created, so they existed on no installation and the page threw wherever it was opened. It was also unlinked from every navigation',
+                'REMOVED: api/instances/register.php, which inserted into customer_instances - a table that exists in no schema file and on no installation',
+                'REMOVED: The Licensing System section of FEATURES.md - thirty-seven lines marked "Production" describing licence tiers with monthly prices, grace periods and feature degradation, for a system that has never existed in a project that is free',
+                'CHANGED: Migration 0017 drops the licensing tables. Run php scripts/migrate.php after upgrading',
+            ],
+        ],
+        [
             'version' => '3.28.1',
             'date' => '2026-09-15',
             'type' => 'patch',

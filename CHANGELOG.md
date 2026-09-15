@@ -6,6 +6,54 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.29.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+> **Upgrading**: run `php scripts/migrate.php` after pulling. Migration 0017 drops
+> the licensing tables. On the maintainer's installation that removed one row — a
+> test record named "Test" that had never checked in.
+
+### Removed
+
+- **The licensing subsystem.** OPNManager is MIT licensed and self-hosted, and the
+  project's own published description says these tools have *"no per-seat billing.
+  No licence server."* The repository shipped one anyway, and it did not work:
+
+  - `license_server.php` queried `license_tiers` and `license_checkins`. Those tables
+    were only ever created by `db/migrations/create_license_tables.sql`, and
+    `scripts/migrate.php` reads `database/migrations/` — never `db/migrations/`. So
+    they existed on **no** installation, including the maintainer's, and the page
+    threw wherever it was opened. It was also unlinked from every navigation.
+  - `api/instances/register.php` inserted into `customer_instances`, a table that
+    exists in no schema file and on no installation.
+  - `package_builder.php` excluded `api/license_checkin.php` from deployment
+    packages; that file has never existed either.
+
+  Removed: `license_server.php`, `inc/license_utils.php`,
+  `db/migrations/create_license_tables.sql`, `api/instances/register.php`, the
+  `deployed_instances` table, and the stale entries in `package_builder.php` and
+  `generate_pdf.php`.
+
+- **The Licensing System section of `FEATURES.md`.** Thirty-seven lines marked
+  **"✅ Production"** describing licence tiers with prices ($49/month Starter, and
+  others), grace periods, expiry notifications and "feature degradation on expired
+  licence" — for a system that has never existed, in a project that is free. It
+  named tables (`licenses`, `licensed_servers`), an endpoint
+  (`/api/instance_checkin.php`) and a UI (`/deployment/licenses.php`) that appear
+  nowhere in the repository.
+
+  Advertising paid tiers for software that is MIT licensed and has no licence
+  server is the most misleading thing the documentation said.
+
+### Verified
+
+The documented install path was re-run end to end against an empty database:
+`database/schema.sql` imports cleanly and produces 80 tables with no licence tables
+among them, `scripts/migrate.php` applies all 18 migrations, a second run reports the
+database up to date, and `--status` shows zero pending.
+
+---
+
 ## Version 3.28.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

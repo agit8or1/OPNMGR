@@ -604,31 +604,6 @@ CREATE TABLE IF NOT EXISTS `customers` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
-CREATE TABLE IF NOT EXISTS `deployed_instances` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `instance_name` varchar(255) NOT NULL,
-  `instance_key` varchar(64) NOT NULL,
-  `server_mac` varchar(17) DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  `fqdn` varchar(255) DEFAULT NULL,
-  `license_tier` varchar(50) NOT NULL,
-  `max_firewalls` int(11) NOT NULL DEFAULT 5,
-  `current_firewalls` int(11) NOT NULL DEFAULT 0,
-  `status` enum('active','suspended','expired','trial') DEFAULT 'trial',
-  `license_expires` datetime DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `last_checkin` datetime DEFAULT NULL,
-  `version` varchar(20) DEFAULT NULL,
-  `notes` text DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `instance_key` (`instance_key`),
-  UNIQUE KEY `server_mac` (`server_mac`),
-  KEY `idx_instance_key` (`instance_key`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `detected_threats` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `log_analysis_id` int(11) NOT NULL,

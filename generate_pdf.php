@@ -769,7 +769,6 @@ function generateDocumentationContent() {
             <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
             <tr><td>/api/updates/check.php</td><td>POST</td><td>Check for available updates</td></tr>
             <tr><td>/api/updates/download.php</td><td>POST</td><td>Download and apply updates</td></tr>
-            <tr><td>/api/instances/register.php</td><td>POST</td><td>Register new customer instance</td></tr>
         </table>
 
         <h2>Firewall Management APIs</h2>
