@@ -56,10 +56,10 @@ The captures, and where each is used:
 | `audit-log.png` | Audit log | gallery |
 | `users-roles.png` | Staff and roles | gallery |
 | `dashboard-light.png` | Dashboard, light theme | gallery |
+| `alerts.png` | Alert configuration | gallery |
+| `alert-history.png` | Notification history | gallery |
 
-Two pages are deliberately not captured. `alerts.php` renders a Pushover token
-shaped placeholder in an empty input, which reads as a live credential in a
-screenshot even though nothing is stored. `alert_history.php` selects
-`alert_history.*` but renders `recipient_emails` and `sent_successfully`, neither
-of which exists in that table, so every row displays as "Failed / 0 recipient(s)"
-on any installation — publishing that would advertise a bug as if it were normal.
+Both alerting pages were held back from the 3.24.0 gallery because of defects that
+a screenshot would have advertised as normal behaviour. Both were fixed in 3.24.1:
+`alert_history.php` read columns that do not exist in `alert_history`, and
+`alerts.php` carried a credential-shaped placeholder. See the changelog.

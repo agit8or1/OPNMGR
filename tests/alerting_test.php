@@ -18,7 +18,8 @@ register_shutdown_function(function () use (&$fwId, &$custId, &$siteId) {
             db()->prepare('DELETE e FROM alert_incident_events e
                              JOIN alert_incidents i ON i.id = e.incident_id
                             WHERE i.firewall_id = ?')->execute([$fwId]);
-            foreach (['alert_incidents','maintenance_windows','audit_log','firewall_system_stats'] as $t) {
+            db()->prepare('DELETE FROM alert_history WHERE alert_type = "__test_alert_history__"')->execute();
+            foreach (['alert_incidents','maintenance_windows','audit_log','firewall_system_stats','alert_history'] as $t) {
                 $col = $t === 'maintenance_windows' ? null : 'firewall_id';
                 if ($col) { db()->prepare("DELETE FROM {$t} WHERE {$col} = ?")->execute([$fwId]); }
             }
@@ -230,5 +231,54 @@ T::group('Counts');
 $counts = alert_incident_counts();
 T::ok($counts['total_open'] >= 1, 'open incidents are counted');
 T::ok(array_key_exists('acknowledged', $counts), 'acknowledged incidents are counted separately');
+
+// ===========================================================================
+T::group('Alert history columns');
+
+// Regression guard for 3.24.1. inc/alerts.php wrote a `recipient_email` column
+// and alert_history.php read `recipient_emails` and `sent_successfully`. None of
+// the three exists in `alert_history`, so every write threw and every row
+// rendered as "Failed / 0 recipient(s)". Nothing caught it because the failing
+// insert was swallowed as a send error, and because the columns are only named
+// in SQL strings and array keys, which no linter checks.
+
+$cols = db()->query('SHOW COLUMNS FROM alert_history')->fetchAll(PDO::FETCH_COLUMN);
+
+foreach (['recipients_count', 'notification_method', 'status', 'error_message'] as $needed) {
+    T::ok(in_array($needed, $cols, true), "alert_history has the `{$needed}` column");
+}
+foreach (['recipient_email', 'recipient_emails', 'sent_successfully'] as $phantom) {
+    T::ok(!in_array($phantom, $cols, true), "alert_history has no `{$phantom}` column");
+}
+
+// The write path must round-trip through the real schema, for every status the
+// enum allows.
+$written = [];
+foreach ([['sent', 2, null], ['partial', 1, 'b@example.com: relay refused'], ['failed', 0, 'all recipients failed']] as $case) {
+    [$status, $count, $err] = $case;
+    db()->prepare(
+        'INSERT INTO alert_history
+            (firewall_id, alert_level, alert_type, subject, message,
+             recipients_count, notification_method, status, error_message, sent_at)
+         VALUES (?,?,?,?,?,?,"email",?,?,NOW())'
+    )->execute([$fwId, 'warning', '__test_alert_history__', 'Regression', 'body', $count, $status, $err]);
+    $written[] = (int) db()->lastInsertId();
+}
+
+$back = db()->prepare(
+    'SELECT status, recipients_count, error_message FROM alert_history
+      WHERE alert_type = "__test_alert_history__" ORDER BY id'
+);
+$back->execute();
+$rows = $back->fetchAll(PDO::FETCH_ASSOC);
+
+T::eq(3, count($rows), 'every status the enum allows round-trips');
+T::eq('sent', $rows[0]['status'] ?? null, 'a fully delivered alert records as sent');
+T::eq(2, (int)($rows[0]['recipients_count'] ?? 0), 'the recipient count is what was written');
+T::eq('partial', $rows[1]['status'] ?? null, 'a partly delivered alert records as partial');
+T::ok(!empty($rows[1]['error_message']), 'a partial delivery keeps the per-recipient error');
+T::eq('failed', $rows[2]['status'] ?? null, 'a wholly undelivered alert records as failed');
+
+db()->prepare('DELETE FROM alert_history WHERE alert_type = "__test_alert_history__"')->execute();
 
 exit(T::summary());

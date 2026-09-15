@@ -6,6 +6,55 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.24.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **Alert history was never recorded, and every alert displayed as failed.** Three
+  column names that do not exist in `alert_history` were in use at once:
+
+  - `inc/alerts.php` inserted a `recipient_email` column. Every insert threw. The
+    throw was caught by the per-recipient handler, which recorded it as *"Error
+    sending to <address>"* — so a mail that had already been delivered successfully
+    was reported back to the caller as a send failure, and nothing was written to the
+    table.
+  - `alert_history.php` rendered `recipient_emails` and `sent_successfully`. Neither
+    exists, so `$alert['sent_successfully']` was always null and every row displayed
+    as **Failed** with **0 recipient(s)** — including, on any installation, rows that
+    would have described successful deliveries.
+
+  The consequence was larger than the display: `was_alert_recently_sent()` and
+  `get_recent_alert_count()` both read this table to suppress repeat notification.
+  With nothing ever written, both always reported zero, so that suppression path
+  never engaged.
+
+  The writer now records one row per alert rather than one per recipient — which is
+  what `recipients_count` means — using the columns the table actually has, with
+  `status` set to `sent`, `partial` or `failed` and per-recipient errors kept in
+  `error_message`. Recording history is wrapped so that a logging failure can never
+  again turn a delivered alert into a reported failure. The reader renders those
+  columns, showing *Partial* distinctly from *Sent* and *Failed*.
+
+  `tests/alerting_test.php` now asserts that the four required columns exist, that
+  none of the three phantom names has come back, and that all three status values
+  round-trip through the shipped schema. The bug survived because the column names
+  live in SQL strings and array keys, which nothing in CI was checking.
+
+- **`alerts.php` carried a credential-shaped string as an input placeholder.** The
+  Pushover API token field used a 30-character token-shaped literal as its
+  `placeholder`. Nothing was ever stored or transmitted, but it read as a live
+  credential to anyone looking at the page or a screenshot of it, and it sat in a
+  public repository. It now reads `30-character token from pushover.net/apps`.
+
+### Added
+
+- **Both alerting pages are now in the gallery**, bringing it to eighteen captures.
+  They were held back from 3.24.0 precisely because of the two defects above — a
+  screenshot would have advertised them as normal behaviour.
+
+---
+
 ## Version 3.24.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

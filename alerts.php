@@ -196,7 +196,7 @@ include __DIR__ . '/inc/header.php';
                                     <input type="text" class="form-control font-monospace" 
                                            id="pushover_api_token" name="pushover_api_token" 
                                            value="<?php echo htmlspecialchars($settings['pushover_api_token']); ?>"
-                                           placeholder="azGDORePK8gMaC0QOYAMyEEuzJnyUi"
+                                           placeholder="30-character token from pushover.net/apps"
                                            maxlength="30">
                                     <small class="text-muted">Your application's API token from Pushover</small>
                                 </div>

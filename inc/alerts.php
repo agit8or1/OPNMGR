@@ -95,32 +95,63 @@ function send_email_alert($level, $type, $subject, $message_html, $firewall_id =
             return $results;
         }
         
-        // Send to each admin user
+        // Plain text version, recorded once rather than rebuilt per recipient.
+        $plain_text = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $message_html));
+
+        // Send to each admin user. Delivery failures are collected rather than
+        // thrown, so one bad address does not stop the rest of the fleet's
+        // operators being told.
+        $send_errors = [];
         foreach ($recipients as $recipient) {
+            $to = $recipient['email'];
             try {
-                $to = $recipient['email'];
-                
-                // Create plain text version
-                $plain_text = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $message_html));
-                
-                // Send email using SMTP
                 $email_result = send_smtp_email($smtp_settings, $to, $subject, $message_html, $from_address, $from_name);
-                
+
                 if ($email_result['success']) {
                     $results['sent']++;
-                    
-                    // Log to alert_history
-                    $stmt = $DB->prepare("INSERT INTO alert_history (firewall_id, alert_level, alert_type, subject, message, recipient_email, sent_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-                    $stmt->execute([$firewall_id, $level, $type, $subject, $plain_text, $to]);
                 } else {
-                    $results['errors'][] = "Failed to send to {$to}: {$email_result['error']}";
+                    $send_errors[] = "{$to}: {$email_result['error']}";
                 }
             } catch (Exception $e) {
-                error_log("alerts.php error sending to {$recipient['email']}: " . $e->getMessage());
-                $results['errors'][] = "Error sending to {$recipient['email']}";
+                error_log("alerts.php error sending to {$to}: " . $e->getMessage());
+                $send_errors[] = "{$to}: " . $e->getMessage();
             }
         }
-        
+
+        $results['errors'] = array_merge($results['errors'], array_map(
+            static fn(string $e): string => "Failed to send to {$e}",
+            $send_errors
+        ));
+
+        // Record one history row for the alert, not one per recipient.
+        //
+        // This used to run inside the loop and insert a `recipient_email`
+        // column, which does not exist in `alert_history`. Every insert threw,
+        // so nothing was ever recorded - which also silently disabled
+        // was_alert_recently_sent() and get_recent_alert_count(), both of which
+        // read this table to suppress repeat notifications.
+        $status = 'failed';
+        if ($results['sent'] > 0) {
+            $status = empty($send_errors) ? 'sent' : 'partial';
+        }
+
+        try {
+            $stmt = $DB->prepare(
+                "INSERT INTO alert_history
+                    (firewall_id, alert_level, alert_type, subject, message,
+                     recipients_count, notification_method, status, error_message, sent_at)
+                 VALUES (?, ?, ?, ?, ?, ?, 'email', ?, ?, NOW())"
+            );
+            $stmt->execute([
+                $firewall_id, $level, $type, $subject, $plain_text,
+                $results['sent'], $status,
+                $send_errors ? substr(implode('; ', $send_errors), 0, 65535) : null,
+            ]);
+        } catch (Exception $e) {
+            // Recording history must never turn a delivered alert into a failure.
+            error_log('alerts.php could not record alert history: ' . $e->getMessage());
+        }
+
         $results['success'] = $results['sent'] > 0;
         
     } catch (Exception $e) {

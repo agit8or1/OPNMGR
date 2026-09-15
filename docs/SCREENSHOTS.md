@@ -140,6 +140,20 @@ capability, not the role name.
 
 [![User management page listing five staff accounts with name, username, email and role badges for admin, technician and readonly](images/github/users-roles.png)](images/github/users-roles.png)
 
+### Alerting
+
+Which conditions notify, how often they are checked, and the delivery channel. Alerts
+are opt-in per level and go to administrator accounts with an email address.
+
+[![Alert system configuration with email and Pushover sections, per-level toggles for informational, warning and critical alerts, and the list of administrator recipients](images/github/alerts.png)](images/github/alerts.png)
+
+### Notification history
+
+What was actually sent, to how many recipients, and whether delivery succeeded.
+A partly delivered alert records as *Partial* and keeps the per-recipient error.
+
+[![Alert history listing seven notifications with time, level, affected firewall, message, recipient count and a delivery status of Sent or Partial](images/github/alert-history.png)](images/github/alert-history.png)
+
 ### Audit log
 
 Who did what, to which firewall, from where — filterable by action, user, firewall,

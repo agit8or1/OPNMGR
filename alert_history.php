@@ -202,22 +202,30 @@ include __DIR__ . '/inc/header.php';
                                     </td>
                                     <td>
                                         <small class="text-muted">
-                                            <?php 
-                                            $recipients = explode(',', $alert['recipient_emails'] ?? '');
-                                            echo count(array_filter($recipients)) . ' recipient(s)';
+                                            <?php
+                                            // `recipients_count` and `status` are the columns
+                                            // alert_history actually has. This block used to read
+                                            // `recipient_emails` and `sent_successfully`, neither of
+                                            // which exists, so every row rendered as "Failed" with
+                                            // "0 recipient(s)" regardless of what happened.
+                                            $count = (int)($alert['recipients_count'] ?? 0);
+                                            echo $count . ' recipient' . ($count === 1 ? '' : 's');
                                             ?>
+                                            <?php if (!empty($alert['notification_method']) && $alert['notification_method'] !== 'email'): ?>
+                                                <span class="text-secondary">&middot; <?php echo htmlspecialchars($alert['notification_method']); ?></span>
+                                            <?php endif; ?>
                                         </small>
                                     </td>
                                     <td>
-                                        <?php if ($alert['sent_successfully']): ?>
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check me-1"></i>Sent
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-danger" title="<?php echo htmlspecialchars($alert['error_message'] ?? 'Unknown error'); ?>">
-                                                <i class="fas fa-times me-1"></i>Failed
-                                            </span>
-                                        <?php endif; ?>
+                                        <?php
+                                        $status = $alert['status'] ?? 'sent';
+                                        $badge  = ['sent' => 'bg-success', 'partial' => 'bg-warning text-dark', 'failed' => 'bg-danger'][$status] ?? 'bg-secondary';
+                                        $icon   = ['sent' => 'fa-check', 'partial' => 'fa-triangle-exclamation', 'failed' => 'fa-times'][$status] ?? 'fa-question';
+                                        ?>
+                                        <span class="badge <?php echo $badge; ?>"
+                                              <?php if (!empty($alert['error_message'])): ?>title="<?php echo htmlspecialchars($alert['error_message']); ?>"<?php endif; ?>>
+                                            <i class="fas <?php echo $icon; ?> me-1"></i><?php echo htmlspecialchars(ucfirst($status)); ?>
+                                        </span>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
