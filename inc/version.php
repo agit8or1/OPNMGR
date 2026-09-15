@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Own Address'); }
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.2'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.3'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-05'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.31.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Agent 1.6.3, Built By A Script',
+            'changes' => [
+                'ADDED: Agent v1.6.3, which carries the checkin.sh fix from 3.30.2 - forcing a check-in no longer relabels a current agent as eight releases old. Firewalls are offered it on their next check-in',
+                'ADDED: scripts/build_agent_package.sh. There was no build script: packages were tarred by hand, which is how plugin/src came to differ from the package it was supposedly built from and how checkin.sh shipped a version label eight releases behind agent.sh. The version comes from AGENT_VERSION, the package name and the agent\'s self-reported version cannot disagree, and the build refuses to overwrite a version that already exists',
+                'CHANGED: The package is built deterministically - sorted entries, fixed mtime, numeric owner - so rebuilding the same source gives identical bytes and a diff against a published artifact means the source really changed. Verified: 1.6.3 rebuilds byte-for-byte, and differs from 1.6.2 in exactly the two intended files',
+                'FIXED: Packages were built from a file list, so the empty service/templates tree every previous release shipped would have been silently dropped. Directory entries are included',
+                'CHANGED: downloads/manifest.json re-signed to cover 1.6.3; all 51 artifacts verify against the pinned Ed25519 public key',
+            ],
+        ],
         [
             'version' => '3.30.2',
             'date' => '2026-09-15',

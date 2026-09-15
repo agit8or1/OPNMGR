@@ -6,6 +6,52 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.31.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **Upgrading**: firewalls are offered v1.6.3 on their next check-in and update
+> themselves. If you self-host, run `./scripts/build_agent_package.sh` and
+> `php scripts/sign_release.php --publish` after pulling, or your manager will
+> advertise a version its `downloads/` directory cannot serve.
+
+### Added
+
+- **Agent v1.6.3.** Carries the `checkin.sh` fix from 3.30.2: forcing a check-in no
+  longer relabels a current agent as eight releases old. This is the release that
+  actually delivers it — 3.30.2 fixed the source, which firewalls never see.
+
+- **`scripts/build_agent_package.sh`.** There was no build script. Packages were tarred
+  by hand, which is precisely how `plugin/src` came to differ from the package it was
+  supposedly built from, and how `checkin.sh` shipped a version label eight releases
+  behind `agent.sh`. The script:
+
+  - takes the version from `AGENT_VERSION` in `inc/version.php`, the same single source
+    the rest of the version machinery uses, so the package filename and the agent's
+    self-reported version cannot disagree;
+  - refuses to build if `agent.sh` declares a different version than `inc/version.php`;
+  - refuses to overwrite a tarball that already exists, because an agent that already
+    installed that version would keep its old bytes while the manifest advertised new
+    ones (`FORCE=1` for a version that was never distributed);
+  - excludes `__pycache__`, which is build output from whichever Python happened to run
+    and was one of the reasons source and package differed.
+
+### Changed
+
+- **The package is built deterministically** — sorted entries, fixed mtime, numeric
+  owner — so rebuilding the same source produces identical bytes, and a diff against a
+  published artifact means the source really changed rather than that the tar ran on a
+  different day. Verified: 1.6.3 rebuilds byte-for-byte identical, has the same tree
+  structure as 1.6.2, and differs from it in exactly the two intended files.
+
+- **Directory entries are included in the archive.** A files-only build would have
+  silently dropped the empty `service/templates` tree that every previous package
+  shipped.
+
+- **`downloads/manifest.json` re-signed** to cover 1.6.3. All 51 artifacts verify
+  against the pinned Ed25519 public key.
+
+---
+
 ## Version 3.30.2
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 
