@@ -88,6 +88,7 @@ $tables = [
     'firewall_gateways', 'firewall_vpn_tunnels', 'firewall_services',
     'firewall_certificates', 'firewall_carp', 'firewall_wan_interfaces',
     'firewall_system_stats', 'firewall_traffic_stats', 'firewall_latency',
+    'firewall_speedtest', 'bandwidth_tests',
     'audit_log', 'firewall_tags', 'tags', 'alert_history', 'alert_triggers',
     'firewall_agents', 'firewalls', 'sites', 'customers',
 ];
@@ -425,8 +426,181 @@ foreach ($ids as $n => $fid) {
 echo "  telemetry history  24h of stats, traffic and latency per firewall\n";
 
 // ---------------------------------------------------------------------------
-// Configuration backups, baselines and drift.
+// Bandwidth test history. The firewall detail chart reads `bandwidth_tests`,
+// which is also what agent_checkin.php writes when an agent returns a speedtest
+// result - so this is the table the live path actually uses. (`firewall_speedtest`
+// is written by api/agent_speedtest_result.php but nothing renders it.) Without
+// these rows the detail page draws an empty chart, which is worse than no panel.
 // ---------------------------------------------------------------------------
+
+$insSpeed = $db->prepare(
+    'INSERT INTO bandwidth_tests
+        (firewall_id, test_type, test_status, download_speed, upload_speed,
+         latency, test_server, test_duration, tested_at)
+     VALUES (?,?,\'completed\',?,?,?,?,?,?)'
+);
+$sites = ['Dallas, TX', 'Chicago, IL', 'Denver, CO', 'Seattle, WA', 'Atlanta, GA'];
+foreach ($ids as $n => $fid) {
+    // Four-hourly for a week: a believable circuit with a little variance.
+    $baseDown = [940, 940, 500, 300, 940, 600, 940, 1000, 200, 500, 500][$n] ?? 500;
+    $baseUp   = (int) round($baseDown * (($n % 3 === 0) ? 1.0 : 0.22));
+    for ($h = 42; $h >= 0; $h--) {
+        $jitter = (sin($h / 3.0 + $n) + 1) / 2;          // 0..1
+        $peak   = ($h % 6 === 0) ? 0.82 : 1.0;           // periodic contention
+        $insSpeed->execute([
+            $fid,
+            $h === 0 ? 'manual' : 'scheduled',
+            round($baseDown * (0.86 + 0.14 * $jitter) * $peak, 1),
+            round($baseUp   * (0.88 + 0.12 * $jitter) * $peak, 1),
+            round(6 + ($n * 2) % 18 + 5 * $jitter, 1),
+            'iperf3 ' . $sites[$n % count($sites)],
+            8,
+            $ts('-' . ($h * 4) . ' hours'),
+        ]);
+    }
+}
+echo "  bandwidth tests    " . (count($ids) * 43) . " results over 7 days\n";
+
+// ---------------------------------------------------------------------------
+// Configuration backups. Real OPNsense-shaped XML is written to disk, because
+// configuration drift and fleet configuration search both parse the stored
+// file - seeding rows alone gives a drift page that cannot diff and a search
+// that returns nothing.
+//
+// The generated configuration is deliberately varied: most firewalls are clean,
+// and a few carry findings the named checks in inc/config_search.php actually
+// detect, so search results are real rather than staged.
+// ---------------------------------------------------------------------------
+
+$storeRoot = getenv('OPNMGR_DEMO_BACKUP_DIR')
+    ?: (sys_get_temp_dir() . '/opnmgr-demo-backups');
+if (!is_dir($storeRoot) && !mkdir($storeRoot, 0700, true) && !is_dir($storeRoot)) {
+    exit("Cannot create demo backup directory {$storeRoot}\n");
+}
+
+/**
+ * Build an OPNsense-shaped configuration document.
+ *
+ * @param array $fw      One row of the $fleet table.
+ * @param bool  $drifted Emit the post-change variant.
+ * @param string $stamp  Value for the <revision> block, which OPNsense rewrites
+ *                       on every save and drift detection must therefore ignore.
+ */
+$makeConfig = static function (array $fw, bool $drifted, string $stamp): string {
+    [$host, $cc, $sc, $wan, $lanNet] = $fw;
+    $short  = explode('.', $host)[0];
+    $domain = substr($host, strlen($short) + 1);
+    $lanIp  = preg_replace('/\.0\/24$/', '.1', $lanNet);
+    $lanNet3 = preg_replace('/\.0\/24$/', '', $lanNet);
+
+    // A handful of firewalls carry real findings for the named checks.
+    $sshFromAny   = ($short === 'fw-dal-edge01');   // ssh_open_to_world
+    $anyAny       = ($short === 'fw-dal-edge01');   // any_any_pass
+    $passwordAuth = ($short === 'fw-tac-edge01');   // password_auth_ssh
+    $guiOnWan     = ($short === 'fw-nor-edge01');   // webgui_on_wan
+
+    $rules = [];
+    $rules[] = ['pass', 'lan', 'LAN to any', ['any' => ''], ['any' => ''], null, false];
+    $rules[] = ['block', 'wan', 'Default deny inbound', ['any' => ''], ['any' => ''], null, false];
+    $rules[] = ['pass', 'wan', 'IPsec from partner gateway', ['address' => '203.0.113.200'],
+                ['network' => 'wanip'], '500', false];
+
+    if ($sshFromAny) {
+        $rules[] = ['pass', 'wan', 'Temporary SSH for vendor - REMOVE', ['any' => ''],
+                    ['network' => 'wanip'], '22', false];
+    } else {
+        $rules[] = ['pass', 'wan', 'SSH from management network', ['network' => '198.51.100.0/24'],
+                    ['network' => 'wanip'], '22', false];
+    }
+    if ($anyAny) {
+        $rules[] = ['pass', 'wan', 'Troubleshooting rule left enabled', ['any' => ''], ['any' => ''], null, false];
+    }
+    if ($guiOnWan) {
+        $rules[] = ['pass', 'wan', 'Web GUI for remote admin', ['network' => '198.51.100.0/24'],
+                    ['network' => 'wanip'], '443', false];
+    }
+    $rules[] = ['pass', 'lan', 'Permit DNS to resolver', ['network' => 'lan'],
+                ['address' => $lanIp], '53', false];
+
+    if ($drifted) {
+        // The changes the drift page is meant to surface.
+        if ($short === 'fw-dal-edge01') {
+            $rules[] = ['pass', 'wan', 'NEW: RDP forward for accounting', ['any' => ''],
+                        ['network' => 'wanip'], '3389', false];
+            $rules[] = ['pass', 'lan', 'NEW: guest VLAN to internet', ['network' => 'opt1'],
+                        ['any' => ''], null, false];
+        } elseif ($short === 'fw-tac-edge01') {
+            $rules[] = ['pass', 'wan', 'NEW: SNMP from monitoring host', ['address' => '198.51.100.50'],
+                        ['network' => 'wanip'], '161', false];
+        }
+    }
+
+    $x  = "<?xml version=\"1.0\"?>\n<opnsense>\n";
+    // Rewritten on every save. Drift must ignore this or every firewall drifts.
+    $x .= "  <revision>\n    <time>{$stamp}</time>\n"
+        . "    <description>/usr/local/etc/rc.filter_configure made changes</description>\n"
+        . "    <username>root@" . htmlspecialchars($lanIp, ENT_XML1) . "</username>\n  </revision>\n";
+
+    $x .= "  <system>\n";
+    $x .= "    <hostname>" . htmlspecialchars($short, ENT_XML1) . "</hostname>\n";
+    $x .= "    <domain>" . htmlspecialchars($domain, ENT_XML1) . "</domain>\n";
+    $x .= "    <timezone>Etc/UTC</timezone>\n";
+    $x .= "    <dnsserver>9.9.9.9</dnsserver>\n    <dnsserver>149.112.112.112</dnsserver>\n";
+    $x .= "    <webgui>\n      <protocol>https</protocol>\n      <port>443</port>\n    </webgui>\n";
+    $x .= "    <ssh>\n      <enabled>enabled</enabled>\n"
+        . "      <passwordauth>" . ($passwordAuth ? '1' : '0') . "</passwordauth>\n    </ssh>\n";
+    $x .= "  </system>\n";
+
+    $x .= "  <interfaces>\n";
+    $x .= "    <wan>\n      <if>igc0</if>\n      <descr>WAN</descr>\n"
+        . "      <ipaddr>" . htmlspecialchars($wan, ENT_XML1) . "</ipaddr>\n      <subnet>24</subnet>\n"
+        . "      <gateway>WAN_DHCP</gateway>\n    </wan>\n";
+    $x .= "    <lan>\n      <if>igc1</if>\n      <descr>LAN</descr>\n"
+        . "      <ipaddr>" . htmlspecialchars($lanIp, ENT_XML1) . "</ipaddr>\n      <subnet>24</subnet>\n    </lan>\n";
+    if ($drifted && $short === 'fw-tac-edge01') {
+        // A whole interface added since the baseline.
+        $x .= "    <opt1>\n      <if>igc2</if>\n      <descr>GUEST</descr>\n"
+            . "      <ipaddr>" . htmlspecialchars($lanNet3, ENT_XML1) . ".200.1</ipaddr>\n"
+            . "      <subnet>24</subnet>\n    </opt1>\n";
+    }
+    $x .= "  </interfaces>\n";
+
+    $x .= "  <filter>\n";
+    foreach ($rules as $r) {
+        [$type, $iface, $descr, $src, $dst, $port, $disabled] = $r;
+        $x .= "    <rule>\n";
+        $x .= "      <type>{$type}</type>\n";
+        $x .= "      <interface>{$iface}</interface>\n";
+        $x .= "      <ipprotocol>inet</ipprotocol>\n";
+        $x .= "      <descr>" . htmlspecialchars($descr, ENT_XML1) . "</descr>\n";
+        if ($disabled) { $x .= "      <disabled>1</disabled>\n"; }
+        $x .= "      <source>\n";
+        foreach ($src as $k => $v) {
+            $x .= $v === '' ? "        <{$k}/>\n"
+                            : "        <{$k}>" . htmlspecialchars((string)$v, ENT_XML1) . "</{$k}>\n";
+        }
+        $x .= "      </source>\n      <destination>\n";
+        foreach ($dst as $k => $v) {
+            $x .= $v === '' ? "        <{$k}/>\n"
+                            : "        <{$k}>" . htmlspecialchars((string)$v, ENT_XML1) . "</{$k}>\n";
+        }
+        if ($port !== null) { $x .= "        <port>{$port}</port>\n"; }
+        $x .= "      </destination>\n    </rule>\n";
+    }
+    $x .= "  </filter>\n";
+
+    $x .= "  <nat>\n    <outbound>\n      <mode>automatic</mode>\n    </outbound>\n  </nat>\n";
+
+    $dhcpTo = $drifted && $short === 'fw-nor-edge01' ? '199' : '150';
+    $x .= "  <dhcpd>\n    <lan>\n      <enable>1</enable>\n      <range>\n"
+        . "        <from>" . htmlspecialchars($lanNet3, ENT_XML1) . ".100</from>\n"
+        . "        <to>" . htmlspecialchars($lanNet3, ENT_XML1) . ".{$dhcpTo}</to>\n"
+        . "      </range>\n    </lan>\n  </dhcpd>\n";
+
+    $x .= "  <unbound>\n    <enable>1</enable>\n  </unbound>\n";
+    $x .= "</opnsense>\n";
+    return $x;
+};
 
 $insBackup = $db->prepare(
     'INSERT INTO backups
@@ -434,74 +608,88 @@ $insBackup = $db->prepare(
          storage_path, checksum_sha256, validated, uploaded_at, source_filename)
      VALUES (?,?,?,?,?,?,?,?,1,?,?)'
 );
-$backupIds = [];
-foreach ($ids as $n => $fid) {
+
+$backupIds = [];        // newest backup per firewall
+$baselineBackup = [];   // the 7-day-old one, promoted to baseline
+
+// Which firewalls have changed since their baseline.
+$driftIdx = [3, 8, 10];
+
+foreach ($fleet as $n => $f) {
+    $fid = $ids[$n];
+    $dir = $storeRoot . '/fw-' . $fid;
+    if (!is_dir($dir)) { mkdir($dir, 0700, true); }
+
     for ($d = 14; $d >= 0; $d--) {
         $when = $ts("-{$d} days -" . (2 + $n % 3) . ' hours');
         $name = 'config-' . (new DateTimeImmutable($when))->format('Ymd-His') . '.xml';
+        $path = $dir . '/' . $name;
+
+        // Drifted firewalls changed 1-3 days ago; everything before that, and
+        // every other firewall, is the baseline configuration.
+        $changedDaysAgo = [3 => 1, 8 => 3, 10 => 2][$n] ?? null;
+        $isDrifted = $changedDaysAgo !== null && $d <= $changedDaysAgo;
+
+        $xml = $makeConfig($f, $isDrifted, (new DateTimeImmutable($when))->format('U'));
+        file_put_contents($path, $xml);
+
         $insBackup->execute([
-            $fid, $name,
-            $d === 0 ? 'Scheduled nightly backup' : 'Scheduled nightly backup',
-            $when, 'automated', 148_000 + $n * 2_100 + $d * 37,
-            '/var/opnmgr/backups/' . $fid, hash('sha256', "demo-$fid-$d"),
-            $when, $name,
+            $fid, $name, 'Scheduled nightly backup', $when, 'automated',
+            strlen($xml), $path, hash('sha256', $xml), $when, $name,
         ]);
-        if ($d === 0) {
-            $backupIds[$fid] = (int) $db->lastInsertId();
-        }
-        if ($d === 7) {
-            $baselineBackup[$fid] = (int) $db->lastInsertId();
-        }
+        $bid = (int) $db->lastInsertId();
+        if ($d === 0) { $backupIds[$fid] = $bid; }
+        if ($d === 7) { $baselineBackup[$fid] = $bid; }
     }
 }
+echo "  backups            " . (count($fleet) * 15) . " real config files under {$storeRoot}\n";
 
-$insBaseline = $db->prepare(
-    'INSERT INTO config_baselines
-        (firewall_id, backup_id, config_hash, section_hashes, set_by_user_id,
-         set_by_username, set_at, notes, is_current)
-     VALUES (?,?,?,?,1,?,?,?,1)'
-);
-$insDrift = $db->prepare(
-    'INSERT INTO config_drift
-        (firewall_id, baseline_id, current_backup_id, current_hash, status,
-         sections_changed, change_count, first_detected_at, last_checked_at,
-         acknowledged_at, acknowledged_by, acknowledged_note)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
-);
+// ---------------------------------------------------------------------------
+// Baselines and drift, computed by the application rather than fabricated.
+// ---------------------------------------------------------------------------
 
-$driftPlan = [
-    // index => [status, changed sections, count, acknowledged?]
-    3  => ['drifted', ['modified' => ['filter', 'nat']], 4, false],
-    8  => ['drifted', ['modified' => ['interfaces'], 'added' => ['staticroutes']], 2, false],
-    10 => ['drifted', ['modified' => ['dhcpd']], 1, true],
-];
+// bootstrap_agent gives us db() with no session or auth, which is what the
+// drift helpers expect. It connects to the same DB_NAME the guards above
+// already checked.
+require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/config_drift.php';
 
-foreach ($ids as $n => $fid) {
-    $sections = json_encode([
-        'filter' => hash('sha256', "f-$fid"), 'nat' => hash('sha256', "n-$fid"),
-        'interfaces' => hash('sha256', "i-$fid"), 'dhcpd' => hash('sha256', "d-$fid"),
-    ]);
-    $insBaseline->execute([
-        $fid, $baselineBackup[$fid], hash('sha256', "baseline-$fid"), $sections,
-        'demo', $ts('-7 days'), 'Approved after quarterly review',
-    ]);
-    $baselineId = (int) $db->lastInsertId();
-
-    $plan = $driftPlan[$n] ?? null;
-    $insDrift->execute([
-        $fid, $baselineId, $backupIds[$fid],
-        hash('sha256', $plan ? "changed-$fid" : "baseline-$fid"),
-        $plan ? 'drifted' : 'match',
-        $plan ? json_encode($plan[1]) : json_encode([]),
-        $plan ? $plan[2] : 0,
-        $plan ? $ts('-' . (1 + $n % 3) . ' days') : null,
-        $ts('-25 minutes'),
-        ($plan && $plan[3]) ? $ts('-10 hours') : null,
-        ($plan && $plan[3]) ? 'demo' : null,
-        ($plan && $plan[3]) ? 'Planned DHCP scope change, ticket NWL-4417' : null,
-    ]);
+$drifted = 0;
+foreach ($fleet as $n => $f) {
+    $fid = $ids[$n];
+    $set = drift_set_baseline($fid, $baselineBackup[$fid], 'Approved after quarterly review');
+    if (!$set['ok']) {
+        echo "    ! baseline for {$f[0]}: {$set['error']}\n";
+        continue;
+    }
+    $ev = drift_evaluate($fid);
+    if (($ev['status'] ?? '') === 'drifted') { $drifted++; }
 }
-echo "  backups and drift  15 backups per firewall, baselines, 3 drifted\n";
+
+// The app stamps "now" on a baseline it has just been given and on drift it has
+// just noticed. Backdate both to when the fixture says they happened, so the
+// page shows a realistic baseline age rather than "1m" across the fleet.
+$db->prepare('UPDATE config_baselines SET set_at = ?')->execute([$ts('-7 days')]);
+$changedAt = [3 => '-1 days', 8 => '-3 days', 10 => '-2 days'];
+foreach ($changedAt as $idx => $ago) {
+    $db->prepare('UPDATE config_drift SET first_detected_at = ? WHERE firewall_id = ?')
+       ->execute([$ts($ago), $ids[$idx]]);
+}
+
+// Approving eleven baselines writes eleven audit entries in the same second,
+// which would otherwise be the entire first page of the audit log. Move them to
+// when the fixture says the approval happened.
+$db->prepare("UPDATE audit_log SET occurred_at = ? WHERE action = 'drift.baseline.set'")
+   ->execute([$ts('-7 days')]);
+
+// One drifted firewall is acknowledged, to show that state too.
+drift_acknowledge($ids[10], 'Planned DHCP scope change, ticket NWL-4417');
+$db->prepare("UPDATE audit_log SET occurred_at = ? WHERE action = 'drift.acknowledge'")
+   ->execute([$ts('-10 hours')]);
+$db->prepare('UPDATE config_drift SET acknowledged_at = ? WHERE firewall_id = ?')
+   ->execute([$ts('-10 hours'), $ids[10]]);
+
+echo "  drift              evaluated by the app: {$drifted} drifted\n";
 
 // ---------------------------------------------------------------------------
 // Update campaign. Seeded in terminal states - no command rows are created,
@@ -716,7 +904,9 @@ echo "  staff accounts     " . (count($staff) + 1) . " across admin/technician/r
 
 $tags = [
     ['critical-site', '#ef4444'], ['ha-pair', '#8b5cf6'], ['lte-backup', '#f59e0b'],
-    ['pci-scope', '#10b981'], ['remote-hands', '#3b82f6'],
+    ['pci-scope', '#10b981'], ['remote-hands', '#3b82f6'], ['hipaa', '#06b6d4'],
+    ['24x7-support', '#ec4899'], ['fiber-primary', '#22c55e'], ['dual-wan', '#a855f7'],
+    ['k12-filtering', '#eab308'], ['ot-network', '#f97316'], ['legacy-hardware', '#64748b'],
 ];
 $insTag = $db->prepare('INSERT INTO tags (name, color) VALUES (?,?)');
 $tagIds = [];
@@ -724,11 +914,17 @@ foreach ($tags as $t) { $insTag->execute($t); $tagIds[$t[0]] = (int) $db->lastIn
 
 $insFwTag = $db->prepare('INSERT IGNORE INTO firewall_tags (firewall_id, tag_id) VALUES (?,?)');
 $tagPlan = [
-    0 => ['critical-site', 'ha-pair'], 1 => ['critical-site', 'ha-pair'],
-    2 => ['lte-backup'],  3 => ['lte-backup', 'remote-hands'],
-    4 => ['pci-scope', 'critical-site'], 5 => ['pci-scope'],
-    6 => ['critical-site'], 7 => ['pci-scope'], 8 => ['remote-hands'],
-    9 => ['critical-site'], 10 => [],
+    0  => ['critical-site', 'ha-pair', 'fiber-primary', '24x7-support'],
+    1  => ['critical-site', 'ha-pair', 'fiber-primary'],
+    2  => ['lte-backup', 'dual-wan'],
+    3  => ['lte-backup', 'remote-hands', 'dual-wan'],
+    4  => ['pci-scope', 'critical-site', 'hipaa', '24x7-support'],
+    5  => ['pci-scope', 'hipaa'],
+    6  => ['critical-site', 'fiber-primary'],
+    7  => ['pci-scope', 'ot-network'],
+    8  => ['remote-hands', 'ot-network', 'legacy-hardware'],
+    9  => ['critical-site', 'k12-filtering'],
+    10 => ['k12-filtering'],
 ];
 foreach ($tagPlan as $idx => $names) {
     foreach ($names as $n) { $insFwTag->execute([$ids[$idx], $tagIds[$n]]); }

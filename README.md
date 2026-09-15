@@ -6,7 +6,14 @@
 
 [![CI](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![v3.24.1](https://img.shields.io/badge/version-3.24.1-blue)](CHANGELOG.md)
+[![v3.25.0](https://img.shields.io/badge/version-3.25.0-blue)](CHANGELOG.md)
+
+[Quick Start](#quick-start) ·
+[Screenshots](docs/SCREENSHOTS.md) ·
+[Watch the walkthrough](#watch-the-walkthrough) ·
+[Documentation](#documentation) ·
+[Security](SECURITY.md) ·
+[MSPReboot](https://mspreboot.com)
 
 </div>
 
@@ -15,11 +22,7 @@ and update every OPNsense firewall you look after, grouped by customer and site.
 Customers and sites are organisational groupings inside your installation — they are
 not tenant logins, and nobody outside your own team signs in.
 
-[Quick Start](#quick-start) · [Walkthrough](#walkthrough) · [Screenshots](docs/SCREENSHOTS.md) · [Documentation](#documentation) · [Releases](https://github.com/agit8or1/OPNMGR/releases) · [Security](SECURITY.md)
-
----
-
-[![Fleet dashboard showing eleven managed firewalls across five customers, with roll-up tiles for offline devices, pending updates, gateways down, configuration drift and expiring certificates](docs/images/github/fleet-dashboard.png)](docs/images/github/fleet-dashboard.png)
+[![Fleet dashboard showing eleven managed firewalls across five customers, with roll-up tiles for offline devices, pending updates, gateways down, configuration drift and expiring certificates above a per-firewall health table](docs/images/github/fleet-dashboard-dark.png)](docs/images/github/fleet-dashboard-dark.png)
 
 <sub>All screenshots show the real interface populated with simulated data from an
 isolated demo fixture. Addresses are reserved documentation ranges and every
@@ -29,83 +32,86 @@ organisation and hostname is fictitious.</sub>
 
 ## What it helps you do
 
-### Find firewall and connectivity problems
+**Find firewall and connectivity problems.** Agents report check-ins, gateway latency
+and loss, VPN tunnel state, CARP status, service state and certificate expiry.
+Problems become incidents — one entry per ongoing condition, opened when it starts and
+closed when it actually clears, rather than one email per poll.
 
-Agents report check-ins, gateway latency and loss, VPN tunnel state, CARP status,
-service state and certificate expiry. Problems become incidents — one entry per
-ongoing condition, opened when it starts and closed when it actually clears, rather
-than one email per poll.
+**Review configuration backups and changes.** Configurations are backed up on a
+schedule and kept per firewall. Mark one as the approved baseline and every firewall
+is compared against it, ignoring serialisation noise and the fields OPNsense rewrites
+on every save. Nothing is ever restored automatically.
 
-### Review configuration backups and changes
-
-Configurations are backed up on a schedule and kept per firewall. Mark one as the
-approved baseline and every firewall is compared against it, ignoring serialisation
-noise and the fields OPNsense rewrites on every save, so an untouched firewall does
-not report drift. Nothing is ever restored automatically.
-
-### Coordinate maintenance and updates
-
-Updates run as campaigns through canary, pilot and production rings, with manual
-progression between them. Members of a CARP pair are never updated at the same time.
-Maintenance windows scoped to a firewall, a site or a customer withhold notifications
-while collection and health display continue.
+**Coordinate maintenance and updates.** Updates run as campaigns through canary, pilot
+and production rings with manual progression. Members of a CARP pair are never updated
+at the same time. Maintenance windows withhold notification while collection and
+health display continue.
 
 ---
 
-## Screenshot tour
+## Watch the walkthrough
 
-| | |
-|---|---|
-| [![Per-firewall health panel listing gateways with interface, address, status, latency and loss; VPN tunnels; service state; and certificate expiry](docs/images/github/firewall-health.png)](docs/images/github/firewall-health.png) | [![Configuration drift page comparing each firewall's newest backup against its approved baseline, showing three drifted firewalls with the changed configuration sections named](docs/images/github/config-drift.png)](docs/images/github/config-drift.png) |
-| **Firewall health** — gateways, tunnels, services and certificates for one firewall, as reported by its agent. | **Configuration drift** — what changed since the baseline you approved, named by section. |
-| [![Fleet updates page showing a running OPNsense 26.7.3 campaign with canary, pilot and production ring progress, and a fleet table with per-firewall ring, current and available version](docs/images/github/fleet-updates.png)](docs/images/github/fleet-updates.png) | [![Incident list showing two critical and four warning incidents with severity, affected firewall, customer, how long each has been open and acknowledgement controls](docs/images/github/incidents.png)](docs/images/github/incidents.png) |
-| **Fleet updates** — rollout rings, campaign progress and HA pairing. | **Incidents** — one entry per ongoing problem, with acknowledgement and an event trail. |
+[![Play the OPNManager walkthrough — fleet dashboard, incident triage, configuration diff, ringed update rollout and the customer and site model, in both light and dark themes](docs/images/github/walkthrough-poster.png)](https://github.com/agit8or1/OPNMGR/releases/latest)
 
-**[See all 18 screenshots →](docs/SCREENSHOTS.md)** — the fleet list, search, customers
-and sites, health overview, backup history, bulk operations, maintenance windows,
-alerting and notification history, staff roles, the audit log and the light theme.
+A recorded tour of the running application — the fleet dashboard, finding a
+connectivity problem, reviewing what changed against an approved baseline, planning a
+ringed update, and the customer and site model, with a theme switch part way through.
 
----
-
-## Walkthrough
-
-A minute through the dashboard, the fleet list, search, one firewall's health,
-configuration drift, a rollout in progress, incidents, and the customer/site model.
-
-[![Walkthrough of OPNManager: the fleet dashboard, firewall list, fleet search, per-firewall health, configuration drift, an update rollout in progress, the incident list, and customers and sites](docs/images/github/walkthrough.gif)](docs/SCREENSHOTS.md#walkthrough)
-
-<sub>Recorded against the same demo fixture. A 1440×900 MP4 of this walkthrough is
-attached to the [latest release](https://github.com/agit8or1/OPNMGR/releases/latest).</sub>
+**[▶ Download the walkthrough from the latest release](https://github.com/agit8or1/OPNMGR/releases/latest)**
+(`opnmanager-walkthrough-1080p.mp4`, with a short highlight clip alongside it).
+Captions: [`docs/walkthrough.vtt`](docs/walkthrough.vtt) ·
+Transcript: [`docs/walkthrough-script.md`](docs/walkthrough-script.md).
+The video is caption-led; no narration audio was produced.
 
 ---
 
-## How it fits together
+## See it in action
 
-```mermaid
-flowchart LR
-    subgraph fleet["Managed fleet"]
-        direction TB
-        a1["Agent<br/>Customer A firewall"]
-        a2["Agent<br/>Customer B firewall"]
-        a3["Agent<br/>Customer C firewall"]
-    end
+### Know exactly what changed, and when
 
-    server["OPNManager server<br/>PHP + MySQL"]
-    staff["MSP staff<br/>browser"]
+Each firewall's newest backup is compared against the baseline you approved, and the
+diff names every change by its description rather than by line number.
 
-    a1 -->|outbound HTTPS check-in| server
-    a2 --> server
-    a3 --> server
-    server -.->|SSH, on demand only| a1
-    staff -->|HTTPS, signed in| server
-```
+[![Configuration diff in dark theme showing two firewall rules added since the baseline, each labelled "added" with the rule description, interface and type](docs/images/github/config-diff-dark.png)](docs/images/github/config-diff-dark.png)
 
-Firewalls are never polled. Each agent makes an outbound HTTPS check-in to the
-manager, reports what it has collected, and picks up any work queued for it — so no
-inbound port has to be opened on a customer's firewall for normal operation. The one
-exception is on-demand SSH access for the web proxy and tunnels: the agent first
-installs a time-limited rule permitting only the manager's address, and the manager
-then connects out to the firewall for the length of that session.
+### Diagnose one firewall without leaving the page
+
+Gateways with latency and loss, VPN tunnels with handshake age, service state and
+certificate expiry — here a degraded LTE gateway and a stopped IDS service.
+
+[![Per-firewall health in light theme showing a gateway flagged high latency at 148.70 ms with 2.40% loss, a WireGuard tunnel, six services with one stopped, and a certificate expiring in six days](docs/images/github/firewall-health-light.png)](docs/images/github/firewall-health-light.png)
+
+### Roll updates out without taking a customer down
+
+Canary, then pilot, then production, with manual progression — and never both members
+of a CARP pair at once.
+
+[![Fleet updates in dark theme with a running OPNsense 26.7.3 campaign showing canary completed cleanly, pilot in progress and production holding, above a fleet table with each firewall's ring, versions and HA partner](docs/images/github/fleet-updates-dark.png)](docs/images/github/fleet-updates-dark.png)
+
+### Work one list instead of an inbox
+
+An incident opens when a condition becomes true and closes when it actually clears.
+Acknowledging stops the notifications without closing it.
+
+[![Incident list in light theme with two critical and four warning incidents showing severity, affected firewall, customer, how long each has been open and acknowledge controls](docs/images/github/incidents-light.png)](docs/images/github/incidents-light.png)
+
+### See the trend, not just the current value
+
+Per-firewall WAN throughput, CPU load, memory and disk, collected on each agent
+check-in.
+
+[![Firewall statistics in dark theme showing four populated twenty-four-hour charts: WAN traffic, CPU load average, memory usage and disk usage, each with average, peak and low figures](docs/images/github/firewall-statistics-dark.png)](docs/images/github/firewall-statistics-dark.png)
+
+### Organised the way you actually support them
+
+Customers group sites, sites group firewalls, each with a code, timezone, contacts and
+a default maintenance window.
+
+[![Customer management in light theme listing five customer organisations with code, contact, timezone, default maintenance window, their sites and firewall counts](docs/images/github/fleet-firewalls-light.png)](docs/images/github/fleet-firewalls-light.png)
+
+**[See all 28 screenshots →](docs/SCREENSHOTS.md)** — fleet health, config search,
+backups, bulk operations, maintenance windows, staff roles, tags, approved commands,
+audit history and more, in both themes.
 
 ---
 
@@ -160,23 +166,18 @@ The agent installs as a native plugin, checks in every two minutes by default, l
 `/var/log/opnmanager_agent.log`, and is managed with
 `service opnmanager_agent start|stop|restart`.
 
-> The installer script currently fetches the agent package from the project's own
-> distribution host rather than from your server. If your firewalls cannot reach it,
-> mirror `downloads/plugins/os-opnmanager-agent-<version>.tar.gz` yourself and adjust
-> `PLUGIN_URL` in the installer.
-
 ---
 
 ## Compatibility and feature availability
 
 | | Version | Notes |
 |---|---|---|
-| Application | 3.24.1 | Install from `main`. |
+| Application | 3.25.0 | Install from `main`. |
 | Agent | v1.6.2 | Newest published package in `downloads/plugins/`. |
 | Minimum supported agent | 1.3.0 | Older agents are refused. |
 | Database schema | 1.4.0 | `database/schema.sql`, regenerated by `scripts/generate_schema.sh`. |
 
-CI enforces these against `VERSION` and the published artifact — application 3.24.1,
+CI enforces these against `VERSION` and the published artifact — application 3.25.0,
 **Agent**: v1.6.2 — so no reference in the tree can drift out of step.
 
 Feature availability depends on the agent version a firewall is actually running:
@@ -199,15 +200,25 @@ runs. Earlier releases may work — the agent needs only a POSIX shell, `fetch` 
 `configctl` — but are not tested. Firewalls need outbound HTTPS to the manager; no
 inbound port is required.
 
+### Known limitations
+
+- **The agent installer fetches its package from the project's distribution host**,
+  not from your server. `install_opnmanager_agent.sh` has `PLUGIN_URL` hardcoded. If
+  your firewalls cannot reach it, mirror
+  `downloads/plugins/os-opnmanager-agent-<version>.tar.gz` and adjust that URL.
+- **There is no formal support or LTS policy.** Treat this as actively developed
+  software and read the changelog before upgrading.
+- **Two-factor enrolment renders its QR code through a third-party service**
+  (`api.qrserver.com`), which means the TOTP URI leaves your server during setup. The
+  secret is also shown as text for manual entry if you would rather not use the image.
+
 ### Releases
 
 Each version is tagged from `main`, so the
 [latest release](https://github.com/agit8or1/OPNMGR/releases/latest) matches this tree.
 Tagging was intermittent before 3.22 — v3.11.1 was the previous tag, and 3.12 through
 3.21 shipped on `main` and are recorded only in the changelog — so
-[CHANGELOG.md](CHANGELOG.md) remains the authoritative history rather than the releases
-page. There is no formal support or LTS policy, so treat this as actively developed
-software and read the changelog before upgrading.
+[CHANGELOG.md](CHANGELOG.md) remains the authoritative history.
 
 ---
 
@@ -215,19 +226,19 @@ software and read the changelog before upgrading.
 
 | | |
 |---|---|
-| [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | Full screenshot gallery and the walkthrough. |
+| [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | Full screenshot gallery — 28 captures in both themes. |
 | [CHANGELOG.md](CHANGELOG.md) | Full release-by-release history. |
 | [FEATURES.md](FEATURES.md) | Feature reference. |
 | [docs/UPGRADING.md](docs/UPGRADING.md) | Upgrading the server and the agent fleet. |
 | [SECURITY.md](SECURITY.md) | Security architecture and how to report a vulnerability. |
-| [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Day-to-day operator commands. |
+| [docs/walkthrough-script.md](docs/walkthrough-script.md) | Walkthrough transcript and narration script. |
 
 ---
 
 ## Security
 
-Agents authenticate with a per-firewall API key and HMAC signing secret. Secrets,
-SSH private keys and MFA recovery codes are encrypted at rest with XChaCha20-Poly1305
+Agents authenticate with a per-firewall API key and HMAC signing secret. Secrets, SSH
+private keys and MFA recovery codes are encrypted at rest with XChaCha20-Poly1305
 keyed from `.env`. Agent updates are Ed25519-signed and verified before installation,
 with automatic rollback. Remote operations go through a validated action catalogue;
 raw shell is a separate, audited, explicitly privileged path. Certificate metadata is
@@ -247,7 +258,21 @@ reference derived from it agree.
 ## Support
 
 - [Issues](https://github.com/agit8or1/OPNMGR/issues) for bugs and questions
-- [mspreboot.com](https://mspreboot.com) — the maintainer's MSP consultancy
+- There is no paid support offering for OPNManager
+
+---
+
+## More tools from MSPReboot
+
+OPNManager is one of six free, self-hosted tools published at
+**[mspreboot.com/free-projects](https://mspreboot.com/free-projects)** — alongside
+Client St0r (IT documentation and asset management), Depl0y, St0r, Rem0te and
+Net Agit8or. They are free to use and self-hosted, with no per-seat billing and no
+licence server.
+
+[mspreboot.com](https://mspreboot.com) is the MSP consulting practice of the same
+author, who ran an MSP for 24 years. Consulting is a separate offering: it is not a
+support contract for these projects, and nothing here is sold or bundled with it.
 
 ## License
 

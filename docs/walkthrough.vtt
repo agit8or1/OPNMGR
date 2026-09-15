@@ -1,0 +1,83 @@
+WEBVTT
+
+NOTE
+Captions for opnmanager-walkthrough-1080p.mp4. The video is caption-led and has no
+audio track; these cues mirror the on-screen text. Script: docs/walkthrough-script.md
+
+1
+00:00:00.500 --> 00:00:04.700
+OPNManager — self-hosted OPNsense fleet management for MSPs and IT teams
+
+2
+00:00:04.700 --> 00:00:09.000
+Every firewall you look after, grouped by customer and site.
+All data shown is simulated demo data.
+
+3
+00:00:09.700 --> 00:00:13.700
+Start with what needs attention — roll-up tiles appear only when the count is non-zero
+
+4
+00:00:16.900 --> 00:00:21.100
+Eleven firewalls across five customers: one offline, four with updates pending,
+two drifted from baseline
+
+5
+00:00:26.000 --> 00:00:30.600
+Workflow 1 — find the problem. One incident per ongoing condition, not one email per poll
+
+6
+00:00:36.000 --> 00:00:41.400
+Gateways, tunnels, services and certificates for a single firewall,
+as reported by its agent
+
+7
+00:00:41.400 --> 00:00:46.000
+A degraded LTE gateway at 148 ms and 2.4% loss, and a stopped intrusion detection service
+
+8
+00:00:48.000 --> 00:00:52.600
+Workflow 2 — review what changed. Each firewall compared against the baseline you approved
+
+9
+00:00:54.000 --> 00:00:59.600
+Two firewall rules added since the baseline.
+Serialisation noise is ignored, so an untouched firewall reports no drift
+
+10
+00:01:02.000 --> 00:01:05.400
+The whole interface has a light theme, with system preference detection and a manual toggle
+
+11
+00:01:09.000 --> 00:01:14.000
+Workflow 3 — plan an update. Canary, then pilot, then production;
+rings are a rollout mechanism, not customer tiers
+
+12
+00:01:17.600 --> 00:01:22.200
+HA pairs are never updated at the same time — the BACKUP member goes first
+
+13
+00:01:24.000 --> 00:01:28.800
+Maintenance windows scoped to a firewall, a site or a customer.
+Collection continues; only notification is withheld
+
+14
+00:01:31.000 --> 00:01:36.000
+Per-firewall traffic, load, memory and disk, collected on each agent check-in
+
+15
+00:01:37.000 --> 00:01:41.600
+Who did what, to which firewall, from where. Credential material is never recorded
+
+16
+00:01:43.000 --> 00:01:47.800
+Customers and sites are organisational groupings — they have no accounts and never log in
+
+17
+00:01:49.500 --> 00:01:54.100
+OPNManager — free and self-hosted. github.com/agit8or1/OPNMGR
+
+18
+00:01:54.100 --> 00:01:58.500
+More free tools for MSPs — mspreboot.com

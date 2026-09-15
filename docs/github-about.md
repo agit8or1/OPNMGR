@@ -3,10 +3,10 @@
 Settings that live in GitHub's own UI rather than in the tree, under
 **About → ⚙** on the repository page.
 
-> **Applied on 2026-09-15 (v3.22.0).** The repository now carries the description,
-> topics and Website setting described below. This file is the record of that
-> intended state, not a to-do list — check it if the settings ever drift, and update
-> it here first if you change them.
+> **Applied on 2026-09-15.** The repository carries the description, topics and
+> Website setting described below. This file is the record of that intended state,
+> not a to-do list — check it if the settings drift, and update it here first if
+> you change them.
 
 Nothing here is applied automatically; GitHub settings are not part of the tree.
 
@@ -18,21 +18,22 @@ GitHub allows 350 characters. Currently set to this (248 characters):
 > connectivity health, review configuration backups and drift, and roll out updates
 > through canary/pilot/production rings — with firewalls grouped by customer and site.
 
-Shorter alternative, if the one above wraps awkwardly in search results:
-
-> Self-hosted OPNsense fleet management for MSPs and IT teams — health monitoring,
-> configuration backups and drift, and ringed update rollouts.
-
 ## Website
 
 The **Website** field is deliberately empty.
 
-The project has no dedicated site. `mspreboot.com` resolves (verified, HTTP 200) but
-is the maintainer's MSP consulting site, not an OPNManager project page, so putting it
-in the Website field would misdirect anyone clicking it expecting documentation. If you
-would rather point somewhere, the honest target is the changelog:
+The project has no dedicated site of its own. Two candidates were considered:
 
-    https://github.com/agit8or1/OPNMGR/blob/main/CHANGELOG.md
+- `https://mspreboot.com/free-projects` — the author's project index, which does
+  list OPNManager among six free tools (verified). It is accurate, but it points
+  visitors at a catalogue rather than at this project's own documentation.
+- `https://github.com/agit8or1/OPNMGR/blob/main/CHANGELOG.md` — the authoritative
+  history.
+
+Leaving the field empty keeps the repository's own README as the landing page,
+which serves a visitor better than either. The MSPReboot links in the README and
+gallery cover the promotion without hijacking the About link. If a dedicated
+product site ever exists, that becomes the primary About URL.
 
 ## Topics
 
@@ -68,9 +69,8 @@ How that differs from the pre-3.22.0 list:
 
 ## Other repository settings
 
-- **Releases** — done. v3.22.0 is tagged and is the latest release. It was the first
-  tag since v3.11.1; 3.12 through 3.21 shipped on `main` and exist only in the
-  changelog.
-- **Social preview image** — `docs/images/github/fleet-dashboard.png` works as-is
-  (1440×900, close to GitHub's 1280×640 aspect target; it will be letterboxed).
+- **Releases** — each version is tagged from `main`. The walkthrough MP4 and the
+  highlight clip are attached as release assets rather than tracked in git.
+- **Social preview image** — `docs/images/github/fleet-dashboard-dark.png` works
+  as-is (2880×2000; GitHub will letterbox it to its 1280×640 target).
 - **Issue templates** — already present in `.github/ISSUE_TEMPLATE/`.

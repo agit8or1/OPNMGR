@@ -6,6 +6,74 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.25.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+Presentation and demo-tooling release. No application behaviour change, no schema
+migration, no agent update.
+
+### Added
+
+- **A 28-capture screenshot gallery, half light and half dark.**
+  `docs/SCREENSHOTS.md` is organised by what an operator is trying to do rather
+  than by page name, with a table of contents, a theme label and a caption on
+  every entry. Captures are 1440×1000 at deviceScaleFactor 2, so interface text
+  stays sharp when GitHub scales them down, and the whole set is 4.2 MB.
+
+- **A recorded walkthrough of the running application**, with a highlight clip, a
+  poster frame, a WebVTT caption file (`docs/walkthrough.vtt`) and a transcript
+  that doubles as a narration script (`docs/walkthrough-script.md`). The
+  walkthrough switches theme through the application's own toggle part way
+  through, so both themes are shown honestly rather than claimed. It is
+  caption-led: **no narration audio was produced**, and the file has no audio
+  track. The MP4s are release assets, not tracked files.
+
+- **`scripts/encode_demo_media.sh`** — encodes the recording to 1080p30 H.264 with
+  `yuv420p` and `faststart` so it plays in browsers and on phones, cuts the
+  highlight clip, and extracts the poster.
+
+### Changed
+
+- **The demo fixture now writes real OPNsense-shaped configuration XML.**
+  Configuration drift and fleet configuration search both parse the stored backup
+  file, so seeding database rows alone produced a drift page that could not diff
+  and a search that returned nothing. The fixture writes 165 config files to a
+  directory outside the repository, then calls `drift_set_baseline()` and
+  `drift_evaluate()` — so the drift state in the screenshots is computed by the
+  application from real files rather than fabricated. A few configurations carry
+  findings the named security checks genuinely detect.
+
+- **The fixture also seeds what the visual pages need**: bandwidth test history
+  (the detail chart reads `bandwidth_tests`, which is what `agent_checkin.php`
+  writes — `firewall_speedtest` is written by `api/agent_speedtest_result.php` but
+  nothing renders it), `firewall_agents` rows, twelve tags, five staff across the
+  three roles, and alert triggers and notifications.
+
+- **The capture script takes a manifest.** Every capture records its route, theme,
+  any tab it had to click and the viewport, written to
+  `docs/images/github/captures.json`, so a capture can be reproduced without
+  guesswork. Themes are applied through the application's own selector and each
+  capture waits for `<html data-theme>` to settle before the shutter.
+
+- **README rebuilt** around one hero image, three benefits, a six-shot visual tour
+  grouped by outcome, and the walkthrough — with a Known limitations section that
+  names the hardcoded agent-package URL, the absence of a support policy, and the
+  third-party QR service used during two-factor enrolment.
+
+### Fixed
+
+- **A broken documentation link shipped in 3.22.0.** The README linked
+  `docs/QUICK_REFERENCE.md`, which is gitignored and therefore 404s on GitHub. The
+  file is stale v2.1.0 content that contradicts the current version and references
+  pages that no longer exist, so the link is gone rather than the file tracked.
+
+### Removed
+
+Six files with evidence, and nineteen superseded media files. See the cleanup
+commit for the per-file reasoning.
+
+---
+
 ## Version 3.24.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

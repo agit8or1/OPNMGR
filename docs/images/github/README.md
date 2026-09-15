@@ -1,17 +1,32 @@
-# README screenshots
+# Documentation media
 
-The images in this directory are the ones embedded in the project README.
+The images here are the ones embedded in [the README](../../../README.md) and
+[docs/SCREENSHOTS.md](../../SCREENSHOTS.md).
 
-They show the real interface. The data in them is not real: it comes from
-`scripts/demo_fixture.php`, which populates a throwaway `*_demo` database with
-fictitious customers, sites and simulated telemetry and refuses to run against
-anything else. No live firewall is contacted, and no update, reboot or restore is
-triggered to produce them.
+They show the real OPNManager interface. The data in them is not real: it comes
+from [`scripts/demo_fixture.php`](../../../scripts/demo_fixture.php), which
+populates a throwaway `*_demo` database with fictitious customers, sites and
+simulated telemetry and refuses to run against anything else. No live firewall is
+contacted, and no update, reboot or restore is triggered to produce them.
 
 Every address is from a range reserved for documentation — RFC 5737
 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) and RFC 3849
 (`2001:db8::/32`) — and every hostname is under a reserved `.example` domain
-(RFC 6761).
+(RFC 6761). Because nothing real is ever rendered, there is no redaction step
+that can silently fail to catch a hostname.
+
+## What is here
+
+| File | Content |
+|---|---|
+| `<feature>-light.png`, `<feature>-dark.png` | 28 captures, 1440×1000 at deviceScaleFactor 2 |
+| `walkthrough-poster.png` | Poster frame for the walkthrough video |
+| `captures.json` | Route, theme, tab and viewport for every capture |
+
+`captures.json` is written by the capture script on every run and is the record of
+how each image was produced. The walkthrough MP4s are **not** kept here: they are
+release assets, because a binary that regenerates from a script does not need to
+sit in git history.
 
 ## Regenerating
 
@@ -19,47 +34,30 @@ Every address is from a range reserved for documentation — RFC 5737
    `USE opnsense_fw`, so strip that line when importing under another name.
 2. Point a throwaway `.env` at it with `DB_NAME` ending in `_demo` and
    `OPNMGR_DEMO=1`, and create an account with `scripts/create_admin.php`.
-3. Seed and capture, in that order and without a long gap between them — the
-   fixture seeds check-in ages in seconds and the dashboard treats anything
-   older than five minutes as offline:
+3. Seed, then capture without a long gap — the fixture seeds check-in ages in
+   seconds and the dashboard treats anything older than five minutes as offline:
 
    ```bash
-   OPNMGR_DEMO=1 php scripts/demo_fixture.php
+   OPNMGR_DEMO=1 OPNMGR_DEMO_BACKUP_DIR=/tmp/opnmgr-demo-backups \
+     php scripts/demo_fixture.php
+
    DEMO_PASS='...' node scripts/capture_demo_screenshots.js
    DEMO_PASS='...' node scripts/record_demo_walkthrough.js
+   sh scripts/encode_demo_media.sh
    ```
 
-   The recorder writes `walkthrough.mp4`. The README embeds a GIF, which is
-   produced from it with the two ffmpeg commands in the recorder's header
-   comment (800px wide, 6 fps, 128 colours — legible and about 5 MB).
+   `DEMO_PASS` comes from the environment; no credential is stored in any script
+   or manifest. Set `ONLY=fleet-dashboard-dark` to re-shoot a single capture.
 
-All captures are 1440×900, dark theme, sidebar pinned.
+The fixture writes real OPNsense-shaped configuration XML to
+`OPNMGR_DEMO_BACKUP_DIR` (default `$TMPDIR/opnmgr-demo-backups`), outside the
+repository, because configuration drift and fleet configuration search both parse
+the stored file. Delete that directory when you are done.
 
-The captures, and where each is used:
+## Themes
 
-| File | Page | Used in |
-|---|---|---|
-| `fleet-dashboard.png` | Dashboard | README hero, gallery |
-| `firewall-health.png` | Health, focused on one firewall | README tour, gallery |
-| `config-drift.png` | Configuration Drift | README tour, gallery |
-| `fleet-updates.png` | Fleet Updates | README tour, gallery |
-| `incidents.png` | Incidents | README tour, gallery |
-| `walkthrough.gif` | Eight-stop tour | README, gallery |
-| `fleet-firewalls.png` | Firewall list | gallery |
-| `fleet-search.png` | Fleet search | gallery |
-| `customers.png` | Customers and sites | gallery |
-| `health-overview.png` | Health, fleet-wide | gallery |
-| `firewall-detail.png` | Firewall detail, system statistics | gallery |
-| `backup-history.png` | Firewall detail, Backups tab | gallery |
-| `maintenance.png` | Maintenance windows | gallery |
-| `bulk-operations.png` | Bulk operations | gallery |
-| `audit-log.png` | Audit log | gallery |
-| `users-roles.png` | Staff and roles | gallery |
-| `dashboard-light.png` | Dashboard, light theme | gallery |
-| `alerts.png` | Alert configuration | gallery |
-| `alert-history.png` | Notification history | gallery |
-
-Both alerting pages were held back from the 3.24.0 gallery because of defects that
-a screenshot would have advertised as normal behaviour. Both were fixed in 3.24.1:
-`alert_history.php` read columns that do not exist in `alert_history`, and
-`alerts.php` carried a credential-shaped placeholder. See the changelog.
+Captures are split evenly between the application's light and dark themes. The
+theme is applied through the application's own selector — `theme.js` reads
+`opnmgr-theme` from `localStorage` — and each capture waits until
+`<html data-theme>` actually reflects the requested value before the shutter.
+Nothing is themed with a screenshot filter or injected CSS.
