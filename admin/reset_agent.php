@@ -80,7 +80,7 @@ $firewalls = $stmt->fetchAll();
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/../inc/nav.php'; ?>
+    <?php /* inc/nav.php has never existed; this page renders its own shell. */ ?>
 
     <div class="container mt-4">
         <h2><i class="fas fa-sync-alt"></i> Manual Agent Reset</h2>

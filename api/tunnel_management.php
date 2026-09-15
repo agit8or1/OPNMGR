@@ -5,7 +5,9 @@
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/functions.php';
+// (inc/functions.php was required here; it has never existed in this
+// repository, which made this endpoint fatal on load. Everything this
+// file uses comes from inc/bootstrap.php or PHP itself.)
 
 header('Content-Type: application/json');
 

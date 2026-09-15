@@ -138,24 +138,42 @@ screenshots-raw/
 storageState*.json
 playwright/.auth/
 
-# Test and development files.
+# Throwaway scratch files at the top of the working tree.
 #
-# These patterns are broad on purpose, but they were also swallowing real
-# application endpoints that the shipped UI calls: api/test_email.php (the
-# "Send Test Email" button in alerts.php) and api/run_bandwidth_test.php were
-# both absent from the repository, so a fresh clone 404'd on them. Negate the
-# endpoints that are part of the product.
-test_*
-debug_*
-temp_*
-*_test.*
-!api/test_email.php
-!api/run_bandwidth_test.php
-# ...but the committed test suite must ship: CI runs it, and it is the
-# regression guard for the agent authentication and authorization behaviour.
+# These are ANCHORED to the repository root on purpose. They used to be bare
+# patterns, which match at every depth, and that quietly excluded real product
+# files: api/test_email.php (the "Send Test Email" button), api/test_ssl.php and
+# api/test_nginx.php (the diagnostics buttons), api/test_pushover.php (the
+# "Send Test Push" button) and api/run_bandwidth_test.php. A fresh clone 404'd
+# on every one of them, and nobody could have committed a fix, because the fix
+# would have been ignored too.
+#
+# Keep new patterns anchored. An unanchored name here silently removes files
+# from the product.
+/test_*
+/debug_*
+/temp_*
+/*_test.*
+# The committed test suite must ship: CI runs it, and it is the regression guard
+# for the agent authentication and authorization behaviour.
 !tests/
 !tests/*.php
-*_debug.*
+
+# Scratch files that anchoring made visible. Each was checked: none is
+# referenced by any tracked source, and none appears in the released agent
+# packages. Listed individually rather than by pattern, so adding a real
+# endpoint whose name happens to start with "test" does not silently vanish.
+/api/record_bandwidth_test.php
+/api/system_test.php
+/api/test_api.php
+/api/test_api_agent.php
+/api/test_data.php
+/diagnostics/
+/scripts/debug_webport.php
+/scripts/test_webport.php
+/scripts/test_webport2.php
+/scripts/test_webport3.php
+/*_debug.*
 *_broken*
 *.broken
 *.broken_*

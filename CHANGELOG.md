@@ -6,6 +6,101 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.27.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+An audit for files that are referenced but absent. It found nine, including two
+fatal errors on paths a user can reach.
+
+### Fixed
+
+- **Saving a firewall crashed if you changed the Web GUI IP list.**
+  `firewall_details.php` did `require_once __DIR__ . '/scripts/queue_command.php'`
+  on a file that has never existed in this repository, which is a fatal error — and
+  it fired after the `UPDATE` had already committed, so the row changed and the page
+  died. There was nothing to call in its place: `configure_webgui_access.sh` does not
+  exist either, `queue_command()` is not in scope, and the agent has no handler for
+  any of it.
+
+  The field also promised something the product does not do. Its help text said
+  *"Restrict web GUI access to specific IPs"* and named a hardcoded public IP as
+  always-permitted, while nothing was ever pushed to any firewall. A security control
+  that silently does nothing is worse than no control, so the field is now labelled
+  **Recorded only**, says plainly that it does not restrict anything, and points at
+  where to actually configure it. The stored values are untouched.
+
+- **Two endpoints were fatal on load, both reachable from the UI.**
+  `api/tunnel_management.php` (linked from Settings) required `inc/functions.php`,
+  and `api/apply_secure_lockdown.php` (the Secure Outbound Lockdown toggle on the
+  firewall detail page) required `inc/ssh_tunnel.php`. Neither file has ever existed.
+
+  `tunnel_management.php` did not need it — everything it uses comes from
+  `inc/bootstrap.php` — so the include is gone and the endpoint works.
+
+  `apply_secure_lockdown.php` depends on `create_ssh_tunnel()`, which was meant to
+  come from that missing file and is not defined anywhere. The rest of the endpoint
+  is implemented, so rather than delete a half-built feature or invent an SSH tunnel
+  subsystem, it now returns **501 with an explanation** instead of fataling. The
+  toggle reports a clear reason rather than a JSON parse error.
+
+- **`admin/reset_agent.php` included `inc/nav.php`**, which has never existed. The
+  page renders its own shell, so the include is gone.
+
+- **Four UI buttons called endpoints that were never written.** All four are now
+  implemented and behave the way their callers already expect:
+
+  | Endpoint | Button |
+  |---|---|
+  | `api/test_pushover.php` | "Send Test Push" in Alerts — posts through the Pushover API using the saved application token and reports the specific error Pushover returns |
+  | `api/test_ssl.php` | "Test SSL certificates" in Diagnostics — reports the certificate this server presents, its issuer, validity and days remaining |
+  | `api/test_nginx.php` | "Test nginx configuration" in Diagnostics — runs `nginx -t`, falling back to `apachectl configtest` |
+
+  All three require a session and refuse with 401 otherwise.
+
+- **`scripts/install_snyk.sh` was restored.** `security_scan.php` still `exec()`s it,
+  but commit `1ac6a54` *"Remove 248 unused files - major repo cleanup"* deleted it.
+  Recovered unchanged from `a20f8cb`.
+
+- **`api/instances/register.php` advertised `/api/support/ticket.php`**, which does
+  not exist, so every registered instance was handed a support URL that 404s. It is
+  no longer advertised.
+
+### Removed
+
+- **`inc/api_auth.php`** — 34 orphan lines redefining `requireLogin()` and
+  `requireAdmin()` **unguarded**. Nothing included it, and loading it alongside
+  `inc/auth.php` is a hard fatal (`Cannot redeclare requireLogin()`), which was
+  confirmed by running it. Any future `require_once` of it would have been an instant
+  crash.
+
+- **`deployment_packages.php`** — an orphan page, in no navigation and linked from
+  nowhere, whose entire client side called `api/deployment_packages.php`. That API
+  was never committed, so the page has never functioned.
+
+### Changed
+
+- **`.gitignore` patterns are anchored to the repository root.** `test_*`, `debug_*`,
+  `temp_*`, `*_test.*` and `*_debug.*` were unanchored, so they matched at every
+  depth and quietly excluded real product files: `api/test_email.php`,
+  `api/test_ssl.php`, `api/test_nginx.php`, `api/test_pushover.php` and
+  `api/run_bandwidth_test.php`. A fresh clone 404'd on all of them, and nobody could
+  have committed a fix, because the fix would have been ignored too. Root-level
+  scratch files are still ignored; this was verified both ways.
+
+### Added
+
+- **`tests/referenced_files_test.php`, wired into CI.** Every internal URL the UI
+  fetches, every `require`/`include` built from `__DIR__`, and every `.sh` path the
+  server executes must exist on disk. It also asserts that the shipped endpoints are
+  not excluded by `.gitignore`.
+
+  It earned its place while being written: the first three findings came from the
+  manual audit, and the test then surfaced `inc/nav.php`, `inc/ssh_tunnel.php` and
+  `inc/functions.php` — including both fatal endpoints — which the manual pass had
+  missed because it only looked at URLs, not at server-side includes.
+
+---
+
 ## Version 3.26.2
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

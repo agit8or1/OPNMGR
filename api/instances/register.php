@@ -76,10 +76,12 @@ echo json_encode([
     'customer_name' => $customer_name,
     'api_key' => $api_key,
     'registered_at' => date('Y-m-d H:i:s'),
+    // Only advertise endpoints that exist. '/api/support/ticket.php' was listed
+    // here but has never been written, so every registered instance was handed a
+    // support URL that 404s.
     'endpoints' => [
         'updates_check' => '/api/updates/check.php',
         'updates_download' => '/api/updates/download.php',
-        'support' => '/api/support/ticket.php'
     ],
     'next_steps' => [
         'Configure automatic update checks',

@@ -169,6 +169,11 @@ jobs:
       - name: Auth ordering suite
         run: php tests/auth_ordering_test.php
 
+      # Files the UI fetches, and files the server requires, must exist. Broad
+      # .gitignore rules and bulk deletions have removed several of both.
+      - name: Referenced files suite
+        run: php tests/referenced_files_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

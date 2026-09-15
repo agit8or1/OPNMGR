@@ -169,11 +169,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
 
             error_log("Tags saved for FW$id: " . implode(', ', $tags_list) . " (" . count($tags_list) . " tags)");
 
-            // Queue command to apply web GUI IP lockdown if changed
-            if ($allowed_webgui_ips !== ($firewall['allowed_webgui_ips'] ?? '')) {
-                require_once __DIR__ . '/scripts/queue_command.php';
-                queue_command($id, '/tmp/configure_webgui_access.sh', 'Configure Web GUI IP Access');
-            }
+            // The Web GUI IP list is recorded only. It used to require_once
+            // scripts/queue_command.php here, a file that has never existed in
+            // this repository, so changing the field produced a fatal error and
+            // the save died after the UPDATE had already committed. There is
+            // nothing to call in its place: configure_webgui_access.sh does not
+            // exist either, and the agent has no handler for it, so no command
+            // could be queued that any firewall would act on.
 
             // Log the update
             error_log("Configuration updated for firewall ID $id: checkin_interval=$checkin_interval, speedtest_interval={$speedtest_interval}h, customer_group=$customer_group, tags=" . implode(',', $tags_list) . ", webgui_ips=$allowed_webgui_ips");
@@ -758,16 +760,17 @@ include __DIR__ . '/inc/header.php';
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label for="allowed_webgui_ips" class="form-label fw-bold">
-                                                    <i class="fas fa-shield-alt me-2" style="color: #17a2b8;"></i>Web GUI IP Lockdown
+                                                    <i class="fas fa-note-sticky me-2" style="color: #17a2b8;"></i>Web GUI IP Notes
                                                 </label>
                                                 <input type="text" name="allowed_webgui_ips" id="allowed_webgui_ips" class="form-control"
                                                        value="<?php echo htmlspecialchars($firewall['allowed_webgui_ips'] ?? ''); ?>"
                                                        placeholder="192.168.1.100, 10.0.0.50">
                                                 <small class="d-block mt-2">
-                                                    <strong>Restrict web GUI access to specific IPs</strong><br>
-                                                    ✓ Comma-separated IP addresses (e.g., 192.168.1.100, 10.0.0.50)<br>
-                                                    ✓ Management platform (184.175.206.229) is <strong>always included</strong><br>
-                                                    ✓ Leave empty to allow access from any IP
+                                                    <span class="badge bg-warning text-dark">Recorded only</span>
+                                                    <strong class="d-block mt-2">This list is stored against the firewall for your
+                                                    reference. It is not pushed to the firewall and does not restrict anything.</strong>
+                                                    Apply web GUI access restrictions on the firewall itself, under
+                                                    <em>Firewall &rarr; Rules</em>. Comma-separated IP addresses.
                                                 </small>
                                             </div>
                                         </div>

@@ -10,7 +10,8 @@
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-require_once __DIR__ . '/../inc/ssh_tunnel.php';
+// inc/ssh_tunnel.php has never existed in this repository, so requiring it
+// here made this endpoint fatal before it read a single parameter.
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -50,6 +51,20 @@ try {
     }
     
     // Establish tunnel to firewall
+    // create_ssh_tunnel() was meant to come from inc/ssh_tunnel.php, which was
+    // never written. Report that plainly instead of fataling on an undefined
+    // function: the rest of this endpoint is implemented, but it cannot run
+    // without a way to open the tunnel.
+    if (!function_exists('create_ssh_tunnel')) {
+        http_response_code(501);
+        echo json_encode([
+            'success' => false,
+            'error'   => 'Secure outbound lockdown is not available in this build: '
+                       . 'the SSH tunnel helper it depends on is not implemented.',
+        ]);
+        exit;
+    }
+
     $tunnel_port = create_ssh_tunnel($firewall_id);
     if (!$tunnel_port) {
         http_response_code(500);
