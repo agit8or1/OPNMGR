@@ -57,7 +57,7 @@ try {
     $stmt->execute([$firewall_id]);
     
     // Log the action
-    log_action("Removed reverse proxy for firewall {$firewall['hostname']}");
+    log_event('info', 'Proxy Management', "Removed reverse proxy for firewall {$firewall['hostname']}");
     
     header('Content-Type: application/json');
     echo json_encode([

@@ -30,7 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = '<div class="alert alert-danger"><i class="fas fa-lock me-2"></i><strong>Account Locked</strong><br>Too many failed login attempts. Please try again in ' . $remaining . ' minute' . ($remaining > 1 ? 's' : '') . '.</div>';
         error_log("SECURITY: Login attempt on locked account - Username: {$username}, IP: {$ip_address}");
     } else {
-        if (login($username, $password)) {
+        $login_result = login($username, $password);
+
+        // '2fa' is truthy, so it has to be tested before the success branch:
+        // the password was right but the session is not authenticated yet.
+        if ($login_result === '2fa') {
+            $bfp->clear_attempts($username, $ip_address);
+            error_log("LOGIN: Password accepted, awaiting 2FA - Username: {$username}, IP: {$ip_address}");
+            header('Location: /verify2fa.php');
+            exit;
+        } elseif ($login_result) {
             $bfp->clear_attempts($username, $ip_address);
             error_log("LOGIN: Successful login - Username: {$username}, IP: {$ip_address}");
             header('Location: /dashboard.php');

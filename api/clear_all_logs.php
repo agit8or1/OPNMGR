@@ -31,7 +31,7 @@ try {
     $deleted_count = $stmt->rowCount();
     
     // Log this action (will be the first entry in the fresh log)
-    log_action('System Management', 'WARNING', 'All system logs cleared by admin user: ' . ($_SESSION['username'] ?? 'unknown'), '', $_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    log_event('warning', 'System Management', 'All system logs cleared by admin user: ' . ($_SESSION['username'] ?? 'unknown'), '', $_SERVER['REMOTE_ADDR'] ?? 'unknown');
     
     echo json_encode([
         'success' => true,

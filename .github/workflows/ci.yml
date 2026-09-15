@@ -202,6 +202,12 @@ jobs:
       - name: Notification health suite
         run: php tests/notification_health_test.php
 
+      # A call to a function that does not exist is a fatal that only appears
+      # when that line is reached. verify2fa.php called clear2FA() on a correct
+      # code; two-factor could not be completed by anyone.
+      - name: Undefined functions suite
+        run: php tests/undefined_functions_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

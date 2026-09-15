@@ -154,7 +154,7 @@ server {
     $stmt->execute([$proxy_port, $firewall_id]);
     
     // Log the action
-    log_action("Proxy Management", "INFO", "Setup reverse proxy for firewall {$firewall['hostname']} on port {$proxy_port}", $firewall['hostname']);
+    log_event("info", "Proxy Management", "Setup reverse proxy for firewall {$firewall['hostname']} on port {$proxy_port}", $firewall['hostname']);
     
     header('Content-Type: application/json');
     echo json_encode([

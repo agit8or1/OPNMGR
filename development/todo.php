@@ -6,15 +6,17 @@ requireLogin();
  * Track features, bugs, and improvements
  */
 
-require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/bootstrap.php';
 
-// Check authentication
-if (!check_authentication()) {
+// This gated on check_authentication(), which is defined nowhere, so the page
+// was fatal on every request rather than authenticated. Nothing ran past the
+// fatal, so it was never a way in - just a page that had never worked.
+if (!isLoggedIn()) {
     header('HTTP/1.1 401 Unauthorized');
     echo "Authentication required";
     exit;
 }
+requireAdmin();
 ?>
 
 <!DOCTYPE html>

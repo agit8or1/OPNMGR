@@ -6,6 +6,82 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.35.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **If you had 2FA "enabled"**, it was not protecting your account and is now enforced.
+> Confirm your authenticator still produces accepted codes before relying on it. No
+> account on the maintainer's installation was enrolled, so nobody could be locked out
+> by this change.
+
+### Security
+
+- **Two-factor authentication was never asked for.** `login()` verified the password,
+  set `$_SESSION['user_id']` and returned success — it never read `totp_secret`. Nothing
+  anywhere redirected to `verify2fa.php`; no code path referenced it at all. An account
+  whose profile said *"2FA is currently enabled for your account"* was protected by a
+  password and nothing else.
+
+  This is the same shape as the lockdown toggles and the scheduled jobs page: a control
+  surface reporting a protection it did not have. It is worse here, because the operator
+  chose that protection deliberately.
+
+- **And the verification page could not have worked either.** `verify2fa.php` called
+  `clear2FA()` on a **correct** code. That function is defined nowhere in the codebase,
+  so entering the right number produced a fatal error page, while a wrong number returned
+  a tidy "Invalid code". Combined with the enrolment bug fixed earlier (a hex secret
+  offered to authenticators as if it were Base32), two-factor has never worked end to end
+  in any part: enrol, challenge, or verify.
+
+### Fixed
+
+- **The second factor is now held at login.** An enrolled account gets a pending state
+  rather than a session: no `user_id` is set, so `isLoggedIn()` is false and every
+  `requireLogin()` page refuses until the code is confirmed. The pending state expires
+  after five minutes and is bound to the address that supplied the password, so a stolen
+  cookie cannot be completed elsewhere. Promotion regenerates the session id.
+
+  `login()` returns `'2fa'` for this case — truthy, so the caller tests it before the
+  success branch. Verified end to end against a real enrolled account: correct password
+  redirects to the challenge, the session is *not* authenticated at that point, a wrong
+  code is rejected, a correct code promotes and lands on the dashboard. Also verified
+  that an account **without** 2FA logs in exactly as before.
+
+- **The verification form had no CSRF token**, and the page read `$_SESSION['user_id']` —
+  only set once a session is already authenticated, so by the time anyone could reach it
+  the second factor was moot.
+
+- **Seven more calls to functions that do not exist**, each a fatal when reached:
+  `write_log()` and `log_action()` across five endpoints and two cron jobs
+  (`inc/logging.php` provides `log_event()`, with the arguments in a different order),
+  and `check_authentication()` in `development/todo.php`.
+
+  `scripts/run_auto_scans.php` calls `performAIScan()`, which has never existed — the
+  only entry point is `performAIAnalysis()`, with a different signature. Scheduled AI
+  scanning has therefore never run, and the script is in no crontab. Its table
+  (`firewall_ai_settings`) carries real rows, so the feature is unfinished rather than
+  abandoned; the script now says so and exits instead of calling into nothing.
+
+### Changed
+
+- **Reaching a firewall no longer depends on that firewall's certificate, anywhere.**
+  Managed firewalls routinely carry self-signed or expired certificates; that is
+  something to report, not a reason to lose the ability to manage the box. The live
+  paths already connected with verification off, but `inc/opnsense_api.php` defaulted the
+  other way — adopting it would have made management fail exactly when a certificate
+  problem most needed looking at. Certificate state is still collected and reported by
+  `health_ingest_certificates()`, which is unchanged.
+
+### Added
+
+- **`tests/undefined_functions_test.php`** (9 assertions, in CI). Tokenises every tracked
+  PHP file, collects definitions and call sites, and fails if a call has no definition —
+  honouring `function_exists()` guards as deliberate optional dependencies. It also pins
+  that no connection path requires a valid firewall certificate. Verified to fail against
+  the pre-fix code.
+
+---
+
 ## Version 3.34.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

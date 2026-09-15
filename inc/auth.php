@@ -200,6 +200,33 @@ function login($username, $password) {
         // Regenerate session ID to prevent session fixation
         session_regenerate_id(true);
 
+        // A password alone used to be a full session even for an account with
+        // two-factor enrolled: nothing here read totp_secret, nothing sent the
+        // browser to verify2fa.php, and that page was unreachable from the
+        // login flow. So an account showing "2FA enabled" on its profile was
+        // protected by a password and nothing else - the badge asserted a
+        // control that did not exist.
+        //
+        // The second factor is now held here. No user_id is set, so
+        // isLoggedIn() is false and every requireLogin() page refuses, until
+        // verify2fa.php confirms the code and promotes the session.
+        if (!empty($user['totp_secret'])) {
+            $_SESSION['pending_2fa_user_id'] = $user['id'];
+            $_SESSION['pending_2fa_started'] = time();
+            $_SESSION['pending_2fa_ip']      = $_SERVER['REMOTE_ADDR'] ?? '';
+
+            if (function_exists('audit_log')) {
+                audit_log('auth.login.2fa_required', [
+                    'success'     => true,
+                    'object_type' => 'user',
+                    'object_id'   => (string) $user['id'],
+                    'message'     => 'Password accepted; awaiting second factor',
+                ]);
+            }
+
+            return '2fa';
+        }
+
         // Set session variables
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];

@@ -81,11 +81,23 @@ try {
             // Run the scan (always with logs)
             log_message("Starting AI scan for $hostname...");
 
-            $scan_result = performAIScan(
-                $firewall,
-                'config_with_logs',
-                $provider ?: null
-            );
+            // performAIScan() is defined nowhere and never has been. The only
+            // scan entry point is performAIAnalysis() in api/ai_scan.php, whose
+            // signature is different - it wants the AI settings, the firewall's
+            // configuration and the log data, none of which this script
+            // collects. So scheduled scanning has never run; this script is not
+            // in any crontab and nothing invokes it.
+            //
+            // The table it reads (firewall_ai_settings, with auto_scan_enabled
+            // and next_scan_at) is real and carries rows, so the feature is
+            // unfinished rather than abandoned. Failing loudly here is honest;
+            // calling a function that does not exist was not.
+            fwrite(STDERR,
+                "Scheduled AI scanning is not implemented.\n" .
+                "This script calls performAIScan(), which does not exist. Wiring it to\n" .
+                "performAIAnalysis() in api/ai_scan.php needs the AI settings, the\n" .
+                "firewall configuration and the log data assembled first.\n");
+            exit(1);
 
             if ($scan_result['success']) {
                 log_message("SUCCESS: AI scan completed for $hostname (Report ID: {$scan_result['report_id']})");

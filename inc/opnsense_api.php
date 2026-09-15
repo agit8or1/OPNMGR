@@ -6,7 +6,18 @@ class OPNsenseAPI {
     private $api_secret;
     private $verify_ssl;
     
-    public function __construct($host, $api_key, $api_secret, $verify_ssl = true) {
+    /**
+     * Reaching a managed firewall must not depend on its certificate.
+     *
+     * Firewalls carry self-signed or expired certificates as a matter of
+     * course - that is a thing to report on, not a reason to lose the ability
+     * to manage the box. Every live path already connects with verification
+     * off (tunnel_proxy.php); this constructor defaulted the other way, so
+     * adopting it would have made management fail exactly when a certificate
+     * problem most needed looking at. Certificate state is collected
+     * separately by health_ingest_certificates().
+     */
+    public function __construct($host, $api_key, $api_secret, $verify_ssl = false) {
         $this->host = rtrim($host, '/');
         $this->api_key = $api_key;
         $this->api_secret = $api_secret;

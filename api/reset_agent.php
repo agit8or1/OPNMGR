@@ -4,6 +4,7 @@
  * Forces agent to restart on firewall
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/logging.php';
 
 requireLogin();
 requireAdmin();
@@ -59,7 +60,7 @@ echo 'Agent restarted'";
     ]);
     
     // Also force immediate checkin by touching flag file (would need agent to check, but let's queue it)
-    write_log('AGENT', "Queued agent restart for firewall #{$firewall_id} ({$firewall['hostname']})");
+    log_event('info', 'AGENT', "Queued agent restart for firewall #{$firewall_id} ({$firewall['hostname']})");
     
     echo json_encode([
         'success' => true,

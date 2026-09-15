@@ -53,7 +53,7 @@ try {
     hk_log("Deleted $deleted reports older than $cutoff_date");
     
     if ($deleted > 0) {
-        write_log('HOUSEKEEPING', "Deleted $deleted AI reports older than 30 days");
+        log_event('info', 'HOUSEKEEPING', "Deleted $deleted AI reports older than 30 days");
     }
     
     hk_log("=== Report Cleanup Complete ===");

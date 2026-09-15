@@ -44,6 +44,21 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.35.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Two-Factor Was Never Asked For',
+            'changes' => [
+                'SECURITY: Two-factor authentication was never enforced. login() set a full session on the password alone and never read totp_secret; nothing redirected to verify2fa.php, and no code path did. An account showing "2FA is currently enabled" on its profile was protected by a password and nothing else - the badge asserted a control that did not exist',
+                'SECURITY: verify2fa.php called clear2FA() on a *correct* code. That function is defined nowhere, so entering the right number produced a fatal while a wrong one returned a tidy "Invalid code". Even someone who reached the page could not complete two-factor',
+                'FIXED: login() now holds an enrolled account at a pending step - no user_id is set, so isLoggedIn() is false and every requireLogin() page refuses - until verify2fa.php confirms the code and promotes the session. The pending state expires after 5 minutes and is bound to the address that supplied the password',
+                'FIXED: The verification form had no CSRF token and the page read $_SESSION[user_id], which is only set once a session is already authenticated. Both corrected',
+                'FIXED: Seven more calls to functions that do not exist, each a fatal when reached: write_log() and log_action() across five endpoints and two cron jobs (inc/logging.php provides log_event(), with the arguments in a different order), and check_authentication() in development/todo.php',
+                'CHANGED: Reaching a firewall no longer depends on that firewall\'s certificate anywhere. Live paths already connected with verification off; inc/opnsense_api.php defaulted the other way, so adopting it would have made management fail exactly when a certificate problem most needed looking at. Certificate state is still collected and reported',
+                'ADDED: tests/undefined_functions_test.php tokenises every tracked PHP file and fails if a call has no definition, honouring function_exists() guards. It also pins that no connection path requires a valid firewall certificate',
+            ],
+        ],
+        [
             'version' => '3.34.0',
             'date' => '2026-09-15',
             'type' => 'minor',

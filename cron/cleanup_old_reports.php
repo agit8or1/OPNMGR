@@ -39,7 +39,7 @@ try {
         ");
         $stmt->execute([$cutoff_date]);
         
-        write_log('HOUSEKEEPING', "Deleted {$count} AI scan reports older than {$retention_days} days (before {$cutoff_date})");
+        log_event('info', 'HOUSEKEEPING', "Deleted {$count} AI scan reports older than {$retention_days} days (before {$cutoff_date})");
         echo "✓ Deleted {$count} old AI scan reports\n";
     } else {
         echo "✓ No old reports to delete\n";
@@ -47,7 +47,7 @@ try {
     
 } catch (Exception $e) {
     $error = $e->getMessage();
-    write_log('HOUSEKEEPING_ERROR', "Report cleanup failed: {$error}");
+    log_event('error', 'HOUSEKEEPING', "Report cleanup failed: {$error}");
     echo "✗ Error: {$error}\n";
     exit(1);
 }
