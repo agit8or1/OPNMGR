@@ -6,6 +6,61 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.23.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Removed
+
+Twenty-four files, none of them referenced by anything that runs. Verified by
+grepping every tracked file for each path before deleting it.
+
+- **`screenshots/` (19 PNGs, ~9 MB).** Captured from a live installation and kept
+  only because the old README embedded them. `docs/images/github/` replaced them in
+  3.22.0, and they were the last thing in the tree produced by pointing a camera at
+  the real fleet. The only remaining mention was an *exclusion* pattern in
+  `package_builder.php`, which is unaffected by their absence.
+
+- **`scripts/take_screenshots.js`.** The live-installation capture path. It worked by
+  rewriting hostnames, addresses and email addresses in the rendered DOM immediately
+  before each capture — a redaction step that fails open: anything its patterns missed
+  got published. `scripts/capture_demo_screenshots.js` renders a database that never
+  held real data, so there is nothing to redact and nothing to get wrong. Keeping both
+  meant keeping the risky one.
+
+- **`download.php`.** Served `downloads_public.zip` — a 5.8 MB archive of screenshots —
+  to anyone who asked, with no authentication and no link anywhere in the application.
+  The two apparent references were to `/api/updates/download.php`, which is a different,
+  live endpoint and is untouched.
+
+- **`download_agent_wrapper.php`.** A PID-safe wrapper for
+  `/usr/local/bin/opnsense_agent.sh`, the pre-plugin agent. Nothing has invoked it since
+  the agent became a native OPNsense plugin, and nothing links to it.
+
+- **`download/opnsense_agent_v3.8.5.sh`** and **`scripts/upgrade_to_v350.php`.** A
+  superseded agent build and a one-off migration for 3.5.0. Neither is referenced.
+
+### Changed
+
+- **The README's Releases section no longer names a version.** Written in 3.22.0 and
+  already wrong twice by 3.22.1, because every tag and every bump invalidated it. It
+  now states the rule — each version is tagged from `main` — and links to
+  `releases/latest`, which stays correct without editing.
+
+### Notes
+
+Two dead-looking endpoints were deliberately left in place:
+
+- **`download_agent.php`** looks legacy, but `agent_checkin.php` hands agents a
+  `selfheal_url` pointing at it and the file it serves does exist. Removing it would
+  break agent self-healing.
+- **`download_tunnel_key.php`** reads private keys from `/opt/opnsense-tunnels/keys/`,
+  a path the current tunnel system does not use, so it almost certainly always 404s.
+  It is gated behind `requireLogin()` and `requireAdmin()`, so it is not an exposure,
+  but an endpoint whose job is to emit private keys should be removed deliberately
+  rather than as part of a tidy-up.
+
+---
+
 ## Version 3.22.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 
