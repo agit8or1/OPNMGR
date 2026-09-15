@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![v3.30.0](https://img.shields.io/badge/version-3.30.0-blue)](CHANGELOG.md)
+[![v3.30.1](https://img.shields.io/badge/version-3.30.1-blue)](CHANGELOG.md)
 
 [Quick Start](#quick-start) ·
 [Screenshots](docs/SCREENSHOTS.md) ·

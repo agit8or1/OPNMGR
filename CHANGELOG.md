@@ -6,6 +6,24 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.30.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **`tests/server_identity_test.php` could not see files that were not committed yet.**
+  It enumerated candidates with `git ls-files`, which lists the index — so a file
+  present on disk but not yet added was skipped entirely. That is precisely the moment
+  a literal slips through, and it did: the suite passed locally and then failed in CI on
+  its own first commit, because `inc/server_identity.php` named the offending hostname
+  in its own docblock. It now scans with `--cached --others --exclude-standard`, so new
+  files are covered before they are committed rather than after. Verified by dropping an
+  untracked file containing the literal and watching the suite fail.
+
+- The hostname in the `inc/server_identity.php` docblock, replaced with a description.
+
+---
+
 ## Version 3.30.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

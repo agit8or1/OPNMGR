@@ -5,7 +5,7 @@
  * Agents fetch their plugin, upload backups and open tunnels against a URL the
  * manager hands them, and a firewall policy has to know which address to allow
  * in. Those values used to be typed into each call site as the maintainer's own
- * host - `opn.agit8or.net` and its public IP appeared in more than thirty files,
+ * host - one specific hostname and its public IP appeared in more than thirty files,
  * including the agent download URL and the enrolment script. A self-hosted
  * install therefore pointed its firewalls at somebody else's server, which is
  * both broken and a disclosure.

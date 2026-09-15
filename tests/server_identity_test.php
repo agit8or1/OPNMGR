@@ -48,8 +48,16 @@ $banned = [
     '204.1.21.52'       => "a real firewall's WAN IP",
 ];
 
-exec('cd ' . escapeshellarg($root) . ' && git ls-files 2>/dev/null', $files, $status);
-check('git ls-files works', $status === 0 && count($files) > 100, 'got ' . count($files) . ' files');
+// --others --exclude-standard includes files that are present but not yet
+// committed. Without it a brand-new file is invisible to this scan until the
+// commit that adds it, which is exactly when a literal would slip through: the
+// first version of this suite passed locally and failed in CI for that reason.
+exec(
+    'cd ' . escapeshellarg($root) . ' && git ls-files --cached --others --exclude-standard 2>/dev/null',
+    $files,
+    $status
+);
+check('git lists tracked and new files', $status === 0 && count($files) > 100, 'got ' . count($files) . ' files');
 
 $selfPath = 'tests/' . basename(__FILE__);
 $hits = [];
@@ -71,7 +79,7 @@ foreach ($files as $file) {
         }
     }
 }
-check('no installation-specific hosts or IPs in tracked files', $hits === [], implode("\n      ", $hits));
+check('no installation-specific hosts or IPs in tracked or new files', $hits === [], implode("\n      ", $hits));
 
 // Guard against the guard being vacuous: it must actually be reading content.
 $sentinel = $root . '/inc/server_identity.php';

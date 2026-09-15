@@ -44,6 +44,16 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.30.1',
+            'date' => '2026-09-15',
+            'type' => 'patch',
+            'title' => 'The Guard Could Not See New Files',
+            'changes' => [
+                'FIXED: tests/server_identity_test.php scanned only `git ls-files`, so a file that existed but had not been committed yet was invisible to it. That is exactly when a literal slips through: the suite passed locally and failed in CI on its own first commit, because inc/server_identity.php named the offending hostname in its docblock. It now scans tracked and new files together',
+                'FIXED: Removed that hostname from the inc/server_identity.php docblock',
+            ],
+        ],
+        [
             'version' => '3.30.0',
             'date' => '2026-09-15',
             'type' => 'minor',
