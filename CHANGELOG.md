@@ -6,6 +6,56 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.26.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+> **Upgrading**: this adds one Composer dependency. Run `composer install --no-dev`
+> after pulling, or `twofactor_setup.php` will fail to load.
+
+### Fixed
+
+- **Two-factor enrolment could never have worked.** The `otpauth://` URI in the QR
+  carried the secret as hex, but the URI format requires Base32. Hex contains `0`,
+  `1`, `8` and `9`, none of which exist in the Base32 alphabet, and `a`-`f` decode to
+  entirely different values — so an authenticator app derived a different HMAC key
+  from the one `verify2FACode()` checks against, and the six digits never matched.
+  Anyone who tried to enable two-factor got "Invalid verification code" every time,
+  with nothing in any log to explain it.
+
+  The secret is still generated and stored as hex, so nothing already in the database
+  changes and the verification path is untouched. Only the URI and the manual-entry
+  display now carry the same bytes correctly Base32-encoded. The URI also states
+  `algorithm`, `digits` and `period` explicitly rather than relying on app defaults.
+
+- **The enrolment QR was fetched from `api.qrserver.com` with the secret in the query
+  string.** That handed the shared TOTP secret to a third party, and to every proxy
+  and access log between here and there. It is now rendered on your own server as an
+  inline SVG — inline rather than a URL so the secret does not end up in this
+  server's access log either.
+
+  `api.qrserver.com` is also gone from the `img-src` Content-Security-Policy
+  directive in `inc/header.php`, which had been widened to permit it.
+
+### Added
+
+- **`bacon/bacon-qr-code` ^2.0** (BSD-2-Clause) renders the QR. Pinned to the 2.x
+  line deliberately: 3.x requires PHP 8.1, and this project documents a PHP 8.0
+  floor. It uses the SVG backend, so no image extension is required.
+
+- **`tests/twofactor_test.php`, wired into CI.** It checks `base32Encode()` against
+  the RFC 4648 test vectors, asserts the advertised secret contains no character
+  outside the Base32 alphabet, decodes that secret the way an authenticator does and
+  requires it to equal the server's key, then runs a full TOTP round-trip: generate
+  the code a compliant app would produce and require the server to accept it, and an
+  unrelated code to be rejected. It also asserts the rendered QR loads nothing over
+  the network.
+
+  Verification during development went further than the test does: the rendered SVG
+  was rasterised and decoded with `zbarimg`, and the decoded payload matched the
+  `otpauth://` URI exactly.
+
+---
+
 ## Version 3.25.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

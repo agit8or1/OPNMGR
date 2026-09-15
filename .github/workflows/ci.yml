@@ -152,6 +152,12 @@ jobs:
       - name: Schema/code column contract
         run: php tests/schema_columns_test.php
 
+      # The enrolment secret must stay Base32 and the QR must stay local. Both
+      # halves failed silently before: a wrong encoding just means the code
+      # never matches, and a third-party QR still renders a picture.
+      - name: Two-factor enrolment suite
+        run: php tests/twofactor_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

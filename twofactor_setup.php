@@ -1,7 +1,13 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/secrets.php';
+require_once __DIR__ . '/vendor/autoload.php';
 require_once 'inc/header.php';
+
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 
 // Check if user is logged in
 if (!isLoggedIn()) {
@@ -68,8 +74,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php else: ?>
                         <?php if (isset($showQR) && $showQR): ?>
                             <div class="text-center mb-4">
-                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=<?php echo urlencode($qrCodeUrl); ?>" alt="QR Code" class="img-fluid">
-                                <p class="mt-2">Or enter this code manually: <code><?php echo $_SESSION['temp_2fa_secret']; ?></code></p>
+                                <?php
+                                // Rendered here, on this server. This used to be an
+                                // <img> pointing at api.qrserver.com with the otpauth
+                                // URI in the query string - which handed the shared
+                                // TOTP secret to a third party, and put it in their
+                                // logs and every proxy in between.
+                                echo render2FAQrSvg($qrCodeUrl);
+                                ?>
+                                <p class="mt-3 mb-1">Or enter this key manually:</p>
+                                <p><code style="font-size:1.05rem; letter-spacing:.08em;"><?php
+                                    echo htmlspecialchars(chunk_split(totpSecretForApp($_SESSION['temp_2fa_secret']), 4, ' '));
+                                ?></code></p>
+                                <p class="text-muted small mb-0">Spaces are for readability; most apps ignore them.</p>
                             </div>
                             <form method="post">
                                 <div class="mb-3">
@@ -106,9 +123,84 @@ function generate2FASecret() {
     return bin2hex(random_bytes(16));
 }
 
+/**
+ * Base32 (RFC 4648, no padding) - the encoding otpauth:// URIs require.
+ *
+ * The secret is generated and stored as hex. It used to be placed into the URI
+ * as hex too, which cannot work: hex contains 0, 1, 8 and 9, none of which are
+ * in the Base32 alphabet, and the letters a-f decode to entirely different
+ * values. An authenticator therefore derived a different key from the one this
+ * server verifies against, so a scanned code never matched and two-factor could
+ * not be enabled at all.
+ *
+ * Encoding the same bytes correctly fixes that without changing what is stored,
+ * so any existing row keeps verifying through the unchanged hex path.
+ */
+function base32Encode(string $bytes): string
+{
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $out = '';
+    $buffer = 0;
+    $bitsLeft = 0;
+
+    for ($i = 0, $len = strlen($bytes); $i < $len; $i++) {
+        $buffer = ($buffer << 8) | ord($bytes[$i]);
+        $bitsLeft += 8;
+        while ($bitsLeft >= 5) {
+            $bitsLeft -= 5;
+            $out .= $alphabet[($buffer >> $bitsLeft) & 31];
+        }
+    }
+    if ($bitsLeft > 0) {
+        $out .= $alphabet[($buffer << (5 - $bitsLeft)) & 31];
+    }
+    return $out;
+}
+
+/** The stored hex secret, in the form an authenticator app expects. */
+function totpSecretForApp(string $hexSecret): string
+{
+    $raw = hex2bin($hexSecret);
+    return $raw === false ? '' : base32Encode($raw);
+}
+
 function generateQRCodeUrl($secret, $username) {
     $issuer = 'OPNsense';
-    return "otpauth://totp/{$issuer}:{$username}?secret={$secret}&issuer={$issuer}";
+    return sprintf(
+        'otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30',
+        rawurlencode($issuer),
+        rawurlencode($username),
+        totpSecretForApp($secret),
+        rawurlencode($issuer)
+    );
+}
+
+/**
+ * Render the enrolment QR as an inline SVG.
+ *
+ * SVG rather than PNG so no image extension is required, and inline so the
+ * secret never becomes a URL - not to a third party, and not to this server
+ * either, where it would land in the access log.
+ */
+function render2FAQrSvg(string $uri): string
+{
+    try {
+        $writer = new Writer(new ImageRenderer(
+            new RendererStyle(220, 1),
+            new SvgImageBackEnd()
+        ));
+        $svg = $writer->writeString($uri);
+
+        // Strip the XML declaration so the fragment can be embedded directly.
+        $svg = preg_replace('/<\?xml[^>]*\?>\s*/', '', $svg);
+
+        return '<div class="d-inline-block bg-white p-3 rounded" role="img" '
+             . 'aria-label="Two-factor enrolment QR code">' . $svg . '</div>';
+    } catch (Throwable $e) {
+        error_log('twofactor_setup.php could not render the QR code: ' . $e->getMessage());
+        return '<div class="alert alert-warning">The QR code could not be rendered. '
+             . 'Enter the key below into your authenticator app manually.</div>';
+    }
 }
 
 function verify2FACode($secret, $code) {
