@@ -6,6 +6,55 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.37.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Security
+
+- **`users.is_active` did nothing.** The column has been in the schema all along with no
+  line of code reading it. Setting it to `0` looked exactly like disabling an account,
+  and the account carried on logging in. There was no control for it in the interface
+  either, so the only way to stop someone was to delete them — which also destroys the
+  record of what they did.
+
+  It is enforced now, in both places that matter:
+
+  - **At login**, checked *after* password verification, so a wrong password and a
+    disabled account are indistinguishable from outside. The refusal is audited.
+  - **On sessions already open**, which end within a minute. Without this, "disable this
+    user" would have quietly meant "disable them at their next login" — not what anyone
+    reaching for it needs. The check runs once a minute per session rather than on every
+    request, bounding both the cost and the exposure, and a database blip logs nobody out.
+
+### Added
+
+- **Enable/Disable in user management.** Deleting an account destroys the record of what
+  it did; disabling keeps the audit trail and stops the login. Two guards, because this
+  is the control that can lock you out of your own installation:
+
+  - you cannot disable your own account;
+  - the **last active administrator** is refused, since deactivating it would leave
+    nobody able to administer the installation.
+
+  Both the activation and the deactivation are audited.
+
+- **Account status and last sign-in in the user list.** Two admin accounts on the
+  maintainer's installation, created a year ago, had never signed in once — and nothing
+  in the interface surfaced that.
+
+### Fixed
+
+- **The user listing query selected neither `is_active` nor `last_login`.** Added
+  alongside the display, since otherwise both would have rendered as decoration
+  regardless of what the database actually held — the same shape of bug as the badge
+  this release fixes.
+
+- **`tests/account_status_test.php`** (15 assertions, in CI). Refusal at login, session
+  termination, the rate limit, the self and last-admin guards, and that the listing
+  selects the columns it displays. Verified to fail against the pre-fix code.
+
+---
+
 ## Version 3.36.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

@@ -213,6 +213,11 @@ jobs:
       - name: Settings audit suite
         run: php tests/settings_audit_test.php
 
+      # users.is_active sat in the schema with nothing reading it, so setting
+      # it to 0 looked like disabling an account and did nothing.
+      - name: Account status suite
+        run: php tests/account_status_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

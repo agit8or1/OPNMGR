@@ -42,6 +42,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $message = '<div class="alert alert-danger">You cannot delete your own account.</div>';
         }
+    } elseif (isset($_POST['set_active'])) {
+        // Deleting an account destroys who did what; deactivating keeps the
+        // audit trail intact and stops the login. users.is_active has been in
+        // the schema all along with nothing reading it - inc/auth.php enforces
+        // it now, at login and on a short interval for sessions already open.
+        $userId = (int) ($_POST['user_id'] ?? 0);
+        $makeActive = (int) ($_POST['set_active'] === 'activate');
+
+        if ($userId === (int) $_SESSION['user_id'] && !$makeActive) {
+            $message = '<div class="alert alert-danger">You cannot deactivate your own account.</div>';
+        } else {
+            // Never leave the installation with no way in.
+            $remaining = 0;
+            if (!$makeActive) {
+                $stmt = db()->prepare(
+                    "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id <> ?"
+                );
+                $stmt->execute([$userId]);
+                $remaining = (int) $stmt->fetchColumn();
+            }
+
+            $target = db()->prepare('SELECT username, role FROM users WHERE id = ?');
+            $target->execute([$userId]);
+            $targetUser = $target->fetch(PDO::FETCH_ASSOC);
+
+            if (!$targetUser) {
+                $message = '<div class="alert alert-danger">No such user.</div>';
+            } elseif (!$makeActive && $targetUser['role'] === 'admin' && $remaining === 0) {
+                $message = '<div class="alert alert-danger">This is the last active administrator. '
+                         . 'Deactivating it would leave nobody able to administer this installation.</div>';
+            } else {
+                db()->prepare('UPDATE users SET is_active = ? WHERE id = ?')
+                    ->execute([$makeActive, $userId]);
+
+                if (function_exists('audit_log')) {
+                    audit_log($makeActive ? 'user.activate' : 'user.deactivate', [
+                        'success'     => true,
+                        'object_type' => 'user',
+                        'object_id'   => (string) $userId,
+                        'message'     => ($makeActive ? 'Activated ' : 'Deactivated ')
+                                       . $targetUser['username'],
+                    ]);
+                }
+
+                $message = '<div class="alert alert-success">'
+                         . htmlspecialchars($targetUser['username'])
+                         . ($makeActive ? ' activated.' : ' deactivated. Any open session ends within a minute.')
+                         . '</div>';
+            }
+        }
     } elseif (isset($_POST['change_password'])) {
         $newPassword = $_POST['new_password'];
         $confirmPassword = $_POST['confirm_password'];
@@ -92,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Get all users
-$stmt = db()->query("SELECT id, username, first_name, last_name, email, role, created_at FROM users ORDER BY username");
+$stmt = db()->query("SELECT id, username, first_name, last_name, email, role, created_at, is_active, last_login FROM users ORDER BY username");
 $users = $stmt->fetchAll();
 
 // Everything that might redirect has run; start the page.
@@ -174,6 +224,7 @@ require_once __DIR__ . '/inc/header.php';
                                     <th>Email</th>
                                     <th>Role</th>
                                     <th>Created</th>
+                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -190,11 +241,32 @@ require_once __DIR__ . '/inc/header.php';
                                     </td>
                                     <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                                     <td>
+                                        <?php $isActive = !array_key_exists('is_active', $user) || (int) $user['is_active'] === 1; ?>
+                                        <span class="badge bg-<?php echo $isActive ? 'success' : 'secondary'; ?>">
+                                            <?php echo $isActive ? 'Active' : 'Disabled'; ?>
+                                        </span>
+                                        <div class="small text-muted mt-1">
+                                            <?php echo empty($user['last_login'])
+                                                ? 'Never signed in'
+                                                : 'Last ' . htmlspecialchars(date('M j, Y', strtotime($user['last_login']))); ?>
+                                        </div>
+                                    </td>
+                                    <td>
                                         <button type="button" class="btn btn-sm btn-primary me-1" onclick="editUser(<?php echo $user['id']; ?>)">
                                             <i class="fa fa-edit"></i> Edit
                                         </button>
                                         <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                                        <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this user?')">
+                                        <form method="post" class="d-inline">
+                                            <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
+                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                            <button type="submit" name="set_active"
+                                                    value="<?php echo $isActive ? 'deactivate' : 'activate'; ?>"
+                                                    class="btn btn-sm btn-<?php echo $isActive ? 'warning' : 'success'; ?> me-1">
+                                                <i class="fa fa-<?php echo $isActive ? 'ban' : 'check'; ?>"></i>
+                                                <?php echo $isActive ? 'Disable' : 'Enable'; ?>
+                                            </button>
+                                        </form>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Delete this user permanently? Disabling keeps their history and stops the login.')">
                                             <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
                                             <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                             <button type="submit" name="delete_user" class="btn btn-sm btn-danger">

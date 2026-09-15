@@ -144,6 +144,34 @@ function isLoggedIn() {
         return false;
     }
 
+    // Deactivating an account has to end the sessions it already has, or
+    // "disable this user" means "disable them at their next login", which is
+    // not what an operator reaching for it needs. Re-checked on a short
+    // interval rather than every request: one query a minute per active
+    // session, bounding both the cost and how long a disabled account keeps
+    // working.
+    $activeChecked = $_SESSION['active_checked_at'] ?? 0;
+    if (($now - $activeChecked) > 60) {
+        try {
+            $stmt = db()->prepare('SELECT is_active FROM users WHERE id = ?');
+            $stmt->execute([$_SESSION['user_id']]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // A deleted account ends the session too.
+            if ($row === false || (array_key_exists('is_active', $row) && (int) $row['is_active'] === 0)) {
+                error_log('SECURITY: session for deactivated or removed user_id='
+                    . $_SESSION['user_id'] . ' - session destroyed');
+                destroySession();
+                return false;
+            }
+            $_SESSION['active_checked_at'] = $now;
+        } catch (Throwable $e) {
+            // A database blip must not log everyone out; the check retries on
+            // the next request.
+            error_log('OPNMGR: could not verify account status: ' . $e->getMessage());
+        }
+    }
+
     // Periodically roll the session id so a long-lived session does not keep
     // the same identifier for its whole life.
     if (!isset($_SESSION['last_regenerated']) || ($now - $_SESSION['last_regenerated']) > 900) {
@@ -195,6 +223,28 @@ function login($username, $password) {
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
+
+    // users.is_active has existed in the schema without a single line reading
+    // it. Setting it to 0 looked like disabling an account and did nothing at
+    // all - the account kept logging in. It is enforced here, so the column
+    // means what an operator would assume it means.
+    //
+    // Checked after password verification so a wrong password and a disabled
+    // account are indistinguishable from outside.
+    if ($user && password_verify($password, $user['password'])
+        && array_key_exists('is_active', $user) && (int) $user['is_active'] === 0) {
+
+        if (function_exists('audit_log')) {
+            audit_log('auth.login', [
+                'success'     => false,
+                'object_type' => 'user',
+                'object_id'   => (string) $user['id'],
+                'username'    => $username,
+                'message'     => 'Login refused: account is deactivated',
+            ]);
+        }
+        return false;
+    }
 
     if ($user && password_verify($password, $user['password'])) {
         // Regenerate session ID to prevent session fixation

@@ -44,6 +44,21 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.37.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Disabling An Account Now Disables It',
+            'changes' => [
+                'SECURITY: users.is_active sat in the schema with no line of code reading it. Setting it to 0 looked like disabling an account and did nothing at all - the account carried on logging in. Enforced now at login, and on open sessions',
+                'FIXED: A disabled account is refused at login, checked after password verification so a wrong password and a disabled account are indistinguishable from outside. The refusal is audited',
+                'FIXED: Sessions already open end within a minute of deactivation. Without that, "disable this user" would have meant "disable them at their next login". The check is rate limited to once a minute per session rather than run per request, and a database blip logs nobody out',
+                'ADDED: Enable/Disable in user management. Deleting an account destroys the record of what it did; disabling keeps the audit trail and stops the login. You cannot disable your own account, and the last active administrator is refused - deactivating it would leave nobody able to administer the installation',
+                'ADDED: The user list shows account status and when each account last signed in. Two admin accounts on the maintainer\'s installation had never signed in at all and nothing surfaced that',
+                'FIXED: The user listing query selected neither is_active nor last_login, so both would have rendered as decoration regardless of the stored values',
+                'ADDED: tests/account_status_test.php covers refusal at login, session termination, the self and last-admin guards, and that the listing selects the columns it displays',
+            ],
+        ],
+        [
             'version' => '3.36.0',
             'date' => '2026-09-15',
             'type' => 'minor',
