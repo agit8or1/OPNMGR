@@ -1,161 +1,64 @@
 <?php
 /**
- * Manage Scheduled Tasks API
- * Enables/disables scheduled cron tasks for the OPNsense Manager
+ * Scheduled jobs status.
+ *
+ * This endpoint was fatal on every request, authenticated or not: it gated on
+ * check_authentication(), a function that is defined nowhere in the codebase.
+ * So the Scheduled Tasks page could never list a job, and its toggles could
+ * never save. PHP stops at the fatal, so nothing ran unauthenticated - it was a
+ * feature that had never worked, not a way past the login.
+ *
+ * Behind the toggle was a second problem. It wrote `scheduled_tasks.enabled`,
+ * which no cron script, include or scheduler has ever read. Switching a job
+ * "off" changed a column and left the job running on its normal schedule. The
+ * jobs are started by the system crontab, which this application does not own
+ * and should not silently override.
+ *
+ * So this reports rather than pretends to control. Each job records its own
+ * start, outcome and duration (inc/cron_runs.php), and this returns that -
+ * which answers the question an operator actually has: did the backup run last
+ * night, and did it work.
+ *
+ * @since 3.32.0
  */
+
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/cron_runs.php';
 
-require_once __DIR__ . '/../inc/logging.php';
+header('Content-Type: application/json');
 
-// Require authentication
-if (!check_authentication()) {
+if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Authentication required']);
     exit;
 }
 
-// Only POST and GET allowed
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'GET') {
-    handle_list_tasks();
-} elseif ($method === 'POST') {
-    handle_update_task();
-} else {
+// Job status names the scripts and schedules of the installation itself, so it
+// is an administrator's view rather than a technician's.
+if (function_exists('requireAdmin')) {
+    requireAdmin();
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Method not allowed. Scheduled jobs are run by the system '
+                   . 'crontab; this endpoint reports their status and does not change it.',
+    ]);
+    exit;
 }
 
-function handle_list_tasks() {
-    try {
-        $stmt = db()->query("
-            SELECT id, task_name, schedule, status, enabled, last_run, next_run
-            FROM scheduled_tasks
-            ORDER BY task_name
-        ");
-        
-        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // If no tasks in DB, create defaults from cron
-        if (empty($tasks)) {
-            $tasks = get_default_tasks();
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'tasks' => $tasks,
-            'count' => count($tasks)
-        ]);
-        
-    } catch (Exception $e) {
-        http_response_code(500);
-        error_log("manage_tasks.php error: " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Internal server error']);
-    }
+try {
+    $jobs = cron_jobs();
+
+    echo json_encode([
+        'success' => true,
+        'jobs'    => $jobs,
+        'note'    => 'Jobs are scheduled by the system crontab. This is a status view.',
+    ]);
+} catch (Throwable $e) {
+    error_log('manage_tasks.php error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Could not read scheduled job status']);
 }
-
-function handle_update_task() {
-    $input = json_decode(file_get_contents('php://input'), true);
-
-    // CSRF validation
-    $csrf_token = $input['csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    if (!csrf_verify($csrf_token)) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-        return;
-    }
-
-    if (!isset($input['task_id']) || !isset($input['enabled'])) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Missing required fields: task_id, enabled']);
-        return;
-    }
-    
-    $task_id = (int)$input['task_id'];
-    $enabled = (bool)$input['enabled'];
-    
-    try {
-        // Check if task exists in DB
-        $stmt = db()->prepare("SELECT id FROM scheduled_tasks WHERE id = ?");
-        $stmt->execute([$task_id]);
-        $task = $stmt->fetch();
-        
-        if ($task) {
-            // Update existing
-            $stmt = db()->prepare("UPDATE scheduled_tasks SET enabled = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$enabled ? 1 : 0, $task_id]);
-            $message = 'Task ' . ($enabled ? 'enabled' : 'disabled') . ' successfully';
-        } else {
-            // Shouldn't happen but handle gracefully
-            http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'Task not found']);
-            return;
-        }
-        
-        log_info('tasks', $message . ' (ID: ' . $task_id . ')', null, null);
-        
-        echo json_encode([
-            'success' => true,
-            'message' => $message,
-            'task_id' => $task_id,
-            'enabled' => $enabled
-        ]);
-        
-    } catch (Exception $e) {
-        http_response_code(500);
-        error_log("manage_tasks.php error: " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'Internal server error']);
-    }
-}
-
-function get_default_tasks() {
-    // Return the default tasks that should always exist
-    return [
-        [
-            'id' => 1,
-            'task_name' => 'Nightly Backups',
-            'schedule' => '2:00 AM daily',
-            'status' => 'active',
-            'enabled' => 1,
-            'last_run' => date('Y-m-d H:i:s'),
-            'next_run' => date('Y-m-d H:i:s', strtotime('+1 day'))
-        ],
-        [
-            'id' => 2,
-            'task_name' => 'Firewall Health Check',
-            'schedule' => 'Every minute',
-            'status' => 'active',
-            'enabled' => 1,
-            'last_run' => date('Y-m-d H:i:s'),
-            'next_run' => date('Y-m-d H:i:s', time() + 60)
-        ],
-        [
-            'id' => 3,
-            'task_name' => 'SSH Tunnel Cleanup',
-            'schedule' => 'Every 5 minutes',
-            'status' => 'active',
-            'enabled' => 1,
-            'last_run' => date('Y-m-d H:i:s'),
-            'next_run' => date('Y-m-d H:i:s', time() + 300)
-        ],
-        [
-            'id' => 4,
-            'task_name' => 'Proxy Session Cleanup',
-            'schedule' => 'Every 5 minutes',
-            'status' => 'active',
-            'enabled' => 1,
-            'last_run' => date('Y-m-d H:i:s'),
-            'next_run' => date('Y-m-d H:i:s', time() + 300)
-        ],
-        [
-            'id' => 5,
-            'task_name' => 'AI Report Housekeeping',
-            'schedule' => '3:00 AM daily',
-            'status' => 'active',
-            'enabled' => 1,
-            'last_run' => date('Y-m-d H:i:s'),
-            'next_run' => date('Y-m-d H:i:s', strtotime('+1 day'))
-        ]
-    ];
-}
-
-?>

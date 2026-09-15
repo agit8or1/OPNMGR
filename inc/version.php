@@ -44,6 +44,23 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.32.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Scheduled Jobs Page Was Fiction',
+            'changes' => [
+                'FIXED: api/manage_tasks.php was fatal on every request. It gated on check_authentication(), a function defined nowhere in the codebase, so the Scheduled Tasks page could never list a job and its toggles could never save. PHP stops at the fatal, so nothing ran unauthenticated - a feature that had never worked, not a way past the login',
+                'FIXED: The toggle beside each job wrote scheduled_tasks.enabled, which no cron script, include or scheduler has ever read. Switching a job off changed a column and left it running on its normal schedule',
+                'FIXED: scheduled_tasks was seeded once by hand with five rows. Two named a real job on the wrong schedule, three - Firewall Health Check, SSH Tunnel Cleanup, Proxy Session Cleanup - have never been scheduled at all, and the four jobs that do run were absent entirely. Migration 0018 replaces them with the six real ones',
+                'FIXED: last_run was NULL on every row because nothing ever wrote it, so a job running every five minutes displayed as never having run',
+                'FIXED: scheduled_tasks.id was NOT NULL with no AUTO_INCREMENT, so every insert needed an explicit id. That is why the table was populated once and never grew a row for a job added later',
+                'ADDED: inc/cron_runs.php. Each cron entrypoint records its own start, outcome and duration, with completion written from a shutdown handler so a fatal is reported rather than leaving the row stuck at running. Every write is wrapped - a scheduled backup must never be lost because bookkeeping could not write a row',
+                'CHANGED: The page reports rather than pretends to control. Jobs are started by the system crontab, which this application does not own; the page shows when each last ran, how long it took, whether it failed, and flags a job overdue at twice its expected interval',
+                'CHANGED: The page was unreachable - nothing linked to it. It is now in the Admin sidebar as Scheduled Jobs',
+                'ADDED: tests/scheduled_jobs_test.php asserts every registered job names a script that exists and every cron entrypoint reports itself',
+            ],
+        ],
+        [
             'version' => '3.31.0',
             'date' => '2026-09-15',
             'type' => 'minor',

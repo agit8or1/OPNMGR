@@ -6,6 +6,64 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.32.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **Upgrading**: run `php scripts/migrate.php`. Migration 0018 replaces the invented
+> rows in `scheduled_tasks` with the jobs that actually run. Daily jobs will show
+> "Never run" until their next scheduled run — nothing recorded before this release.
+
+### Fixed
+
+- **The Scheduled Tasks page was fiction, end to end.** Four separate failures stacked:
+
+  1. **The endpoint was fatal on every request.** `api/manage_tasks.php` gated on
+     `check_authentication()` — a function defined nowhere in this codebase. So the page
+     could never list a job and its toggles could never save. PHP stops at the fatal, so
+     nothing executed unauthenticated: a feature that had never worked, not a way past
+     the login.
+  2. **The toggle controlled nothing.** It wrote `scheduled_tasks.enabled`, a column no
+     cron script, include or scheduler has ever read. Switching a job "off" changed a
+     column and left it running on its normal schedule.
+  3. **The rows were invented.** The table was seeded once by hand with five entries.
+     Two named a real job on the wrong schedule; three — *Firewall Health Check*,
+     *SSH Tunnel Cleanup*, *Proxy Session Cleanup* — have never been scheduled at all.
+     The four jobs that genuinely run on a schedule (stuck-command cleanup, alert
+     evaluation, backup health, backup pruning) were absent entirely.
+  4. **Nothing ever wrote `last_run`.** Every row read "never run", including jobs
+     running every five minutes.
+
+  The page was also unreachable — nothing in the application linked to it.
+
+- **`scheduled_tasks.id` was `NOT NULL` with no `AUTO_INCREMENT`,** so every insert had
+  to carry an explicit id. That is why the table was populated once, by hand, and never
+  grew a row for a job added later.
+
+### Changed
+
+- **The page reports instead of pretending to control.** Jobs are started by the system
+  crontab, which this application does not own and should not silently override. The
+  page shows when each job last ran, how long it took, whether it failed and why, and
+  flags a job *overdue* once it has not reported for twice its expected interval.
+
+- **It is reachable.** Added to the Admin sidebar as **Scheduled Jobs**.
+
+### Added
+
+- **`inc/cron_runs.php`.** One line in each cron entrypoint records that run. Completion
+  is written from a shutdown handler, so a fatal or an `exit()` is still reported rather
+  than leaving the row stuck at "running". Every database write is wrapped and swallowed
+  with a log line — a scheduled backup must never be lost because bookkeeping could not
+  write a status row. Verified both paths against the live database: a real job records
+  `ok` with its duration, and a deliberately fatal job records `failed` with the message.
+
+- **`tests/scheduled_jobs_test.php`** (34 assertions, in CI). Every registered job must
+  name a script that exists, every cron entrypoint must report itself, the endpoint must
+  gate on a function that is actually defined, and it must not write the column nothing
+  reads. Verified to fail against the pre-fix code.
+
+---
+
 ## Version 3.31.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

@@ -23,6 +23,12 @@ opnmgr_block_direct_web_access(__FILE__);
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/cron_runs.php';
+
+// Report this run - start, outcome and duration - so the scheduled jobs
+// page shows what happened instead of the invented rows it used to carry.
+// Recording never blocks the job: every failure inside is logged and swallowed.
+cron_run_begin('evaluate_alerts');
 require_once __DIR__ . '/../inc/alerting.php';
 require_once __DIR__ . '/../inc/maintenance.php';
 require_once __DIR__ . '/../inc/firewall_health.php';

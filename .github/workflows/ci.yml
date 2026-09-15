@@ -191,6 +191,11 @@ jobs:
       - name: Agent package suite
         run: php tests/agent_package_test.php
 
+      # The scheduled jobs page described five jobs, three of which had never
+      # been scheduled, behind an endpoint that was fatal on every request.
+      - name: Scheduled jobs suite
+        run: php tests/scheduled_jobs_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

@@ -255,6 +255,10 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-sliders-h"></i></span>
         <span class="sidebar-label">Settings</span>
       </a>
+      <a class="sidebar-item <?php echo isActive('settings_tasks.php') ?>" href="/settings_tasks.php">
+        <span class="sidebar-icon"><i class="fas fa-clock"></i></span>
+        <span class="sidebar-label">Scheduled Jobs</span>
+      </a>
       <a class="sidebar-item <?php echo isActive(['logs.php','nginx_logs.php']) ?>" href="/logs.php">
         <span class="sidebar-icon"><i class="fas fa-list-alt"></i></span>
         <span class="sidebar-label">Logs</span>

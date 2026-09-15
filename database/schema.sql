@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.20.5.
+-- Generated from the reference installation for OPNManager v3.31.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -1318,7 +1318,7 @@ CREATE TABLE IF NOT EXISTS `request_queue` (
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `task_name` varchar(255) NOT NULL,
   `description` text DEFAULT NULL,
   `schedule` varchar(100) DEFAULT NULL,
@@ -1328,6 +1328,11 @@ CREATE TABLE IF NOT EXISTS `scheduled_tasks` (
   `next_run` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `script_path` varchar(255) DEFAULT NULL,
+  `expected_interval_minutes` int(11) DEFAULT NULL,
+  `last_status` varchar(20) DEFAULT NULL,
+  `last_duration_ms` int(11) DEFAULT NULL,
+  `last_message` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `task_name` (`task_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

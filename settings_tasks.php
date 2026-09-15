@@ -1,269 +1,145 @@
 <?php
-// Settings > Scheduled Tasks & Housekeeping
+/**
+ * Settings > Scheduled jobs.
+ *
+ * This page used to show five jobs with a toggle beside each. Two named a real
+ * job on the wrong schedule, three had never existed as scheduled jobs at all,
+ * and the four jobs that do run were absent. Every row read "never run",
+ * because nothing wrote last_run. The toggles called an endpoint that was fatal
+ * on every request, and had it worked it would have written a column that no
+ * scheduler reads - so a job switched "off" kept running.
+ *
+ * It reports now. Jobs are scheduled by the system crontab, which this
+ * application does not own; each one records its own start, outcome and
+ * duration, and this shows that.
+ */
 require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
 requireAdmin();
+require_once __DIR__ . '/inc/cron_runs.php';
 
-$page_title = "Scheduled Tasks & Housekeeping";
-include 'inc/header.php';
+$page_title = 'Scheduled Jobs';
 
-// Get tasks from database
-function getTasks() {
-    try {
-        $result = db()->query("SELECT id, task_name as name, schedule, description, enabled FROM scheduled_tasks ORDER BY id");
-        return $result->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        return [];
-    }
+$jobs  = [];
+$error = '';
+try {
+    $jobs = cron_jobs();
+} catch (Throwable $e) {
+    error_log('settings_tasks.php: ' . $e->getMessage());
+    $error = 'Could not read scheduled job status.';
 }
 
-$cron_tasks = getTasks();
+require_once __DIR__ . '/inc/header.php';
+
+function job_state(array $job): array
+{
+    if (!empty($job['never_run'])) {
+        return ['secondary', 'Never run'];
+    }
+    if (($job['last_status'] ?? '') === 'failed') {
+        return ['danger', 'Failed'];
+    }
+    if (($job['last_status'] ?? '') === 'running') {
+        return ['info', 'Running'];
+    }
+    if (!empty($job['stale'])) {
+        return ['warning', 'Overdue'];
+    }
+    return ['success', 'OK'];
+}
+
+function job_age(?int $seconds): string
+{
+    if ($seconds === null) {
+        return '—';
+    }
+    if ($seconds < 90) {
+        return $seconds . 's ago';
+    }
+    if ($seconds < 5400) {
+        return round($seconds / 60) . 'm ago';
+    }
+    if ($seconds < 172800) {
+        return round($seconds / 3600) . 'h ago';
+    }
+    return round($seconds / 86400) . 'd ago';
+}
 ?>
 
-<style>
-.settings-container {
-    max-width: 1000px;
-    margin: 30px auto;
-    padding: 0 20px;
-}
-.settings-card {
-    background: var(--bg-elevated);
-    border-radius: 8px;
-    padding: 25px;
-    margin-bottom: 25px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border: 1px solid var(--border);
-}
-.settings-card h2 {
-    color: var(--accent);
-    border-bottom: 3px solid var(--accent);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-.task-item {
-    background: var(--bg-elevated);
-    border-left: 4px solid var(--accent);
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 4px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.task-info h4 {
-    color: var(--accent);
-    margin: 0 0 5px 0;
-}
-.task-info p {
-    color: var(--text-muted);
-    margin: 0;
-    font-size: 14px;
-}
-.task-schedule {
-    color: #81c784;
-    font-size: 14px;
-    font-weight: 600;
-}
-.task-toggle {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-.toggle-switch {
-    width: 50px;
-    height: 25px;
-    background: var(--border);
-    border-radius: 25px;
-    cursor: pointer;
-    position: relative;
-    transition: background 0.3s;
-}
-.toggle-switch.active {
-    background: #27ae60;
-}
-.toggle-switch::after {
-    content: '';
-    position: absolute;
-    width: 21px;
-    height: 21px;
-    background: white;
-    border-radius: 50%;
-    top: 2px;
-    left: 2px;
-    transition: left 0.3s;
-}
-.toggle-switch.active::after {
-    left: 27px;
-}
-.status-badge {
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-}
-.status-active {
-    background: #27ae60;
-    color: white;
-}
-.status-inactive {
-    background: #e74c3c;
-    color: white;
-}
-.status-loading {
-    background: #3498db;
-    color: white;
-}
-.info-section {
-    background: var(--bg-surface);
-    border-left: 4px solid #f39c12;
-    padding: 15px;
-    margin-top: 20px;
-    border-radius: 4px;
-}
-.info-section h5 {
-    color: #f39c12;
-    margin-top: 0;
-}
-.info-section p {
-    color: var(--text-muted);
-    font-size: 14px;
-    margin: 10px 0;
-}
-.error-message {
-    background: #e74c3c;
-    color: white;
-    padding: 12px;
-    border-radius: 4px;
-    margin-bottom: 15px;
-}
-.success-message {
-    background: #27ae60;
-    color: white;
-    padding: 12px;
-    border-radius: 4px;
-    margin-bottom: 15px;
-}
-</style>
+<div class="container-fluid mt-4" style="max-width:1100px;">
+    <h2 class="mb-1"><i class="fas fa-clock me-2"></i>Scheduled Jobs</h2>
+    <p class="text-muted">
+        These run from the system crontab. Each job records its own outcome, so this
+        page reports what happened rather than what was configured. Changing the
+        schedule means editing the crontab on the server.
+    </p>
 
-<div class="settings-container">
-    <div class="settings-card">
-        <h2><i class="fa fa-clock me-2"></i> Scheduled Tasks & Housekeeping</h2>
-        <p>Manage automatic maintenance and monitoring tasks. All tasks run in the background on the server.</p>
-        
-        <div id="message-container"></div>
-        
-        <div class="task-items-list">
-            <?php if (empty($cron_tasks)): ?>
-                <p style="color: #95a5a6;">Loading tasks...</p>
-            <?php else: ?>
-                <?php foreach ($cron_tasks as $task): ?>
-                    <div class="task-item">
-                        <div class="task-info">
-                            <h4><?= htmlspecialchars($task['name']) ?></h4>
-                            <p><?= htmlspecialchars($task['description']) ?></p>
-                            <p class="task-schedule">
-                                <i class="fa fa-clock-o me-1"></i> 
-                                <?= htmlspecialchars($task['schedule']) ?>
-                            </p>
-                        </div>
-                        <div class="task-toggle">
-                            <span class="status-badge <?= $task['enabled'] ? 'status-active' : 'status-inactive' ?>">
-                                <?= $task['enabled'] ? 'ACTIVE' : 'INACTIVE' ?>
-                            </span>
-                            <div class="toggle-switch <?= $task['enabled'] ? 'active' : '' ?>" 
-                                 onclick="toggleTask(this, <?= (int)$task['id'] ?>, '<?= htmlspecialchars($task['name']) ?>')"
-                                 data-task-id="<?= (int)$task['id'] ?>">
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+    <?php if ($error !== ''): ?>
+        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+    <?php elseif (!$jobs): ?>
+        <div class="alert alert-warning">
+            No scheduled jobs are registered. Run <code>php scripts/migrate.php</code> to
+            populate them.
         </div>
-        
-        <div class="info-section">
-            <h5><i class="fa fa-info-circle me-2"></i> Important Notes</h5>
-            <p><strong>Backups:</strong> Firewall configs are backed up daily at 2:00 AM. Essential for disaster recovery.</p>
-            <p><strong>Health Checks:</strong> Firewall connectivity monitored in real-time. Alerts if firewall goes offline.</p>
-            <p><strong>Tunnel Cleanup:</strong> Expired SSH tunnels removed every 5 minutes to free ports and system resources.</p>
-            <p><strong>Report Housekeeping:</strong> AI scan reports older than 30 days automatically deleted to save storage.</p>
-            <p><strong>Warning:</strong> Disabling tasks may impact system reliability and security monitoring.</p>
+    <?php else: ?>
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Job</th>
+                            <th>Schedule</th>
+                            <th>Last run</th>
+                            <th>Took</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($jobs as $job): ?>
+                        <?php [$colour, $label] = job_state($job); ?>
+                        <tr>
+                            <td>
+                                <div><strong><?php echo htmlspecialchars($job['task_name']); ?></strong></div>
+                                <div class="small text-muted"><?php echo htmlspecialchars($job['description'] ?? ''); ?></div>
+                                <?php if (!empty($job['script_path'])): ?>
+                                    <div class="small"><code><?php echo htmlspecialchars($job['script_path']); ?></code></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-nowrap"><?php echo htmlspecialchars($job['schedule'] ?? '—'); ?></td>
+                            <td class="text-nowrap">
+                                <?php if (empty($job['last_run'])): ?>
+                                    <span class="text-muted">—</span>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars(job_age($job['age_seconds'] ?? null)); ?>
+                                    <div class="small text-muted"><?php echo htmlspecialchars($job['last_run']); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-nowrap">
+                                <?php echo $job['last_duration_ms'] === null
+                                    ? '—'
+                                    : htmlspecialchars(number_format((int) $job['last_duration_ms'] / 1000, 1) . 's'); ?>
+                            </td>
+                            <td>
+                                <span class="badge bg-<?php echo $colour; ?>"><?php echo $label; ?></span>
+                                <?php if (!empty($job['last_message'])): ?>
+                                    <div class="small text-danger mt-1">
+                                        <?php echo htmlspecialchars($job['last_message']); ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+
+        <p class="text-muted small mt-3">
+            <strong>Overdue</strong> means a job has not reported in for more than twice its
+            expected interval. <strong>Never run</strong> means it has not reported since this
+            page started recording — a daily job will show that until its next scheduled run.
+        </p>
+    <?php endif; ?>
 </div>
 
-<script>
-async function toggleTask(element, taskId, taskName) {
-    const isCurrentlyActive = element.classList.contains('active');
-    const newState = isCurrentlyActive ? 0 : 1;
-    const statusBadge = element.previousElementSibling;
-    
-    // Show loading state
-    const originalBadgeText = statusBadge.textContent;
-    statusBadge.textContent = 'UPDATING...';
-    statusBadge.classList.add('status-loading');
-    
-    try {
-        const response = await fetch('/api/manage_tasks.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                task_id: taskId,
-                enabled: newState
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // Update UI
-            element.classList.toggle('active');
-            if (newState === 1) {
-                element.classList.add('active');
-                statusBadge.textContent = 'ACTIVE';
-                statusBadge.classList.remove('status-inactive', 'status-loading');
-                statusBadge.classList.add('status-active');
-            } else {
-                element.classList.remove('active');
-                statusBadge.textContent = 'INACTIVE';
-                statusBadge.classList.remove('status-active', 'status-loading');
-                statusBadge.classList.add('status-inactive');
-            }
-            
-            showMessage(`✓ ${taskName} ${newState ? 'enabled' : 'disabled'} successfully`, 'success');
-        } else {
-            statusBadge.textContent = originalBadgeText;
-            statusBadge.classList.remove('status-loading');
-            statusBadge.classList.add(isCurrentlyActive ? 'status-active' : 'status-inactive');
-            showMessage(`Error: ${data.message || 'Failed to update task'}`, 'error');
-        }
-    } catch (error) {
-        statusBadge.textContent = originalBadgeText;
-        statusBadge.classList.remove('status-loading');
-        statusBadge.classList.add(isCurrentlyActive ? 'status-active' : 'status-inactive');
-        showMessage(`Error: ${error.message}`, 'error');
-    }
-}
-
-function showMessage(message, type) {
-    const container = document.getElementById('message-container');
-    const className = type === 'success' ? 'success-message' : 'error-message';
-    const messageDiv = document.createElement('div');
-    messageDiv.className = className;
-    messageDiv.textContent = message;
-    container.innerHTML = '';
-    container.appendChild(messageDiv);
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-        messageDiv.style.opacity = '0';
-        messageDiv.style.transition = 'opacity 0.3s';
-        setTimeout(() => {
-            messageDiv.remove();
-        }, 300);
-    }, 5000);
-}
-</script>
-
-<?php include 'inc/footer.php'; ?>
+<?php require_once __DIR__ . '/inc/footer.php'; ?>

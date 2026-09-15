@@ -20,6 +20,12 @@ opnmgr_block_direct_web_access(__FILE__);
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+require_once __DIR__ . '/../inc/cron_runs.php';
+
+// Report this run - start, outcome and duration - so the scheduled jobs
+// page shows what happened instead of the invented rows it used to carry.
+// Recording never blocks the job: every failure inside is logged and swallowed.
+cron_run_begin('cleanup_stuck_commands');
 
 $counts = [
     'stale_pending' => 0, 'stale_sent' => 0, 'orphaned' => 0, 'offline' => 0,
