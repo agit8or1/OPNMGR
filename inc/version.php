@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-05'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Documented At Last'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-15'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Front Door'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because

@@ -1,0 +1,672 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/../inc/cli_guard.php';
+opnmgr_block_direct_web_access(__FILE__);
+/**
+ * Populate an isolated demo database with fictitious fleet data.
+ *
+ * This exists so the screenshots in docs/images/github/ can be regenerated
+ * without ever pointing a camera at a real customer's fleet. It writes only
+ * to a database whose name ends in `_demo`, and only when the environment
+ * declares OPNMGR_DEMO=1.
+ *
+ * What it deliberately does NOT do: it never inserts into `firewall_commands`,
+ * `agent_commands`, `request_queue`, `update_campaign_targets.command_id` or
+ * `firewall_ssh_keys`. A demo fleet therefore has no path to issuing an
+ * instruction to anything, because nothing ever checks in to collect one.
+ * Campaign targets are seeded in terminal states only.
+ *
+ * Every address is from a range reserved for documentation (RFC 5737
+ * 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 and RFC 3849 2001:db8::/32)
+ * and every hostname is under a reserved `.example` domain (RFC 6761).
+ *
+ * Usage:
+ *
+ *     OPNMGR_DEMO=1 php scripts/demo_fixture.php
+ *
+ * @since 3.22.0
+ */
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit("This script may only be run from the command line.\n");
+}
+
+require_once __DIR__ . '/../config.php';
+
+// ---------------------------------------------------------------------------
+// Guards. Each one must pass before a single row is written.
+// ---------------------------------------------------------------------------
+
+$demoFlag = getenv('OPNMGR_DEMO') ?: ($_ENV['OPNMGR_DEMO'] ?? '');
+if ($demoFlag !== '1') {
+    exit("Refusing to run: OPNMGR_DEMO is not 1.\n"
+        . "This script only ever populates a throwaway demo database.\n");
+}
+
+if (!preg_match('/_demo$/', DB_NAME)) {
+    exit("Refusing to run: DB_NAME is '" . DB_NAME . "', which does not end in '_demo'.\n"
+        . "This script will not write to an installation database.\n");
+}
+
+try {
+    $db = new PDO(
+        sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', DB_HOST, DB_NAME),
+        DB_USER,
+        DB_PASS,
+        [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]
+    );
+} catch (PDOException $e) {
+    exit("Database connection failed: {$e->getMessage()}\n");
+}
+
+// A demo database must not contain agent credentials. If it does, it is not a
+// demo database and we are pointed at the wrong place.
+$credentialled = (int) $db->query(
+    "SELECT COUNT(*) FROM firewalls
+      WHERE agent_api_key IS NOT NULL OR agent_api_secret IS NOT NULL
+         OR ssh_private_key IS NOT NULL"
+)->fetchColumn();
+if ($credentialled > 0) {
+    exit("Refusing to run: this database holds firewall credentials. It is not a demo database.\n");
+}
+
+echo "Seeding demo fixture into " . DB_NAME . "\n\n";
+
+// ---------------------------------------------------------------------------
+// Clear anything a previous run left behind, so the fixture is reproducible.
+// ---------------------------------------------------------------------------
+
+$tables = [
+    'alert_incident_events', 'alert_incidents', 'config_drift', 'config_baselines',
+    'backups', 'update_campaign_targets', 'update_campaigns', 'maintenance_windows',
+    'firewall_gateways', 'firewall_vpn_tunnels', 'firewall_services',
+    'firewall_certificates', 'firewall_carp', 'firewall_wan_interfaces',
+    'firewall_system_stats', 'firewall_traffic_stats', 'firewall_latency',
+    'audit_log', 'firewalls', 'sites', 'customers',
+];
+$db->exec('SET FOREIGN_KEY_CHECKS=0');
+foreach ($tables as $t) {
+    $db->exec("TRUNCATE TABLE `$t`");
+}
+$db->exec('SET FOREIGN_KEY_CHECKS=1');
+
+$now = new DateTimeImmutable('now');
+$ts  = static fn(string $mod): string => (new DateTimeImmutable($mod))->format('Y-m-d H:i:s');
+
+// ---------------------------------------------------------------------------
+// Customers. Organisational groupings, not accounts - none of these log in.
+// ---------------------------------------------------------------------------
+
+$customers = [
+    ['Northwind Logistics',  'NWL', 'America/Chicago',  'logistics,priority', 'Dana Whitfield', 'ops@northwind.example'],
+    ['Cascade Health Group', 'CHG', 'America/Denver',   'healthcare,hipaa',   'Rowan Vega',     'it@cascadehealth.example'],
+    ['Harbor Point Legal',   'HPL', 'America/New_York', 'legal',              'Sam Okafor',     'admin@harborpoint.example'],
+    ['Verdant Manufacturing','VDM', 'America/Los_Angeles', 'industrial,ot',   'Alex Brennan',   'noc@verdantmfg.example'],
+    ['Brightline Schools',   'BLS', 'America/New_York', 'education,k12',      'Jordan Reyes',   'tech@brightline.example'],
+];
+
+$insCustomer = $db->prepare(
+    'INSERT INTO customers (name, code, contact_person, email, phone, timezone, tags,
+                            is_active, maintenance_window_start, maintenance_window_end,
+                            maintenance_window_days, notes)
+     VALUES (?,?,?,?,?,?,?,1,?,?,?,?)'
+);
+$customerIds = [];
+foreach ($customers as $i => $c) {
+    $insCustomer->execute([
+        $c[0], $c[1], $c[4], $c[5], '+1 555 0100',
+        $c[2], $c[3],
+        '02:00:00', '05:00:00', '0,6',
+        'Demo fixture data. Fictitious organisation.',
+    ]);
+    $customerIds[$c[1]] = (int) $db->lastInsertId();
+}
+echo "  customers          " . count($customerIds) . "\n";
+
+// ---------------------------------------------------------------------------
+// Sites.
+// ---------------------------------------------------------------------------
+
+$sites = [
+    ['NWL', 'Chicago DC',        'CHI'], ['NWL', 'Memphis Hub',     'MEM'],
+    ['NWL', 'Dallas Crossdock',  'DAL'],
+    ['CHG', 'Denver Clinic',     'DEN'], ['CHG', 'Boulder Clinic',  'BLD'],
+    ['HPL', 'Manhattan Office',  'NYC'],
+    ['VDM', 'Fremont Plant',     'FRE'], ['VDM', 'Tacoma Plant',    'TAC'],
+    ['BLS', 'District Office',   'DIS'], ['BLS', 'North Campus',    'NOR'],
+];
+
+$insSite = $db->prepare(
+    'INSERT INTO sites (customer_id, name, code, timezone, is_active, notes)
+     VALUES (?,?,?,?,1,?)'
+);
+$siteIds = [];
+foreach ($sites as $s) {
+    $insSite->execute([
+        $customerIds[$s[0]], $s[1], $s[2], null,
+        'Demo fixture data. Fictitious site.',
+    ]);
+    $siteIds[$s[0] . '/' . $s[2]] = (int) $db->lastInsertId();
+}
+echo "  sites              " . count($siteIds) . "\n";
+
+// ---------------------------------------------------------------------------
+// Firewalls. Reserved documentation addresses and .example hostnames only.
+//
+// [hostname, cust, site, wan_ip, lan_net, version, agent, status,
+//  seconds since check-in, updates, reboot, ring, carp_state]
+//
+// Check-in ages are in seconds, and the online ones are well inside the
+// five-minute window the dashboard treats as live, so a capture run started
+// straight after seeding does not show a fleet that has gone stale.
+// ---------------------------------------------------------------------------
+
+$fleet = [
+    ['fw-chi-edge01.northwind.example',  'NWL','CHI','192.0.2.11',  '10.20.0.0/24','26.7.2','1.6.2','online',   25, 0,0,'production','MASTER'],
+    ['fw-chi-edge02.northwind.example',  'NWL','CHI','192.0.2.12',  '10.20.0.0/24','26.7.2','1.6.2','online',   40, 0,0,'production','BACKUP'],
+    ['fw-mem-edge01.northwind.example',  'NWL','MEM','192.0.2.21',  '10.21.0.0/24','26.7.2','1.6.2','online',   30, 1,0,'pilot',     null],
+    ['fw-dal-edge01.northwind.example',  'NWL','DAL','192.0.2.31',  '10.22.0.0/24','26.1.9','1.6.1','online',   55, 1,1,'production',null],
+    ['fw-den-edge01.cascadehealth.example','CHG','DEN','198.51.100.11','10.30.0.0/24','26.7.2','1.6.2','online', 20, 0,0,'canary',    null],
+    ['fw-bld-edge01.cascadehealth.example','CHG','BLD','198.51.100.21','10.31.0.0/24','26.7.2','1.6.2','online', 45, 0,0,'production',null],
+    ['fw-nyc-edge01.harborpoint.example','HPL','NYC','198.51.100.31','10.40.0.0/24','26.7.2','1.6.2','online',   35, 0,0,'production',null],
+    ['fw-fre-edge01.verdantmfg.example', 'VDM','FRE','203.0.113.11','10.50.0.0/24','26.7.2','1.6.2','online',   50, 0,0,'production',null],
+    ['fw-tac-edge01.verdantmfg.example', 'VDM','TAC','203.0.113.21','10.51.0.0/24','25.7.11','1.5.6','offline', 2820, 1,0,'production',null],
+    ['fw-dis-edge01.brightline.example', 'BLS','DIS','203.0.113.31','10.60.0.0/24','26.7.2','1.6.2','online',   28, 0,0,'production',null],
+    ['fw-nor-edge01.brightline.example', 'BLS','NOR','203.0.113.41','10.61.0.0/24','26.7.2','1.6.2','online',   60, 1,0,'pilot',     null],
+];
+
+$insFw = $db->prepare(
+    'INSERT INTO firewalls
+        (hostname, hardware_id, uuid, ip_address, wan_ip, lan_ip, lan_network, ipv6_address,
+         customer_id, site_id, customer_name, customer_group, status, last_checkin,
+         checkin_interval, opnsense_version, current_version, version, available_version,
+         agent_version, updates_available, reboot_required, update_ring, carp_enabled,
+         carp_state, wan_interfaces, wan_gateway, uptime, enrolled_at, alerts_enabled,
+         api_key_confirmed, agent_signing_supported, last_backup_at, last_backup_status,
+         onboarded, web_port, notes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,?,?,1,443,?)'
+);
+
+$fwIds = [];
+foreach ($fleet as $i => $f) {
+    [$host,$cc,$sc,$wan,$lanNet,$ver,$agent,$status,$secs,$upd,$reboot,$ring,$carp] = $f;
+
+    $lanIp   = preg_replace('/\.0\/24$/', '.1', $lanNet);
+    $custId  = $customerIds[$cc];
+    $siteId  = $siteIds[$cc . '/' . $sc];
+    $custRow = array_values(array_filter($customers, static fn($c) => $c[1] === $cc))[0];
+    $siteRow = array_values(array_filter($sites, static fn($s) => $s[0] === $cc && $s[2] === $sc))[0];
+
+    $insFw->execute([
+        $host,
+        substr(hash('md5', 'demo-' . $host), 0, 32),
+        sprintf('00000000-0000-4000-8000-%012d', $i + 1),
+        $wan, $wan, $lanIp, $lanNet, '2001:db8:' . dechex(1000 + $i) . '::1',
+        $custId, $siteId, $custRow[0], $siteRow[1],
+        $status,
+        $ts("-{$secs} seconds"),
+        120,
+        $ver, $ver, $ver,
+        $upd ? '26.7.3' : $ver,
+        $agent, $upd, $reboot, $ring,
+        $carp !== null ? 1 : 0, $carp,
+        'igc0', preg_replace('/\.\d+$/', '.1', $wan),
+        ($status === 'online' ? (14 + $i) . ' days, ' . (2 + $i) . ':1' . $i : '0'),
+        $ts('-' . (90 + $i * 3) . ' days'),
+        $ts('-' . (6 + ($i % 5)) . ' hours'),
+        'success',
+        'Demo fixture data. Fictitious firewall; no agent is enrolled against this record.',
+    ]);
+    $fwIds[$host] = (int) $db->lastInsertId();
+}
+echo "  firewalls          " . count($fwIds) . "\n";
+
+// Pair the Chicago CARP members with each other.
+$a = $fwIds['fw-chi-edge01.northwind.example'];
+$b = $fwIds['fw-chi-edge02.northwind.example'];
+$db->prepare('UPDATE firewalls SET ha_peer_firewall_id = ?, carp_peer_host = ?, carp_sync_status = ? WHERE id = ?')
+   ->execute([$b, 'fw-chi-edge02.northwind.example', 'in sync', $a]);
+$db->prepare('UPDATE firewalls SET ha_peer_firewall_id = ?, carp_peer_host = ?, carp_sync_status = ? WHERE id = ?')
+   ->execute([$a, 'fw-chi-edge01.northwind.example', 'in sync', $b]);
+
+$ids = array_values($fwIds);
+
+// ---------------------------------------------------------------------------
+// Health telemetry: gateways, VPN tunnels, services, certificates, CARP.
+// ---------------------------------------------------------------------------
+
+$insGw = $db->prepare(
+    'INSERT INTO firewall_gateways
+        (firewall_id, name, interface, address, monitor, status, latency_ms,
+         stddev_ms, loss_percent, is_default, gateway_group, priority)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($ids as $n => $fid) {
+    $base = 8 + ($n * 3) % 22;
+    $insGw->execute([$fid, 'WAN_DHCP', 'igc0', '192.0.2.1', '192.0.2.1', 'online',
+        $base + 0.4, 1.1, 0.0, 1, 'WAN_GROUP', 255]);
+    // One site is on a degraded backup link; one has a down secondary.
+    if ($n === 3) {
+        $insGw->execute([$fid, 'WAN2_LTE', 'igc1', '192.0.2.2', '192.0.2.2', 'delay',
+            148.7, 24.6, 2.4, 0, 'WAN_GROUP', 254]);
+    } elseif ($n === 8) {
+        $insGw->execute([$fid, 'WAN2_LTE', 'igc1', '192.0.2.2', '192.0.2.2', 'down',
+            null, null, 100.0, 0, 'WAN_GROUP', 254]);
+    } elseif ($n % 3 === 0) {
+        $insGw->execute([$fid, 'WAN2_FIBER', 'igc1', '192.0.2.2', '192.0.2.2', 'online',
+            $base + 4.2, 0.9, 0.0, 0, 'WAN_GROUP', 254]);
+    }
+}
+
+$insVpn = $db->prepare(
+    'INSERT INTO firewall_vpn_tunnels
+        (firewall_id, vpn_type, name, peer, endpoint, status, enabled,
+         latest_handshake, connected_since, rx_bytes, tx_bytes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($ids as $n => $fid) {
+    $insVpn->execute([$fid, 'wireguard', 'wg-hub', 'hub-' . $n, 'vpn.hq.example:51820',
+        $n === 8 ? 'down' : 'up', 1,
+        $n === 8 ? $ts('-3 hours') : $ts('-2 minutes'),
+        $ts('-' . (5 + $n) . ' days'),
+        1_200_000_000 + $n * 91_000_000, 840_000_000 + $n * 63_000_000]);
+    if ($n % 2 === 0) {
+        $insVpn->execute([$fid, 'ipsec', 'ipsec-partner', 'partner-gw',
+            'gw.partner.example', 'up', 1, null, $ts('-' . (2 + $n) . ' days'),
+            310_000_000, 270_000_000]);
+    }
+}
+
+$insSvc = $db->prepare(
+    'INSERT INTO firewall_services (firewall_id, name, description, running, enabled)
+     VALUES (?,?,?,?,?)'
+);
+$services = [
+    ['unbound', 'Unbound DNS'], ['dpinger', 'Gateway monitoring'],
+    ['openssh', 'Secure Shell'], ['ntpd', 'Network Time'],
+    ['suricata', 'Intrusion Detection'], ['wireguard', 'WireGuard VPN'],
+];
+foreach ($ids as $n => $fid) {
+    foreach ($services as $si => $s) {
+        // One firewall has a genuinely stopped IDS engine; everything else is up.
+        $running = ($n === 3 && $s[0] === 'suricata') ? 0 : 1;
+        $insSvc->execute([$fid, $s[0], $s[1], $running, 1]);
+    }
+}
+
+$insCert = $db->prepare(
+    'INSERT INTO firewall_certificates
+        (firewall_id, refid, name, issuer, subject, cert_type, not_before, not_after,
+         days_remaining, in_use)
+     VALUES (?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($ids as $n => $fid) {
+    // A couple of near-expiry certificates so the warning states are visible.
+    $days = [11, 64, 190, 6, 240, 133, 88, 155, 27, 201, 176][$n];
+    $insCert->execute([
+        $fid, substr(hash('md5', "cert-$fid"), 0, 13),
+        'webgui-' . $n, "Let's Encrypt R3",
+        'CN=' . array_keys($fwIds)[$n], 'server',
+        $ts('-' . (90 - 0) . ' days'), $ts("+{$days} days"), $days, 'Web GUI',
+    ]);
+}
+
+$insCarp = $db->prepare(
+    'INSERT INTO firewall_carp (firewall_id, vhid, interface, address, state, advskew, advbase)
+     VALUES (?,?,?,?,?,?,?)'
+);
+$insCarp->execute([$a, '1', 'igc0', '192.0.2.10', 'MASTER', 0, 1]);
+$insCarp->execute([$a, '2', 'igc1', '10.20.0.1',  'MASTER', 0, 1]);
+$insCarp->execute([$b, '1', 'igc0', '192.0.2.10', 'BACKUP', 100, 1]);
+$insCarp->execute([$b, '2', 'igc1', '10.20.0.1',  'BACKUP', 100, 1]);
+echo "  health telemetry   gateways, VPN, services, certificates, CARP\n";
+
+// ---------------------------------------------------------------------------
+// Interfaces, system stats and traffic history.
+// ---------------------------------------------------------------------------
+
+$insIf = $db->prepare(
+    'INSERT INTO firewall_wan_interfaces
+        (firewall_id, interface_name, status, ip_address, netmask, gateway, media,
+         rx_packets, rx_errors, rx_bytes, tx_packets, tx_errors, tx_bytes)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($fleet as $n => $f) {
+    $fid = $ids[$n];
+    $insIf->execute([$fid, 'igc0', $f[7] === 'offline' ? 'down' : 'up', $f[3],
+        '255.255.255.0', preg_replace('/\.\d+$/', '.1', $f[3]),
+        '1000baseT <full-duplex>',
+        48_000_000 + $n * 3_100_000, 0, 612_000_000_000 + $n * 21_000_000_000,
+        41_000_000 + $n * 2_700_000, 0, 388_000_000_000 + $n * 17_000_000_000]);
+    $insIf->execute([$fid, 'igc1', 'up', '10.' . (20 + $n) . '.0.1',
+        '255.255.255.0', null, '1000baseT <full-duplex>',
+        52_000_000, 0, 501_000_000_000, 49_000_000, 0, 476_000_000_000]);
+}
+
+$insStat = $db->prepare(
+    'INSERT INTO firewall_system_stats
+        (firewall_id, recorded_at, cpu_load_1min, cpu_load_5min, cpu_load_15min,
+         memory_total_mb, memory_used_mb, memory_percent,
+         disk_total_gb, disk_used_gb, disk_percent)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+);
+$insTraffic = $db->prepare(
+    'INSERT INTO firewall_traffic_stats
+        (firewall_id, recorded_at, wan_interface, bytes_in, bytes_out, packets_in, packets_out)
+     VALUES (?,?,?,?,?,?,?)'
+);
+$insLat = $db->prepare(
+    'INSERT INTO firewall_latency (firewall_id, latency_ms, measured_at) VALUES (?,?,?)'
+);
+
+// 24 hours at 10-minute resolution, so the charts have a real shape.
+foreach ($ids as $n => $fid) {
+    $rxAcc = 612_000_000_000 + $n * 21_000_000_000;
+    $txAcc = 388_000_000_000 + $n * 17_000_000_000;
+    for ($m = 144; $m >= 0; $m--) {
+        $when = $ts('-' . ($m * 10) . ' minutes');
+        // A daily shape: quiet overnight, busy through the working day.
+        $hour  = (int) (new DateTimeImmutable($when))->format('G');
+        $duty  = ($hour >= 7 && $hour <= 19) ? 1.0 : 0.28;
+        $wobble = (sin($m / 7.0 + $n) + 1.3) / 2.0;
+
+        $insStat->execute([
+            $fid, $when,
+            round(0.18 + 0.55 * $duty * $wobble, 2),
+            round(0.20 + 0.48 * $duty * $wobble, 2),
+            round(0.22 + 0.40 * $duty * $wobble, 2),
+            8192, (int) round(2100 + 900 * $duty * $wobble),
+            round((2100 + 900 * $duty * $wobble) / 8192 * 100, 2),
+            120, 22 + $n % 7, round((22 + $n % 7) / 120 * 100, 2),
+        ]);
+
+        $rxDelta = (int) round((9_000_000 + 41_000_000 * $duty * $wobble));
+        $txDelta = (int) round((4_000_000 + 23_000_000 * $duty * $wobble));
+        $rxAcc += $rxDelta;
+        $txAcc += $txDelta;
+        $insTraffic->execute([$fid, $when, 'igc0', $rxAcc, $txAcc,
+            (int) ($rxAcc / 1200), (int) ($txAcc / 1400)]);
+
+        if ($m % 3 === 0) {
+            $insLat->execute([$fid, round(8 + ($n * 3) % 22 + 4 * $wobble, 2), $when]);
+        }
+    }
+}
+echo "  telemetry history  24h of stats, traffic and latency per firewall\n";
+
+// ---------------------------------------------------------------------------
+// Configuration backups, baselines and drift.
+// ---------------------------------------------------------------------------
+
+$insBackup = $db->prepare(
+    'INSERT INTO backups
+        (firewall_id, backup_file, description, created_at, backup_type, file_size,
+         storage_path, checksum_sha256, validated, uploaded_at, source_filename)
+     VALUES (?,?,?,?,?,?,?,?,1,?,?)'
+);
+$backupIds = [];
+foreach ($ids as $n => $fid) {
+    for ($d = 14; $d >= 0; $d--) {
+        $when = $ts("-{$d} days -" . (2 + $n % 3) . ' hours');
+        $name = 'config-' . (new DateTimeImmutable($when))->format('Ymd-His') . '.xml';
+        $insBackup->execute([
+            $fid, $name,
+            $d === 0 ? 'Scheduled nightly backup' : 'Scheduled nightly backup',
+            $when, 'automated', 148_000 + $n * 2_100 + $d * 37,
+            '/var/opnmgr/backups/' . $fid, hash('sha256', "demo-$fid-$d"),
+            $when, $name,
+        ]);
+        if ($d === 0) {
+            $backupIds[$fid] = (int) $db->lastInsertId();
+        }
+        if ($d === 7) {
+            $baselineBackup[$fid] = (int) $db->lastInsertId();
+        }
+    }
+}
+
+$insBaseline = $db->prepare(
+    'INSERT INTO config_baselines
+        (firewall_id, backup_id, config_hash, section_hashes, set_by_user_id,
+         set_by_username, set_at, notes, is_current)
+     VALUES (?,?,?,?,1,?,?,?,1)'
+);
+$insDrift = $db->prepare(
+    'INSERT INTO config_drift
+        (firewall_id, baseline_id, current_backup_id, current_hash, status,
+         sections_changed, change_count, first_detected_at, last_checked_at,
+         acknowledged_at, acknowledged_by, acknowledged_note)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+
+$driftPlan = [
+    // index => [status, changed sections, count, acknowledged?]
+    3  => ['drifted', ['modified' => ['filter', 'nat']], 4, false],
+    8  => ['drifted', ['modified' => ['interfaces'], 'added' => ['staticroutes']], 2, false],
+    10 => ['drifted', ['modified' => ['dhcpd']], 1, true],
+];
+
+foreach ($ids as $n => $fid) {
+    $sections = json_encode([
+        'filter' => hash('sha256', "f-$fid"), 'nat' => hash('sha256', "n-$fid"),
+        'interfaces' => hash('sha256', "i-$fid"), 'dhcpd' => hash('sha256', "d-$fid"),
+    ]);
+    $insBaseline->execute([
+        $fid, $baselineBackup[$fid], hash('sha256', "baseline-$fid"), $sections,
+        'demo', $ts('-7 days'), 'Approved after quarterly review',
+    ]);
+    $baselineId = (int) $db->lastInsertId();
+
+    $plan = $driftPlan[$n] ?? null;
+    $insDrift->execute([
+        $fid, $baselineId, $backupIds[$fid],
+        hash('sha256', $plan ? "changed-$fid" : "baseline-$fid"),
+        $plan ? 'drifted' : 'match',
+        $plan ? json_encode($plan[1]) : json_encode([]),
+        $plan ? $plan[2] : 0,
+        $plan ? $ts('-' . (1 + $n % 3) . ' days') : null,
+        $ts('-25 minutes'),
+        ($plan && $plan[3]) ? $ts('-10 hours') : null,
+        ($plan && $plan[3]) ? 'demo' : null,
+        ($plan && $plan[3]) ? 'Planned DHCP scope change, ticket NWL-4417' : null,
+    ]);
+}
+echo "  backups and drift  15 backups per firewall, baselines, 3 drifted\n";
+
+// ---------------------------------------------------------------------------
+// Update campaign. Seeded in terminal states - no command rows are created,
+// so nothing here can dispatch to anything.
+// ---------------------------------------------------------------------------
+
+$db->prepare(
+    'INSERT INTO update_campaigns
+        (name, description, target_version, operation, status, current_ring,
+         auto_progress, reboot_if_required, respect_maintenance, ha_safe,
+         created_by_user_id, created_by_username, created_at, started_at)
+     VALUES (?,?,?,?,?,?,0,1,1,1,1,?,?,?)'
+)->execute([
+    'OPNsense 26.7.3 rollout',
+    'Quarterly firmware rollout across the managed fleet.',
+    '26.7.3', 'install', 'running', 'pilot',
+    'demo', $ts('-2 days'), $ts('-2 days'),
+]);
+$campaignId = (int) $db->lastInsertId();
+
+$insTarget = $db->prepare(
+    'INSERT INTO update_campaign_targets
+        (campaign_id, firewall_id, ring, status, hold_reason, version_before,
+         version_after, dispatched_at, completed_at, result)
+     VALUES (?,?,?,?,?,?,?,?,?,?)'
+);
+foreach ($fleet as $n => $f) {
+    $fid  = $ids[$n];
+    $ring = $f[11];
+    if ($ring === 'canary') {
+        $insTarget->execute([$campaignId, $fid, $ring, 'succeeded', null, '26.7.2',
+            '26.7.3', $ts('-2 days'), $ts('-2 days'), 'Updated and rebooted; agent re-checked in.']);
+    } elseif ($ring === 'pilot') {
+        $insTarget->execute([$campaignId, $fid, $ring, $n === 2 ? 'succeeded' : 'dispatched',
+            null, '26.7.2', $n === 2 ? '26.7.3' : null, $ts('-4 hours'),
+            $n === 2 ? $ts('-3 hours') : null, $n === 2 ? 'Updated and rebooted.' : null]);
+    } elseif ($f[7] === 'offline') {
+        $insTarget->execute([$campaignId, $fid, $ring, 'pending',
+            'Firewall has not checked in since ' . $ts('-47 minutes'),
+            '25.7.11', null, null, null, null]);
+    } elseif ($f[12] === 'BACKUP') {
+        $insTarget->execute([$campaignId, $fid, $ring, 'holding',
+            'HA partner fw-chi-edge01 must complete first', '26.7.2', null, null, null, null]);
+    } else {
+        $insTarget->execute([$campaignId, $fid, $ring, 'pending', null, '26.7.2',
+            null, null, null, null]);
+    }
+}
+echo "  update campaign    1 running, rings seeded in terminal states\n";
+
+// ---------------------------------------------------------------------------
+// Incidents.
+// ---------------------------------------------------------------------------
+
+$insInc = $db->prepare(
+    'INSERT INTO alert_incidents
+        (dedupe_key, dedupe_source, alert_type, object_key, severity, status,
+         firewall_id, customer_id, site_id, title, detail, metadata,
+         first_seen_at, last_seen_at, resolved_at, occurrence_count,
+         acknowledged_at, acknowledged_by, acknowledged_note, notify_count,
+         last_notified_at, suppressed, suppressed_reason)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+$insEvent = $db->prepare(
+    'INSERT INTO alert_incident_events (incident_id, event, detail, actor, occurred_at)
+     VALUES (?,?,?,?,?)'
+);
+
+$fwMeta = static function (int $idx) use ($ids, $fleet, $customerIds, $siteIds) {
+    $f = $fleet[$idx];
+    return [$ids[$idx], $customerIds[$f[1]], $siteIds[$f[1] . '/' . $f[2]], $f[0]];
+};
+
+$incidents = [
+    // [fw index, type, object, severity, status, title, detail, age hours, count]
+    [8,  'firewall.offline',   null,        'critical', 'open',
+     'Firewall has not checked in', 'No agent check-in for 47 minutes. Last seen on OPNsense 25.7.11.', 0.8, 24],
+    [8,  'vpn.tunnel.down',    'wg-hub',    'critical', 'open',
+     'WireGuard tunnel wg-hub is down', 'No handshake for 3 hours.', 3.0, 18],
+    [3,  'gateway.degraded',   'WAN2_LTE',  'warning',  'acknowledged',
+     'Gateway WAN2_LTE is degraded', 'Latency 148.7 ms, loss 2.4% over the last 15 minutes.', 9.0, 52],
+    [3,  'service.stopped',    'suricata',  'warning',  'open',
+     'Service suricata is not running', 'Configured but reported stopped on the last three check-ins.', 5.0, 3],
+    [3,  'certificate.expiring','webgui-3', 'warning',  'open',
+     'Certificate webgui-3 expires in 6 days', 'Web GUI certificate. Renew before expiry.', 26.0, 2],
+    [0,  'certificate.expiring','webgui-0', 'warning',  'open',
+     'Certificate webgui-0 expires in 11 days', 'Web GUI certificate. Renew before expiry.', 14.0, 1],
+    [3,  'config.drift',       null,        'warning',  'open',
+     'Configuration has drifted from baseline', '4 changes across filter and nat since the approved baseline.', 30.0, 1],
+    [6,  'firewall.reboot_required', null,  'info',     'resolved',
+     'Reboot required after update', 'Cleared when the firewall reported a new uptime.', 40.0, 1],
+    [1,  'agent.outdated',     null,        'info',     'resolved',
+     'Agent below minimum supported version', 'Agent self-updated to 1.6.2.', 60.0, 1],
+];
+
+$opened = 0;
+foreach ($incidents as $inc) {
+    [$idx, $type, $obj, $sev, $status, $title, $detail, $ageH, $count] = $inc;
+    [$fid, $cid, $sid, $host] = $fwMeta($idx);
+
+    $first = $ts('-' . $ageH . ' hours');
+    $resolved = $status === 'resolved' ? $ts('-' . ($ageH - 2) . ' hours') : null;
+    $key = $status === 'resolved' ? null : "$fid:$type:" . ($obj ?? '-');
+
+    $insInc->execute([
+        $key, "$fid:$type:" . ($obj ?? '-'), $type, $obj, $sev, $status,
+        $fid, $cid, $sid, $title, $detail,
+        json_encode(['hostname' => $host, 'demo' => true]),
+        $first,
+        $status === 'resolved' ? $resolved : $ts('-2 minutes'),
+        $resolved, $count,
+        $status === 'acknowledged' ? $ts('-6 hours') : null,
+        $status === 'acknowledged' ? 'demo' : null,
+        $status === 'acknowledged' ? 'Carrier ticket raised, ETA 48h' : null,
+        $status === 'resolved' ? 2 : 3,
+        $ts('-30 minutes'),
+        0, null,
+    ]);
+    $incId = (int) $db->lastInsertId();
+    $opened++;
+
+    $insEvent->execute([$incId, 'opened', $title, null, $first]);
+    $insEvent->execute([$incId, 'notified', 'Notified 1 recipient', null, $first]);
+    if ($status === 'acknowledged') {
+        $insEvent->execute([$incId, 'acknowledged', 'Carrier ticket raised, ETA 48h', 'demo', $ts('-6 hours')]);
+    }
+    if ($status === 'resolved') {
+        $insEvent->execute([$incId, 'resolved', 'Condition cleared', null, $resolved]);
+    } else {
+        $insEvent->execute([$incId, 'updated', "Still present after {$count} checks", null, $ts('-2 minutes')]);
+    }
+}
+echo "  incidents          {$opened} with event trails\n";
+
+// ---------------------------------------------------------------------------
+// Maintenance windows and an audit trail.
+// ---------------------------------------------------------------------------
+
+$insWin = $db->prepare(
+    'INSERT INTO maintenance_windows
+        (scope, scope_id, starts_at, ends_at, reason, status, suppress_alerts,
+         created_by_user_id, created_by_username)
+     VALUES (?,?,?,?,?,?,1,1,?)'
+);
+$insWin->execute(['customer', $customerIds['NWL'], $ts('+2 days'), $ts('+2 days +4 hours'),
+    'Quarterly firmware rollout, production ring', 'scheduled', 'demo']);
+$insWin->execute(['site', $siteIds['CHG/DEN'], $ts('-1 hour'), $ts('+3 hours'),
+    'Clinic network cutover', 'active', 'demo']);
+$insWin->execute(['firewall', $ids[8], $ts('-6 days'), $ts('-6 days +2 hours'),
+    'ISP circuit replacement', 'completed', 'demo']);
+
+$insAudit = $db->prepare(
+    'INSERT INTO audit_log
+        (occurred_at, actor_type, user_id, username, source_ip, action, object_type,
+         object_id, firewall_id, customer_id, site_id, success, message, metadata)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+$auditActions = [
+    ['user','demo','config.baseline.set','firewall','Baseline approved after quarterly review',1],
+    ['user','demo','incident.acknowledge','incident','Acknowledged gateway degradation',1],
+    ['user','demo','campaign.ring.advance','campaign','Advanced rollout from canary to pilot',1],
+    ['user','demo','backup.download','backup','Downloaded configuration backup',1],
+    ['agent',null,'agent.checkin','firewall','Agent check-in accepted',1],
+    ['user','demo','auth.login','user','Signed in',1],
+    ['user','demo','command.raw','firewall','Raw shell refused: capability not held',0],
+    ['system',null,'backup.schedule.run','system','Nightly backup completed for 11 firewalls',1],
+];
+foreach ($auditActions as $i => $act) {
+    $insAudit->execute([
+        $ts('-' . ($i * 37 + 12) . ' minutes'), $act[0],
+        $act[1] ? 1 : null, $act[1], '192.0.2.200',
+        $act[2], $act[3], (string) ($ids[$i % count($ids)]),
+        $ids[$i % count($ids)], $customerIds['NWL'], null,
+        $act[5], $act[4], json_encode(['demo' => true]),
+    ]);
+}
+echo "  maintenance/audit  3 windows, " . count($auditActions) . " audit entries\n";
+
+// ---------------------------------------------------------------------------
+// Verify the fixture issued no commands.
+// ---------------------------------------------------------------------------
+
+$commandRows = 0;
+foreach (['firewall_commands', 'agent_commands', 'request_queue'] as $t) {
+    $commandRows += (int) $db->query("SELECT COUNT(*) FROM `$t`")->fetchColumn();
+}
+
+echo "\nCommand-queue rows after seeding: {$commandRows} (must be 0)\n";
+if ($commandRows !== 0) {
+    exit("FAILED: the fixture created command rows.\n");
+}
+echo "Demo fixture complete.\n";

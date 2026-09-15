@@ -2,7 +2,74 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: September 5, 2026
+**Last Updated**: September 15, 2026
+
+---
+
+## Version 3.22.0
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Changed
+
+- **Rewrote `README.md` around what the product does.** The first screen was a
+  reverse-chronological pile of release notes for 3.12 through 3.17 — every one of
+  which is already in this file — before any statement of what OPNManager is for.
+  It now leads with the positioning, one fleet dashboard screenshot, the three
+  things the product actually helps an operator do, a short screenshot tour, and a
+  Mermaid diagram of the communication direction. The release history was removed
+  from the README rather than duplicated; this file is the history.
+
+- **Removed the "Production Stable" status claim.** Nothing in the repository
+  defines a release policy, a support window or a validation gate that the claim
+  could refer to, so it asserted more than the project documents.
+
+- **Stopped implying the Releases page is current.** The newest tag is `v3.11.1`
+  while `main` is at 3.22.0. The README now says so plainly and names `main` as the
+  version to install, instead of linking to a releases page ten minor versions
+  behind and leaving the reader to discover the gap.
+
+- **Feature availability is now stated per agent version.** Health telemetry needs
+  agent 1.6.2 — 1.6.0 reported no gateways and 1.6.1 miscounted services — and the
+  README previously still carried the 3.14-era line saying the health collector was
+  "not in a published agent release yet", which stopped being true at 1.6.0.
+
+- **Documented that the agent installer fetches its package from the project's
+  distribution host.** The one-liner the UI generates is correctly built from the
+  operator's own hostname, but `install_opnmanager_agent.sh` has `PLUGIN_URL`
+  hardcoded to `opn.agit8or.net`, so a self-hosted installation does not currently
+  serve its own agent tarball. Calling a product self-hosted while quietly relying
+  on someone else's host is the kind of claim this release is meant to stop making.
+  The README now says so and explains how to mirror the package.
+
+- **Added the independence notice.** The project is not affiliated with or endorsed
+  by Deciso B.V. or the OPNsense project, and now says so.
+
+### Added
+
+- **`scripts/demo_fixture.php`** — seeds a throwaway database with fictitious
+  customers, sites and simulated telemetry so documentation screenshots never come
+  from a live fleet. It refuses to run unless `OPNMGR_DEMO=1` and `DB_NAME` ends in
+  `_demo`, refuses a database holding agent credentials, and writes nothing to
+  `firewall_commands`, `agent_commands` or `request_queue` — it asserts those are
+  empty before it exits, so a demo fleet has no path to instructing anything.
+  Addresses come from the documentation ranges in RFC 5737 and RFC 3849 and
+  hostnames from the reserved `.example` domain.
+
+- **`scripts/capture_demo_screenshots.js`** — captures the README images from that
+  demo environment at a consistent 1440×900, dark theme, sidebar pinned. It takes
+  its credential from the environment and points at the demo instance, so unlike
+  the live-installation capture path there is no redaction step that can silently
+  fail to catch a hostname.
+
+- **`docs/images/github/`** — five screenshots (dashboard, firewall health,
+  configuration drift, fleet updates, incidents) with a `README.md` recording how
+  they were produced and how to regenerate them.
+
+- **`docs/github-about.md`** — the About description, Website decision and topic
+  list for the repository page, with the reasoning for each change. Notably it
+  recommends dropping the `multi-tenant` topic: customers are organisational
+  groupings with no accounts and no login, so the topic advertises isolation the
+  product does not implement.
 
 ---
 

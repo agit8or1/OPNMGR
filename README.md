@@ -1,389 +1,241 @@
-# OPNManager - OPNsense Firewall Management Platform
+<div align="center">
 
-[![GitHub Stars](https://img.shields.io/github/stars/agit8or1/OPNMGR?style=social)](https://github.com/agit8or1/OPNMGR/stargazers)
+# OPNManager
 
-**Status**: Production Stable | **License**: MIT | **Version**: [![v3.21.3](https://img.shields.io/badge/version-3.21.3-blue)](https://github.com/agit8or1/OPNMGR/releases) | **Agent**: v1.6.2
+**Self-hosted OPNsense fleet management for MSPs and IT teams.**
 
-Self-hosted centralized OPNsense management for MSPs and IT teams.
+[![CI](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/agit8or1/OPNMGR/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![v3.22.0](https://img.shields.io/badge/version-3.22.0-blue)](CHANGELOG.md)
 
-OPNManager runs on your own server and manages the OPNsense firewalls belonging to the
-customers you support. Customers are organisational containers used to group firewalls
-and sites &mdash; they are not accounts and they do not log in. Your own staff sign in and
-work across the whole managed fleet, subject to their role.
+</div>
 
-If you find OPNManager useful, please consider giving it a star on GitHub — it helps others discover the project!
+OPNManager runs on your own server and gives your staff one place to watch, back up
+and update every OPNsense firewall you look after, grouped by customer and site.
+Customers and sites are organisational groupings inside your installation — they are
+not tenant logins, and nobody outside your own team signs in.
 
-### New in v3.17 — AI Redaction, Dashboard Roll-ups &amp; Hardening
-
-- **AI redaction** — configuration is stripped of password hashes, private keys, pre-shared
-  keys, SNMP communities and tokens before any of it reaches an external provider.
-  Redaction cannot be disabled, and an unparseable configuration is refused rather than
-  sent raw.
-- **AI is opt-in and off by default**, behind an explicit disclosure of what is and is not
-  transmitted. Nothing in the product requires it.
-- **Dashboard roll-ups** for reboots, gateways, VPN, drift, backups, certificates,
-  critical incidents and maintenance. Tiles appear only when non-zero.
-- **Version consistency enforced in CI** — `VERSION` is authoritative and derived
-  references cannot drift.
-
-### v3.16 — Fleet Updates, Bulk Operations &amp; Config Search
-
-- **Fleet update management** with rollout rings (canary &rarr; pilot &rarr; production).
-  Rings are a rollout mechanism, not customer tiers, and progression is manual unless
-  explicitly automated. A ring with any failure never counts as clean.
-- **HA-safe updates** — members of a CARP pair are never updated simultaneously. The
-  BACKUP goes first so the MASTER keeps serving, and the second member waits until the
-  first is back with CARP settled.
-- **Bulk operations** with typed confirmation phrases that include the target count.
-  Raw shell is deliberately not a bulk operation.
-- **Fleet configuration search** — deterministic, over stored backups, with named checks
-  such as "SSH reachable from WAN". No AI in the path.
-- **Safer restores** — validated and checksum-verified, a pre-restore snapshot first,
-  hostname typed to confirm, and success only recorded once the agent checks in again.
-
-### v3.15 — Incident Alerting &amp; Maintenance Windows
-
-- **Incident-based alerting** — one entry per ongoing problem rather than one per email.
-  Opened when a condition becomes true, updated while it persists, resolved when it
-  clears. OPEN / ACKNOWLEDGED / RESOLVED, with notification backoff so an offline
-  firewall stops notifying every two minutes. 17 alert types across availability,
-  gateways, VPN, HA, services, certificates, resources, drift, backups and agent health.
-- **Maintenance windows** — scoped to a firewall, a site or a whole customer. Monitoring,
-  health collection and incident recording all continue during a window; only outbound
-  notification is withheld, and the suppression is recorded on the incident.
-
-### v3.14 — Configuration Drift &amp; Firewall Health
-
-- **Configuration drift** — mark a configuration backup as the baseline and see, per
-  firewall, whether the current configuration still matches it. The comparison is
-  semantic: serialisation noise and the `<revision>` block OPNsense stamps on every save
-  are ignored, so an untouched firewall does not report drift. Diffs name a changed rule
-  by its description; findings can be acknowledged, and a new configuration can be
-  promoted to baseline. Nothing is ever restored automatically.
-- **Firewall health** — gateways with latency, packet loss and flapping detection; VPN
-  tunnels across WireGuard, OpenVPN and IPsec; CARP/HA state; services; and certificate
-  expiry with configurable 30/14/7 day warnings. Only what the agent reports is shown.
-- **The agent health collector** gathers the above. Certificate metadata only — private
-  key material is never read. Not in a published agent release yet: the collector is in
-  the plugin source and ships with the next agent version.
-
-### v3.13 — MSP Roles, Customers &amp; Fleet Search
-
-- **MSP staff roles** — Administrator, Technician and Read Only, defined once as a
-  capability matrix rather than role strings scattered through the code. Navigation and
-  actions follow the capability, not the role name.
-- **Customer and site model** — `Customer -> Site -> Firewall(s)`, with real foreign keys
-  replacing the two parallel free-text columns firewalls were previously grouped by.
-  Customers carry a short code, timezone, tags, contact details, an active flag and a
-  default maintenance window. They remain organisational containers: no accounts, no login.
-- **Global fleet search** — header typeahead and a full results page, with field
-  qualifiers and CIDR range matching.
-- **Audit log UI** — filter by action, user, firewall, result and date range.
-
-### v3.12 — Agent Authentication &amp; Secret Encryption
-
-Security release. See [SECURITY.md](SECURITY.md) for the full architecture.
-
-- **Per-firewall agent credentials** — a 256-bit API key and HMAC signing secret per
-  firewall, provisioned over the authenticated check-in and pinned on first use.
-  `hardware_id` alone (an md5 of the hostid or WAN MAC) is no longer a credential.
-- **Optional signed agent requests** — HMAC-SHA256 with a replay store, deployed in a
-  compatibility mode so an installed fleet upgrades without a flag day.
-- **Secrets encrypted at rest** — XChaCha20-Poly1305, keyed from `.env`.
-- **Verified agent updates** — Ed25519-signed manifest plus SHA-256 per artifact, atomic
-  install and automatic rollback.
-- **Structured remote operations** — a validated action catalogue replaces hand-built
-  shell. Raw shell remains as an explicitly privileged, audited path.
+[Quick Start](#quick-start) · [Screenshots](#screenshot-tour) · [Documentation](#documentation) · [Releases](https://github.com/agit8or1/OPNMGR/releases) · [Security](SECURITY.md)
 
 ---
 
-## Key Features
+[![Fleet dashboard showing eleven managed firewalls across five customers, with roll-up tiles for offline devices, pending updates, gateways down, configuration drift and expiring certificates](docs/images/github/fleet-dashboard.png)](docs/images/github/fleet-dashboard.png)
 
-### Firewall Management
-- **Centralized Dashboard**: Monitor all firewalls from a single interface
-- **Real-time Status**: Live agent check-ins every 2 minutes
-- **Plugin Agent**: Native OPNsense plugin with auto-update support
-- **Health Monitoring**: CPU, memory, disk, uptime, network status
-- **Tag System**: Organize firewalls with color-coded tags
-- **Customer & Site Grouping**: Organise managed firewalls by customer organisation and site. Customers do not log in.
-
-### Network & Traffic Monitoring
-- **WAN Traffic Charts**: Real-time throughput graphs with auto-scaling (Mb/s / Gb/s)
-- **Interface Status**: Per-interface RX/TX byte counters with error tracking
-- **Latency Monitoring**: Continuous ping measurement to multiple targets
-- **Bandwidth Testing**: On-demand iperf3 speed tests with multi-server fallback
-- **Smart Counter Detection**: Automatic fallback to pf counters when driver-level counters are broken (virtio_net)
-
-### System Monitoring
-- **Accurate Uptime Tracking**: Real system uptime from agent
-- **Version Tracking**: OPNsense version, agent version, available updates
-- **One-Click Updates**: Trigger OPNsense updates with animated progress status
-- **Reboot Control**: Clickable "Reboot Required" badge triggers remote reboot with confirmation
-- **Stuck Update Recovery**: Auto-recovery for updates stuck >15 minutes
-- **System Stats**: CPU, memory, disk usage charts (1h, 4h, 12h, 24h, 1w, 30d timeframes)
-
-### Command Execution
-- **Remote Command Queue**: Execute commands on firewalls remotely
-- **Base64 Encoding**: Support for complex multi-line commands
-- **Command History**: Track all executed commands with timestamps
-- **Output Capture**: View command results in real-time
-
-### Configuration Backup
-- **Automated Backups**: Scheduled configuration backups
-- **Manual Backups**: On-demand backup creation
-- **Backup Management**: Download, restore, and delete backups
-- **Retention Policies**: Automatic cleanup of old backups
-
-### AI-Powered Security Analysis
-- **Intelligent Configuration Review**: AI-driven analysis of firewall configurations
-- **Security Recommendations**: Automated suggestions for improving security posture
-- **Risk Assessment**: Identify potential vulnerabilities and misconfigurations
-
-### Secure Connectivity
-- **On-Demand SSH Tunnels**: Dynamic reverse tunnels with no exposed ports
-- **Web Proxy**: Access firewall web UI through the manager
-- **Automatic Cleanup**: Tunnel sessions timeout and clean up automatically
+<sub>All screenshots show the real interface populated with simulated data from an
+isolated demo fixture. Addresses are reserved documentation ranges and every
+organisation and hostname is fictitious.</sub>
 
 ---
 
-## Screenshots
+## What it helps you do
 
-Captured from a live installation with `scripts/take_screenshots.js`. Hostnames, IP
-addresses and email addresses are redacted in the rendered page before capture.
+### Find firewall and connectivity problems
 
-### Login
-![Login](screenshots/01-login.png)
+Agents report check-ins, gateway latency and loss, VPN tunnel state, CARP status,
+service state and certificate expiry. Problems become incidents — one entry per
+ongoing condition, opened when it starts and closed when it actually clears, rather
+than one email per poll.
 
-### Dashboard
-KPI strip, per-firewall health cards, status chart and network map.
+### Review configuration backups and changes
 
-![Dashboard](screenshots/02-dashboard.png)
+Configurations are backed up on a schedule and kept per firewall. Mark one as the
+approved baseline and every firewall is compared against it, ignoring serialisation
+noise and the fields OPNsense rewrites on every save, so an untouched firewall does
+not report drift. Nothing is ever restored automatically.
 
-### Firewalls
-Sortable, filterable fleet list with health scores and status indicators.
+### Coordinate maintenance and updates
 
-![Firewalls](screenshots/03-firewalls.png)
-
-### Customers
-Customer organisations used to group managed firewalls. Customers do not log in.
-
-![Customers](screenshots/04-customers.png)
-
-### Alerts
-![Alerts](screenshots/05-alerts.png)
-
-### Fleet Search
-One box across the whole fleet. Field qualifiers (`customer:`, `site:`, `tag:`,
-`version:`, `agent:`, `ip:`, `interface:`, `vpn:`, `status:`) combine with AND, and a bare
-CIDR such as `192.168.22.0/24` matches firewalls with an address inside it.
-
-![Fleet Search](screenshots/11-search.png)
-
-### Firewall Health
-Gateways, VPN tunnels, CARP/HA, services and certificate expiry, as reported by the agent.
-
-![Firewall Health](screenshots/12-health.png)
-
-### Configuration Drift
-Compares each firewall's current configuration against the approved baseline, ignoring
-serialisation noise and volatile fields.
-
-![Configuration Drift](screenshots/13-drift.png)
-
-### Fleet Updates
-Rollout rings, campaign progress and HA pairing at a glance.
-
-![Fleet Updates](screenshots/16-fleet-updates.png)
-
-### Configuration Search
-Deterministic answers across every stored configuration.
-
-![Configuration Search](screenshots/18-config-search.png)
-
-### Incidents
-One entry per ongoing problem, with acknowledgement and a full event trail.
-
-![Incidents](screenshots/14-incidents.png)
-
-### Audit Log
-Who did what, to which firewall, from where — filterable by action, user, firewall,
-result and date range. Credential material is never recorded.
-
-![Audit Log](screenshots/06-audit-log.png)
-
-### Users and Roles
-MSP staff accounts with the Administrator / Technician / Read Only roles.
-
-![Users](screenshots/07-users.png)
-
-### Settings
-![Settings](screenshots/08-settings.png)
-
-### About
-![About](screenshots/09-about.png)
-
-### Light Theme
-Full light theme with system-preference detection and a manual toggle.
-
-![Light Theme](screenshots/10-dashboard-light.png)
+Updates run as campaigns through canary, pilot and production rings, with manual
+progression between them. Members of a CARP pair are never updated at the same time.
+Maintenance windows scoped to a firewall, a site or a customer withhold notifications
+while collection and health display continue.
 
 ---
 
-## System Requirements
+## Screenshot tour
 
-### Server Requirements
-- **OS**: Ubuntu 22.04 LTS or newer
-- **PHP**: 8.0 or higher
-- **MySQL/MariaDB**: 8.0+ / 10.6+
-- **Web Server**: Apache 2.4+ or Nginx 1.18+
-- **Disk Space**: Minimum 10GB (20GB+ recommended for backups)
-- **Memory**: Minimum 2GB RAM (4GB+ recommended)
+| | |
+|---|---|
+| [![Per-firewall health panel listing gateways with interface, address, status, latency and loss; VPN tunnels; service state; and certificate expiry](docs/images/github/firewall-health.png)](docs/images/github/firewall-health.png) | [![Configuration drift page comparing each firewall's newest backup against its approved baseline, showing three drifted firewalls with the changed configuration sections named](docs/images/github/config-drift.png)](docs/images/github/config-drift.png) |
+| **Firewall health** — gateways, tunnels, services and certificates for one firewall, as reported by its agent. | **Configuration drift** — what changed since the baseline you approved, named by section. |
+| [![Fleet updates page showing a running OPNsense 25.7.3 campaign with canary, pilot and production ring progress, and a fleet table with per-firewall ring, current and available version](docs/images/github/fleet-updates.png)](docs/images/github/fleet-updates.png) | [![Incident list showing two critical and four warning incidents with severity, affected firewall, customer, how long each has been open and acknowledgement controls](docs/images/github/incidents.png)](docs/images/github/incidents.png) |
+| **Fleet updates** — rollout rings, campaign progress and HA pairing. | **Incidents** — one entry per ongoing problem, with acknowledgement and an event trail. |
 
-### Managed Firewalls
-- **OPNsense**: 20.7+ (tested up to 25.7.x)
-- **FreeBSD**: 13.x or 14.x
-- **Connectivity**: Outbound HTTPS (443) access to manager server
+---
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph fleet["Managed fleet"]
+        direction TB
+        a1["Agent<br/>Customer A firewall"]
+        a2["Agent<br/>Customer B firewall"]
+        a3["Agent<br/>Customer C firewall"]
+    end
+
+    server["OPNManager server<br/>PHP + MySQL"]
+    staff["MSP staff<br/>browser"]
+
+    a1 -->|outbound HTTPS check-in| server
+    a2 --> server
+    a3 --> server
+    server -.->|SSH, on demand only| a1
+    staff -->|HTTPS, signed in| server
+```
+
+Firewalls are never polled. Each agent makes an outbound HTTPS check-in to the
+manager, reports what it has collected, and picks up any work queued for it — so no
+inbound port has to be opened on a customer's firewall for normal operation. The one
+exception is on-demand SSH access for the web proxy and tunnels: the agent first
+installs a time-limited rule permitting only the manager's address, and the manager
+then connects out to the firewall for the length of that session.
 
 ---
 
 ## Quick Start
 
-### 1. Server Installation
+Requires Ubuntu 22.04 LTS or newer, PHP 8.0+ (CI builds against 8.3), MySQL 8.0+ or
+MariaDB 10.6+, and Apache 2.4+ or Nginx 1.18+.
+
+### 1. Server
 
 ```bash
-# Clone the repository
 cd /var/www
 git clone https://github.com/agit8or1/OPNMGR.git opnsense
 cd /var/www/opnsense
 
-# Install PHP dependencies
 composer install --no-dev
 
-# Import the database schema
-# This creates the `opnsense_fw` database, all tables, and the reference data.
+# Creates the opnsense_fw database, every table and the reference data.
+# Safe to re-import: every statement is idempotent.
 mysql -u root -p < database/schema.sql
 
-# Create the application database user
 mysql -u root -p -e "
   CREATE USER 'opnsense_user'@'localhost' IDENTIFIED BY 'your-secure-password';
   GRANT ALL PRIVILEGES ON opnsense_fw.* TO 'opnsense_user'@'localhost';
   FLUSH PRIVILEGES;"
 
-# Configure the application
 cp .env.example .env
-# Edit .env and set at minimum DB_HOST, DB_NAME, DB_USER, DB_PASS and APP_URL
+# Set at minimum DB_HOST, DB_NAME, DB_USER, DB_PASS and APP_URL.
 chmod 640 .env
 
-# Create the first administrator account
+# Required since 3.12: encrypts agent credentials and SSH keys at rest.
+php scripts/generate_master_key.php
+
 php scripts/create_admin.php
 
-# Set proper permissions
 chown -R www-data:www-data /var/www/opnsense
-chmod 755 /var/www/opnsense
-
-# Configure Apache virtual host and reload
-a2ensite opnmanager
-systemctl reload apache2
+a2ensite opnmanager && systemctl reload apache2
 ```
 
-> **Note:** the schema is safe to re-import — every statement is idempotent.
-> To regenerate it from an existing installation, run `scripts/generate_schema.sh`.
+### 2. Agent
 
-### 2. Firewall Enrollment
+Sign in, open **Settings**, and copy the install one-liner shown there. It is built
+from your own server's hostname:
 
-#### Option A: Quick Enrollment (Recommended)
-
-1. Log into OPNManager web interface
-2. Navigate to **Firewalls > Add Firewall**
-3. Generate an enrollment key
-4. On the OPNsense firewall, run the one-liner install command shown on the page
-
-#### Option B: Manual Plugin Installation
-
-```bash
-# On the OPNsense firewall, install the agent plugin:
+```sh
+# On the OPNsense firewall, as root:
 fetch -o - https://<your-opnmgr-server>/downloads/plugins/install_opnmanager_agent.sh | sh
 ```
 
-Then configure the agent via the OPNsense web GUI under **Services > OPNManager Agent**.
+Then configure the agent under **Services → OPNManager Agent** in the OPNsense GUI.
+The agent installs as a native plugin, checks in every two minutes by default, logs to
+`/var/log/opnmanager_agent.log`, and is managed with
+`service opnmanager_agent start|stop|restart`.
 
-### 3. Agent Plugin
-
-The OPNManager agent installs as a native OPNsense plugin:
-
-- **Plugin location**: `/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh`
-- **Configuration**: Via OPNsense GUI (Services > OPNManager Agent)
-- **Service management**: `service opnmanager_agent start|stop|restart`
-- **Logs**: `/var/log/opnmanager_agent.log`
-- **Auto-update**: Agent checks for updates on each check-in and self-updates
+> The installer script currently fetches the agent package from the project's own
+> distribution host rather than from your server. If your firewalls cannot reach it,
+> mirror `downloads/plugins/os-opnmanager-agent-<version>.tar.gz` yourself and adjust
+> `PLUGIN_URL` in the installer.
 
 ---
 
-## Configuration
+## Compatibility and feature availability
 
-### Agent Check-in
+| | Version | Notes |
+|---|---|---|
+| Application | 3.22.0 | Install from `main`. See the caveat under Releases below. |
+| Agent | v1.6.2 | Newest published package in `downloads/plugins/`. |
+| Minimum supported agent | 1.3.0 | Older agents are refused. |
+| Database schema | 1.4.0 | `database/schema.sql`, regenerated by `scripts/generate_schema.sh`. |
 
-The agent checks in every 2 minutes by default. On each check-in, it reports:
-- System stats (CPU, memory, disk)
-- Network interface status and traffic counters
-- Latency measurements
-- OPNsense version and update availability
-- Pending command results
+CI enforces these against `VERSION` and the published artifact — application 3.22.0,
+**Agent**: v1.6.2 — so no reference in the tree can drift out of step.
 
-### Traffic Counter Intelligence
+Feature availability depends on the agent version a firewall is actually running:
 
-The agent uses the best available counter source:
-- **Link layer** (default): Captures all traffic including forwarded/NAT
-- **pf counters** (fallback): Used when Link-layer counters are frozen (common with virtio_net on VPS)
-- **IP layer** (last resort): Per-address traffic only
+| Feature | Requires | Status |
+|---|---|---|
+| Check-ins, system stats, traffic, latency | agent 1.3.0+ | Released |
+| Configuration backup, restore, drift | agent 1.3.0+ | Released |
+| Fleet updates, rings, HA-safe ordering | agent 1.3.0+ | Released |
+| Incidents and maintenance windows | server only | Released |
+| Health telemetry — gateways, VPN, CARP, services, certificates | agent 1.6.2+ | Released. 1.6.0 reported no gateways and 1.6.1 miscounted services; use 1.6.2. |
+| AI configuration review | server only, opt-in | Released, off by default. Secrets are redacted before anything leaves your server and redaction cannot be disabled. |
+
+Firewalls below the health minimum are shown as *not reporting* rather than as
+failures. Anything present in this repository but not listed above should be treated
+as source-only until it appears in [CHANGELOG.md](CHANGELOG.md).
+
+**Validated on** OPNsense 26.7 (FreeBSD 14), which is what the maintainer's own fleet
+runs. Earlier releases may work — the agent needs only a POSIX shell, `fetch` and
+`configctl` — but are not tested. Firewalls need outbound HTTPS to the manager; no
+inbound port is required.
+
+### Releases
+
+The [releases page](https://github.com/agit8or1/OPNMGR/releases) currently lags `main`;
+the newest tag is v3.11.1 while this tree is 3.22.0. Until tagging catches up,
+`main` is the version to install and [CHANGELOG.md](CHANGELOG.md) is the authoritative
+history. There is no formal support or LTS policy, so treat this as actively developed
+software and read the changelog before upgrading.
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | Full release-by-release history. |
+| [FEATURES.md](FEATURES.md) | Feature reference. |
+| [docs/UPGRADING.md](docs/UPGRADING.md) | Upgrading the server and the agent fleet. |
+| [SECURITY.md](SECURITY.md) | Security architecture and how to report a vulnerability. |
+| [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Day-to-day operator commands. |
 
 ---
 
 ## Security
 
-### Authentication
-- Secure password hashing (PHP `password_hash`)
-- Session management with CSRF protection
-- Login attempt logging
+Agents authenticate with a per-firewall API key and HMAC signing secret. Secrets,
+SSH private keys and MFA recovery codes are encrypted at rest with XChaCha20-Poly1305
+keyed from `.env`. Agent updates are Ed25519-signed and verified before installation,
+with automatic rollback. Remote operations go through a validated action catalogue;
+raw shell is a separate, audited, explicitly privileged path. Certificate metadata is
+collected, never private key material.
 
-### Agent Communication
-- HTTPS-only agent check-ins
-- Hardware ID-based firewall identification
-- Base64-encoded command payloads
-- PID file locking prevents duplicate agents
+Read [SECURITY.md](SECURITY.md) before exposing an installation, and report
+vulnerabilities through the process described there rather than in a public issue.
 
-### Secure Connections
-- On-demand SSH reverse tunnels (dynamic port allocation 8100-8200)
-- No exposed firewall ports required
-- Automatic tunnel session cleanup
+## Contributing
 
----
-
-## Troubleshooting
-
-### Agent Not Checking In
-
-```bash
-# On the OPNsense firewall:
-service opnmanager_agent status
-tail -20 /var/log/opnmanager_agent.log
-```
-
-### Network Data Shows Incorrect Values
-
-- Ensure agent is v1.5.6+ (supports pf counter fallback for virtio_net)
-- Check agent log for "Link layer counter frozen" messages
-- Traffic data accumulates over time; new installations need ~24h for full graphs
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
+Issues and pull requests are welcome — there are
+[templates](https://github.com/agit8or1/OPNMGR/issues/new/choose) for bugs, features
+and questions. CI lints every PHP and shell file, validates Composer dependencies,
+runs the security regression suite, and enforces that `VERSION` and every version
+reference derived from it agree.
 
 ## Support
 
-- Star this repo on [GitHub](https://github.com/agit8or1/OPNMGR)
-- Visit [mspreboot.com](https://mspreboot.com)
+- [Issues](https://github.com/agit8or1/OPNMGR/issues) for bugs and questions
+- [mspreboot.com](https://mspreboot.com) — the maintainer's MSP consultancy
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+<sub>OPNManager is an independent project. It is not affiliated with, endorsed by, or
+sponsored by Deciso B.V. or the OPNsense project. "OPNsense" is a registered trademark
+of Deciso B.V.</sub>
