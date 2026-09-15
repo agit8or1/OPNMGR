@@ -27,7 +27,11 @@ $smtp_settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 $notice = '';
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify($_POST['csrf'] ?? ($_POST['csrf_token'] ?? ''))) {
+    // Redirecting alerts to an address of the attacker's choosing, or turning
+    // them off entirely, was a cross-site request away.
+    $error = 'Session expired. Please try again.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['save_email_settings'])) {
         $email_enabled = isset($_POST['email_enabled']) ? 'true' : 'false';
         $email_from = trim($_POST['email_from_address'] ?? '');
@@ -126,6 +130,7 @@ include __DIR__ . '/inc/header.php';
                             <?php endif; ?>
                             
                             <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="email_enabled" name="email_enabled" 
                                            <?php echo $settings['email_enabled'] ? 'checked' : ''; ?>>
@@ -180,6 +185,7 @@ include __DIR__ . '/inc/header.php';
                             </p>
                             
                             <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="pushover_enabled" name="pushover_enabled" 
                                            <?php echo $settings['pushover_enabled'] ? 'checked' : ''; ?>>
@@ -239,6 +245,7 @@ include __DIR__ . '/inc/header.php';
                             </p>
                             
                             <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                                 <div class="mb-3 form-check form-switch">
                                     <input type="checkbox" class="form-check-input" id="alerts_info_enabled" name="alerts_info_enabled" 
                                            <?php echo $settings['alerts_info_enabled'] ? 'checked' : ''; ?>>

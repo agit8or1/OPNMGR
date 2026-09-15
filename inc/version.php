@@ -44,6 +44,20 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.39.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'A Form You Never Saw',
+            'changes' => [
+                'SECURITY: twofactor_setup.php accepted disable_2fa with no CSRF token. An operator who loaded an attacker\'s page had their second factor stripped, silently, from a form they never saw - and 3.35.0 had just made that second factor real',
+                'SECURITY: alerts.php accepted new notification settings with no token, so redirecting alerts to an address of the attacker\'s choosing, or switching them off entirely, was one cross-site request',
+                'SECURITY: api/request_queue.php queued an arbitrary method, path, headers and body to be proxied at a managed firewall, behind requireLogin() alone - no token and no role check. It now requires firewall.manage and a token',
+                'SECURITY: package_builder.php rendered a CSRF token and its JavaScript sent one, and the handler never looked at it. A decorative token is worse than none: it reads as protection',
+                'CHANGED: firewall_edit.php compared the token by hand with !== against the session value. It uses csrf_verify() now, which compares with hash_equals() and is the single implementation the rest of the application uses',
+                'ADDED: tests/endpoint_authz_test.php now also fails if a browser-driven writer does not verify a token. It accepts only csrf_verify() - rendering a token does not count, which is what hid two of these',
+            ],
+        ],
+        [
             'version' => '3.38.0',
             'date' => '2026-09-15',
             'type' => 'minor',

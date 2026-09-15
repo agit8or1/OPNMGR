@@ -24,7 +24,12 @@ $user = getUserById($userId);
 // Handle 2FA setup
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['enable_2fa'])) {
+    // None of these branches verified anything. disable_2fa is the one that
+    // matters: a logged-in operator loading an attacker's page was enough to
+    // strip their second factor, silently, from a form they never saw.
+    if (!csrf_verify($_POST['csrf'] ?? ($_POST['csrf_token'] ?? ''))) {
+        $message = '<div class="alert alert-danger">Session expired. Please try again.</div>';
+    } elseif (isset($_POST['enable_2fa'])) {
         // Generate secret key
         $secret = generate2FASecret();
         
@@ -72,6 +77,7 @@ require_once __DIR__ . '/inc/header.php';
                             <i class="fa fa-check-circle me-2"></i>2FA is currently enabled for your account.
                         </div>
                         <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                             <button type="submit" name="disable_2fa" class="btn btn-danger" onclick="return confirm('Are you sure you want to disable 2FA?')">
                                 <i class="fa fa-times me-2"></i>Disable 2FA
                             </button>
@@ -94,6 +100,7 @@ require_once __DIR__ . '/inc/header.php';
                                 <p class="text-muted small mb-0">Spaces are for readability; most apps ignore them.</p>
                             </div>
                             <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                                 <div class="mb-3">
                                     <label for="verification_code" class="form-label">Enter verification code from your app:</label>
                                     <input type="text" class="form-control" id="verification_code" name="verification_code" required maxlength="6" pattern="[0-9]{6}">
@@ -108,6 +115,7 @@ require_once __DIR__ . '/inc/header.php';
                                 You'll need an authenticator app like Google Authenticator, Authy, or Microsoft Authenticator.
                             </div>
                             <form method="post">
+                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
                                 <button type="submit" name="enable_2fa" class="btn btn-primary">
                                     <i class="fa fa-qrcode me-2"></i>Enable 2FA
                                 </button>

@@ -15,6 +15,21 @@ $action = $_GET['action'] ?? '';
 
 switch ($action) {
     case 'queue_request':
+        // queueRequest() inserts an arbitrary method, path, headers and body to
+        // be proxied at a managed firewall. It sat behind requireLogin() alone:
+        // no CSRF token, so an operator who loaded an attacker's page queued
+        // whatever that page chose, and no role check, so a read-only account
+        // could queue it too.
+        //
+        // proxy.php calls this over HTTP to localhost without forwarding a
+        // session cookie, so that call has always been rejected by
+        // requireLogin() and is not what this protects - see the release notes.
+        require_permission('firewall.manage');
+        if (!csrf_verify($_POST['csrf'] ?? ($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            break;
+        }
         queueRequest();
         break;
     case 'poll_requests':

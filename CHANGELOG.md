@@ -6,6 +6,54 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.39.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Security
+
+Four state-changing paths accepted a cross-site request. All four sat behind a valid
+session, so they needed an operator to load an attacker's page while logged in — not a
+remote hole, but each removes or redirects a protection:
+
+- **`twofactor_setup.php` accepted `disable_2fa` with no token.** An operator who loaded
+  the wrong page had their second factor stripped, silently, from a form they never saw —
+  and 3.35.0 had just made that second factor real for the first time.
+- **`alerts.php` accepted new notification settings with no token.** Redirecting alerts
+  to an address of the attacker's choosing, or switching them off entirely, was one
+  cross-site request.
+- **`api/request_queue.php` queued an arbitrary method, path, headers and body** to be
+  proxied at a managed firewall, behind `requireLogin()` alone — no token, no role check.
+  It now requires `firewall.manage` and a token.
+- **`package_builder.php` rendered a CSRF token, its JavaScript sent one, and the handler
+  never looked at it.** A decorative token is worse than none: it reads as protection in
+  review, which is exactly how this survived.
+
+### Changed
+
+- **`firewall_edit.php` compared the token by hand** — `$_POST['csrf_token'] !==
+  $_SESSION['csrf_token']`. It uses `csrf_verify()` now, which compares with
+  `hash_equals()` and is the one implementation the rest of the application uses. A
+  second copy is a second thing to get wrong.
+
+### Added
+
+- **CSRF coverage in `tests/endpoint_authz_test.php`.** Any endpoint that writes, is
+  reachable by a browser session, and can receive a POST must call `csrf_verify()`.
+  Machine-to-machine callers — the agent and enrolment — are excluded, since they carry
+  no cookie.
+
+  It accepts **only** `csrf_verify()`. An earlier version of this scan counted
+  `csrf_token()` as protection, and that is precisely what hid `package_builder.php`:
+  the page mentions CSRF twice and verifies nothing. Verified to fail against each of
+  the fixes reverted.
+
+### Verified
+
+Both directions tested against a running server: a POST without a token is refused and
+changes nothing, and a POST carrying the rendered token still saves normally.
+
+---
+
 ## Version 3.38.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

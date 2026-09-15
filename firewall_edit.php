@@ -54,8 +54,10 @@ $current_tag_names = array_column($current_tags, 'name');
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF protection
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    // Was a hand-rolled !== against the session value. csrf_verify() compares
+    // with hash_equals() instead, and is the one implementation the rest of the
+    // application uses - a second copy is a second thing to get wrong.
+    if (!csrf_verify($_POST['csrf_token'] ?? ($_POST['csrf'] ?? ''))) {
         die('CSRF token validation failed');
     }
 

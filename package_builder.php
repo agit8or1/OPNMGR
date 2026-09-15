@@ -73,6 +73,14 @@ $package_url = '';
 $package_filename = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_package'])) {
+    // The form rendered a token and the JavaScript sent it, but nothing here
+    // ever looked at it - a decorative token is worse than none, because it
+    // reads as protection in review.
+    if (!csrf_verify($_POST['csrf'] ?? ($_POST['csrf_token'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+        exit;
+    }
     try {
         // Create packages directory if it doesn't exist
         $packages_dir = '/var/www/opnsense/packages';

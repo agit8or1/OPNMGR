@@ -95,5 +95,50 @@ if ($dl !== '') {
         'it returned files and SQL to apply, to anyone, on an unvalidated instance_id');
 }
 
+// ---------------------------------------------------------------------------
+// Anything a browser session can be made to submit needs a CSRF token.
+// ---------------------------------------------------------------------------
+//
+// twofactor_setup.php accepted disable_2fa with no token, so an operator who
+// loaded an attacker's page had their second factor stripped from a form they
+// never saw. alerts.php accepted new notification settings the same way -
+// redirecting alerts elsewhere, or switching them off, was one cross-site
+// request. api/request_queue.php accepted an arbitrary method, path, headers
+// and body to proxy at a managed firewall.
+
+exec('cd ' . escapeshellarg($root) . ' && git ls-files "api/*.php" "*.php" 2>/dev/null', $all, $st);
+
+$writes  = '/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|queue_firewall_command|queue_command)\b/i';
+$csrfRe  = '/\b(csrf_verify|check_csrf|verify_csrf)\b/';
+$machine = '/\b(authenticateAgentRequest|agent_verify_signature|validate_agent)\b|FROM\s+enrollment_tokens/i';
+$browser = '/\b(requireLogin|requireAdmin|require_permission|isLoggedIn)\b'
+         . '|\$_SESSION\s*\[\s*[\'"]user_id[\'"]\s*\]/';
+
+$noCsrf = [];
+$csrfExamined = 0;
+
+foreach ($all as $rel) {
+    $path = $root . '/' . $rel;
+    if (!is_file($path)) { continue; }
+    if (preg_match('#^(inc/|tests/|scripts/|cron/|plugin/|development/)#', $rel)) { continue; }
+
+    $src  = (string) file_get_contents($path);
+    $code = preg_replace(['~//[^\n]*~', '~/\*.*?\*/~s'], '', $src);
+
+    if (!preg_match($writes, $code)) { continue; }
+    if (preg_match($machine, $code)) { continue; }   // no browser, no cookie
+    if (!preg_match($browser, $code)) { continue; }  // covered by the authz check above
+    if (strpos($code, '$_POST') === false && strpos($code, 'php://input') === false) { continue; }
+
+    $csrfExamined++;
+    if (!preg_match($csrfRe, $code)) { $noCsrf[] = $rel; }
+}
+
+check('browser-driven writers were found', $csrfExamined > 30, "{$csrfExamined} examined");
+
+sort($noCsrf);
+check('every browser-driven writer verifies a CSRF token', $noCsrf === [],
+    implode("\n      ", $noCsrf));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
