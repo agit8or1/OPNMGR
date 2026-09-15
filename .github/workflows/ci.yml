@@ -185,6 +185,12 @@ jobs:
       - name: Server identity suite
         run: php tests/server_identity_test.php
 
+      # agent.sh is the only place the agent's version is declared. A second
+      # literal in checkin.sh drifted eight releases behind and relabelled
+      # healthy agents as outdated on every forced check-in.
+      - name: Agent package suite
+        run: php tests/agent_package_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

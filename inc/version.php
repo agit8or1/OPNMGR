@@ -44,6 +44,19 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.30.2',
+            'date' => '2026-09-15',
+            'type' => 'patch',
+            'title' => 'One Button Aged The Agent Eight Releases',
+            'changes' => [
+                'FIXED: checkin.sh carried its own AGENT_VERSION literal saying 1.1.7 while agent.sh said 1.6.2. checkin.sh is what the `checkin` configctl action runs - the force-check-in button and `configctl opnmanager_agent checkin` both invoke it - and the manager stores whatever version the payload reports. One press relabelled a current agent as eight releases old, dropping it below the minimum supported version, costing nine points of health score and flagging it as needing an update, until the next scheduled check-in put the real version back. Only agent.sh declares the version now',
+                'FIXED: README claimed agents below the minimum supported version "are refused". Nothing refuses them - AGENT_MIN_VERSION is read only by the health score. Corrected to say what actually happens',
+                'FIXED: README\'s compatibility table and the sentence under it both still said 3.29.0, two releases behind - and that same sentence is the one claiming "CI enforces these ... so no reference in the tree can drift out of step". scripts/check_versions.php now covers both, so the claim is true',
+                'FIXED: README said the agent installer fetches its package from the project\'s distribution host with PLUGIN_URL hardcoded. That stopped being true in 3.30.0. Replaced with the limitation that was always real and never stated: downloads/ is gitignored, so a fresh clone has no agent package to serve and enrolment 404s until the operator builds and places one',
+                'ADDED: tests/agent_package_test.php asserts the agent version has exactly one source and fails if a second literal reappears',
+            ],
+        ],
+        [
             'version' => '3.30.1',
             'date' => '2026-09-15',
             'type' => 'patch',

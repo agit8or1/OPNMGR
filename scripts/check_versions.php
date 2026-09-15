@@ -144,6 +144,29 @@ check(
     $fix, $problems, $fixed
 );
 
+// The compatibility table and the sentence directly under it both name the
+// application version. Neither was covered, while that same sentence claimed
+// "CI enforces these ... so no reference in the tree can drift out of step" -
+// so the one paragraph asserting the guarantee was the paragraph drifting. Both
+// sat at 3.29.0 through two releases.
+check(
+    $root . '/README.md',
+    '/\| Application \| ([0-9][0-9.]*) \|/',
+    $appVersion,
+    'compatibility table',
+    fn(string $c) => preg_replace('/(\| Application \| )[0-9][0-9.]*( \|)/', '${1}' . $appVersion . '${2}', $c) ?: $c,
+    $fix, $problems, $fixed
+);
+
+check(
+    $root . '/README.md',
+    '/enforces these against `VERSION` and the published artifact \x{2014} application ([0-9][0-9.]*),/u',
+    $appVersion,
+    'enforcement sentence',
+    fn(string $c) => preg_replace('/(enforces these against `VERSION` and the published artifact \x{2014} application )[0-9][0-9.]*(,)/u', '${1}' . $appVersion . '${2}', $c) ?: $c,
+    $fix, $problems, $fixed
+);
+
 // --- inc/version.php --------------------------------------------------------
 // APP_VERSION already reads the VERSION file. AGENT_VERSION is the single
 // constant for the newest installable agent (LATEST_AGENT_VERSION in

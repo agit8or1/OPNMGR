@@ -6,6 +6,58 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.30.2
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+> **Note**: the `checkin.sh` fix is in the agent source. Shipping it to firewalls needs
+> a new agent package — `plugin/` is tracked, the built tarball is not. Until then the
+> force-check-in button still misreports the version on installed agents.
+
+### Fixed
+
+- **One button press aged the agent eight releases.** `agent.sh` and `checkin.sh` each
+  carried their own `AGENT_VERSION` literal, and they drifted: `agent.sh` said `1.6.2`,
+  `checkin.sh` said `1.1.7`. `checkin.sh` is what the `checkin` configctl action runs —
+  the GUI's force-check-in button and `configctl opnmanager_agent checkin` both invoke
+  it — and the manager records whatever version the payload reports.
+
+  So forcing a check-in on a correctly installed 1.6.2 agent relabelled it 1.1.7: below
+  the documented minimum supported version, nine points off its health score, and
+  flagged as needing an update — until the next scheduled check-in from `agent.sh` put
+  the real version back. The effect was transient, which is why it survived: it looked
+  like a flapping health score rather than a bug.
+
+  `agent.sh` is the only declaration now; `checkin.sh` reads from it and fails loudly if
+  it cannot.
+
+- **"Older agents are refused" was never true.** `AGENT_MIN_VERSION` is read in exactly
+  one place — `inc/health.php`, to score the firewall. Nothing rejects a check-in from an
+  old agent. The compatibility table now says what actually happens: they still report
+  in, and lose health score and version-gated features.
+
+- **The paragraph claiming CI prevents version drift had itself drifted.** The
+  compatibility table and the sentence below it both still read `3.29.0`, two releases
+  behind — and that sentence is the one asserting *"CI enforces these against `VERSION`
+  and the published artifact ... so no reference in the tree can drift out of step."*
+  `scripts/check_versions.php` checked the badge and two links, but never those two.
+  It covers both now, so the guarantee is real rather than asserted.
+
+- **The stated agent-installer limitation was out of date, and hid a real one.** The
+  README said the installer fetches its package from the project's distribution host
+  with `PLUGIN_URL` hardcoded. That stopped being true in 3.30.0. The limitation that
+  *is* true was never written down: `downloads/` holds release artifacts and is
+  gitignored, so a fresh clone has no `os-opnmanager-agent-<version>.tar.gz` to serve and
+  enrolment gets a 404 until the operator builds one from the tracked `plugin/` tree.
+
+### Added
+
+- **`tests/agent_package_test.php`** (10 assertions, in CI). The agent's version must
+  have exactly one source; the suite fails if a second literal reappears in any agent
+  script, and checks that `checkin.sh` derives it and errors rather than guessing.
+  Verified to fail against the pre-fix source.
+
+---
+
 ## Version 3.30.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

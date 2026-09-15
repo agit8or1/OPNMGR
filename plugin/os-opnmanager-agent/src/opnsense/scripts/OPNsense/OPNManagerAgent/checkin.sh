@@ -27,7 +27,21 @@
 # Force immediate check-in (one-shot command for testing)
 
 CONFIG_FILE="/conf/config.xml"
-AGENT_VERSION="1.1.7"
+AGENT_SCRIPT="/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh"
+
+# Read the version from agent.sh rather than carrying a second literal. This
+# said 1.1.7 while agent.sh said 1.6.2, so a forced check-in - the "checkin"
+# configctl action, which the GUI button and `configctl opnmanager_agent
+# checkin` both invoke - reported a version eight releases older than the agent
+# actually installed. The manager stores whatever the payload says, so one
+# button press dropped the firewall below the minimum supported version, cost it
+# nine points of health score and flagged it as needing an update, until the
+# next scheduled check-in from agent.sh put the real version back.
+AGENT_VERSION=$(grep '^AGENT_VERSION=' "$AGENT_SCRIPT" 2>/dev/null | head -1 | cut -d'"' -f2)
+if [ -z "$AGENT_VERSION" ]; then
+    echo "ERROR: could not read AGENT_VERSION from $AGENT_SCRIPT"
+    exit 1
+fi
 
 # Read configuration value from config.xml
 get_config() {
