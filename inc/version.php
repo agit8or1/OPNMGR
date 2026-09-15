@@ -44,6 +44,19 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.33.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Alerts Nobody Received',
+            'changes' => [
+                'FIXED: Alerting detected, raised and recorded correctly - and delivered nothing. On the maintainer\'s installation alert_history held 911 notifications, every one failed, not a single one sent, going back to the first row in the table. The SMTP credential had been rejected by the provider the whole time. Nothing surfaced it: no banner, no tile, no health signal. The only trace was 114,355 lines in a log file',
+                'ADDED: inc/notification_health.php tracks delivery per channel - consecutive failures since the last success, and whether a channel has ever delivered at all, which distinguishes a misconfiguration from an outage',
+                'ADDED: A banner on every administrative page when a channel has failed three consecutive attempts. Not dismissible: the failure persists until someone fixes a credential, and a banner that can be waved away is how 911 undelivered alerts go unnoticed. It states plainly that it cannot be emailed',
+                'FIXED: send_smtp_email() returned "Internal server error" for every failure, so the response that explains the problem - 535-5.7.8 Username and Password not accepted - reached only the log. It now returns the server\'s own response, redacted: base64 runs are stripped, because an echoed AUTH line carries the username and password and would otherwise land in alert_history and on screen',
+                'ADDED: tests/notification_health_test.php covers never-delivered versus outage, partial delivery, per-channel isolation, and that redaction keeps the SMTP code while removing a credential',
+            ],
+        ],
+        [
             'version' => '3.32.0',
             'date' => '2026-09-15',
             'type' => 'minor',

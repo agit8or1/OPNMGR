@@ -309,6 +309,29 @@ function isActive($page) {
 <!-- ========== MAIN CONTENT ========== -->
 <main class="app-content">
 
+<?php
+// Alerts that are raised but never delivered are worse than no alerting, since
+// the operator believes they are covered. This installation sent 911 failed
+// notifications and not one successful delivery before anything said so, and
+// the only trace was a log file. A broken email path cannot email anyone about
+// being broken, so it is reported here.
+//
+// Administrators only: it names configuration, and it is the account that can
+// act on it.
+if (function_exists('can') && can('settings.manage')) {
+    require_once __DIR__ . '/notification_health.php';
+    try {
+        $opnmgr_delivery_banner = notification_health_banner();
+        if ($opnmgr_delivery_banner !== '') {
+            echo '<div class="container-fluid pt-3">' . $opnmgr_delivery_banner . '</div>';
+        }
+    } catch (Throwable $e) {
+        // A warning banner must never be able to take the page down.
+        error_log('OPNMGR: notification health banner failed: ' . $e->getMessage());
+    }
+}
+?>
+
 <?php else: ?>
 <!-- Not logged in - no sidebar/header, just content -->
 <main class="app-content-full">

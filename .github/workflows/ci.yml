@@ -196,6 +196,12 @@ jobs:
       - name: Scheduled jobs suite
         run: php tests/scheduled_jobs_test.php
 
+      # Alerting that cannot deliver has to say so. This installation recorded
+      # 911 failed notifications and not one delivery before anything surfaced
+      # it, and the reason was replaced with "Internal server error".
+      - name: Notification health suite
+        run: php tests/notification_health_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

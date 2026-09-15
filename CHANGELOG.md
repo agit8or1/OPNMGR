@@ -6,6 +6,61 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.33.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **If you upgrade and a red banner appears**, it is not new breakage — it is a delivery
+> failure that was already happening silently. The banner reports what `alert_history`
+> has been recording all along.
+
+### Fixed
+
+- **Alerting worked perfectly and told nobody.** It detected conditions, raised
+  incidents, and recorded every notification — with `status = 'failed'`. On the
+  maintainer's installation `alert_history` held **911 notifications, every one failed,
+  not one sent**, going back to the first row in the table. The SMTP credential had been
+  rejected by the provider the entire time.
+
+  Nothing surfaced this. No banner, no dashboard tile, no health signal, no self-alert.
+  The only trace was 114,355 lines in `/var/log/opnmgr_alerts.log`. That is worse than
+  having no alerting at all, because the operator believes they are covered.
+
+- **The reason was unreadable.** `send_smtp_email()` caught every failure and returned
+  the string `Internal server error`, so the response that actually explains the problem —
+  `535-5.7.8 Username and Password not accepted` — reached the log and nowhere else. The
+  administrator diagnosing their own mail server was shown less than the server told us.
+
+  It now returns the SMTP response itself, **redacted**: base64 runs are stripped, since
+  an echoed `AUTH` line carries the username and password and would otherwise be written
+  into `alert_history` and rendered on screen. The configured credentials are also
+  replaced if a server quotes them back in the clear. Verified that `535-5.7.8` and
+  `Connection refused (111)` survive intact while a base64 credential does not.
+
+### Added
+
+- **`inc/notification_health.php`.** Delivery state per channel: consecutive failures
+  since the last success, and whether a channel has *ever* delivered — which separates a
+  misconfiguration from an outage, and deserves different wording. `partial` counts as
+  delivery, because somebody was told. Channels are tracked independently, so a working
+  Pushover does not mask a dead mail path.
+
+- **A banner on every administrative page** when a channel has failed three consecutive
+  attempts. Three, so a single transient bounce is not reported as a broken channel.
+
+  It is **not dismissible**, deliberately: the failure persists until someone fixes a
+  credential, and a banner an operator can wave away is precisely how 911 undelivered
+  alerts go unnoticed. It states plainly that this warning cannot be emailed to you.
+  Administrators only — it names configuration, and they are the account that can act on
+  it. Wrapped so that a failing banner can never take a page down.
+
+- **`tests/notification_health_test.php`** (33 assertions, in CI). Covers
+  never-delivered versus outage, partial delivery, failures before a success not being
+  counted, per-channel isolation, an empty history not being reported as failure, and
+  that redaction keeps the SMTP diagnostic while removing a credential. Verified to fail
+  against the pre-fix code.
+
+---
+
 ## Version 3.32.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

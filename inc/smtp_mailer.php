@@ -1,4 +1,39 @@
 <?php
+
+if (!function_exists('smtp_safe_error')) {
+    /**
+     * An SMTP failure an operator can act on, with any credential removed.
+     *
+     * Keeps the server's response - the code and text are the diagnostic - but
+     * strips base64 runs, which is the form a leaked AUTH line would take.
+     */
+    function smtp_safe_error(string $message): string
+    {
+        // Long base64 runs: an echoed AUTH argument, never part of a useful
+        // human-readable response.
+        $message = preg_replace('/\b[A-Za-z0-9+\/]{20,}={0,2}\b/', '[redacted]', $message);
+
+        // Belt and braces: the configured credentials themselves, in case a
+        // server quotes them back in the clear.
+        foreach (['smtp_username', 'smtp_password'] as $name) {
+            try {
+                $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+                $stmt->execute([$name]);
+                $value = (string) ($stmt->fetchColumn() ?: '');
+                if (function_exists('decrypt_setting_value')) {
+                    $value = (string) decrypt_setting_value($value);
+                }
+                if ($value !== '' && strlen($value) > 3) {
+                    $message = str_ireplace($value, '[redacted]', $message);
+                }
+            } catch (Throwable $e) {
+                // Redaction is best effort on top of the base64 strip above.
+            }
+        }
+
+        return substr(trim($message), 0, 500);
+    }
+}
 /**
  * Simple SMTP Mailer
  * Direct SMTP connection without external dependencies
@@ -140,6 +175,17 @@ function send_smtp_email($smtp_settings, $to, $subject, $message, $from_address,
             @fclose($socket);
         }
         error_log("smtp_mailer.php error: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Internal server error'];
+
+        // The caller is an administrator diagnosing their own mail server, and
+        // "Internal server error" told them nothing: this installation failed
+        // 911 deliveries on a rejected credential while the only description of
+        // why sat in a log file. The messages thrown above are SMTP protocol
+        // responses - "535-5.7.8 Username and Password not accepted" - which is
+        // exactly what is needed to fix it.
+        //
+        // Redacted first. AUTH lines carry base64 of the username and password,
+        // and a server that echoes the offending line back would otherwise put
+        // a credential into alert_history and onto the screen.
+        return ['success' => false, 'error' => smtp_safe_error($e->getMessage())];
     }
 }
