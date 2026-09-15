@@ -6,6 +6,60 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.34.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Added
+
+- **`scripts/check_production_drift.php`.** Deployment here is a file copy from a working
+  tree, not a checkout, and nothing ever checked the result. It reports three things:
+
+  - **STALE** — a tracked file whose deployed copy differs, meaning the server is not
+    running the code in the repository;
+  - **MISSING** — a tracked file absent from the deployment;
+  - **EXTRA** — a deployed file that is not tracked and is not runtime data.
+
+  STALE and MISSING fail; EXTRA is reported but does not, because a deployment
+  legitimately holds release artifacts, keys, logs and vendor code.
+
+  On its first run it found a stale CI workflow and two test suites added hours earlier
+  that had never been deployed.
+
+### Fixed
+
+- **111 files on the server that are in no repository.** A year of accumulated session
+  notes, emergency shell scripts, SQL dumps, `.broken` copies of live pages, an
+  `.archive/` directory holding 16 old versions of pages, and six test endpoints.
+  Archived off the server and removed.
+
+  Checked before removing: **no unauthenticated exposure.** The test endpoints returned
+  401, `.archive/` and `diagnostics/` were blocked at the web server. This was hygiene,
+  not a breach. Every candidate was checked for inbound references first — the eight that
+  had any turned out to be changelog text, comments, and two substring false positives.
+
+- **A stale `check_agent_install.php` at the deployment root** still carrying the
+  hostname removed in 3.30.0. `tests/server_identity_test.php` scans the repository and
+  never sees what is actually being served — precisely the gap the drift checker closes.
+
+- **`about_backup_20251009.php`**, a dated copy of `about.php`, was web-reachable and
+  returned 500 on every request. A sweep of all 93 deployed pages now finds no 500s.
+
+- **Unanchored `.gitignore` rules hid real documentation.** `*_GUIDE.md`,
+  `*_IMPLEMENTATION.md` and eight more exist to ignore session notes in the project root;
+  unanchored, they match at every depth and were silently excluding `docs/`. Anchored
+  now, and `docs/AGENT_RECOVERY_GUIDE.md` and `docs/AI_LOG_ANALYSIS_IMPLEMENTATION.md`
+  are tracked.
+
+  This is the **third** time an unanchored ignore rule has hidden a real file in this
+  project, so `tests/referenced_files_test.php` now fails if any of those rules loses its
+  anchor. Verified by removing one anchor and watching the suite fail.
+
+  `docs/QUICK_REFERENCE.md` and `docs/VERSION_2.1.0_GUIDE.md` describe v2.1.0 and remain
+  deliberately untracked rather than published as though current — they need updating or
+  removing, which is a decision about content.
+
+---
+
 ## Version 3.33.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

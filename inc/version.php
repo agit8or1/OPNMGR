@@ -44,6 +44,21 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.34.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'What Is Actually On The Server',
+            'changes' => [
+                'ADDED: scripts/check_production_drift.php compares a deployed tree against the repository - tracked files whose deployed copy differs, tracked files missing from the deployment, and deployed files that are not tracked. Deployment here is a file copy, not a checkout, and nothing checked it',
+                'FIXED: The deployment was carrying 111 files that are in no repository: a year of session notes, emergency shell scripts, SQL dumps, .broken copies of live pages, an .archive directory of 16 old page versions, and six test endpoints. Archived off the server and removed. No unauthenticated exposure - the test endpoints returned 401 and .archive was blocked at the web server - so this was hygiene, not a breach',
+                'FIXED: A stale copy of check_agent_install.php sat at the deployment root still carrying the hostname removed in 3.30.0. tests/server_identity_test.php scans the repository and never sees what is actually being served, which is exactly the gap the drift checker closes',
+                'FIXED: about_backup_20251009.php, a dated copy of about.php, was web-reachable and returned 500 on every request. A sweep of all 93 deployed pages now finds no 500s',
+                'FIXED: Two test suites added earlier today had never been deployed, and the CI workflow on the server was stale. The drift checker found both on its first run',
+                'FIXED: Unanchored .gitignore rules for session notes (*_GUIDE.md, *_IMPLEMENTATION.md and eight more) matched at every depth and silently excluded real documentation under docs/. Anchored to the root, and docs/AGENT_RECOVERY_GUIDE.md and docs/AI_LOG_ANALYSIS_IMPLEMENTATION.md are tracked now. This is the third time an unanchored ignore rule has hidden a real file',
+                'ADDED: tests/referenced_files_test.php now fails if any of those rules loses its anchor',
+            ],
+        ],
+        [
             'version' => '3.33.0',
             'date' => '2026-09-15',
             'type' => 'minor',

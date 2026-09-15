@@ -215,18 +215,34 @@ docs/_build/
 site/
 
 # Redundant/old documentation (keep only README, SECURITY, LICENSE)
-*_FIXES_*.md
-*_FIXES.md
-*_CHANGELOG.md
-*_SUMMARY.md
-*_COMPLETE.md
-*_STATUS.md
-*_GUIDE.md
-*_REQUIREMENTS.md
-*_IMPLEMENTATION.md
-*_DEPLOYMENT.md
-KNOWLEDGE_BASE.md
-QUICK_REFERENCE.*
+# Session notes and one-off write-ups that accumulated in the project root.
+# Anchored to the root: unanchored, these match at every depth, and they were
+# silently swallowing real documentation under docs/ - AGENT_RECOVERY_GUIDE.md
+# and AI_LOG_ANALYSIS_IMPLEMENTATION.md were untracked for that reason alone,
+# which is the same way product files went missing before.
+/*_FIXES_*.md
+/*_FIXES.md
+/*_CHANGELOG.md
+/*_SUMMARY.md
+/*_COMPLETE.md
+/*_STATUS.md
+/*_GUIDE.md
+/*_REQUIREMENTS.md
+/*_IMPLEMENTATION.md
+/*_DEPLOYMENT.md
+/KNOWLEDGE_BASE.md
+/QUICK_REFERENCE.*
+
+# A session write-up from October 2025 that the anchored rules above no longer
+# match. development/documentation.php and todo.php are product pages and stay
+# tracked; this one is notes.
+development/COMPLETION_SUMMARY.md
+
+# These two describe v2.1.0 and have not been revised since. Left untracked
+# deliberately rather than published as if current: they need updating or
+# removing, and that is a call about content, not about ignore rules.
+docs/QUICK_REFERENCE.md
+docs/VERSION_2.1.0_GUIDE.md
 
 # Security scan results
 snyk-*.json

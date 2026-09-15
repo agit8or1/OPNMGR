@@ -107,12 +107,36 @@ $shipped = [
     'api/test_email.php', 'api/test_ssl.php', 'api/test_nginx.php',
     'api/test_pushover.php', 'api/run_bandwidth_test.php',
     'tests/schema_columns_test.php',
+    // Real documentation that *_GUIDE.md and *_IMPLEMENTATION.md swallowed
+    // while unanchored. Those rules exist for session notes in the project
+    // root; at every depth they took docs/ with them.
+    'docs/AGENT_RECOVERY_GUIDE.md',
+    'docs/AI_LOG_ANALYSIS_IMPLEMENTATION.md',
 ];
 foreach ($shipped as $f) {
     $rc = 1;
     $o  = [];
     @exec('git -C ' . escapeshellarg($root) . ' check-ignore -q ' . escapeshellarg($f) . ' 2>/dev/null', $o, $rc);
     T::ok($rc !== 0, "{$f} is not excluded by .gitignore");
+}
+
+// The rules those files fell foul of must stay anchored. An unanchored form
+// matches at every depth, which is how both product endpoints and docs have
+// gone missing from a clone before.
+$gitignore = @file_get_contents($root . '/.gitignore');
+T::ok(is_string($gitignore) && $gitignore !== '', '.gitignore is readable');
+
+if (is_string($gitignore)) {
+    $mustBeAnchored = [
+        '*_GUIDE.md', '*_IMPLEMENTATION.md', '*_SUMMARY.md',
+        '*_COMPLETE.md', '*_FIXES.md', '*_STATUS.md',
+        '*_REQUIREMENTS.md', '*_DEPLOYMENT.md', '*_CHANGELOG.md',
+        'KNOWLEDGE_BASE.md',
+    ];
+    foreach ($mustBeAnchored as $rule) {
+        $unanchored = preg_match('/^' . preg_quote($rule, '/') . '$/m', $gitignore) === 1;
+        T::ok(!$unanchored, "'{$rule}' is anchored to the repository root");
+    }
 }
 
 exit(T::summary());
