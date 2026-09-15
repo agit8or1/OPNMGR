@@ -183,7 +183,10 @@ fix_*.sh
 fix_*.php
 emergency_*
 *_fix.php
-simple_*.sh
+/simple_*.sh
+# ...but the enrollment script is product: api/get_enroll_script.php reads it
+# and serves it to firewalls, so a clone without it serves an empty script.
+!simple_enroll.sh
 super_simple_*.sh
 
 # Old session notes, fix logs, handoff docs

@@ -6,6 +6,38 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.27.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **The enrollment script was not in the repository, and carried one installation's
+  management IP.** CI caught this on the 3.27.0 release run — the local test passed
+  because the file exists on the maintainer's machine, and failed on a fresh checkout,
+  which is precisely the bug.
+
+  `api/get_enroll_script.php` reads `simple_enroll.sh`, substitutes the panel URL and
+  enrollment token, and serves it to a firewall. A `simple_*.sh` rule in `.gitignore`
+  excluded it, so a clone served an **empty** script.
+
+  Worse, the script hardcoded `MGMT_SERVER_IP="184.175.206.229"` and used it to add a
+  firewall rule permitting SSH to that address. Published as-is, every other
+  self-hosted deployment would have opened SSH on its customers' firewalls to somebody
+  else's server, while its own manager still could not reach them. The address is now
+  a placeholder that `api/get_enroll_script.php` fills in with the manager that served
+  the script, resolved from `SERVER_NAME` and falling back to `SERVER_ADDR`. If it
+  cannot be determined the endpoint refuses rather than serving a script with a
+  literal placeholder, and the script itself exits if it is ever run unsubstituted.
+
+### Changed
+
+- **Support section corrected.** The README stated there was no paid support offering.
+  Managed hosting and support for OPNManager are available through
+  [mspreboot.com](https://mspreboot.com); the project itself remains free, MIT
+  licensed and self-hosted, and nothing documented requires an engagement.
+
+---
+
 ## Version 3.27.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 
