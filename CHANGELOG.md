@@ -6,6 +6,47 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.36.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Security
+
+- **The SMTP password was printed into the page.** `settings.php` rendered the
+  *decrypted* credential as the `value` of its password input. `type="password"` hides
+  it on screen, but the value still sits in the page source, in the browser's cache, and
+  in anything between. `smtp_settings.php` has always declined to echo it back — the two
+  dialogs had diverged.
+
+### Fixed
+
+- **Saving the SMTP dialog could silently wipe the password.** `settings.php` treated a
+  blank field as "store the empty string" rather than "unchanged", so opening it to edit
+  the host or port and saving cleared the credential. `smtp_settings.php` already got
+  this right. Nothing recorded the change, so there was no way to see it had happened.
+
+- **Settings changes were never audited.** `save_setting()` was defined twice —
+  identically, in `settings.php` and `smtp_settings.php` — and neither recorded anything.
+  The `settings` table has no `updated_at`. So `audit_log` held 1,657 entries without a
+  single settings change among them, and a straightforward question — *when did the mail
+  server configuration last change, and to what?* — had no answer anywhere in the system.
+
+### Added
+
+- **An audit trail for configuration.** `save_setting()` now lives in `inc/secrets.php`
+  and records the setting's name with its previous and new value, so a change can be read
+  back rather than merely detected. `save_secret_setting()` records that a credential was
+  set, replaced or cleared — **the name and the fact, never the value**, because an audit
+  trail holding credentials is a second place to steal them from. Auditing never prevents
+  the write.
+
+- **`tests/settings_audit_test.php`** (12 assertions, in CI). No page may print a stored
+  credential into its form; a blank password field must mean unchanged; changes must be
+  audited with their previous value; the credential audit line must never contain the
+  credential; and neither page may redefine `save_setting()` privately and bypass the
+  trail. Verified to fail against the pre-fix code.
+
+---
+
 ## Version 3.35.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

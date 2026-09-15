@@ -208,6 +208,11 @@ jobs:
       - name: Undefined functions suite
         run: php tests/undefined_functions_test.php
 
+      # Settings changes were not audited at all, and the SMTP dialog both
+      # printed the stored password into the page and wiped it on a blank save.
+      - name: Settings audit suite
+        run: php tests/settings_audit_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

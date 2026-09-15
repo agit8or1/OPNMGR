@@ -21,10 +21,7 @@ $smtp_from_email = $rows['smtp_from_email'] ?? '';
 $smtp_from_name = $rows['smtp_from_name'] ?? 'OPNsense Manager';
 
 // Helper function to save settings
-function save_setting($k, $v) {
-    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
-    $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
-}
+// save_setting() lives in inc/secrets.php, where it records the change.
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify($_POST['csrf'] ?? '')) {

@@ -44,6 +44,19 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.36.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Who Changed That Setting',
+            'changes' => [
+                'SECURITY: settings.php rendered the decrypted SMTP password into the page as an input value. type="password" hides it on screen; it was still in the page source, the browser cache and anything in between. smtp_settings.php has always declined to echo it back',
+                'FIXED: settings.php treated a blank password field as "store the empty string" rather than "unchanged", so opening the SMTP dialog to edit any other field and saving wiped the credential. smtp_settings.php already handled this correctly; the two had diverged',
+                'FIXED: Settings changes were never audited. save_setting() was defined twice - once in settings.php, once in smtp_settings.php - identically, and neither recorded anything. The settings table has no updated_at, so audit_log held 1,657 entries without a single settings change among them, and a question about when a credential last changed had no answer',
+                'ADDED: save_setting() moved to inc/secrets.php and records the setting name with its previous and new value. save_secret_setting() records that a credential was set, replaced or cleared - the name and the fact, never the value, because an audit trail holding credentials is a second place to steal them from',
+                'ADDED: tests/settings_audit_test.php pins all four: no page prints a stored credential, a blank password means unchanged, changes are audited with their previous value, and the credential audit line never carries the credential',
+            ],
+        ],
+        [
             'version' => '3.35.0',
             'date' => '2026-09-15',
             'type' => 'minor',

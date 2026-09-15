@@ -59,15 +59,81 @@ if (!function_exists('get_secret_setting')) {
     }
 }
 
+if (!function_exists('save_setting')) {
+    /**
+     * Write a non-secret setting, recording that it changed.
+     *
+     * This was defined twice - once in settings.php, once in
+     * smtp_settings.php - identically, and neither audited. So a change to the
+     * SMTP host, or to any other setting, left no trace at all: the table has
+     * no updated_at, and audit_log held 1,657 entries without a single one for
+     * a settings change. When an operator asked why the configured mail server
+     * was not the one they remembered entering, there was nothing to consult.
+     *
+     * The previous value is recorded so a change can be read back, not just
+     * detected. Auditing must never prevent the write.
+     */
+    function save_setting(string $name, string $value): void {
+        $previous = null;
+        try {
+            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+            $stmt->execute([$name]);
+            $found = $stmt->fetchColumn();
+            $previous = $found === false ? null : (string) $found;
+        } catch (Throwable $e) {
+            // Reading the old value is for the audit line only.
+        }
+
+        db()->prepare(
+            'INSERT INTO settings (`name`,`value`) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)'
+        )->execute([$name, $value]);
+
+        if ($previous !== $value && function_exists('audit_log')) {
+            try {
+                audit_log('settings.change', [
+                    'success'     => true,
+                    'object_type' => 'setting',
+                    'object_id'   => $name,
+                    'message'     => $previous === null
+                        ? "Set {$name} to '{$value}'"
+                        : "Changed {$name} from '{$previous}' to '{$value}'",
+                ]);
+            } catch (Throwable $e) {
+                error_log('OPNMGR: could not audit settings change for ' . $name . ': ' . $e->getMessage());
+            }
+        }
+    }
+}
+
 if (!function_exists('save_secret_setting')) {
     /**
      * Write a credential to the settings table, encrypted.
      */
     function save_secret_setting(string $name, string $value): void {
+        $had = get_secret_setting($name);
+
         db()->prepare(
             'INSERT INTO settings (`name`,`value`) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)'
         )->execute([$name, opnmgr_encrypt($value)]);
+
+        // The fact and the name, never the value - an audit trail that records
+        // credentials is a second place to steal them from.
+        if ($had !== $value && function_exists('audit_log')) {
+            try {
+                audit_log('settings.credential_change', [
+                    'success'     => true,
+                    'object_type' => 'setting',
+                    'object_id'   => $name,
+                    'message'     => $had === ''
+                        ? "Set credential {$name}"
+                        : ($value === '' ? "Cleared credential {$name}" : "Replaced credential {$name}"),
+                ]);
+            } catch (Throwable $e) {
+                error_log('OPNMGR: could not audit credential change for ' . $name . ': ' . $e->getMessage());
+            }
+        }
     }
 }
 

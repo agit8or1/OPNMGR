@@ -36,10 +36,7 @@ $backup_retention_days = $rows['backup_retention_days']
 $backup_retention_min_keep = $rows['backup_retention_min_keep'] ?? '3';
 
 // helpers
-function save_setting($k,$v){
-    $s = db()->prepare('INSERT INTO settings (`name`,`value`) VALUES (:k,:v) ON DUPLICATE KEY UPDATE `value` = :v2');
-    $s->execute([':k' => $k, ':v' => $v, ':v2' => $v]);
-}
+// save_setting() lives in inc/secrets.php, where it records the change.
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_verify($_POST['csrf'] ?? '')) { $notice = 'Bad CSRF'; }
@@ -108,7 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $smtp_host = trim($_POST['smtp_host'] ?? '');
       $smtp_port = trim($_POST['smtp_port'] ?? '587');
       $smtp_username = trim($_POST['smtp_username'] ?? '');
-      $smtp_password = trim($_POST['smtp_password'] ?? '');
+      // Blank means 'unchanged'. This used to save the empty string straight
+      // over the stored credential, so opening this dialog to change any other
+      // SMTP field and saving silently wiped the password - and nothing audited
+      // the change, so there was no way to see it had happened.
+      $smtp_password = $_POST['smtp_password'] ?? '';
+      if ($smtp_password === '') {
+          $smtp_password = get_secret_setting('smtp_password');
+      }
       $smtp_encryption = trim($_POST['smtp_encryption'] ?? 'tls');
       
       save_setting('smtp_host',$smtp_host);
@@ -540,7 +544,11 @@ include __DIR__ . '/inc/header.php';
           </div>
           <div class="mb-3">
             <label for="smtp_password" class="form-label">SMTP Password</label>
-            <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="<?php echo htmlspecialchars($smtp_password); ?>" placeholder="App password or SMTP password">
+            <!-- The stored password is never echoed back. type="password" hides it on
+                 screen but the value still sits in the page source, in the browser's
+                 cache and in anything between - smtp_settings.php has always declined
+                 to do this, and this form should not have either. -->
+            <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="" autocomplete="new-password" placeholder="<?php echo $smtp_password !== '' ? 'Unchanged - type to replace' : 'App password or SMTP password'; ?>">
           </div>
           <div class="mb-3">
             <label for="smtp_encryption" class="form-label">Encryption</label>
