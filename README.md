@@ -185,11 +185,12 @@ inbound port is required.
 
 ### Releases
 
-The [releases page](https://github.com/agit8or1/OPNMGR/releases) currently lags `main`;
-the newest tag is v3.11.1 while this tree is 3.22.0. Until tagging catches up,
-`main` is the version to install and [CHANGELOG.md](CHANGELOG.md) is the authoritative
-history. There is no formal support or LTS policy, so treat this as actively developed
-software and read the changelog before upgrading.
+[v3.22.0](https://github.com/agit8or1/OPNMGR/releases/latest) is the current tagged
+release. Tagging has been intermittent — v3.11.1 was the previous tag, with 3.12
+through 3.21 shipped on `main` and recorded only in the changelog — so
+[CHANGELOG.md](CHANGELOG.md) remains the authoritative history rather than the
+releases page. There is no formal support or LTS policy, so treat this as actively
+developed software and read the changelog before upgrading.
 
 ---
 

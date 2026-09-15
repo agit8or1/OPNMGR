@@ -23,10 +23,10 @@ All notable changes to OPNManager are documented here.
   defines a release policy, a support window or a validation gate that the claim
   could refer to, so it asserted more than the project documents.
 
-- **Stopped implying the Releases page is current.** The newest tag is `v3.11.1`
-  while `main` is at 3.22.0. The README now says so plainly and names `main` as the
-  version to install, instead of linking to a releases page ten minor versions
-  behind and leaving the reader to discover the gap.
+- **Tagged this release and pointed the README at it.** The newest tag had been
+  `v3.11.1`, ten minor versions behind `main`, so the README's Releases link led
+  nowhere useful. 3.12 through 3.21 shipped on `main` and exist only in this file, so
+  the changelog stays the authoritative history rather than the releases page.
 
 - **Feature availability is now stated per agent version.** Health telemetry needs
   agent 1.6.2 — 1.6.0 reported no gateways and 1.6.1 miscounted services — and the
