@@ -6,6 +6,29 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.28.1
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **The in-app changelog was seven releases behind.** `about.php` renders
+  `getChangelogEntries()`, so on a 3.28.0 installation the About page advertised
+  **v3.21.0** as the newest release. Everything from 3.22.0 onward was missing —
+  entries for all seven are now present.
+
+  This is the second time this has drifted: 3.21.3 fixed the same thing after the
+  entire 3.21 line went missing. `scripts/check_versions.php` now checks the in-app
+  changelog's newest entry against `VERSION`, exactly as it already did for
+  `CHANGELOG.md`, so CI fails rather than shipping a stale About page. Verified by
+  simulating the drift: the check reports it and exits non-zero.
+
+- **`getChangelogEntries($limit)` ignored its argument.** `about.php` asks for three
+  entries and was handed all thirty-three, so the About page rendered the complete
+  release history instead of a summary. The function now slices before returning;
+  a limit of `0` still returns everything.
+
+---
+
 ## Version 3.28.0
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

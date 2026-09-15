@@ -183,8 +183,10 @@ $gone = [
 foreach ($gone as $name => $where) {
     $hits = [];
     foreach ($files as $rel) {
-        // The tests name these on purpose - that is the point of the guard.
-        if (str_starts_with($rel, 'tests/')) { continue; }
+        // The tests name these on purpose - that is the point of the guard - and
+        // inc/version.php carries the in-app changelog, where a release note
+        // legitimately says which column name caused which outage.
+        if (str_starts_with($rel, 'tests/') || $rel === 'inc/version.php') { continue; }
 
         $src = (string) file_get_contents($root . '/' . $rel);
 

@@ -253,6 +253,20 @@ check(
     false, $problems, $fixed
 );
 
+// --- In-app changelog -------------------------------------------------------
+// about.php renders getChangelogEntries(), so this is what an operator sees as
+// "what's new" on their own installation. It drifted seven releases behind
+// VERSION before this check existed, and the 3.21 line went missing before
+// that, so the file-based CHANGELOG check alone was demonstrably not enough.
+check(
+    $root . '/inc/version.php',
+    "/'version'\s*=>\s*'([0-9][0-9.]*)'/",
+    $appVersion,
+    'in-app changelog newest entry',
+    fn(string $c) => $c,   // never rewritten: a missing entry is a real omission
+    false, $problems, $fixed
+);
+
 // ---------------------------------------------------------------------------
 echo "\n";
 

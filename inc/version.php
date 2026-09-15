@@ -40,7 +40,107 @@ define('JQUERY_VERSION', '3.7.1');
 
 // Changelog entries (most recent first)
 function getChangelogEntries($limit = 10) {
-    return [
+    // $limit was accepted and ignored: about.php asks for 3 and rendered the
+    // entire history. Slice before returning.
+    $entries = [
+        [
+            'version' => '3.28.1',
+            'date' => '2026-09-15',
+            'type' => 'patch',
+            'title' => 'The About Page Was Seven Releases Behind',
+            'changes' => [
+                'FIXED: This changelog was stale by seven releases - about.php advertised v3.21.0 as newest on a 3.28.0 install. scripts/check_versions.php now checks it against VERSION, as it already did for CHANGELOG.md, so CI fails rather than shipping a stale About page',
+                'FIXED: getChangelogEntries($limit) ignored its argument, so about.php asked for three entries and rendered all thirty-three',
+            ],
+        ],
+        [
+            'version' => '3.28.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Lockdown Policies Actually Work',
+            'changes' => [
+                'ADDED: Web GUI IP Lockdown and Secure Outbound Lockdown are implemented. Both were UI controls with nothing behind them - one fatal on save, the other fatal on load. They now queue a policy script through the agent like every other firewall change, so no agent release and no new credentials on the firewall',
+                'ADDED: Every generated policy backs up /conf/config.xml, marks the rules it writes and removes only those (so it is idempotent and never touches a human-written rule), validates the XML before installing, and restores the backup if the filter reload is rejected',
+                'ADDED: Web GUI lockdown applies on WAN only and always permits this manager first, so a typo cannot cut the platform off from the firewall it manages. Unparseable entries are reported rather than silently dropped',
+                'CHANGED: Enabling outbound lockdown now requires typing RESTRICT <hostname> and is admin-only. It blocks mail, VPN and NTP on a customer network, which is more than one toggle click should commit to',
+                'FIXED: The walkthrough video links pointed at releases/latest, which broke the moment a later release shipped without the media attached. They are pinned to the v3.25.0 assets',
+                'NOTE: The lockdown policies have not been run against a live OPNsense firewall. The generator is tested by executing the real scripts against a sample configuration',
+            ],
+        ],
+        [
+            'version' => '3.27.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Nine Missing Files, Two Of Them Fatal',
+            'changes' => [
+                'FIXED: Saving a firewall crashed if the Web GUI IP list changed - require_once on scripts/queue_command.php, a file that has never existed, firing after the UPDATE had already committed',
+                'FIXED: api/tunnel_management.php and api/apply_secure_lockdown.php were fatal on load, both reachable from the UI, each requiring an inc/ file that has never existed',
+                'ADDED: api/test_pushover.php, api/test_ssl.php and api/test_nginx.php - three UI buttons that had been calling endpoints nobody had written',
+                'FIXED: scripts/install_snyk.sh restored; a bulk "remove unused files" commit deleted it while security_scan.php still exec\'d it',
+                'REMOVED: inc/api_auth.php, 34 orphan lines redefining requireLogin/requireAdmin unguarded - loading it beside inc/auth.php is a hard fatal',
+                'CHANGED: .gitignore patterns are anchored to the repository root. Unanchored test_* and *_test.* rules had been excluding real product endpoints, so a fresh clone 404\'d on them',
+                'ADDED: tests/referenced_files_test.php - every URL the UI fetches and every include the server builds must exist',
+            ],
+        ],
+        [
+            'version' => '3.26.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Two-Factor Enrolment Works Now',
+            'changes' => [
+                'FIXED: Two-factor enrolment could never have succeeded. The otpauth URI carried the secret as hex, but the format requires Base32 - hex contains 0, 1, 8 and 9, which are not in the Base32 alphabet, so an authenticator derived a different key and the six digits never matched',
+                'FIXED: The enrolment QR was fetched from api.qrserver.com with the secret in the query string, handing the shared TOTP secret to a third party. It is rendered on this server as an inline SVG, and api.qrserver.com is gone from the img-src CSP directive',
+                'ADDED: bacon/bacon-qr-code ^2.0 renders the QR. Run composer install --no-dev after upgrading',
+                'ADDED: tests/twofactor_test.php checks Base32 against the RFC 4648 vectors and runs a full TOTP round-trip',
+            ],
+        ],
+        [
+            'version' => '3.25.1',
+            'date' => '2026-09-15',
+            'type' => 'patch',
+            'title' => 'Phantom Columns',
+            'changes' => [
+                'FIXED: The on-demand web proxy was broken at both ends - firewall_proxy.php wrote a request_body column and read a status_code column; request_queue has body and response_status',
+                'FIXED: The profile page reported two-factor as disabled for every account, testing two_factor_secret when the column is totp_secret',
+                'FIXED: "Send Test Email" reported failure for mail it had delivered - api/test_email.php wrote the same non-existent alert_history.recipient_email column',
+                'ADDED: tests/schema_columns_test.php - every column named in a literal INSERT or UPDATE must exist in the shipped schema',
+            ],
+        ],
+        [
+            'version' => '3.24.1',
+            'date' => '2026-09-15',
+            'type' => 'patch',
+            'title' => 'Alert History Was Never Recorded',
+            'changes' => [
+                'FIXED: inc/alerts.php inserted a recipient_email column that does not exist, so every insert threw and a delivered email was reported to the caller as a send failure. Nothing was ever written to alert_history, which silently disabled the repeat-notification suppression that reads it',
+                'FIXED: alert_history.php rendered recipient_emails and sent_successfully, neither of which is a column, so every alert displayed as Failed with 0 recipients',
+                'FIXED: alerts.php carried a credential-shaped string as the Pushover token placeholder',
+            ],
+        ],
+        [
+            'version' => '3.24.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Screenshots And A Walkthrough',
+            'changes' => [
+                'ADDED: A 28-capture screenshot gallery in docs/SCREENSHOTS.md, half light and half dark, at 1440x1000 and deviceScaleFactor 2',
+                'ADDED: A recorded walkthrough of the running application with a highlight clip, poster, WebVTT captions and a transcript',
+                'ADDED: scripts/demo_fixture.php writes real OPNsense-shaped configuration XML and calls the application\'s own drift functions, so the drift and search screenshots are computed by the product rather than staged',
+                'CHANGED: Captures record their route, theme and viewport in docs/images/github/captures.json',
+            ],
+        ],
+        [
+            'version' => '3.22.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'A README That Says What This Is',
+            'changes' => [
+                'CHANGED: The README leads with the product rather than a reverse-chronological pile of release notes for 3.12 through 3.17, all of which were already in CHANGELOG.md',
+                'REMOVED: The "Production Stable" claim - nothing in the repository defines a release policy, support window or validation gate it could refer to',
+                'FIXED: Health telemetry was still described as "not in a published agent release yet". That stopped being true at agent 1.6.0, and the real requirement is 1.6.2',
+                'CHANGED: The architecture description had the SSH direction backwards. Agents check in outbound; the manager only connects in on demand, after the agent opens a time-limited rule',
+            ],
+        ],
         [
             'version' => '3.21.0',
             'date' => '2026-09-05',
@@ -464,6 +564,9 @@ function getChangelogEntries($limit = 10) {
             ]
         ]
     ];
+
+    $limit = (int) $limit;
+    return $limit > 0 ? array_slice($entries, 0, $limit) : $entries;
 }
 
 // Get system health status for about page (guarded to avoid conflict with api/health_monitor.php)
