@@ -6,6 +6,51 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.26.2
+**Released**: September 15, 2026 | **Agent**: v1.6.2
+
+### Fixed
+
+- **Three pages emitted the page before deciding who was allowed to see it.**
+  `inc/header.php` starts sending the response, and `header('Location: ...')` cannot
+  take effect once output has begun — so an auth gate placed after that include
+  degraded from a redirect into a 200 carrying a truncated page.
+
+  Measured against the pre-fix files on an isolated instance:
+
+  | Request | Before | After |
+  |---|---|---|
+  | `twofactor_setup.php`, unauthenticated | 200 | 302 → `/login.php` |
+  | `users.php`, unauthenticated | 200 | 302 → `/login.php` |
+  | `users.php`, as a technician | 200, 13,956 bytes | 302 → `/dashboard.php`, 0 bytes |
+  | `network_tools.php`, unauthenticated | 200 | 302 → `/login.php` |
+
+  **No data escaped in any of these.** The gate's `exit()` still stopped the page
+  before a single record rendered — the 13,956 bytes a technician received were
+  header, navigation and sidebar markup, with no user list, no account and no
+  "Current Users" table; that was checked, not assumed. What was broken was the
+  behaviour: a non-admin got a half-rendered page instead of being sent away, and a
+  gate that cannot redirect is one refactor away from being a gate that does not
+  stop anything.
+
+  All three now authorise first and include the header once every redirect-capable
+  step has run.
+
+### Added
+
+- **`tests/auth_ordering_test.php`, wired into CI.** It checks every gated page that
+  renders: if `isLoggedIn()`, `requireLogin()`, `requireAdmin()` or
+  `requireCapability()` appears after the header include, the build fails. Ten pages
+  currently qualify.
+
+  The first version of the audit behind it missed `network_tools.php` entirely,
+  because its pattern matched `require_once 'inc/header.php'` but not
+  `require_once __DIR__ . '/inc/header.php'` — and almost every page uses the second
+  form. The test asserts a minimum number of pages were actually examined, so a
+  pattern that silently matches nothing fails rather than passing.
+
+---
+
 ## Version 3.26.1
 **Released**: September 15, 2026 | **Agent**: v1.6.2
 

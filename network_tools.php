@@ -13,8 +13,9 @@
  */
 
 require_once __DIR__ . '/inc/bootstrap.php';
-require_once __DIR__ . '/inc/header.php';
 
+// Authenticate before anything is emitted. inc/header.php starts sending the
+// page, and header('Location: ...') cannot take effect once output has begun.
 requireLogin();
 
 // Get firewall ID from query string
@@ -31,6 +32,8 @@ if ($firewall_id > 0) {
 // Get all firewalls for dropdown
 $stmt = db()->query("SELECT id, hostname, wan_ip FROM firewalls ORDER BY hostname");
 $firewalls = $stmt->fetchAll();
+// Everything that might redirect has run; start the page.
+require_once __DIR__ . '/inc/header.php';
 ?>
 
 <div class="container-fluid mt-4">

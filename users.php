@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
-require_once 'inc/header.php';
 
-// Require admin access
+// Authorise before anything is emitted. requireAdmin() sends a redirect and
+// exits, but inc/header.php starts sending the page, and header('Location: ...')
+// cannot take effect once output has begun - so including it first turned the
+// redirect into a 200 with a truncated page for any non-admin who asked.
 requireAdmin();
 
 // Handle user actions
@@ -92,6 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get all users
 $stmt = db()->query("SELECT id, username, first_name, last_name, email, role, created_at FROM users ORDER BY username");
 $users = $stmt->fetchAll();
+
+// Everything that might redirect has run; start the page.
+require_once __DIR__ . '/inc/header.php';
 ?>
 
 <div class="container-fluid mt-4">

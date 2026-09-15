@@ -164,6 +164,11 @@ jobs:
       - name: Two-factor enrolment suite
         run: php tests/twofactor_test.php
 
+      # A gated page that emits the header first cannot redirect, so its access
+      # decision degrades into a 200 carrying a truncated page.
+      - name: Auth ordering suite
+        run: php tests/auth_ordering_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

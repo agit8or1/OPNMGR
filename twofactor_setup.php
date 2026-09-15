@@ -2,14 +2,16 @@
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/secrets.php';
 require_once __DIR__ . '/vendor/autoload.php';
-require_once 'inc/header.php';
 
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 
-// Check if user is logged in
+// Authenticate before anything is emitted. inc/header.php starts sending the
+// page, and once output has begun header('Location: ...') cannot take effect:
+// this file used to include it first, so an unauthenticated request got 200 and
+// a bare page shell instead of a redirect to the login form.
 if (!isLoggedIn()) {
     header('Location: /login.php');
     exit;
@@ -50,6 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = '<div class="alert alert-success">2FA has been disabled.</div>';
     }
 }
+
+// Everything that might redirect has run; start the page.
+require_once __DIR__ . '/inc/header.php';
 ?>
 
 <div class="container-fluid mt-4">
