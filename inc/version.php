@@ -44,6 +44,20 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.45.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Database That Only Grows',
+            'changes' => [
+                'FOUND: Four tables were 96% of a 174 MB database after nine months of watching two firewalls, and nothing had ever pruned them - system_logs at 404k rows and 80 MB, plus three telemetry tables at another 82 MB. Roughly 1,800 rows per firewall per day with no upper bound. Fifty firewalls would add about 33 million rows a year',
+                'FIXED: log_retention_days sat at 90 and was read by no code at all. The only caller of cleanup_old_logs() is a manual endpoint that passes a hardcoded 30 and is in no crontab, so logs were pruned when somebody remembered to click something, at a retention nobody chose. That is the fourth setting this session that stored an intention and ignored it',
+                'ADDED: cron/prune_telemetry.php applies retention to all four tables, honouring log_retention_days and a new telemetry_retention_days. It reports by default and deletes only with --apply, because the first run on an established installation removes hundreds of thousands of rows',
+                'ADDED: Deletes run in 5,000-row chunks with a pause between them. A single DELETE of that size holds locks long enough to stall the check-ins that write to the same tables every two minutes',
+                'CHANGED: The job is registered but deliberately not scheduled, and carries no expected interval so it is never flagged overdue for an operator who has chosen not to run it. Adding it to cron is a decision about deleting history',
+                'ADDED: tests/telemetry_retention_test.php covers table coverage, report-before-delete, the clamped retention values, chunking, and that the migration never overwrites a retention an operator has already chosen',
+            ],
+        ],
+        [
             'version' => '3.44.0',
             'date' => '2026-09-15',
             'type' => 'minor',

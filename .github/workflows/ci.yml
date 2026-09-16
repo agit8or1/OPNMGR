@@ -251,6 +251,11 @@ jobs:
       - name: Injection guard suite
         run: php tests/injection_guard_test.php
 
+      # Four tables were 96% of the database after nine months of watching two
+      # firewalls, and nothing had ever pruned them.
+      - name: Telemetry retention suite
+        run: php tests/telemetry_retention_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

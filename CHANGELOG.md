@@ -6,6 +6,77 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.45.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **Nothing is deleted by this release.** The pruner reports unless you pass `--apply`,
+> and it is not in any crontab. On the maintainer's installation it reports **933,672
+> rows** older than 90 days — about 75% of the database.
+
+### Found
+
+**Nothing had ever pruned the tables that grow forever.** After nine months of watching
+two firewalls, four tables were 96% of a 174 MB database:
+
+| Table | Rows | Size |
+|---|---:|---:|
+| `system_logs` | 404,516 | 80.6 MB |
+| `firewall_traffic_stats` | 299,045 | 34.6 MB |
+| `firewall_system_stats` | 323,294 | 28.1 MB |
+| `firewall_latency` | 324,265 | 19.0 MB |
+
+That is roughly 1,800 rows per firewall per day with no upper bound. For a tool positioned
+at fleets it is the wrong shape — fifty firewalls would add about 33 million rows a year,
+and nothing would remove one.
+
+### Fixed
+
+- **`log_retention_days` did nothing.** It sat at `90` with no code reading it. The only
+  caller of `cleanup_old_logs()` is a manual endpoint that passes a **hardcoded 30** and
+  is in no crontab — so logs were pruned when somebody remembered to click something, at
+  a retention nobody had chosen.
+
+  That is the fourth setting found this session that stored an intention and ignored it,
+  after `users.is_active`, `require_mfa_for_admins`, and two-factor enforcement itself.
+
+### Added
+
+- **`cron/prune_telemetry.php`.** Applies retention to all four tables, honouring
+  `log_retention_days` and a new `telemetry_retention_days` (default 90, clamped to
+  7–3650 so a stray `0` cannot empty them).
+
+  **Reports by default, deletes only with `--apply`.** The first run on an established
+  installation removes hundreds of thousands of rows; that should be a decision, not a
+  surprise.
+
+  **Deletes run in 5,000-row chunks with a pause between them.** A single `DELETE` of that
+  size holds locks long enough to stall the agent check-ins that write to these same
+  tables every two minutes. Verified on a throwaway copy of the real data: one chunk
+  removed exactly 5,000 rows and left everything inside the retention window untouched.
+
+### Changed
+
+- **The job is registered but deliberately not scheduled**, and carries no expected
+  interval, so the Scheduled Jobs page will not flag it overdue for an operator who has
+  chosen not to run it. Adding it to cron is a decision about deleting history.
+
+### Added
+
+- **`tests/telemetry_retention_test.php`** (19 assertions, in CI). Table coverage,
+  report-before-delete, clamped retention, chunking and the pause, run reporting, and that
+  the migration never overwrites a retention an operator has already set.
+
+### Note
+
+The injection guard added in 3.44.0 failed this release on its author's own new file:
+`prune_telemetry.php` interpolates a table name into `SELECT COUNT(*) FROM \`{$table}\``.
+The value comes from a hardcoded map four lines above it, so it is safe and was added to
+the reviewed allowlist with that reason — which is the workflow the allowlist exists for.
+Worth recording that the guard caught the next thing written after it, rather than waiting
+for a stranger.
+
+---
+
 ## Version 3.44.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

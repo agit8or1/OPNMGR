@@ -45,6 +45,7 @@ $reviewed = [
     'inc/maintenance.php',       // {$where} - ternary between two literals
     'scripts/encrypt_secrets.php', // table/column from hardcoded call sites
     'scripts/demo_fixture.php',  // table names from a hardcoded array
+    'cron/prune_telemetry.php',  // table and column from the $targets map above it
 ];
 
 $interpolated = [];
