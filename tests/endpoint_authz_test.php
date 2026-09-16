@@ -106,7 +106,7 @@ if ($dl !== '') {
 // request. api/request_queue.php accepted an arbitrary method, path, headers
 // and body to proxy at a managed firewall.
 
-exec('cd ' . escapeshellarg($root) . ' && git ls-files "api/*.php" "*.php" 2>/dev/null', $all, $st);
+exec('cd ' . escapeshellarg($root) . ' && git ls-files --cached --others --exclude-standard "api/*.php" "*.php" 2>/dev/null', $all, $st);
 
 $writes  = '/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|queue_firewall_command|queue_command)\b/i';
 $csrfRe  = '/\b(csrf_verify|check_csrf|verify_csrf)\b/';

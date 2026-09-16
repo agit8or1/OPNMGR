@@ -320,10 +320,20 @@ function isActive($page) {
 // act on it.
 if (function_exists('can') && can('settings.manage')) {
     require_once __DIR__ . '/notification_health.php';
+    require_once __DIR__ . '/agent_signing_status.php';
     try {
         $opnmgr_delivery_banner = notification_health_banner();
         if ($opnmgr_delivery_banner !== '') {
             echo '<div class="container-fluid pt-3">' . $opnmgr_delivery_banner . '</div>';
+        }
+
+        // A signing policy the fleet cannot satisfy refuses every check-in.
+        // The interface still works when that happens, so this banner is the
+        // route back - which is why the policy is reported rather than
+        // silently downgraded.
+        $opnmgr_signing_banner = agent_signing_banner();
+        if ($opnmgr_signing_banner !== '') {
+            echo '<div class="container-fluid pt-3">' . $opnmgr_signing_banner . '</div>';
         }
     } catch (Throwable $e) {
         // A warning banner must never be able to take the page down.

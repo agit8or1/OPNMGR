@@ -34,7 +34,7 @@ $root = dirname(__DIR__);
 
 // Only files that ship. Untracked scratch is not our problem, and scanning it
 // produced noise that hid the real findings.
-exec('cd ' . escapeshellarg($root) . ' && git ls-files "*.php" 2>/dev/null', $tracked, $status);
+exec('cd ' . escapeshellarg($root) . ' && git ls-files --cached --others --exclude-standard "*.php" 2>/dev/null', $tracked, $status);
 check('tracked PHP files were listed', $status === 0 && count($tracked) > 100,
     'got ' . count($tracked));
 

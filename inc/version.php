@@ -44,6 +44,20 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.43.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Signing With No Signer',
+            'changes' => [
+                'FOUND: Agent request signing is complete on the server - HMAC-SHA256 verification, a freshness window, nonce replay rejection, a per-firewall ratchet, three fleet-wide policy modes - and the check-in response hands each agent its signing secret and the exact canonical string, annotated "Sign requests once supported." No agent release has ever contained a line of signing code. The agent does not store the secret, computes no HMAC, and sends no signature header',
+                'SECURITY: That makes agent_auth_mode = require_signed a trap. It reads as the hardened option and would refuse every check-in in the fleet. It has no UI, so only someone who went looking in the database can set it - exactly the person likely to choose it',
+                'ADDED: The interface warns, loudly and on every administrative page, when the configured signing policy cannot be satisfied by the agents actually deployed. It names the setting, says how many firewalls are affected, and gives the exact way back',
+                'CHANGED: The policy is reported, never overridden. Silently downgrading a security setting is the failure this codebase has been full of - a refused fleet is survivable and reversible, a control that pretends to be on is not. The interface keeps working while agents are refused, so the banner is the route back',
+                'FIXED: tests/undefined_functions_test.php and tests/endpoint_authz_test.php enumerated tracked files only, so a new file\'s definitions were invisible until committed - the same blind spot fixed in the identity guard in 3.30.1. Both scan tracked and new files now',
+                'DOCUMENTED: The README records that signing is server-side only and that agent_auth_mode must stay at compatibility',
+            ],
+        ],
+        [
             'version' => '3.42.0',
             'date' => '2026-09-15',
             'type' => 'minor',

@@ -240,6 +240,11 @@ jobs:
       - name: Config restore suite
         run: php tests/config_restore_test.php
 
+      # Agent request signing is verified, provisioned and policy-controlled
+      # server-side, and no released agent can produce a signature.
+      - name: Agent signing suite
+        run: php tests/agent_signing_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

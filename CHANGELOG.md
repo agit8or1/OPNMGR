@@ -6,6 +6,64 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.43.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Found
+
+**Agent request signing has a complete server and no client.**
+
+The manager verifies HMAC-SHA256 signatures over a canonical
+`METHOD\nPATH\nTIMESTAMP\nNONCE\nSHA256(BODY)`, enforces a freshness window, rejects
+replayed nonces, ratchets each firewall once it has proven it can sign, and offers three
+fleet-wide policy modes. The check-in response hands each agent its signing secret *and
+the canonical string to sign*, annotated **"Sign requests once supported."**
+
+It never was. No agent release contains a line of signing code — the agent does not store
+the `api_secret` it is sent, computes no HMAC, and sends no `X-OPNMGR-Signature` header.
+`agent_signing_supported` is `0` for every firewall because no agent has ever produced a
+signature.
+
+So today the only thing protecting command delivery is TLS. Anyone holding a firewall's
+`hardware_id` and `api_key` can impersonate it, and signing — which exists precisely to
+prevent that — is inert.
+
+### Security
+
+- **`agent_auth_mode = require_signed` is a trap.** It reads as the hardened option and
+  would refuse **every check-in in the fleet**. It has no UI, so it can only be set by
+  someone who went looking for it in the database — exactly the person most likely to
+  choose it.
+
+  The interface now warns, on every administrative page, when the configured policy
+  cannot be satisfied by the agents actually deployed: which setting, how many firewalls
+  are affected, that no agent implements signing, and the exact way back.
+
+### Changed
+
+- **The policy is reported, never overridden.** Quietly downgrading a security setting is
+  the failure this codebase has been full of, and the fix for it is not another instance
+  of it. A refused fleet is survivable and reversible; a control that pretends to be on is
+  not. The interface keeps working while agents are refused, which is what makes the
+  banner a viable route back.
+
+### Fixed
+
+- **`tests/undefined_functions_test.php` and `tests/endpoint_authz_test.php` enumerated
+  tracked files only**, so a new file's definitions were invisible until committed — the
+  same blind spot fixed in the identity guard in 3.30.1. It surfaced here as a false
+  failure against a file added minutes earlier. Both now scan tracked and new files
+  together.
+
+### Added
+
+- **`tests/agent_signing_test.php`** (17 assertions, in CI). Pins that no released agent
+  signs — with a note to update the assertion rather than delete it if one ever does —
+  that the policy is not silently downgraded, the satisfiability rule for each mode
+  including an empty fleet, and that the banner names the setting and gives the remedy.
+
+---
+
 ## Version 3.42.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 
