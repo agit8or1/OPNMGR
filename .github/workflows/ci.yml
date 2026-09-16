@@ -234,6 +234,12 @@ jobs:
       - name: MFA requirement suite
         run: php tests/mfa_requirement_test.php
 
+      # Restore has never been performed, so the script that would run on a
+      # customer's firewall had never been executed by anything. This runs it
+      # with curl and configctl stubbed.
+      - name: Config restore suite
+        run: php tests/config_restore_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

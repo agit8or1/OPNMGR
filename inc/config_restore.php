@@ -217,9 +217,23 @@ if (!function_exists('build_restore_command')) {
 # OPNManager configuration restore
 set -e
 
-HW=\$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null)
-KEY=\$(cat /usr/local/etc/opnmanager_api_key 2>/dev/null)
+# `VAR=\$(cat missing)` fails under set -e, which would end the script here
+# with no output whatsoever on a firewall whose agent credentials are absent.
+# The || keeps it going so the missing-credential case reaches a real message.
+HW=\$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null) || HW=""
+KEY=\$(cat /usr/local/etc/opnmanager_api_key 2>/dev/null) || KEY=""
+
+if [ -z "\$HW" ] || [ -z "\$KEY" ]; then
+    echo "ERROR: agent credentials are missing; cannot authenticate to fetch the configuration"
+    exit 1
+fi
 TMP=/tmp/opnmgr-restore-{$restoreId}.xml
+
+# The fetched file is a complete firewall configuration: user password hashes,
+# IPsec pre-shared keys, RADIUS secrets. It must not survive this script by any
+# path. A trap covers all of them - the fetch failing, the sanity check
+# rejecting it, configctl failing under set -e, or the script being killed.
+trap 'rm -f "\$TMP"' EXIT HUP INT TERM
 
 echo "Fetching configuration..."
 curl -sS -f -o "\$TMP" \\
@@ -238,9 +252,18 @@ if ! grep -q "<opnsense>" "\$TMP"; then
 fi
 
 echo "Applying configuration..."
+
+# Not `cmd; RC=\$?`: under `set -e` a non-zero exit ends the script at that
+# line, so the assignment, the message and the cleanup below it never ran. The
+# operator saw a bare failure and the configuration stayed in /tmp. Testing the
+# command inside `if` is exempt from set -e, so the handling actually executes.
+# set -e is lifted for exactly this call so the real exit code survives.
+# `if ! cmd; then RC=\$?` does not work: inside the test, \$? is the negated
+# status - 1 for any failure - so a restore that failed with 3 reported 1.
+set +e
 /usr/local/sbin/configctl firmware restore "\$TMP"
 RC=\$?
-rm -f "\$TMP"
+set -e
 
 if [ \$RC -ne 0 ]; then
     echo "ERROR: restore failed with code \$RC"

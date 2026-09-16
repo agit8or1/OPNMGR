@@ -6,6 +6,58 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.42.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Security
+
+- **A failed restore left the configuration on the firewall.** The generated script runs
+  under `set -e`, so a non-zero exit from `configctl` ended it *at that line* — and the
+  `rm -f "$TMP"` sat below it, along with the error message. The file left behind is a
+  complete OPNsense configuration: user password hashes, IPsec pre-shared keys, RADIUS
+  secrets, sitting in `/tmp`.
+
+  Cleanup is a `trap` on `EXIT HUP INT TERM` now, which covers every path out — the fetch
+  failing, the sanity check rejecting the file, `configctl` failing, or the script being
+  killed.
+
+### Fixed
+
+- **A failed restore explained nothing.** Same cause: the `ERROR: restore failed` message
+  was below the line the script died on, so the operator saw a bare non-zero exit.
+
+- **The real exit code is preserved.** Worth recording because my first fix was wrong:
+  `if ! configctl ...; then RC=$?` captures the *negated test result*, so a restore that
+  failed with 3 reported 1. The new suite caught it on the first run. `set -e` is now
+  lifted for exactly that call.
+
+- **Missing agent credentials produced silence.** `HW=$(cat ...)` under `set -e` exits
+  when the file is absent, so on a firewall whose agent credentials are missing the script
+  stopped at the first line with no output whatsoever. It now says what is wrong.
+
+### Added
+
+- **`tests/config_restore_test.php`** (13 assertions, in CI). Runs the generated script
+  with `curl` and `configctl` replaced by stubs: a successful restore exits 0, reports
+  success and leaves nothing behind; a failing one propagates the real exit code, says
+  why, and leaves nothing behind; a fetched file that is not a configuration is refused
+  without `configctl` ever being reached.
+
+  Restore has **never been performed** on this installation — `audit_log` holds no restore
+  entries at all — so this script had never been executed by anything before now. Verified
+  to fail against the pre-fix version.
+
+### Verified
+
+**The backups themselves are sound**, which is worth stating plainly. They are stored at
+`/var/lib/opnmgr/backups/`, outside the web root, mode `0640` owned by the web user.
+Checksums and sizes match the database for every file checked, each parses as XML with an
+`<opnsense>` root, and `validate_backup_upload()` genuinely parses the document with
+external entities disabled rather than just checking the file is non-empty. Both firewalls
+have current backups with no gaps.
+
+---
+
 ## Version 3.41.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

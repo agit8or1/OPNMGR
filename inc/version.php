@@ -44,6 +44,20 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.42.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Restore Nobody Had Ever Run',
+            'changes' => [
+                'SECURITY: A failed restore left the fetched configuration in /tmp on the firewall. The script ran under set -e, so a non-zero exit from configctl ended it at that line and the rm -f below never executed. That file is a complete OPNsense configuration - user password hashes, IPsec pre-shared keys, RADIUS secrets. Cleanup is a trap now, covering the fetch failing, the sanity check rejecting the file, configctl failing, and the script being killed',
+                'FIXED: A failed restore also printed nothing explaining itself, for the same reason - the error message sat below the line the script died on. The operator saw a bare non-zero exit',
+                'FIXED: The real exit code is preserved. The first version of this fix used `if ! configctl ...; then RC=$?`, where $? is the negated test result - so a restore that failed with 3 reported 1. Caught by the new suite immediately',
+                'FIXED: The agent credential files are read with $(cat ...) under set -e, so on a firewall whose agent credentials are missing the script exited at that line with no output at all. It now reports the missing credentials',
+                'ADDED: tests/config_restore_test.php runs the generated script with curl and configctl stubbed, covering a successful restore, a failing one, and a fetched file that is not a configuration. Restore had never been performed on this installation - audit_log holds no restore entries - so this script had never been executed by anything until now',
+                'VERIFIED: Backups themselves are sound. Stored outside the web root at 0640 owned by the web user, checksums and sizes match the database, every file parses as XML with an <opnsense> root, and validation genuinely parses rather than checking the file is non-empty',
+            ],
+        ],
+        [
             'version' => '3.41.0',
             'date' => '2026-09-15',
             'type' => 'minor',
