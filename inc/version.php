@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-15'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Own Address'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Waiting, Not Stuck'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.47.0',
+            'date' => '2026-09-16',
+            'type' => 'minor',
+            'title' => 'Waiting, Not Stuck',
+            'changes' => [
+                'FIXED: The hourly sweep no longer fails commands queued for a firewall that is simply offline. Against a live firewall an hour pending means something went wrong; against a firewall that is down the command is not stuck, it is waiting - and the thing most likely to be queued for a firewall that has gone quiet is the instruction that would bring it back. On 2026-09-15 a firewall lost its agent, the recovery install sat pending, and the sweep failed it at the one hour mark',
+                'ADDED: An absolute seven-day cap, so a decommissioned firewall does not accumulate a backlog forever',
+                'FIXED: An agent install or restart kills the process that would have reported the result, exactly as a reboot does - and it was not in the exempt set. The command sat in "sent", the ten-minute sweep returned it to "pending", and the firewall reinstalled its agent again. One firewall was lost to that loop',
+                'ADDED: tests/command_sweep_test.php, and retry-suite coverage asserting the SQL and the PHP exempt the same commands - the sweep and the settler disagreeing about one command is how the loop began',
+                'FIXED: The Agent row of the README compatibility table was the one version reference CI did not check, and it had drifted three agent releases behind. It is checked now',
+            ],
+        ],
         [
             'version' => '3.46.0',
             'date' => '2026-09-15',

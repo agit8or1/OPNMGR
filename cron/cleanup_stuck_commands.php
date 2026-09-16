@@ -37,14 +37,43 @@ try {
     // Phase 1: Mark stuck/dead commands
     // =========================================================================
 
-    // 1. Fail pending commands older than 1 hour
+    // 1. Fail pending commands older than 1 hour - but not for a firewall that
+    //    is simply offline.
+    //
+    //    A command pending for an hour against a *live* firewall really is
+    //    stuck: it should have been collected at the next check-in. Against a
+    //    firewall that is down it is not stuck, it is waiting, and failing it
+    //    deletes the instruction that would have brought the box back. That is
+    //    not hypothetical - on 2026-09-15 a firewall lost its agent, the
+    //    recovery install sat pending, and this sweep failed it at the one hour
+    //    mark. Had the firewall returned after that it would have rejoined
+    //    still broken, with nothing queued to fix it.
+    //
+    //    Commands for an offline firewall are held instead, up to an absolute
+    //    cap so a permanently dead firewall does not accumulate them forever.
     $stmt = db()->prepare("
-        UPDATE firewall_commands
-        SET status = 'failed', completed_at = NOW(), result = 'Auto-cleanup: stuck in pending for over 1 hour'
-        WHERE status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+        UPDATE firewall_commands fc
+          JOIN firewalls f ON f.id = fc.firewall_id
+        SET fc.status = 'failed', fc.completed_at = NOW(),
+            fc.result = 'Auto-cleanup: stuck in pending for over 1 hour'
+        WHERE fc.status = 'pending'
+          AND fc.created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+          AND f.last_checkin IS NOT NULL
+          AND f.last_checkin > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
     ");
     $stmt->execute();
     $counts['stale_pending'] = $stmt->rowCount();
+
+    // 1b. The absolute cap: a week is long enough for any recovery and short
+    //     enough that a decommissioned firewall does not collect a backlog.
+    $stmt = db()->prepare("
+        UPDATE firewall_commands
+        SET status = 'failed', completed_at = NOW(),
+            result = 'Auto-cleanup: pending for over 7 days; the firewall has not returned'
+        WHERE status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+    ");
+    $stmt->execute();
+    $counts['abandoned_pending'] = $stmt->rowCount();
 
     // 2. Fail sent commands older than 30 minutes with no completion
     $stmt = db()->prepare("

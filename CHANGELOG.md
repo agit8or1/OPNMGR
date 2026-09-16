@@ -2,7 +2,59 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: September 15, 2026
+**Last Updated**: September 16, 2026
+
+---
+
+## Version 3.47.0
+**Released**: September 16, 2026 | **Agent**: v1.6.5
+
+### Fixed
+
+**A command waiting for an offline firewall is not a stuck command.** The hourly sweep
+failed anything pending for more than an hour. Against a live firewall that is right — it
+should have been collected at the next check-in, so an hour means something went wrong.
+Against a firewall that is down it is wrong twice over: the command is not stuck, it is
+waiting, and the thing most likely to be queued for a firewall that has gone quiet is the
+instruction that would bring it back.
+
+That happened on 2026-09-15. A firewall lost its agent during the 1.6.4 rollout, the
+recovery install sat pending, and the sweep failed it at the one hour mark. Had the
+firewall returned after that it would have rejoined still running the broken agent, with
+nothing queued to fix it, and the recovery would have looked like it simply did not work.
+
+The one-hour rule now applies only to firewalls that have checked in within the last
+fifteen minutes. Commands for an offline firewall are held.
+
+**An agent install can never report its own result.** It stops the agent, unpacks, and
+starts it again — the process executing the command is killed partway through. That is
+the same property as a reboot, and reboots have been exempt from redelivery since 3.20.0.
+Agent installs were not. The command sat in `sent`, the ten-minute sweep returned it to
+`pending`, and the firewall reinstalled its agent again:
+
+```
+one firewall, 2026-09-15 — install → sent → (no result) → pending → install → …
+```
+
+`install_opnmanager_agent.sh`, `pkg install os-opnmanager-agent` and
+`opnmanager_agent restart` now join the reboot family in both the SQL sweep and the PHP
+settler.
+
+**The README's Agent row was the one version reference CI did not check.** The
+compatibility table's Application row was covered in 3.31.0 after it drifted; the Agent
+row one line below it was not, and it sat at v1.6.2 while v1.6.5 was published — three
+releases, in the same paragraph that claims "no reference in the tree can drift out of
+step."
+
+### Added
+
+- **A seven-day absolute cap on pending commands.** Long enough for any recovery, short
+  enough that a decommissioned firewall does not collect a backlog. Without it, holding
+  commands for offline firewalls would hold them forever.
+- **`tests/command_sweep_test.php`** (11 assertions, in CI), and three more in the retry
+  suite asserting that `agent_unacknowledgeable_command_sql()` and
+  `agent_command_is_unacknowledgeable()` exempt the same commands. The sweep and the
+  settler disagreeing about a single command is exactly how the loop began.
 
 ---
 

@@ -118,4 +118,34 @@ $resetUpd->execute([$fwId]);
 T::eq('completed', status_of($updReboot), 'update-path reboot is settled too');
 T::eq('pending',   status_of($updNormal), 'a stuck update command is still retried');
 
+// An agent install or restart kills the process that would report the result,
+// exactly as a reboot does. It was not in the exempt set, so the command sat in
+// 'sent', the ten-minute sweep returned it to 'pending', and the firewall
+// reinstalled its agent again - and again. One firewall was lost to that loop
+// on 2026-09-15 during a staged agent rollout.
+T::group('Agent replacement is not redelivered');
+
+foreach ([
+    'fetch -o - https://m/downloads/plugins/install_opnmanager_agent.sh | sh',
+    'configctl opnmanager_agent restart',
+    'pkg install -y os-opnmanager-agent',
+] as $cmd) {
+    T::ok(agent_command_is_unacknowledgeable($cmd),
+        'not redelivered: ' . substr($cmd, 0, 44));
+}
+
+// Things that do not replace the agent must still be retried, or a command lost
+// in transit would never be sent again.
+foreach (['ls -l /tmp', 'configctl opnmanager_agent checkin', 'pkg update'] as $cmd) {
+    T::ok(!agent_command_is_unacknowledgeable($cmd), 'still retryable: ' . $cmd);
+}
+
+// The SQL and the PHP must agree, or the sweep and the settler disagree about
+// the same command.
+$sql = agent_unacknowledgeable_command_sql();
+foreach (['install_opnmanager_agent.sh', 'os-opnmanager-agent', 'opnmanager_agent restart'] as $needle) {
+    T::ok(strpos($sql, $needle) !== false, "the SQL also exempts {$needle}");
+}
+
+
 exit(T::summary());

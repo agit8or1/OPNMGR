@@ -149,6 +149,11 @@ jobs:
       - name: Command retry and reboot-loop suite
         run: php tests/agent_command_retry_test.php
 
+      # A command waiting for an offline firewall is not a stuck command, and
+      # an install that replaces the agent can never report its own result.
+      - name: Stuck-command sweep suite
+        run: php tests/command_sweep_test.php
+
       - name: Reboot state derivation suite
         run: php tests/reboot_state_test.php
 

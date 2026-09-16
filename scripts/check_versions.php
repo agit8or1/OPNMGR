@@ -158,6 +158,18 @@ check(
     $fix, $problems, $fixed
 );
 
+// The Agent row of that same table was uncovered too, and drifted three agent
+// releases behind (1.6.2 while 1.6.5 was published) - the exact failure the
+// comment above describes, one row lower.
+check(
+    $root . '/README.md',
+    '/\| Agent \| v([0-9][0-9.]*) \|/',
+    $agentVersion,
+    'compatibility table agent',
+    fn(string $c) => preg_replace('/(\| Agent \| v)[0-9][0-9.]*( \|)/', '${1}' . $agentVersion . '${2}', $c) ?: $c,
+    $fix, $problems, $fixed
+);
+
 check(
     $root . '/README.md',
     '/enforces these against `VERSION` and the published artifact \x{2014} application ([0-9][0-9.]*),/u',

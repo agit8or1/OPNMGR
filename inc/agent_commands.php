@@ -550,7 +550,16 @@ function agent_unacknowledgeable_command_sql(): string {
          . " OR command LIKE '%/sbin/poweroff%'"
          . " OR command LIKE '%shutdown -r%'"
          . " OR command LIKE '%shutdown -h%'"
-         . " OR command LIKE '%shutdown -p%')";
+         . " OR command LIKE '%shutdown -p%'"
+         // An agent install stops the agent, unpacks, and starts it again. The
+         // process executing the command is killed partway through, so a result
+         // can never arrive - the same property as a reboot, and it was not in
+         // this list. The command sat in 'sent', the ten-minute sweep returned
+         // it to 'pending', and the firewall reinstalled its agent again. One
+         // firewall was lost to that loop on 2026-09-15.
+         . " OR command LIKE '%install_opnmanager_agent.sh%'"
+         . " OR command LIKE '%pkg install%os-opnmanager-agent%'"
+         . " OR command LIKE '%opnmanager_agent restart%')";
 }
 
 /**
@@ -566,7 +575,11 @@ function agent_command_is_unacknowledgeable(?string $command): bool {
         return false;
     }
     foreach (['/sbin/reboot', '/sbin/halt', '/sbin/poweroff',
-              'shutdown -r', 'shutdown -h', 'shutdown -p'] as $needle) {
+              'shutdown -r', 'shutdown -h', 'shutdown -p',
+              // Restarting or replacing the agent kills the process that would
+              // have reported the result; see the SQL counterpart above.
+              'install_opnmanager_agent.sh', 'os-opnmanager-agent',
+              'opnmanager_agent restart'] as $needle) {
         if (strpos($c, $needle) !== false) {
             return true;
         }
