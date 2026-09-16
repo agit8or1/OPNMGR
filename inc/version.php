@@ -44,6 +44,20 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.41.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'A Setting That Required Nothing',
+            'changes' => [
+                'SECURITY: require_mfa_for_admins sat in the settings table with no line of code reading it. Turning it on stored a 1 and changed no behaviour - the third setting found this way, after users.is_active and the two-factor enforcement that did not exist at all before 3.35.0',
+                'FIXED: With it on, an administrator without a second factor is sent to enrol and the rest of the interface is unavailable until they do. Enrolment rather than refusal, because a setting that applies to administrators must not strand the administrator who turned it on. The enrolment page, verify2fa, login and logout stay reachable',
+                'FIXED: The requirement is evaluated on every authenticated request, not only at login, so enabling it applies to sessions that are already open. API callers get a 403 with JSON rather than a redirect to an HTML page',
+                'CHANGED: A settings or database error while evaluating the requirement leaves administrators in, and reasserts on the next request - failing closed here would strand everyone on a transient read error',
+                'NOTE: raw_command_admin_only is also read by nothing, but api/queue_command.php already requires an administrator unconditionally, so the stricter behaviour is what happens regardless. The setting cannot loosen it; left alone and documented rather than wired to relax a restriction',
+                'ADDED: tests/mfa_requirement_test.php covers the role scope, the enrolled case, every escape hatch, the JSON branch and the fail-open behaviour',
+            ],
+        ],
+        [
             'version' => '3.40.0',
             'date' => '2026-09-15',
             'type' => 'minor',

@@ -70,6 +70,14 @@ require_once __DIR__ . '/inc/header.php';
                     <h5 class="mb-0"><i class="fa fa-mobile-alt me-2"></i>Two-Factor Authentication Setup</h5>
                 </div>
                 <div class="card-body">
+                    <?php if (isset($_GET['required'])): ?>
+                        <div class="alert alert-warning">
+                            <i class="fa fa-shield-alt me-2"></i>
+                            This installation requires administrators to use two-factor
+                            authentication. Set it up here to continue &mdash; the rest of
+                            the interface is unavailable until you do.
+                        </div>
+                    <?php endif; ?>
                     <?php echo $message; ?>
                     
                     <?php if (!empty($user['totp_secret'])): ?>

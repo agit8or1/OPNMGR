@@ -188,6 +188,42 @@ function isAdmin() {
     return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 }
 
+/**
+ * Is this account required to hold a second factor, and does it not yet?
+ *
+ * require_mfa_for_admins has sat in the settings table with nothing reading it.
+ * An operator who turned it on got a stored 1 and no change in behaviour - the
+ * same shape as users.is_active before 3.37.0, and of the 2FA enforcement that
+ * did not exist before 3.35.0.
+ *
+ * Enrolment, not refusal: an administrator who has not set up a second factor
+ * is sent to do so rather than locked out. Turning this on can therefore never
+ * strand the person who turned it on, which matters for a setting whose whole
+ * purpose is to apply to administrators.
+ */
+function mfa_enrolment_required(): bool {
+    if (($_SESSION['role'] ?? '') !== 'admin') {
+        return false;
+    }
+
+    try {
+        $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+        $stmt->execute(['require_mfa_for_admins']);
+        if ((string) ($stmt->fetchColumn() ?: '0') !== '1') {
+            return false;
+        }
+
+        $stmt = db()->prepare('SELECT totp_secret FROM users WHERE id = ?');
+        $stmt->execute([$_SESSION['user_id'] ?? 0]);
+        return empty($stmt->fetchColumn());
+    } catch (Throwable $e) {
+        // A settings or database problem must not lock administrators out of
+        // the interface; the requirement reasserts on the next request.
+        error_log('OPNMGR: could not evaluate the MFA requirement: ' . $e->getMessage());
+        return false;
+    }
+}
+
 function requireLogin() {
     if (!isLoggedIn()) {
         // Return JSON 401 for API requests, redirect for page requests
@@ -199,6 +235,26 @@ function requireLogin() {
             exit;
         }
         header('Location: /login.php');
+        exit;
+    }
+
+    // Pages that must stay reachable, or an administrator sent to enrol would
+    // have nowhere to do it and no way out.
+    $path = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '');
+    $exempt = ['twofactor_setup.php', 'verify2fa.php', 'logout.php', 'login.php'];
+
+    if (!in_array($path, $exempt, true) && mfa_enrolment_required()) {
+        if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') !== false) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Two-factor authentication is required for administrators. '
+                           . 'Enrol at /twofactor_setup.php.',
+            ]);
+            exit;
+        }
+        header('Location: /twofactor_setup.php?required=1');
         exit;
     }
 }

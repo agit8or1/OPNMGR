@@ -6,6 +6,64 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.41.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+> **This changes nothing until you enable it.** `require_mfa_for_admins` remains `0`.
+> Turning it on now does what it says; before this release it did nothing at all.
+
+### Security
+
+- **`require_mfa_for_admins` required nothing.** The setting has been in the settings
+  table with no line of code reading it. An operator who turned it on got a stored `1`
+  and no change in behaviour.
+
+  That is the third setting found this way — after `users.is_active` in 3.37.0, and
+  two-factor enforcement itself in 3.35.0, where `login()` never read `totp_secret` at
+  all. A security control that stores your intention and ignores it is worse than one
+  that is absent, because you stop looking.
+
+### Fixed
+
+- **With the setting on, an administrator without a second factor is sent to enrol**, and
+  the rest of the interface is unavailable until they do. **Enrolment rather than
+  refusal** is the whole design constraint: a setting that applies to administrators must
+  not be able to strand the administrator who turned it on. `twofactor_setup.php`,
+  `verify2fa.php`, `login.php` and `logout.php` stay reachable.
+
+- **Evaluated on every authenticated request**, not only at login, so enabling it applies
+  to sessions that are already open rather than waiting for everyone to sign in again.
+
+- **API callers get a 403 with JSON** explaining the requirement, rather than a redirect
+  to an HTML page that a fetch() would render as a confusing success.
+
+- **A settings or database error leaves administrators in**, and the requirement
+  reasserts on the next request. Failing closed here would strand everyone on a transient
+  read error.
+
+### Note
+
+`raw_command_admin_only` is also read by nothing, and it is **left alone deliberately**.
+`api/queue_command.php` already requires an administrator unconditionally, so the
+stricter behaviour is what happens regardless; wiring the setting up could only ever
+loosen a restriction that is currently absolute. Recorded here rather than silently
+implemented.
+
+### Added
+
+- **`tests/mfa_requirement_test.php`** (13 assertions, in CI). The role scope, the
+  already-enrolled case, every escape hatch by name, the JSON branch for API callers, and
+  the fail-open behaviour on a database error. Verified to fail when the enforcement is
+  removed.
+
+### Verified
+
+Tested against a running server with the setting on: every page redirects an un-enrolled
+administrator to enrolment, the enrolment page and logout stay open, and an API call
+returns the 403 JSON. The setting was returned to `0` afterwards and confirmed.
+
+---
+
 ## Version 3.40.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

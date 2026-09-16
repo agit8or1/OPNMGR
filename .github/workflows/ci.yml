@@ -229,6 +229,11 @@ jobs:
       - name: SMTP settings suite
         run: php tests/smtp_settings_test.php
 
+      # require_mfa_for_admins sat in the settings table with nothing reading
+      # it, so turning it on stored a 1 and changed no behaviour.
+      - name: MFA requirement suite
+        run: php tests/mfa_requirement_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
