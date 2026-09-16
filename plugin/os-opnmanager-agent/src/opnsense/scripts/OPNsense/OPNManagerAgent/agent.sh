@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.6.5"
+AGENT_VERSION="1.6.6"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
@@ -970,15 +970,32 @@ main() {
     # Load configuration
     load_config
 
-    # Validate configuration
-    if [ "$ENABLED" != "1" ]; then
-        log_message "Agent is disabled in configuration"
-        exit 0
-    fi
+    # Wait for configuration rather than exiting. The agent is supervised now
+    # (see etc/rc.d/opnmanager_agent), so exiting here would mean being
+    # restarted every 15 seconds forever; and on the old unsupervised setup it
+    # meant that enabling the agent in the GUI still needed a manual service
+    # start, because the process that would have noticed had already exited.
+    WAIT_REASON=""
+    while [ "$ENABLED" != "1" ] || [ -z "$SERVER_URL" ]; do
+        if [ "$ENABLED" != "1" ]; then
+            reason="Agent is disabled in configuration"
+        else
+            reason="Server URL not configured"
+        fi
 
-    if [ -z "$SERVER_URL" ]; then
-        log_message "ERROR: Server URL not configured"
-        exit 1
+        # Log the reason once per change, not once a minute forever.
+        if [ "$reason" != "$WAIT_REASON" ]; then
+            log_message "$reason - waiting for configuration"
+            WAIT_REASON="$reason"
+        fi
+
+        sleep 60
+        rotate_log
+        load_config
+    done
+
+    if [ -n "$WAIT_REASON" ]; then
+        log_message "Configuration now valid, starting check-ins"
     fi
 
     # Set up curl command with SSL options

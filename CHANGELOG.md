@@ -6,6 +6,89 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.49.0
+**Released**: September 16, 2026 | **Agent**: v1.6.6
+
+### Found
+
+**Every way the agent could stop was permanent.**
+
+The agent's self-update path has always ended like this:
+
+```
+log_message "Restarting to use new version..."
+# Clean up PID file and exit - let rc.d restart us
+rm -f "$PID_FILE"
+exit 0
+```
+
+rc.d did not restart it. It launched the agent with `daemon -p ... -f`, without
+`-r`, so daemon(8) forked the agent and exited. There was no supervisor. The
+comment described an arrangement that did not exist.
+
+`watchdog.sh` was written for exactly this case. It has shipped in every package
+since it was written and has never run on a single firewall. The only thing that
+ever asked for its cron entry was a comment in its own header:
+
+```
+# Run this from cron every 5 minutes: */5 * * * * .../watchdog.sh
+```
+
+Nothing read that comment. The installer copied the file and scheduled nothing.
+
+So an agent that exited stayed exited, and the only recovery was console access
+to a firewall whose entire purpose is not needing any. On 2026-09-16 fw51
+stopped at 12:02:40 after a clean run of 200-response check-ins and stayed down.
+fw48 had done the same two days earlier and came back only when a queued
+reinstall finally ran, twelve hours after it was sent. Neither firewall needed a
+fix on the firewall. Both needed something to notice.
+
+### Fixed
+
+- **daemon(8) supervises the agent.** `daemon -r -R 15` restarts it after a
+  crash or a self-update, which is what the agent's own comment has always
+  claimed. The 15 second delay keeps a persistently failing start to four
+  restarts a minute rather than a hot loop.
+- **Stopping kills the supervisor first.** Killing only the agent is precisely
+  the event the supervisor reacts to, so `service opnmanager_agent stop` would
+  otherwise be undone within seconds. The supervisor's pid is recorded
+  separately with `-P`.
+- **The installer schedules the watchdog**, every 5 minutes, idempotently, and
+  the uninstaller removes it. It goes in root's crontab rather than
+  `/etc/crontab`, because OPNsense regenerates that from `config.xml` on every
+  configuration apply and would silently drop the entry.
+- **The watchdog's health test was wrong**, which did not matter while it never
+  ran and matters now. It asked whether a successful check-in appeared in the
+  last 20 log lines - something a busy but perfectly healthy agent fails. Every
+  five minutes, that verdict would restart a working agent forever. It now
+  measures the age of the last successful check-in against five check-in
+  intervals with a 15 minute floor: the agent backs off up to 300s per check-in
+  on errors, so a firewall that has merely lost its uplink must not be restarted
+  in a loop. A deliberately disabled agent, which logs no check-ins on purpose,
+  is left alone.
+- **The installer restarted the agent only if it was already running** - the one
+  case that needed no help. It now restarts unconditionally, so a reinstall
+  recovers a dead agent. The restart is detached and delayed by 25 seconds
+  because this script usually runs as a command dispatched by the agent itself,
+  and restarting synchronously kills the process that has to report the result.
+
+### Changed
+
+- A disabled or unconfigured agent now waits and re-reads its configuration
+  instead of exiting. Under supervision, exiting would mean a restart every 15
+  seconds; on the old unsupervised setup it meant that enabling the agent in the
+  GUI still required a manual service start, because the process that would have
+  noticed had already exited.
+
+### Added
+
+- `tests/agent_supervision_test.php` reads the shipped scripts and asserts all
+  three links in the chain exist: the supervisor restarts, the watchdog is
+  scheduled, and the package contains the watchdog that the cron entry points
+  at.
+
+---
+
 ## Version 3.48.0
 **Released**: September 16, 2026 | **Agent**: v1.6.5
 

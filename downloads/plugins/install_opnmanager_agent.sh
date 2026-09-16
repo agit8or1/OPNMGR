@@ -3,7 +3,7 @@
 # OPNManager Agent Plugin Installer
 # Downloads and installs the OPNManager agent plugin for OPNsense
 
-PLUGIN_VERSION="1.6.5"
+PLUGIN_VERSION="1.6.6"
 
 # Base URL of the manager this firewall belongs to. It is passed in by whatever
 # emitted the install command, because a script served as a static file cannot
@@ -139,6 +139,21 @@ fi
 # Enable service in rc.conf
 sysrc opnmanager_agent_enable="YES"
 
+# Schedule the watchdog. It has shipped in every package since it was written
+# and never ran on a single firewall: the only thing that ever asked for the
+# cron entry was a comment in its own header, addressed to a human who never
+# read it. An agent that died therefore stayed dead until someone reached the
+# console, which is how two firewalls went silent in the same week.
+#
+# root's crontab, not /etc/crontab: OPNsense regenerates /etc/crontab from
+# config.xml whenever configuration is applied, and would drop the entry.
+echo "Scheduling agent watchdog..."
+WATCHDOG="/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/watchdog.sh"
+CRON_LINE="*/5 * * * * ${WATCHDOG} >/dev/null 2>&1"
+( crontab -l 2>/dev/null | grep -v "OPNManagerAgent/watchdog.sh"; echo "$CRON_LINE" ) \
+    | crontab - && echo "  watchdog scheduled every 5 minutes" \
+    || echo "  WARNING: could not install watchdog cron entry"
+
 echo "Reloading services and flushing caches..."
 
 # Clear OPNsense menu cache - THIS IS THE KEY
@@ -148,12 +163,17 @@ rm -rf /var/lib/php/cache/*
 # Restart configd to pick up new actions
 service configd restart
 
-# Restart agent service if it was already running (to pick up new version)
-if service opnmanager_agent status >/dev/null 2>&1; then
-    echo "Restarting agent service to load new version..."
-    service opnmanager_agent restart >/dev/null 2>&1 &
-    sleep 2
-fi
+# Restart the agent unconditionally, so this installer also recovers a firewall
+# whose agent is dead - previously it restarted only an agent that was already
+# running, which is the one case that needed no help.
+#
+# Detached and delayed: this script usually runs as a command dispatched by the
+# agent itself, and restarting the agent kills the process that has to report
+# the result. Every install command queued to a live agent was recorded as
+# failed for exactly this reason. nohup outlives the agent's own pkill, and the
+# delay leaves time for the result to be posted first.
+echo "Scheduling agent restart..."
+nohup sh -c 'sleep 25; service opnmanager_agent restart' >/dev/null 2>&1 &
 
 # Restart web GUI to pick up new menu
 echo "Restarting web GUI..."

@@ -14,7 +14,12 @@ load_rc_config $name
 : ${opnmanager_agent_enable:="NO"}
 : ${opnmanager_agent_pidfile:="/var/run/opnmanager_agent.pid"}
 
+# daemon(8) supervises the agent, so there are two pids: the supervisor's and
+# the agent's. Stopping has to kill the supervisor first - killing only the
+# agent is how the supervisor was designed to react, and it would restart it.
 pidfile="${opnmanager_agent_pidfile}"
+supervisor_pidfile="/var/run/opnmanager_agent.supervisor.pid"
+
 command="/usr/local/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh"
 command_interpreter="/bin/sh"
 
@@ -25,19 +30,37 @@ status_cmd="${name}_status"
 opnmanager_agent_start()
 {
     # Kill any existing agent processes first
-    pkill -9 -f "OPNManagerAgent/agent.sh" 2>/dev/null
-    sleep 1
-
-    if [ -f ${pidfile} ]; then
-        rm -f ${pidfile}
-    fi
+    ${name}_stop >/dev/null 2>&1
 
     echo "Starting ${name}."
-    /usr/sbin/daemon -p ${pidfile} -f ${command}
+
+    # -r restarts the agent if it exits for any reason, which is what makes a
+    # crash or a self-update recoverable without someone reaching the console.
+    # The agent's own self-update path has always ended in "exit 0 - let rc.d
+    # restart us", but nothing ever did: daemon ran without -r, and the watchdog
+    # that would have noticed was never installed in cron. A firewall whose
+    # agent exited simply went silent until it was rescued by hand.
+    #
+    # -R 15 keeps a persistent startup failure to four restarts a minute rather
+    # than a hot loop.
+    /usr/sbin/daemon -r -R 15 \
+        -P ${supervisor_pidfile} \
+        -p ${pidfile} \
+        -f ${command}
 }
 
 opnmanager_agent_stop()
 {
+    # Supervisor first, or it restarts the agent we are about to kill.
+    if [ -f ${supervisor_pidfile} ]; then
+        spid=$(cat ${supervisor_pidfile})
+        echo "Stopping ${name} supervisor (pid ${spid})."
+        kill -TERM ${spid} 2>/dev/null
+        sleep 1
+        kill -KILL ${spid} 2>/dev/null
+        rm -f ${supervisor_pidfile}
+    fi
+
     if [ -f ${pidfile} ]; then
         pid=$(cat ${pidfile})
         echo "Stopping ${name} (pid ${pid})."
@@ -47,7 +70,9 @@ opnmanager_agent_stop()
         rm -f ${pidfile}
     fi
 
-    # Aggressively kill ALL agent processes
+    # Aggressively kill ALL agent processes, including any supervisor left over
+    # from a version of this script that did not record one.
+    pkill -9 -f "daemon.*OPNManagerAgent/agent.sh" 2>/dev/null
     pkill -9 -f "OPNManagerAgent/agent.sh" 2>/dev/null
     echo "${name} stopped."
 }

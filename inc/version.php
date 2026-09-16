@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Job That Stopped'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Nothing Was Watching'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,8 +20,8 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Job That Sto
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.5'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-05'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.6'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-16'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 // First agent release that collects OPNsense health telemetry (gateways, VPN,
@@ -43,6 +43,23 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.49.0',
+            'date' => '2026-09-16',
+            'type' => 'minor',
+            'title' => 'Nothing Was Watching',
+            'changes' => [
+                'FOUND: Every way the agent could stop was permanent. Its self-update path has always ended in "rm -f PID_FILE; exit 0 - let rc.d restart us", and nothing ever restarted it: rc.d launched daemon(8) without -r, so the supervisor supervised nothing. The only recovery was console access to a firewall whose entire purpose is not needing any',
+                'FOUND: watchdog.sh, written to restart a crashed agent, has shipped in every package since it was written and has never run on a single firewall. The only thing that ever asked for its cron entry was a comment in its own header, addressed to a human who did not read it. That is the third mechanism this month that stored an intention and never acted on it',
+                'FIXED: daemon(8) now supervises the agent with -r and a 15 second restart delay, so a crash or a self-update restarts it. The stop path kills the supervisor before the agent, because killing only the agent is precisely what the supervisor reacts to',
+                'FIXED: The installer schedules the watchdog in root\'s crontab every 5 minutes, idempotently, and the uninstaller removes it. Root\'s crontab and not /etc/crontab: OPNsense regenerates that from config.xml on every configuration apply and would drop the entry',
+                'FIXED: The watchdog decided an agent was stuck by looking for a check-in in the last 20 log lines, which a busy but healthy agent fails. Now that it actually runs, that verdict would restart a working agent every five minutes, so it measures the age of the last successful check-in against five check-in intervals with a 15 minute floor - the agent backs off to 300s per check-in, and a firewall that has merely lost its uplink must not be restarted in a loop',
+                'FIXED: The installer restarted the agent only if it was already running - the one case that needed no help. It now restarts unconditionally, detached and delayed, so it also recovers a dead agent without killing the process that has to report the command result',
+                'CHANGED: A disabled or unconfigured agent waits and re-reads its configuration instead of exiting. Under supervision exiting would be a restart every 15 seconds, and on the old setup it meant enabling the agent in the GUI still required a manual service start',
+                'ADDED: tests/agent_supervision_test.php reads the shipped scripts and asserts all three links exist: the supervisor restarts, the watchdog is scheduled, and the package contains the watchdog the cron entry points at',
+                'CONTEXT: fw51 stopped at 12:02:40 on 2026-09-16 after a clean run of 200-response check-ins and stayed down. fw48 had done the same two days earlier and came back only when a queued reinstall finally ran, 12 hours later. Neither needed a fix on the firewall; both needed something to notice',
+            ],
+        ],
         [
             'version' => '3.48.0',
             'date' => '2026-09-16',
