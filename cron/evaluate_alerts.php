@@ -345,6 +345,48 @@ foreach (health_gateway_flapping() as $flap) {
     ]);
 }
 
+// --- scheduled jobs that have stopped running ---------------------------------
+// The jobs are what detects everything above, so their own silence has to be
+// detected by something. Two of them stopped for three days in September 2026 -
+// their crontab lines redirected into a log file their user could no longer
+// create, so cron started a shell every cycle and the PHP never ran - and the
+// only surface that would have shown it was a settings page nobody opens.
+//
+// A job is watched from its first recorded run onward. This application does
+// not own the crontab, so an unscheduled job must never raise anything.
+$watched = [];
+foreach (cron_jobs() as $job) {
+    $interval = (int) ($job['expected_interval_minutes'] ?? 0);
+    if ($interval <= 0 || !empty($job['never_run'])) {
+        continue;
+    }
+    $watched[] = $job['task_name'];
+
+    if (empty($job['stale'])) {
+        resolve('job.stale', null, $job['task_name'], 'the job reported a run');
+        continue;
+    }
+
+    $minutes = (int) round(((int) $job['age_seconds']) / 60);
+    raise('job.stale', [
+        'object_key' => $job['task_name'],
+        'title'  => sprintf('Scheduled job %s has not run for %d minutes', $job['task_name'], $minutes),
+        'detail' => sprintf(
+            'Expected every %d minute(s); last run %s. The job is scheduled by the system crontab, '
+            . 'which this application does not own - check that the entry still exists and that its '
+            . 'user can write wherever the line redirects output.',
+            $interval,
+            (string) $job['last_run']
+        ),
+        'metadata' => [
+            'script'   => $job['script_path'],
+            'schedule' => $job['schedule'],
+            'interval_minutes' => $interval,
+        ],
+    ]);
+}
+say(sprintf('Scheduled jobs: %d watched', count($watched)));
+
 say(sprintf('Detection complete: %d raised/updated, %d resolved', $raised, $resolved));
 
 // ---------------------------------------------------------------------------

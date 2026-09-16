@@ -35,6 +35,12 @@ opnmgr_block_direct_web_access(__FILE__);
  */
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+
+// Report this run so a job that stops running is visible. Recording never
+// blocks the job: every failure inside is logged and swallowed.
+require_once __DIR__ . '/../inc/cron_runs.php';
+cron_run_begin('nightly_backups');
+
 require_once __DIR__ . '/../inc/backup_storage.php';
 require_once __DIR__ . '/../inc/agent_commands.php';
 

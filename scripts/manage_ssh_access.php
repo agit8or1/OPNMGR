@@ -407,6 +407,10 @@ if (php_sapi_name() === 'cli' && basename($_SERVER['SCRIPT_FILENAME']) === 'mana
             exit($result['success'] ? 0 : 1);
             
         case 'cleanup':
+            // Only the cleanup subcommand is a scheduled run; the others are
+            // driven by an operator opening a tunnel.
+            require_once __DIR__ . '/../inc/cron_runs.php';
+            cron_run_begin('ssh_access_cleanup');
             $result = cleanup_expired_sessions();
             echo json_encode($result, JSON_PRETTY_PRINT) . "\n";
             exit(0);

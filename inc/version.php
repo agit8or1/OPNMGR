@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Waiting, Not Stuck'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Job That Stopped'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.48.0',
+            'date' => '2026-09-16',
+            'type' => 'minor',
+            'title' => 'The Job That Stopped',
+            'changes' => [
+                'FOUND: Two scheduled jobs stopped running on 2026-09-13 and nothing said so for three days. Their crontab lines redirect into a file under /var/log; after a rotation the user running them could no longer create it, so every cycle cron started a shell, the shell failed on the redirect, and the PHP never ran. cron reported success, because the shell it started exited',
+                'FIXED: monitor_agent_health.php is the only thing that maintains firewalls.status, so a firewall silent since noon still read "online" six hours later - and api/schedule_speedtest.php, which selects on that column, kept queueing work for it',
+                'FIXED: The job registry knew six jobs. The crontab carries fourteen. The other eight - including both jobs that died - reported nothing, appeared on no page, and had no state that could look wrong. They all report now',
+                'ADDED: job.stale alerts. The scheduled jobs are what detects everything else, so their own silence raises an incident like any other fault. A job is watched only from its first recorded run: this application does not own the crontab, so an unscheduled job stays quiet rather than alerting forever',
+                'FIXED: A job dead for days displayed as "Running". The Scheduled Jobs page read the recorded status before the age of the last run, and a job killed mid-run leaves "running" behind permanently - the exact state a stopped job is most likely to be in',
+                'ADDED: cron_jobs_overdue(), and 15 assertions covering the arming rule, the two-cycle tolerance, a row stuck at "running", and that every name an entrypoint reports is registered by a migration. The alert evaluator is itself a scheduled job: it reports that the others stopped, and cannot report its own death',
+            ],
+        ],
         [
             'version' => '3.47.0',
             'date' => '2026-09-16',

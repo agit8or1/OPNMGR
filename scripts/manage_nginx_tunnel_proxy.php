@@ -287,6 +287,10 @@ switch ($action) {
         break;
         
     case 'cleanup':
+        // Only the cleanup subcommand is a scheduled run; create and remove
+        // are driven by an operator opening a tunnel.
+        require_once __DIR__ . '/../inc/cron_runs.php';
+        cron_run_begin('nginx_tunnel_cleanup');
         $cleaned = cleanup_orphaned_configs($pdo);
         echo "Cleaned up {$cleaned} orphaned nginx configs\n";
         exit(0);

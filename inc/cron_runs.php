@@ -111,6 +111,7 @@ if (!function_exists('cron_jobs')) {
         foreach ($rows as &$row) {
             $row['stale'] = false;
             $row['never_run'] = empty($row['last_run']);
+            $row['age_seconds'] = null;
 
             $interval = (int) ($row['expected_interval_minutes'] ?? 0);
             if ($interval > 0 && !empty($row['last_run'])) {
@@ -124,5 +125,32 @@ if (!function_exists('cron_jobs')) {
         unset($row);
 
         return $rows;
+    }
+}
+
+if (!function_exists('cron_jobs_overdue')) {
+    /**
+     * The jobs that have stopped running.
+     *
+     * A job is only watched once it has run at least once: this application
+     * does not own the crontab, so it cannot know whether an operator chose to
+     * schedule a given job. The first recorded run arms the check; from then on
+     * silence past two cycles is a fault rather than a preference.
+     *
+     * A row left at 'running' is included the same way. A job that dies without
+     * reaching its shutdown handler - killed, or its host rebooted mid-run -
+     * leaves that status behind forever, and the age of `last_run` is what says
+     * whether it is working or gone.
+     */
+    function cron_jobs_overdue(): array
+    {
+        $overdue = [];
+        foreach (cron_jobs() as $job) {
+            if (!empty($job['stale'])) {
+                $overdue[] = $job;
+            }
+        }
+
+        return $overdue;
     }
 }

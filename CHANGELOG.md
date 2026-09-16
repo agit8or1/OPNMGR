@@ -6,6 +6,61 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.48.0
+**Released**: September 16, 2026 | **Agent**: v1.6.5
+
+### Fixed
+
+**Two scheduled jobs stopped running on 2026-09-13 and nothing said so for three days.**
+Their crontab lines redirect output into a file under `/var/log`. After a rotation the
+user running them could no longer create that file, so every cycle cron started a shell,
+the shell failed on the redirect, and the PHP never ran:
+
+```
+2026-09-16  syslog:  (administrator) CMD (php .../monitor_agent_health.php >> /var/log/agent_health.log 2>&1)
+            file:    /var/log/agent_health.log — does not exist
+            last run: 2026-09-13
+```
+
+cron reported success, because the shell it started exited. `monitor_agent_health.php` is
+the only thing that maintains `firewalls.status`, so a firewall that had been silent since
+noon still read `online` six hours later, and `api/schedule_speedtest.php` — which selects
+on that column — kept queueing work for it.
+
+**The registry only knew the six jobs someone listed.** 3.32.0 gave every cron entrypoint
+a way to report its start, outcome and duration, and wired up the six that were known
+then. The crontab carries fourteen. The other eight — including both jobs that died —
+reported nothing, appeared on no page, and had no state that could look wrong.
+
+**A job dead for days displayed as "Running".** The Scheduled Jobs page read the recorded
+status before the age of the last run. A job killed mid-run, or whose host rebooted,
+leaves `running` behind permanently; that is the exact state a stopped job is most likely
+to be in, and it rendered as a blue "in progress" badge forever.
+
+### Added
+
+- **`job.stale` alerts.** The scheduled jobs are what detects everything else, so their own
+  silence now raises an incident like any other fault, and resolves when the job reports a
+  run. A job is watched only from its first recorded run: this application does not own the
+  crontab and cannot know which jobs an operator chose to schedule, so an unscheduled job
+  stays quiet rather than alerting forever.
+- **The remaining eight entrypoints report themselves** — `nightly_backups`,
+  `monitor_agent_health`, `auto_reset_stale_agents`, `tunnel_health_monitor`,
+  `ssh_access_cleanup`, `nginx_tunnel_cleanup`, `schedule_speedtest` and `run_auto_scans`.
+  For the two scripts that are also operator tools, only the `cleanup` subcommand counts as
+  a scheduled run; for `api/schedule_speedtest.php`, only a CLI invocation does.
+- **`cron_jobs_overdue()`**, and 15 assertions in `tests/scheduled_jobs_test.php` covering
+  the arming rule, the two-cycle tolerance, a row stuck at `running`, the exact shape of
+  this outage, and that every name an entrypoint reports is registered by a migration —
+  a job reporting a name no row carries writes its status to nothing.
+
+### Known limitation
+
+The alert evaluator is itself a scheduled job. It reports that the others have stopped; it
+cannot report its own death. Watching that needs something outside this application.
+
+---
+
 ## Version 3.47.0
 **Released**: September 16, 2026 | **Agent**: v1.6.5
 

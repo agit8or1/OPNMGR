@@ -19,6 +19,12 @@ date_default_timezone_set('America/New_York');
 chdir(dirname(__DIR__));
 
 require_once __DIR__ . '/../inc/bootstrap_agent.php';
+
+// Report this run so a job that stops running is visible. Recording never
+// blocks the job: every failure inside is logged and swallowed.
+require_once __DIR__ . '/../inc/cron_runs.php';
+cron_run_begin('run_auto_scans');
+
 // AI provider settings are loaded from database, no separate file needed
 
 $log_file = '/var/log/opnsense_auto_scans.log';

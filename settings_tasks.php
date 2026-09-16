@@ -36,14 +36,17 @@ function job_state(array $job): array
     if (!empty($job['never_run'])) {
         return ['secondary', 'Never run'];
     }
+    // Overdue outranks the recorded status. A job that was killed mid-run, or
+    // whose host rebooted, leaves 'running' behind permanently; reading that
+    // first showed a job dead for days as busy.
+    if (!empty($job['stale'])) {
+        return ['warning', 'Overdue'];
+    }
     if (($job['last_status'] ?? '') === 'failed') {
         return ['danger', 'Failed'];
     }
     if (($job['last_status'] ?? '') === 'running') {
         return ['info', 'Running'];
-    }
-    if (!empty($job['stale'])) {
-        return ['warning', 'Overdue'];
     }
     return ['success', 'OK'];
 }

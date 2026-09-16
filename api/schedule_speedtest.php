@@ -8,6 +8,14 @@
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
 
+// Report this run so a job that stops running is visible. Recording never
+// blocks the job: every failure inside is logged and swallowed.
+require_once __DIR__ . '/../inc/cron_runs.php';
+if (php_sapi_name() === 'cli') {
+    cron_run_begin('schedule_speedtest');
+}
+
+
 // Require authentication for web requests (cron runs via CLI)
 if (php_sapi_name() !== 'cli') {
     requireLogin();

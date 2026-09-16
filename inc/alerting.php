@@ -50,6 +50,7 @@ if (!defined('ALERT_TYPES')) {
         'update.failed'          => ['severity' => 'warning',  'label' => 'Update failure'],
         'agent.outdated'         => ['severity' => 'info',     'label' => 'Agent outdated'],
         'agent.auth_failures'    => ['severity' => 'critical', 'label' => 'Repeated agent authentication failures'],
+        'job.stale'              => ['severity' => 'warning',  'label' => 'Scheduled job not running'],
     ]);
 }
 
