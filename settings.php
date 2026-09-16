@@ -101,27 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // SMTP actions
-    if (!empty($_POST['save_smtp'])) {
-      $smtp_host = trim($_POST['smtp_host'] ?? '');
-      $smtp_port = trim($_POST['smtp_port'] ?? '587');
-      $smtp_username = trim($_POST['smtp_username'] ?? '');
-      // Blank means 'unchanged'. This used to save the empty string straight
-      // over the stored credential, so opening this dialog to change any other
-      // SMTP field and saving silently wiped the password - and nothing audited
-      // the change, so there was no way to see it had happened.
-      $smtp_password = $_POST['smtp_password'] ?? '';
-      if ($smtp_password === '') {
-          $smtp_password = get_secret_setting('smtp_password');
-      }
-      $smtp_encryption = trim($_POST['smtp_encryption'] ?? 'tls');
-      
-      save_setting('smtp_host',$smtp_host);
-      save_setting('smtp_port',$smtp_port);
-      save_setting('smtp_username',$smtp_username);
-      save_secret_setting('smtp_password', $smtp_password);  // encrypted at rest
-      save_setting('smtp_encryption',$smtp_encryption);
-      $notice = 'SMTP settings saved.';
-    }
+    // SMTP used to be saved here too, from a modal further down this file that
+    // nothing ever opened. It persisted host, port, username, password and
+    // encryption but not the From address or From name - the fields the alert
+    // sender actually reads. Two editors for one set of settings is how
+    // settings.php and smtp_settings.php drifted apart until this one leaked
+    // the stored password into the page and wiped it on a blank save.
+    // smtp_settings.php is the editor now; the SMTP card links to it.
 
     // Proxy settings actions
     if (!empty($_POST['save_proxy'])) {
@@ -359,7 +345,32 @@ include __DIR__ . '/inc/header.php';
           <i class="fas fa-envelope fa-2x text-info"></i>
         </div>
         <h6 class="card-title">SMTP Settings</h6>
-        <p class="card-text text-muted small">Email server</p>
+        <?php
+        // The card said only "Email server", so the page gave no hint which
+        // server. This installation spent a long time pointed at a mail
+        // provider nobody had chosen, failing every delivery, with the Settings
+        // page showing nothing either way. Show the host and whether delivery
+        // is working, so the question is answerable from here.
+        $smtp_configured = trim((string) $smtp_host) !== '';
+        $delivery_ok = true;
+        try {
+            require_once __DIR__ . '/inc/notification_health.php';
+            $delivery_ok = notification_health_problems() === [];
+        } catch (Throwable $e) {
+            // Status is a nicety; never let it break the settings page.
+        }
+        ?>
+        <p class="card-text small mb-2">
+          <?php if ($smtp_configured): ?>
+            <code><?php echo htmlspecialchars($smtp_host); ?></code>
+            <span class="d-block text-muted"><?php echo htmlspecialchars($smtp_username ?: 'no username'); ?></span>
+            <span class="badge bg-<?php echo $delivery_ok ? 'success' : 'danger'; ?> mt-1">
+              <?php echo $delivery_ok ? 'Delivering' : 'Delivery failing'; ?>
+            </span>
+          <?php else: ?>
+            <span class="text-muted">Not configured</span>
+          <?php endif; ?>
+        </p>
         <a href="smtp_settings.php" class="btn btn-info btn-sm w-100">
           <i class="fas fa-cog me-1"></i>Configure
         </a>
@@ -513,60 +524,11 @@ include __DIR__ . '/inc/header.php';
   </div>
 </div>
 
-<!-- SMTP Configuration Modal -->
-<div class="modal fade" id="smtpModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">SMTP Configuration</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <form method="post">
-        <div class="modal-body">
-          <input type="hidden" name="csrf" value="<?php echo csrf_token(); ?>">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label for="smtp_host" class="form-label">SMTP Host</label>
-                <input type="text" class="form-control" id="smtp_host" name="smtp_host" value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="smtp.gmail.com">
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label for="smtp_port" class="form-label">SMTP Port</label>
-                <input type="number" class="form-control" id="smtp_port" name="smtp_port" value="<?php echo htmlspecialchars($smtp_port); ?>" placeholder="587">
-              </div>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label for="smtp_username" class="form-label">SMTP Username</label>
-            <input type="text" class="form-control" id="smtp_username" name="smtp_username" value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="your-email@gmail.com">
-          </div>
-          <div class="mb-3">
-            <label for="smtp_password" class="form-label">SMTP Password</label>
-            <!-- The stored password is never echoed back. type="password" hides it on
-                 screen but the value still sits in the page source, in the browser's
-                 cache and in anything between - smtp_settings.php has always declined
-                 to do this, and this form should not have either. -->
-            <input type="password" class="form-control" id="smtp_password" name="smtp_password" value="" autocomplete="new-password" placeholder="<?php echo $smtp_password !== '' ? 'Unchanged - type to replace' : 'App password or SMTP password'; ?>">
-          </div>
-          <div class="mb-3">
-            <label for="smtp_encryption" class="form-label">Encryption</label>
-            <select class="form-select" id="smtp_encryption" name="smtp_encryption">
-              <option value="tls" <?php echo $smtp_encryption === 'tls' ? 'selected' : ''; ?>>TLS</option>
-              <option value="ssl" <?php echo $smtp_encryption === 'ssl' ? 'selected' : ''; ?>>SSL</option>
-              <option value="none" <?php echo $smtp_encryption === 'none' ? 'selected' : ''; ?>>None</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" name="save_smtp" class="btn btn-primary">Save SMTP Settings</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
+<!-- The SMTP modal that stood here was never opened: nothing in this file or
+     anywhere else referenced #smtpModal. Its handler also saved host, port,
+     username, password and encryption but not the From address or From name,
+     which are the fields the alert sender reads. smtp_settings.php is the one
+     editor now, linked from the SMTP card above. -->
 
 <!-- Backup Retention Configuration Modal -->
 <div class="modal fade" id="backupRetentionModal" tabindex="-1" aria-labelledby="backupRetentionModalLabel" aria-hidden="true">

@@ -6,6 +6,43 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.40.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+### Fixed
+
+- **Two editors for one set of mail settings.** `settings.php` carried an SMTP modal that
+  **nothing ever opened** — no code anywhere referenced `#smtpModal` — behind a handler
+  that saved host, port, username, password and encryption but *not* the From address or
+  From name, which are fields the alert sender actually reads.
+
+  That duplication is how the two drifted: `settings.php` ended up printing the decrypted
+  password into the page and wiping it on a blank save (both fixed in 3.36.0), while
+  `smtp_settings.php` had always handled both correctly. The dead modal and its handler
+  are gone. `smtp_settings.php` is the editor, reachable from the SMTP card in Settings,
+  and it saves all seven fields — verified by round-tripping every one of them and
+  confirming a blank password leaves the stored credential untouched.
+
+- **The Settings SMTP card said only "Email server".** It named no server, so a manager
+  pointed at a mail provider nobody had chosen looked identical to one correctly
+  configured. The card now shows the host, the username, and whether delivery is actually
+  working — the last from the same signal that raises the delivery banner.
+
+### Changed
+
+- **Placeholders no longer name a mail provider.** Every SMTP field hinted at Gmail —
+  `smtp.gmail.com`, `your-email@gmail.com`, `noreply@yourdomain.com`. A placeholder reads
+  as a recommendation, and these made a wrongly configured installation look deliberate.
+
+### Added
+
+- **`tests/smtp_settings_test.php`** (16 assertions, in CI). One editor must save all
+  seven fields; `settings.php` must save none of them; the dead modal must stay gone; the
+  card must show host and delivery state; and no placeholder may name a provider.
+  Verified to fail when the modal is put back.
+
+---
+
 ## Version 3.39.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

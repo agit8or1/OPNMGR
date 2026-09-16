@@ -224,6 +224,11 @@ jobs:
       - name: Endpoint authorisation suite
         run: php tests/endpoint_authz_test.php
 
+      # Two editors for one set of mail settings is how they drifted apart,
+      # one of them leaking the stored password and wiping it on a blank save.
+      - name: SMTP settings suite
+        run: php tests/smtp_settings_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

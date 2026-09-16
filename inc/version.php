@@ -44,6 +44,18 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.40.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'One Place To Set The Mail Server',
+            'changes' => [
+                'FIXED: settings.php carried an SMTP modal that nothing ever opened - no code referenced #smtpModal - behind a handler that saved host, port, username, password and encryption but not the From address or From name, which the alert sender reads. Removed; smtp_settings.php is the one editor, reachable from the SMTP card in Settings',
+                'FIXED: The Settings SMTP card said only "Email server" and gave no hint which one. It shows the configured host, the username and whether delivery is working, so an installation pointed at a server nobody chose is visible from the page rather than only in a log',
+                'CHANGED: Every SMTP placeholder named a specific mail provider - smtp.gmail.com, your-email@gmail.com. That reads as a recommendation, and made a wrongly configured install look deliberate. They are neutral now',
+                'ADDED: tests/smtp_settings_test.php requires that one editor saves all seven fields, that settings.php no longer saves any of them, that the card shows host and delivery state, and that no placeholder names a provider',
+            ],
+        ],
+        [
             'version' => '3.39.0',
             'date' => '2026-09-15',
             'type' => 'minor',

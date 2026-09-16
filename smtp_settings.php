@@ -134,7 +134,7 @@ include __DIR__ . '/inc/header.php';
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">SMTP Host</label>
-                            <input type="text" name="smtp_host" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="smtp.gmail.com" required>
+                            <input type="text" name="smtp_host" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_host); ?>" placeholder="mail.example.com" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">Port</label>
@@ -153,7 +153,7 @@ include __DIR__ . '/inc/header.php';
                     <div class="row g-2 mt-1">
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">Username</label>
-                            <input type="text" name="smtp_username" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="your-email@gmail.com">
+                            <input type="text" name="smtp_username" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_username); ?>" placeholder="the mailbox OPNManager authenticates as">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">Password</label>
@@ -166,7 +166,7 @@ include __DIR__ . '/inc/header.php';
                     <div class="row g-2 mt-1">
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">From Email</label>
-                            <input type="email" name="smtp_from_email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_from_email); ?>" placeholder="noreply@yourdomain.com">
+                            <input type="email" name="smtp_from_email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($smtp_from_email); ?>" placeholder="noreply@example.com">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="font-size: 0.85rem;">From Name</label>
