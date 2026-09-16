@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.6.3"
+AGENT_VERSION="1.6.5"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
@@ -864,10 +864,9 @@ except:
                         echo "$result" > /tmp/cmd_${cmd_id}_result.txt
 
                         # Send speedtest results to server
-                        $CURL_CMD -s -m 10 -X POST \
-                            -H "Content-Type: application/json" \
-                            -d "{\"hardware_id\":\"$HARDWARE_ID\",\"agent_version\":\"$AGENT_VERSION\",\"speedtest_result\":$result}" \
-                            "${SERVER_URL}/agent_checkin.php" > /dev/null 2>&1
+                        post_to_manager "/agent_checkin.php" \
+                            "{\"hardware_id\":\"$HARDWARE_ID\",\"agent_version\":\"$AGENT_VERSION\",\"speedtest_result\":$result}" \
+                            > /dev/null 2>&1
                     else
                         # Execute regular shell command with timeout
                         # Limit output and execution time to prevent hangs
@@ -902,10 +901,9 @@ except:
                 result_b64=$(echo "$result" | base64 2>/dev/null | tr -d '\n')
 
                 # Report result back to server
-                $CURL_CMD -s -m 10 -X POST \
-                    -H "Content-Type: application/json" \
-                    -d "{\"hardware_id\":\"$HARDWARE_ID\",\"command_id\":$cmd_id,\"status\":\"$cmd_status\",\"result\":\"$result_b64\"}" \
-                    "${SERVER_URL}/agent_checkin.php" > /dev/null 2>&1
+                post_to_manager "/agent_checkin.php" \
+                    "{\"hardware_id\":\"$HARDWARE_ID\",\"command_id\":$cmd_id,\"status\":\"$cmd_status\",\"result\":\"$result_b64\"}" \
+                    > /dev/null 2>&1
 
                 log_message "Command $cmd_id $cmd_status"
             fi
@@ -991,6 +989,111 @@ main() {
     fi
 
     CHECKIN_URL="${SERVER_URL}/agent_checkin.php"
+
+# ---------------------------------------------------------------------------
+# Request credentials and signing
+# ---------------------------------------------------------------------------
+#
+# The server has been issuing each agent an api_key and an api_secret in the
+# check-in response since 3.12.0, with the note "Store these values and send
+# api_key with every request. Sign requests once supported." No agent release
+# ever did either: this agent authenticated with hardware_id alone - a value
+# derived from the hardware, not a secret - and the server's whole signature
+# verification path had no client.
+#
+# Credentials are adopted first and used afterwards. On the first check-in after
+# an upgrade nothing is sent that was not sent before; the response is stored,
+# and every check-in after that is signed. That ordering is what makes the
+# upgrade safe: an agent never sends a signature it cannot yet compute.
+
+API_KEY_FILE="/usr/local/etc/opnmanager_api_key"
+API_SECRET_FILE="/usr/local/etc/opnmanager_api_secret"
+
+# Persist a credential with permissions that keep it off the rest of the box.
+store_credential() {
+    _file="$1"
+    _value="$2"
+    [ -z "$_value" ] && return 0
+    [ "$(cat "$_file" 2>/dev/null)" = "$_value" ] && return 0
+    ( umask 077; printf '%s' "$_value" > "$_file" ) 2>/dev/null || return 1
+    chmod 600 "$_file" 2>/dev/null
+    log_message "Stored updated credential in $_file"
+}
+
+# Pull api_key / api_secret out of a check-in response, if it carried them.
+adopt_credentials() {
+    _response="$1"
+    echo "$_response" | grep -q '"agent_credentials"' || return 0
+
+    _key=$(echo "$_response" | sed -n 's/.*"api_key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    _sec=$(echo "$_response" | sed -n 's/.*"api_secret"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+
+    [ -n "$_key" ] && store_credential "$API_KEY_FILE" "$_key"
+    [ -n "$_sec" ] && store_credential "$API_SECRET_FILE" "$_sec"
+}
+
+# Signing headers for one request, or nothing if we cannot sign yet.
+#
+# Canonical string, exactly as inc/agent_auth.php builds it:
+#     METHOD \n PATH \n TIMESTAMP \n NONCE \n SHA256HEX(BODY)
+# HMAC-SHA256 with the api_secret, lowercase hex. No trailing newline - printf,
+# never echo.
+signing_headers() {
+    _method="$1"
+    _path="$2"
+    _body="$3"
+
+    _secret=$(cat "$API_SECRET_FILE" 2>/dev/null)
+    [ -z "$_secret" ] && return 0
+    command -v openssl >/dev/null 2>&1 || return 0
+
+    _ts=$(date +%s)
+    _nonce=$(head -c 12 /dev/urandom 2>/dev/null | od -An -tx1 | tr -d ' \n')
+    [ -z "$_nonce" ] && return 0
+
+    _bodyhash=$(printf '%s' "$_body" | openssl dgst -sha256 -r 2>/dev/null | cut -d' ' -f1)
+    [ -z "$_bodyhash" ] && return 0
+
+    _sig=$(printf '%s\n%s\n%s\n%s\n%s' "$_method" "$_path" "$_ts" "$_nonce" "$_bodyhash" \
+           | openssl dgst -sha256 -hmac "$_secret" -r 2>/dev/null | cut -d' ' -f1)
+    [ -z "$_sig" ] && return 0
+
+    printf -- '-H\nX-OPNMGR-Timestamp: %s\n-H\nX-OPNMGR-Nonce: %s\n-H\nX-OPNMGR-Signature: %s\n' \
+        "$_ts" "$_nonce" "$_sig"
+}
+
+# Every POST to the manager goes through here.
+#
+# Presenting the api_key ratchets it: from the first request that carries it,
+# the server requires it on *every* endpoint for this firewall. The check-in was
+# converted first and the other two POSTs were not, so command results and
+# speedtest results were rejected as api_key_missing the moment the ratchet
+# engaged - the queue filled with commands stuck at "sent". One function now, so
+# a future endpoint cannot be added without credentials by omission.
+post_to_manager() {
+    _path="$1"
+    _body="$2"
+    _timeout="${3:-10}"
+
+    _url="${SERVER_URL}${_path}"
+    _key=$(cat "$API_KEY_FILE" 2>/dev/null)
+
+    _sig=$(signing_headers "POST" "$_path" "$_body")
+    _old_ifs="$IFS"
+    IFS='
+'
+    set -- $_sig
+    IFS="$_old_ifs"
+
+    $CURL_CMD -s -m "$_timeout" -X POST \
+        -H "Content-Type: application/json" \
+        ${_key:+-H "X-OPNMGR-API-Key: $_key"} \
+        "$@" \
+        -d "$_body" \
+        "$_url" 2>&1
+}
+
+
 
     log_message "Starting OPNManager Agent v$AGENT_VERSION"
     log_message "Server: $SERVER_URL"
@@ -1085,10 +1188,13 @@ main() {
         fi
 
         # Perform check-in
-        RESPONSE=$($CURL_CMD -s -m 30 -X POST \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "$CHECKIN_URL" 2>&1)
+        # The path is what the signature covers, not the full URL - the server
+        # signs over PATH so a rewriting proxy in front of it does not break
+        # verification.
+        CHECKIN_PATH=$(echo "$CHECKIN_URL" | sed -e 's|^[a-z]*://[^/]*||')
+        [ -z "$CHECKIN_PATH" ] && CHECKIN_PATH="/agent_checkin.php"
+
+        RESPONSE=$(post_to_manager "$CHECKIN_PATH" "$PAYLOAD" 30)
         CURL_EXIT=$?
 
         if [ $CURL_EXIT -ne 0 ]; then
@@ -1099,6 +1205,9 @@ main() {
             if echo "$RESPONSE" | grep -q '"success"'; then
                 ERROR_COUNT=0
                 log_message "Check-in successful"
+                # Adopt before using: credentials offered in this response are
+                # stored now and signed with from the next check-in onward.
+                adopt_credentials "$RESPONSE"
                 process_response "$RESPONSE"
             else
                 ERROR_COUNT=$((ERROR_COUNT + 1))

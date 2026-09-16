@@ -6,6 +6,70 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.46.0
+**Released**: September 15, 2026 | **Agent**: v1.6.5
+
+### Added
+
+**The agent signs its requests.** The server has verified HMAC-SHA256 signatures since
+3.12.0 — freshness window, nonce replay rejection, per-firewall ratchet, three policy
+modes — and has been handing every agent its signing secret and the canonical string with
+the note *"Sign requests once supported."* No agent release ever did. Until now TLS was
+the only thing protecting command delivery, and anyone holding a firewall's `hardware_id`
+and `api_key` could impersonate it.
+
+The agent also **adopts the credentials the server has been sending it all along**. It
+previously authenticated with `hardware_id` alone — a value derived from the hardware,
+not a secret. It now stores the key and secret at `0600` and presents the key on every
+request.
+
+**Credentials are adopted before they are used.** The first check-in after an upgrade
+sends nothing new and stores the response; every check-in after that is signed. An agent
+never sends a signature it cannot yet compute — which matters, because `compatibility`
+mode verifies a signature *whenever one is present*, so a malformed one refuses the
+check-in and the firewall goes quiet.
+
+### Fixed
+
+**1.6.4 converted only the check-in, and that was not enough.** Presenting the api_key
+*ratchets* it: from the first request that carries it, the server requires it on **every**
+endpoint for that firewall. The agent has three POST sites, and command results and
+speedtest results still sent `hardware_id` alone — so they were rejected as
+`api_key_missing` and the queue filled with commands stuck at `sent`. The audit log caught
+it in two consecutive lines:
+
+```
+21:34:29  agent.credentials.confirmed   key authentication is now mandatory for this firewall
+21:34:30  agent.auth.failed             api_key_missing
+```
+
+This was found **on one firewall during a staged rollout**, before the fleet was ever
+offered the update. Had 1.6.4 been advertised, both firewalls would have lost command
+result reporting, and the fix would have had to travel through the channel that was
+broken.
+
+1.6.5 routes all three POSTs through a single credentialed helper. **No raw
+`curl … -X POST` remains in the agent**, and the suite asserts that, so a new endpoint
+cannot be added without credentials by omission — which is precisely how this happened.
+
+### Added
+
+- **`tests/agent_request_signing_test.php`** (17 assertions, in CI). It does not inspect
+  the shell for plausible-looking code: it extracts the agent's own functions, runs them,
+  and checks the result against the server's computation. Covers that no signature is
+  produced before credentials exist, that the secret is written unreadable to others, that
+  each request gets a fresh nonce (a repeated one is rejected as a replay, refusing the
+  agent), and that no POST bypasses the helper.
+
+### Changed
+
+- **The 3.43.0 assertion that no released agent could sign failed the moment 1.6.4 was
+  built** — which is exactly what it was written for. It recorded a premise and demanded
+  the premise be revisited when it changed. The assertion and the banner wording, which
+  said signing was "server-side only", were updated together.
+
+---
+
 ## Version 3.45.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

@@ -50,12 +50,14 @@ foreach (glob($agentDir . '/*.sh') ?: [] as $f) {
 }
 check('the agent source was found', $agentSrc !== '');
 
-// If a future agent gains signing, this assertion should be updated rather than
-// deleted - it records why the banner exists.
-check('no released agent computes a signature',
-    !preg_match('/X-OPNMGR-Signature/i', $agentSrc)
-    && !preg_match('/hmac/i', $agentSrc),
-    'if the agent can now sign, update agent_signing_status() and this suite together');
+// This assertion used to read "no released agent computes a signature", and it
+// failed the moment 1.6.4 was built - which is what it was for. The premise has
+// changed, so the assertion changed with it rather than being deleted: the agent
+// must now sign, and the banner's wording had to be corrected at the same time.
+check('the agent computes a signature',
+    preg_match('/X-OPNMGR-Signature/i', $agentSrc) === 1
+    && preg_match('/openssl dgst -sha256 -hmac/i', $agentSrc) === 1,
+    'signing landed in agent 1.6.4; if it is removed, agent_signing_status() needs revisiting');
 
 // ---------------------------------------------------------------------------
 // 2. The status helper reports rather than overrides.
@@ -97,8 +99,9 @@ check('the banner names the setting', strpos($src, 'agent_auth_mode') !== false)
 check('the banner gives the way back',
     strpos($src, 'compatibility') !== false && stripos($src, 'restore check-ins') !== false,
     'a refused fleet cannot fix itself; the operator needs the exact remedy');
-check('the banner states that no agent implements signing',
-    stripos($src, 'server-side') !== false);
+check('the banner says which agent version signs',
+    strpos($src, '1.6.4') !== false,
+    'an operator needs to know what to upgrade to, not just that something is wrong');
 
 $header = (string) @file_get_contents($root . '/inc/header.php');
 check('the banner is rendered from the shared header',

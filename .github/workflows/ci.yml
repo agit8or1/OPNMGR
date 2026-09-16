@@ -256,6 +256,12 @@ jobs:
       - name: Telemetry retention suite
         run: php tests/telemetry_retention_test.php
 
+      # A signature computed wrongly is worse than none: compatibility mode
+      # verifies whenever one is present, so a malformed one refuses the
+      # check-in. This runs the agent's own shell functions.
+      - name: Agent request signing suite
+        run: php tests/agent_request_signing_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

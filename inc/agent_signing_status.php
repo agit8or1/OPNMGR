@@ -94,10 +94,11 @@ if (!function_exists('agent_signing_banner')) {
              . (int) $cannot . ' of ' . (int) $s['total'] . ' firewalls run an agent that '
              . 'cannot produce a signature. Those agents are being refused at check-in and '
              . 'the fleet will go quiet.'
-             . '<div class="small mt-2">No released agent implements request signing: the '
-             . 'verification, the policy modes and the secret provisioning are server-side '
-             . 'only. Set <code>agent_auth_mode</code> back to <code>compatibility</code> '
-             . 'in the <code>settings</code> table to restore check-ins.</div>'
+             . '<div class="small mt-2">Request signing arrived in agent 1.6.4; any agent '
+             . 'older than that cannot produce a signature, and an agent that has never '
+             . 'signed has not yet proven it can. Upgrade the affected firewalls, or set '
+             . '<code>agent_auth_mode</code> back to <code>compatibility</code> in the '
+             . '<code>settings</code> table to restore check-ins.</div>'
              . '</div>';
     }
 }

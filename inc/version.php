@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Own Address'); }
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.3'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.5'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-05'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
@@ -43,6 +43,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.46.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'The Agent Signs',
+            'changes' => [
+                'ADDED: Agent v1.6.5 signs its requests. The server has verified HMAC-SHA256 signatures since 3.12.0 and handed every agent its secret with the note "Sign requests once supported" - no agent release ever did, so TLS was the only thing protecting command delivery and anyone holding a hardware_id and api_key could impersonate a firewall',
+                'ADDED: The agent adopts the api_key and api_secret the server has been sending it all along, stores them 0600, and presents the key on every request. It previously authenticated with hardware_id alone - a value derived from the hardware, not a secret',
+                'CHANGED: Credentials are adopted before they are used. The first check-in after an upgrade sends nothing new and stores the response; every check-in after that is signed. An agent never sends a signature it cannot yet compute, which matters because compatibility mode verifies a signature whenever one is present - a malformed one would refuse the check-in',
+                'FIXED: 1.6.4 converted only the check-in. Presenting the key ratchets it, so the server immediately required it on every endpoint, and command and speedtest results were rejected as api_key_missing - the queue filled with commands stuck at "sent". Found on one firewall during a staged rollout, before the fleet was offered the update. All three POSTs go through one credentialed helper in 1.6.5 and no raw POST remains',
+                'ADDED: tests/agent_request_signing_test.php extracts the agent\'s own shell functions, runs them, and checks the signature against the server computation - including that no signature is produced before credentials exist, that each request gets a fresh nonce, and that no POST bypasses the helper',
+                'CHANGED: The 3.43.0 assertion that no released agent could sign failed the moment 1.6.4 was built, which is what it was for. It and the banner wording were updated together',
+            ],
+        ],
         [
             'version' => '3.45.0',
             'date' => '2026-09-15',
