@@ -245,6 +245,12 @@ jobs:
       - name: Agent signing suite
         run: php tests/agent_signing_test.php
 
+      # Two properties that hold today and are easy to lose one line at a time:
+      # no query built by interpolation, and nothing a firewall reports
+      # rendered unescaped in an administrator's browser.
+      - name: Injection guard suite
+        run: php tests/injection_guard_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and

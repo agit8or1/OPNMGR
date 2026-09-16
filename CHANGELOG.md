@@ -6,6 +6,45 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.44.0
+**Released**: September 15, 2026 | **Agent**: v1.6.3
+
+This release fixes nothing. Two audits came back clean, and the result is pinned so it
+stays that way.
+
+### Audited
+
+- **SQL injection — none.** Every query reaching user input uses a prepared statement
+  with placeholders. Five places build a query by interpolation, and each was read
+  individually: `LIMIT {$limit}` where `$limit` is `int`-typed and clamped to 1..200; two
+  `{$where}` fragments that are ternaries between two literal strings; and table and
+  column names from hardcoded call sites in two scripts. None takes a value from a
+  request.
+
+- **Stored cross-site scripting from the fleet — none.** This is the one worth checking
+  carefully: a firewall's check-in payload is *not* trusted input. The box belongs to a
+  customer, it may be compromised, and what it reports — WAN addresses, interface names,
+  OPNsense version, uptime — is rendered in an administrator's browser. Every
+  agent-supplied field is escaped wherever it appears. The two lines that looked like
+  exceptions were `about.php` rendering the in-app changelog array and `generate_pdf.php`
+  rendering `platform_versions`; neither is agent data, and both happen to use a key named
+  `version`.
+
+### Added
+
+- **`tests/injection_guard_test.php`** (6 assertions, in CI). Both properties hold today
+  and are the kind that get lost one line at a time.
+
+  The interpolation allowlist names the five reviewed files explicitly rather than
+  matching a pattern, so removing an entry costs nothing and adding one is a decision
+  somebody has to make deliberately. Each half also asserts it examined a plausible number
+  of candidates, so neither can pass by scanning nothing.
+
+  Verified by planting a vulnerable file of each kind — a `query()` with a raw `$_GET`
+  value, and an `echo $firewall['wan_ip']` — and confirming both halves fail.
+
+---
+
 ## Version 3.43.0
 **Released**: September 15, 2026 | **Agent**: v1.6.3
 

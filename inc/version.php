@@ -44,6 +44,17 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.44.0',
+            'date' => '2026-09-15',
+            'type' => 'minor',
+            'title' => 'Nothing Wrong, Pinned',
+            'changes' => [
+                'AUDITED: SQL injection. Every query reaching user input uses a prepared statement with placeholders. Five places interpolate, and each was read: an int clamped to 1..200, two ternaries between literal strings, and table names from hardcoded lists. Nothing to fix',
+                'AUDITED: Stored cross-site scripting from the fleet. A firewall\'s check-in payload is not trusted input - the box belongs to a customer and may be compromised - and what it reports is shown in an administrator\'s browser. Every agent-supplied field is escaped wherever it is rendered. The two apparent hits were the in-app changelog and platform_versions, neither of which comes from an agent',
+                'ADDED: tests/injection_guard_test.php pins both, because they are easy to lose one line at a time. The interpolation allowlist names the five reviewed files, so removing one is free and adding one is a decision someone has to make. Verified by planting a vulnerable file of each kind and watching both halves fail',
+            ],
+        ],
+        [
             'version' => '3.43.0',
             'date' => '2026-09-15',
             'type' => 'minor',
