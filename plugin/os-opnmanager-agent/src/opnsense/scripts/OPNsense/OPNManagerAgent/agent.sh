@@ -25,9 +25,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.6.6"
+AGENT_VERSION="1.6.7"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
+# Update transcripts get their own file. The installer's output used to be
+# appended straight into LOG_FILE, which buried the agent's own entries under a
+# hundred lines of install chatter at exactly the moment they mattered most.
+UPDATE_LOG_FILE="/var/log/opnmanager_agent_update.log"
 PID_FILE="/var/run/opnmanager_agent.pid"
 HARDWARE_ID_FILE="/usr/local/etc/opnmanager_hardware_id"
 MAX_LOG_SIZE=10485760  # 10MB
@@ -37,21 +41,48 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 export PATH
 
 # Log rotation
-rotate_log() {
-    if [ -f "$LOG_FILE" ]; then
-        local size=$(stat -f%z "$LOG_FILE" 2>/dev/null || echo 0)
+rotate_one_log() {
+    if [ -f "$1" ]; then
+        local size=$(stat -f%z "$1" 2>/dev/null || echo 0)
         if [ "$size" -gt "$MAX_LOG_SIZE" ]; then
-            mv "$LOG_FILE" "$LOG_FILE.old" 2>/dev/null
-            touch "$LOG_FILE"
-            chmod 600 "$LOG_FILE"
+            mv "$1" "$1.old" 2>/dev/null
+            touch "$1"
+            chmod 600 "$1"
         fi
     fi
+}
+
+rotate_log() {
+    rotate_one_log "$LOG_FILE"
+    rotate_one_log "$UPDATE_LOG_FILE"
 }
 
 # Logging with timestamp
 log_message() {
     rotate_log
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [$AGENT_VERSION] $1" >> "$LOG_FILE"
+    # Collapse newlines, carriage returns and tabs: one call must produce exactly
+    # one line. Multi-line values were written in raw, so the body of a scripted
+    # command became dozens of unprefixed lines that read like log entries and
+    # were not - which made `tail` useless and, worse, made the log unsafe to
+    # grep. The watchdog decides whether the agent is healthy by grepping this
+    # file, so a command body could push real entries out of its window or
+    # supply a matching line of its own.
+    printf '%s [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$AGENT_VERSION" \
+        "$(printf '%s' "$1" | tr '\n\r\t' '   ')" >> "$LOG_FILE"
+}
+
+# A one-line, bounded description of a command for the log. The full body is
+# deliberately not logged: it can be arbitrarily long and can carry credentials,
+# and the result is reported to the manager anyway, which is where it belongs.
+command_summary() {
+    local body="$1"
+    local bytes=$(printf '%s' "$body" | wc -c | tr -d ' ')
+    local lines=$(printf '%s\n' "$body" | wc -l | tr -d ' ')
+    local excerpt=$(printf '%s' "$body" | tr '\n\r\t' '   ' | cut -c1-100)
+    if [ "$bytes" -gt 100 ]; then
+        excerpt="${excerpt}..."
+    fi
+    printf '%s line(s), %s byte(s): %s' "$lines" "$bytes" "$excerpt"
 }
 
 # Generate hardware ID based on system identifiers
@@ -752,8 +783,9 @@ except:
     print('/usr/local/sbin/opnsense-update -bkpf')
 " 2>/dev/null)
 
-        log_message "Executing update command: $update_cmd"
-        nohup sh -c "$update_cmd >> $LOG_FILE 2>&1" > /dev/null 2>&1 &
+        log_message "Executing update command ($(command_summary "$update_cmd"))"
+        log_message "Update transcript: $UPDATE_LOG_FILE"
+        nohup sh -c "echo \"=== $(date '+%Y-%m-%d %H:%M:%S') update command ===\" >> $UPDATE_LOG_FILE; $update_cmd >> $UPDATE_LOG_FILE 2>&1" > /dev/null 2>&1 &
     fi
 
     # Check for agent update notification
@@ -787,8 +819,13 @@ except:
 
         if [ -n "$update_cmd" ]; then
             log_message "Agent update available: v$new_version (current: $AGENT_VERSION)"
-            log_message "Executing agent update command..."
-            nohup sh -c "$update_cmd" > /dev/null 2>&1 &
+            log_message "Executing agent update ($(command_summary "$update_cmd"))"
+            log_message "Update transcript: $UPDATE_LOG_FILE"
+            # This is the path that actually performs a fleet agent upgrade, and
+            # it discarded all of its output. When 1.6.6 installed itself there
+            # was no transcript of it anywhere - the only evidence the upgrade
+            # had happened was the version changing in a later check-in.
+            nohup sh -c "echo \"=== $(date '+%Y-%m-%d %H:%M:%S') self-update to v$new_version ===\" >> $UPDATE_LOG_FILE; $update_cmd >> $UPDATE_LOG_FILE 2>&1" > /dev/null 2>&1 &
         fi
     fi
 
@@ -849,7 +886,7 @@ except:
         if [ -n "$cmd_id" ] && [ -n "$cmd_data_b64" ]; then
             cmd_data=$(echo "$cmd_data_b64" | base64 -d 2>/dev/null)
             if [ -n "$cmd_data" ]; then
-                log_message "Executing command $cmd_id: $cmd_data"
+                log_message "Executing command $cmd_id ($(command_summary "$cmd_data"))"
 
                 # Check for special commands
                 # Execute command with error handling and timeout

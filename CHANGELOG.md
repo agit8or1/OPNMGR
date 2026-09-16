@@ -6,6 +6,65 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.50.0
+**Released**: September 16, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**`tail` on the agent log returned script text instead of what the agent was doing.**
+
+Found while verifying the 1.6.6 watchdog. The check asked for the last twelve log
+lines and got back the verification script itself:
+
+```
+--- last 12 agent log lines ---
+ps -o pid,command -ax | grep "daemon: /usr/bin/true" | grep -v grep
+pkill -f "daemon: /usr/bin/true" 2>/dev/null
+rm -f /tmp/opnmgr-probe.pid
+...
+```
+
+The agent logged the full body of every queued command, raw:
+
+```sh
+log_message "Executing command $cmd_id: $cmd_data"
+```
+
+A scripted command - the nightly backup, an install, any of the probes in
+`scripts/` - therefore wrote dozens of unprefixed lines into the log that read
+like entries and were not. The installer's output was appended into the same
+file on top of that.
+
+This was not only cosmetic. **The watchdog decides whether the agent is healthy
+by grepping this log** for a recent successful check-in, so a logged command body
+could push real entries out of its window or contribute a matching line of its
+own. Command bodies can also carry credentials, and the command's result is
+reported to the manager regardless, which is where it belongs.
+
+- **`log_message()` collapses newlines, carriage returns and tabs**, so one call
+  is exactly one line whatever it is handed. That invariant, rather than the
+  discipline of each call site, is what makes the log safe to grep.
+- **`command_summary()`** logs a bounded description in place of the body - line
+  count, byte count, and a 100 character excerpt. A 50KB single-line command is
+  still one bounded entry.
+- **Update transcripts moved to `/var/log/opnmanager_agent_update.log`**, rotated
+  on the same 10MB cap, with a one-line pointer left in the agent log. Installer
+  output was burying the agent's own entries at the moment they mattered most.
+- **The agent self-update path no longer discards its output.** That is the path
+  that performs an actual fleet upgrade, and it wrote nothing anywhere: when
+  1.6.6 installed itself on fw48 the only evidence was the version changing in a
+  later check-in.
+
+### Added
+
+- `tests/agent_log_hygiene_test.php` extracts the agent's own logging functions
+  and runs them against a realistic multi-line command, asserting that three
+  calls produce three lines, that every line carries a timestamp prefix, that a
+  watchdog-style grep still finds both check-ins either side of a logged command,
+  and that the body never reaches the log verbatim.
+
+---
+
 ## Version 3.49.0
 **Released**: September 16, 2026 | **Agent**: v1.6.6
 

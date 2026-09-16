@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Nothing Was Watching'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One Entry, One Line'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Nothing Was Watc
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.6'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.7'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-16'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.50.0',
+            'date' => '2026-09-16',
+            'type' => 'minor',
+            'title' => 'One Entry, One Line',
+            'changes' => [
+                'FIXED: The agent logged the full body of every queued command, raw. A scripted command - the nightly backup, an install, any of the probes in scripts/ - wrote dozens of unprefixed lines into the log that read like entries and were not, so tail on the agent log returned script text instead of what the agent had been doing. Found while verifying the 1.6.6 watchdog: tail -12 of the log returned the verification script rather than any of the agent activity it was asked about',
+                'FIXED: This was not only cosmetic. The watchdog decides whether the agent is healthy by grepping that log for a recent successful check-in, so a logged command body could push real entries out of its window or contribute a matching line of its own. Command bodies can also carry credentials, and the result is reported to the manager regardless, which is where it belongs',
+                'CHANGED: log_message() collapses newlines, carriage returns and tabs, so one call is exactly one line whatever it is handed. That invariant, not the call sites, is what makes the log safe to grep',
+                'ADDED: command_summary() logs a bounded description - line count, byte count, and a 100 character excerpt - in place of the body. A 50KB single-line command is still one bounded entry',
+                'FIXED: Installer output was appended straight into the agent log, burying the agent\'s own entries under install chatter at the moment they mattered most. Update transcripts now go to /var/log/opnmanager_agent_update.log, rotated on the same 10MB cap, with a one-line pointer left in the agent log',
+                'FIXED: The agent self-update path - the one that actually performs a fleet upgrade - discarded all of its output. When 1.6.6 installed itself on fw48 there was no transcript of it anywhere; the only evidence was the version changing in a later check-in. It writes to the transcript file now',
+                'ADDED: tests/agent_log_hygiene_test.php extracts the agent\'s own logging functions and runs them against a realistic multi-line command, asserting three calls produce three lines, that every line carries a timestamp prefix, that a watchdog-style grep still finds both check-ins either side of a logged command, and that the body never reaches the log verbatim',
+            ],
+        ],
         [
             'version' => '3.49.0',
             'date' => '2026-09-16',
