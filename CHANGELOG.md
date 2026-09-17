@@ -6,6 +6,36 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.67.1
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **Documentation pages rendered in the right three-quarters of the window.**
+
+  ```php
+  <div class="col-md-3">
+      <?php include __DIR__ . '/inc/sidebar.php'; ?>   // "Component - DISABLED"
+  </div>
+  ```
+
+  `inc/sidebar.php` has been disabled for some time - its entire body is a
+  `display:none` div - but an empty quarter-width column still occupies its
+  quarter. Centred now, with a 1140px measure: documentation set to the full
+  width of a wide monitor is its own kind of unreadable.
+
+  ```
+  gapLeft: 206px    gapRight: 206px
+  ```
+
+- **The documentation card carried a fixed slate palette** (`#2c3e50`,
+  `#34495e`, `#ecf0f1`) rather than theme variables, so on the light theme it
+  rendered a dark card on a pale page, with the muted intro line near-black on
+  near-black. That is the second page today whose hardcoded dark-theme colours
+  only became visible once there was enough text to read.
+
+---
+
 ## Version 3.67.0
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 

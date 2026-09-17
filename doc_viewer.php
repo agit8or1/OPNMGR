@@ -32,15 +32,23 @@ $page_title = $page['title'];
 include __DIR__ . '/inc/header.php';
 ?>
 
+<?php
+// The layout reserved a col-md-3 for inc/sidebar.php, which has been disabled
+// for some time - its entire body is a display:none div. An empty quarter-width
+// column still occupies its quarter, so every documentation page rendered in the
+// right three-quarters of the window and read as pushed to one side.
+//
+// Centred with a readable measure instead. Documentation set to the full width
+// of a wide monitor is its own kind of unreadable.
+?>
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-md-3">
-            <?php include __DIR__ . '/inc/sidebar.php'; ?>
-        </div>
-
-        <div class="col-md-9">
-            <div class="card" style="background: #2c3e50; border: 1px solid #34495e;">
-                <div class="card-header" style="background: #34495e; border-bottom: 2px solid #3498db;">
+    <div class="row justify-content-center">
+        <div class="col-12" style="max-width: 1140px;">
+            <?php // Theme variables rather than the fixed slate palette this carried: on
+     // the light theme it rendered a dark card on a pale page, and the muted
+     // intro line came out near-black on near-black. ?>
+            <div class="card" style="background: var(--bg-surface); border: 1px solid var(--border);">
+                <div class="card-header" style="background: var(--bg-surface-2, var(--bg-surface)); border-bottom: 2px solid var(--accent);">
                     <h3 class="card-title">
                         <?php
                         // Icon based on category
@@ -54,7 +62,7 @@ include __DIR__ . '/inc/header.php';
                         <i class="fas <?= $icon ?> me-2"></i><?= htmlspecialchars($page['title']) ?>
                     </h3>
                 </div>
-                <div class="card-body" style="background: #2c3e50; color: #ecf0f1;">
+                <div class="card-body" style="background: var(--bg-surface); color: var(--text-primary);">
                     <?php
                     // Additional data for specific pages
                     if ($pageKey === 'about') {

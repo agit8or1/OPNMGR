@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'No TLS To Renew For'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Column Reserved For Nothing'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.67.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'A Column Reserved For Nothing',
+            'changes' => [
+                'FIXED: Documentation pages rendered in the right three-quarters of the window. The layout reserved a col-md-3 for inc/sidebar.php, which has been disabled for some time - its entire body is a display:none div - and an empty quarter-width column still occupies its quarter. Centred now, with a 1140px measure, because documentation set to the full width of a wide monitor is its own kind of unreadable',
+                'FIXED: The documentation card carried a fixed slate palette (#2c3e50, #34495e, #ecf0f1) rather than theme variables, so on the light theme it rendered a dark card on a pale page with the muted intro line near-black on near-black. That is the second page today whose hardcoded dark-theme colours only showed once there was enough text to read',
+            ],
+        ],
         [
             'version' => '3.67.0',
             'date' => '2026-09-17',
