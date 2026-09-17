@@ -102,33 +102,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get all configured providers
 $providers = db()->query("SELECT * FROM ai_settings ORDER BY created_at DESC")->fetchAll();
 
-// Available AI providers and their models
+// Available AI providers, their suggested models, and how to discover the rest.
+//
+// This was a flat list of model ids that went stale where it stood: it still
+// offered gpt-4, claude-3-opus-20240229 and gemini-pro long after those stopped
+// being the ones anybody would choose, and offered no way to pick anything else.
+// A hardcoded catalogue in a self-hosted product is guaranteed to be wrong
+// eventually, so there are three ways to choose a model now:
+//
+//   1. suggestions  - a short curated list with a note on why you would pick it
+//   2. discovery    - "Fetch from provider" asks the provider's own API what it
+//                     currently serves, which is always more current than this file
+//   3. free text    - any model id can be typed, so a release on the provider's
+//                     side never needs a release here
+//
+// 'suggested' marks the default choice for a firewall configuration review:
+// enough reasoning to reason about a rule set, without paying for the top tier.
 $available_providers = [
     'openai' => [
         'name' => 'OpenAI',
-        'models' => ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-        'icon' => 'fa-brain'
+        'icon' => 'fa-brain',
+        'discoverable' => true,
+        'models' => [
+            ['id' => 'gpt-4-turbo', 'note' => '128K context, 4096 output tokens'],
+            ['id' => 'gpt-4',       'note' => 'older, smaller context'],
+            ['id' => 'gpt-3.5-turbo', 'note' => 'cheapest, weakest reasoning'],
+        ],
+        'hint' => 'Use "Fetch from provider" for the current list - OpenAI publishes '
+                . 'new models faster than this page can be updated.',
     ],
     'anthropic' => [
         'name' => 'Anthropic (Claude)',
-        'models' => ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
-        'icon' => 'fa-robot'
+        'icon' => 'fa-robot',
+        'discoverable' => true,
+        'models' => [
+            ['id' => 'claude-opus-5',    'note' => '1M context - strongest reasoning for config review', 'suggested' => true],
+            ['id' => 'claude-sonnet-5',  'note' => '1M context - cheaper, still strong'],
+            ['id' => 'claude-haiku-4-5', 'note' => '200K context - cheapest, for frequent scans'],
+            ['id' => 'claude-opus-4-8',  'note' => 'previous generation'],
+            ['id' => 'claude-sonnet-4-6','note' => 'previous generation'],
+        ],
+        'hint' => 'Model ids carry no date suffix.',
     ],
     'google' => [
         'name' => 'Google (Gemini)',
-        'models' => ['gemini-pro', 'gemini-pro-vision'],
-        'icon' => 'fa-google'
+        'icon' => 'fa-google',
+        'discoverable' => false,
+        'models' => [
+            ['id' => 'gemini-pro', 'note' => 'older generation'],
+        ],
+        'hint' => 'Check ai.google.dev for the current model ids and enter one below.',
     ],
     'azure' => [
         'name' => 'Azure OpenAI',
-        'models' => ['gpt-4', 'gpt-35-turbo'],
-        'icon' => 'fa-cloud'
+        'icon' => 'fa-cloud',
+        'discoverable' => false,
+        'models' => [
+            ['id' => 'gpt-4', 'note' => 'deployment name, not model name'],
+            ['id' => 'gpt-35-turbo', 'note' => 'deployment name, not model name'],
+        ],
+        'hint' => 'Azure uses your deployment name, which is whatever you called it '
+                . 'in the portal - type it below rather than picking from this list.',
     ],
     'ollama' => [
         'name' => 'Ollama (Local)',
-        'models' => ['llama2', 'mistral', 'codellama'],
-        'icon' => 'fa-server'
-    ]
+        'icon' => 'fa-server',
+        'discoverable' => true,
+        'models' => [
+            ['id' => 'llama3', 'note' => 'general purpose'],
+            ['id' => 'mistral', 'note' => 'smaller, faster'],
+        ],
+        'hint' => 'Nothing leaves your network with Ollama. "Fetch from provider" '
+                . 'lists what you have actually pulled.',
+    ],
 ];
 ?>
 
@@ -542,9 +588,23 @@ $available_providers = [
             </div>
             <div class="form-group">
                 <label>Model *</label>
-                <select name="model" id="model_select" class="form-control" required>
+                <select id="model_select" class="form-control" onchange="onModelPicked(this)">
                     <option value="">Select provider first</option>
                 </select>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="fetch_models_btn"
+                            onclick="fetchModels()" disabled>
+                        <i class="fa fa-rotate me-1"></i> Fetch from provider
+                    </button>
+                    <small id="model_hint" style="color:#95a5a6;"></small>
+                </div>
+                <?php // Free text so a model released tomorrow needs no code change. ?>
+                <input type="text" name="model" id="model_input" class="form-control"
+                       style="margin-top:8px;" required
+                       placeholder="Model id - pick above, fetch, or type one">
+                <small style="color:#95a5a6;display:block;margin-top:4px;">
+                    The list is a starting point. Any model id the provider accepts will work.
+                </small>
             </div>
             <div class="form-group">
                 <label>API Key *</label>
@@ -575,9 +635,15 @@ $available_providers = [
             </div>
             <div class="form-group">
                 <label>Model *</label>
-                <select name="model" id="edit_model_select" class="form-control" required>
-                    <option value="">Select model</option>
+                <select id="edit_model_select" class="form-control" onchange="onEditModelPicked(this)">
+                    <option value="">Select a model</option>
                 </select>
+                <input type="text" name="model" id="edit_model_input" class="form-control"
+                       style="margin-top:8px;" required
+                       placeholder="Model id - pick above or type one">
+                <small style="color:#95a5a6;display:block;margin-top:4px;">
+                    Any model id the provider accepts will work, including one newer than this list.
+                </small>
             </div>
             <div class="form-group">
                 <label>API Key *</label>
@@ -594,7 +660,8 @@ $available_providers = [
 </div>
 
 <script>
-const providerModels = <?= json_encode($available_providers) ?>;
+const providerModels = <?= json_encode($available_providers, JSON_UNESCAPED_SLASHES) ?>;
+const csrfToken = '<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>';
 
 function showAddModal() {
     document.getElementById('addModal').style.display = 'block';
@@ -604,19 +671,98 @@ function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
 }
 
+// The catalogue is a suggestion, not a constraint: the select fills the free-text
+// field, "Fetch from provider" replaces the suggestions with what the provider
+// actually serves, and either can be overtyped.
 function updateModels(select) {
     const provider = select.value;
     const modelSelect = document.getElementById('model_select');
-    modelSelect.innerHTML = '<option value="">Select model</option>';
+    const hint = document.getElementById('model_hint');
+    const fetchBtn = document.getElementById('fetch_models_btn');
 
-    if (provider && providerModels[provider]) {
-        providerModels[provider].models.forEach(model => {
-            const option = document.createElement('option');
-            option.value = model;
-            option.textContent = model;
-            modelSelect.appendChild(option);
-        });
+    modelSelect.innerHTML = '<option value="">Select a model</option>';
+    hint.textContent = '';
+    fetchBtn.disabled = true;
+
+    if (!provider || !providerModels[provider]) {
+        return;
     }
+
+    const entry = providerModels[provider];
+    const group = document.createElement('optgroup');
+    group.label = 'Suggested';
+
+    (entry.models || []).forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = model.id
+            + (model.suggested ? '  - recommended' : '')
+            + (model.note ? '  (' + model.note + ')' : '');
+        if (model.suggested) {
+            option.selected = true;
+            document.getElementById('model_input').value = model.id;
+        }
+        group.appendChild(option);
+    });
+    modelSelect.appendChild(group);
+
+    hint.textContent = entry.hint || '';
+    fetchBtn.disabled = !entry.discoverable;
+    if (!entry.discoverable) {
+        fetchBtn.title = 'This provider does not publish a model list';
+    }
+}
+
+function onEditModelPicked(select) {
+    if (select.value) {
+        document.getElementById('edit_model_input').value = select.value;
+    }
+}
+
+function onModelPicked(select) {
+    if (select.value) {
+        document.getElementById('model_input').value = select.value;
+    }
+}
+
+function fetchModels() {
+    const provider = document.querySelector('select[name="provider"]').value;
+    const btn = document.getElementById('fetch_models_btn');
+    const hint = document.getElementById('model_hint');
+    if (!provider) { return; }
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Fetching...';
+    hint.textContent = '';
+
+    fetch('/api/ai_models.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                   'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ provider: provider, csrf: csrfToken })
+    })
+    .then(r => r.status === 401
+        ? Promise.reject(new Error('Your session has expired. Sign in again.'))
+        : r.json())
+    .then(data => {
+        if (!data.success) {
+            hint.textContent = data.error || 'Could not list models.';
+            return;
+        }
+        const select = document.getElementById('model_select');
+        const group = document.createElement('optgroup');
+        group.label = 'Available from provider (' + data.count + ')';
+        data.models.forEach(id => {
+            const o = document.createElement('option');
+            o.value = id; o.textContent = id;
+            group.appendChild(o);
+        });
+        select.appendChild(group);
+        hint.textContent = data.count + ' model(s) returned by the provider.';
+    })
+    .catch(err => { hint.textContent = err.message || 'Could not reach the provider.'; })
+    .finally(() => { btn.disabled = false; btn.innerHTML = original; });
 }
 
 function showEditModal(provider) {
@@ -631,17 +777,23 @@ function showEditModal(provider) {
     const editModelSelect = document.getElementById('edit_model_select');
     editModelSelect.innerHTML = '<option value="">Select model</option>';
 
+    // The configured model may not be in the suggestions at all - it could predate
+    // them or postdate them - so the text field holds the truth and the list is
+    // only a shortcut.
     if (providerInfo && providerInfo.models) {
         providerInfo.models.forEach(model => {
             const option = document.createElement('option');
-            option.value = model;
-            option.textContent = model;
-            if (model === provider.model) {
+            option.value = model.id;
+            option.textContent = model.id
+                + (model.suggested ? '  - recommended' : '')
+                + (model.note ? '  (' + model.note + ')' : '');
+            if (model.id === provider.model) {
                 option.selected = true;
             }
             editModelSelect.appendChild(option);
         });
     }
+    document.getElementById('edit_model_input').value = provider.model || '';
 
     // Set API key
     document.getElementById('edit_api_key').value = provider.api_key;

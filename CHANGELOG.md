@@ -6,6 +6,51 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.69.0
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+**The model list could only ever be out of date.**
+
+The AI settings page offered a fixed set of ids - `gpt-4`,
+`claude-3-opus-20240229`, `gemini-pro` - which were the right answer when they
+were written and quietly stopped being it, with no way to choose anything else.
+A self-hosted product cannot ship a catalogue that stays current.
+
+There are three routes to a model now, and only the first can go stale:
+
+1. **Suggestions**, each with a note on why you would pick it, one marked
+   recommended.
+2. **Live discovery** - "Fetch from provider" asks the provider's own API what it
+   currently serves. On a real key this returned 130 models.
+3. **Free text** - any id the provider accepts, so a model released tomorrow
+   needs no release here.
+
+### Added
+
+- `api/ai_models.php` lists models from OpenAI, Anthropic and a local Ollama. It
+  uses the **stored key server-side** and returns only model names - the browser
+  never needs to hold the key to list models. A provider with no listing endpoint
+  says so rather than returning an empty list.
+- Claude suggestions are current and carry context windows, so the choice is
+  informed rather than a string to copy.
+- Azure is labelled as wanting a **deployment name** - whatever the operator
+  called it in the portal, which cannot be guessed by anyone.
+
+### Fixed
+
+- The edit dialog had the same fixed dropdown, and would have silently offered a
+  configured model that was no longer in the list. It uses the same field,
+  prefilled with whatever is actually configured.
+
+### Added
+
+- `tests/ai_model_selection_test.php`, including that the discovery endpoint
+  requires settings permission and never returns the key it used.
+
+---
+
 ## Version 3.68.1
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 
