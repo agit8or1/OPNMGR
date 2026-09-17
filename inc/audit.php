@@ -96,6 +96,50 @@ if (!function_exists('audit_client_ip')) {
     }
 }
 
+if (!function_exists('audit_cli_username')) {
+    /**
+     * Who is running this CLI command.
+     *
+     * CLI-initiated audit rows recorded actor_type 'system' with a NULL
+     * username, so the log said what had been done and to what, but never by
+     * whom. For a promotion that releases an agent to the whole fleet, "who"
+     * is most of the point.
+     *
+     * actor_type stays 'system': it is an ENUM('user','agent','system',
+     * 'anonymous') and a CLI operator is not a portal user with a user_id.
+     * The audit UI already prefers username over actor_type when one is set,
+     * so filling it in is enough and needs no migration.
+     *
+     * Under sudo the effective user is root while the person is SUDO_USER, and
+     * both are worth keeping: 'administrator (sudo root)'.
+     */
+    function audit_cli_username(): ?string {
+        if (PHP_SAPI !== 'cli') {
+            return null;
+        }
+
+        $effective = null;
+        if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+            $pw = @posix_getpwuid(posix_geteuid());
+            $effective = is_array($pw) ? ($pw['name'] ?? null) : null;
+        }
+
+        $sudo = getenv('SUDO_USER');
+        $sudo = ($sudo === false || $sudo === '') ? null : $sudo;
+
+        if ($sudo !== null && $sudo !== $effective) {
+            $name = $effective === null ? $sudo : $sudo . ' (sudo ' . $effective . ')';
+        } else {
+            $name = $effective;
+        }
+
+        if ($name === null) {
+            return null;
+        }
+        return strlen($name) > 64 ? substr($name, 0, 64) : $name;
+    }
+}
+
 if (!function_exists('audit_log')) {
     /**
      * Write an audit entry.
@@ -118,6 +162,12 @@ if (!function_exists('audit_log')) {
             $actorType = $opts['actor_type'] ?? null;
             $userId    = $opts['user_id']    ?? ($_SESSION['user_id']  ?? null);
             $username  = $opts['username']   ?? ($_SESSION['username'] ?? null);
+
+            // A CLI run has no session, so this was left NULL and the row did
+            // not say who acted. Fall back to the operating system user.
+            if ($username === null) {
+                $username = audit_cli_username();
+            }
 
             if ($actorType === null) {
                 if ($userId !== null) {

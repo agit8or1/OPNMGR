@@ -99,5 +99,48 @@ foreach (['settings.php', 'smtp_settings.php'] as $rel) {
         'a private copy would bypass the audit trail');
 }
 
+// ---------------------------------------------------------------------------
+// A CLI-initiated entry must say who acted
+//
+// CLI rows recorded actor_type 'system' with a NULL username, so the log said
+// what had been done and to what, but never by whom. For a promotion that
+// releases an agent to the whole fleet, "who" is most of the point.
+
+$audit = (string) @file_get_contents($root . '/inc/audit.php');
+
+check('a CLI operator resolver exists', str_contains($audit, 'function audit_cli_username'));
+check('audit_log() falls back to it when there is no session',
+    (bool) preg_match('/if \(\$username === null\) \{\s*\$username = audit_cli_username\(\);/', $audit),
+    'every CLI call site benefits, not just the one that prompted this');
+check('it applies only to CLI', str_contains($audit, "PHP_SAPI !== 'cli'"),
+    'a web request must keep resolving its actor from the session');
+check('actor_type is left alone',
+    !preg_match("/actor_type.*=.*'operator'/", $audit),
+    "actor_type is an ENUM; adding a value would need a migration");
+check('the name is bounded to the column width',
+    str_contains($audit, 'substr($name, 0, 64)'),
+    'username is varchar(64)');
+
+if (function_exists('shell_exec') && PHP_SAPI === 'cli') {
+    require_once $root . '/inc/audit.php';
+    $who = audit_cli_username();
+    check('the resolver returns the invoking user', is_string($who) && $who !== '',
+        'got ' . var_export($who, true));
+
+    // Under sudo the effective user is root while the person is SUDO_USER, and
+    // the entry should name both rather than recording the promotion as root.
+    $sudoName = (string) shell_exec(
+        'SUDO_USER=alice php -r ' . escapeshellarg(
+            'require "' . $root . '/inc/audit.php"; echo audit_cli_username();'
+        ) . ' 2>/dev/null'
+    );
+    check('a sudo invocation names the person, not just the effective user',
+        str_starts_with($sudoName, 'alice'),
+        'got ' . var_export($sudoName, true));
+    check('...and still records what it ran as',
+        str_contains($sudoName, 'sudo '),
+        'got ' . var_export($sudoName, true));
+}
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Who Released What'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'By Whom'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.53.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'By Whom',
+            'changes' => [
+                'FIXED: CLI-initiated audit entries recorded actor_type "system" with a NULL username, so the log said what had been done and to what, but never by whom. The rollout entries added in 3.52.0 showed this immediately: "agent 1.6.7 promoted to stage fleet" with nobody attached to it. For a promotion that releases an agent to the whole fleet, who is most of the point',
+                'CHANGED: audit_log() falls back to the operating system user when there is no session, so every CLI call site gains this and not only the one that prompted it. Entries from a web request still resolve their actor from the session exactly as before',
+                'CHANGED: actor_type stays "system". It is an ENUM(user, agent, system, anonymous) and a CLI operator is not a portal user with a user_id; the audit page already prefers username over actor_type when one is set, so filling in the name was enough and needed no migration',
+                'ADDED: Under sudo the effective user is root while the person is SUDO_USER, and the entry names both - "administrator (sudo root)" - rather than recording a fleet-wide release as root. The name is truncated to the varchar(64) the column allows',
+                'ADDED: Eight assertions in tests/settings_audit_test.php, including running the resolver under a simulated sudo invocation',
+            ],
+        ],
         [
             'version' => '3.52.0',
             'date' => '2026-09-17',

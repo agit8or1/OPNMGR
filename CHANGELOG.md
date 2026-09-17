@@ -6,6 +6,50 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.53.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**A CLI-initiated audit entry never said who acted.**
+
+The rollout entries added in 3.52.0 showed it immediately:
+
+```
+actor_type: system
+  username: NULL
+   message: agent 1.6.7 promoted to stage 'fleet' (was 'held' for 1.6.7); reaches 1 firewall(s)
+```
+
+The log recorded what had been done and to what, but nobody was attached to it.
+For a promotion that releases an agent to the whole fleet, *who* is most of the
+point.
+
+```
+actor_type: system
+  username: administrator
+   message: agent 1.6.7 promoted to stage 'fleet' ...
+```
+
+- **`audit_log()` falls back to the operating system user when there is no
+  session**, so every CLI call site gains this rather than only the one that
+  prompted it. A web request still resolves its actor from the session exactly as
+  before.
+- **`actor_type` stays `system`.** It is an `ENUM('user','agent','system',
+  'anonymous')` and a CLI operator is not a portal user with a `user_id`. The
+  audit page already prefers `username` over `actor_type` when one is set, so
+  filling in the name was enough and needed no migration.
+- **Under sudo, the entry names the person and what they ran as** -
+  `administrator (sudo root)` - rather than recording a fleet-wide release as
+  `root`. Truncated to the `varchar(64)` the column allows.
+
+### Added
+
+- Eight assertions in `tests/settings_audit_test.php`, including running the
+  resolver under a simulated sudo invocation.
+
+---
+
 ## Version 3.52.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
