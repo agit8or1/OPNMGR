@@ -88,5 +88,37 @@ check('a provider without a listing endpoint says so',
 check('a missing key says so', str_contains($api, 'Save an API key for this provider first'));
 check('a refusal reports the provider message', str_contains($api, 'Provider refused: '));
 
+// --- which LLM runs must be a choice, not an accident -------------------------
+//
+// is_active defaults to 1 in the schema and the insert did not override it, so
+// adding a second provider quietly made it active alongside the first. The scan
+// then took `WHERE is_active = TRUE LIMIT 1` with no ordering, and which LLM ran
+// was whatever the database returned first. The only way to choose was a "Set as
+// Default" button on whichever provider card you happened to scroll to.
+
+$scan = (string) @file_get_contents($root . '/api/ai_scan.php');
+
+check('a new provider does not silently become the active one',
+    str_contains($page, "INSERT INTO ai_settings (provider, api_key, model, is_active)"),
+    'the column defaults to 1, so the insert has to say otherwise');
+check('the first provider configured does become active',
+    str_contains($page, '$existing === 0 ? 1 : 0'),
+    'otherwise nothing would be selected and no scan could run');
+check('adding a later provider says it is not in use yet',
+    str_contains($page, 'Select it above to use it for analysis'));
+
+check('there is one explicit selector for the LLM in use',
+    str_contains($page, 'LLM used for analysis:') && str_contains($page, "id=\"active_llm\""));
+check('it lists provider and model together',
+    (bool) preg_match('/active_llm[\s\S]{0,600}\$p\[.model.\]/', $page),
+    'two providers can differ only by model');
+check('it submits through the existing default-provider handler',
+    (bool) preg_match('/active_llm[\s\S]{0,900}name="set_default_provider"/', $page),
+    'that handler already deactivates the others first');
+
+check('the scan picks deterministically',
+    str_contains($scan, 'WHERE is_active = TRUE ORDER BY id LIMIT 1'),
+    'silently alternating between two LLMs is worse than picking the wrong one');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

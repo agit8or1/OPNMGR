@@ -34,10 +34,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([opnmgr_encrypt($api_key), $model, $provider]);
             $message = "AI provider updated successfully!";
         } else {
-            // Insert new
-            $stmt = db()->prepare("INSERT INTO ai_settings (provider, api_key, model) VALUES (?, ?, ?)");
-            $stmt->execute([$provider, opnmgr_encrypt($api_key), $model]);
-            $message = "AI provider added successfully!";
+            // is_active defaults to 1 in the schema and this insert did not
+            // override it, so adding a second provider quietly made it active
+            // alongside the first. The scan then took `WHERE is_active = TRUE
+            // LIMIT 1` with no ordering, and which LLM actually ran was whatever
+            // the database happened to return first.
+            //
+            // The first provider configured becomes the active one because
+            // otherwise nothing would be; any later one is added inactive and
+            // has to be chosen deliberately.
+            $existing = (int) db()->query('SELECT COUNT(*) FROM ai_settings')->fetchColumn();
+            $stmt = db()->prepare(
+                'INSERT INTO ai_settings (provider, api_key, model, is_active) VALUES (?, ?, ?, ?)'
+            );
+            $stmt->execute([$provider, opnmgr_encrypt($api_key), $model, $existing === 0 ? 1 : 0]);
+            $message = $existing === 0
+                ? 'AI provider added and selected for analysis.'
+                : 'AI provider added. Select it above to use it for analysis.';
         }
         $message_type = 'success';
     }
@@ -473,13 +486,37 @@ $available_providers = [
                 }
             }
             ?>
+            <?php
+            // Which LLM actually runs was decided by a "Set as Default" button on
+            // whichever provider card you scrolled to, and with more than one
+            // configured it was not obvious - or, before the insert was fixed,
+            // reliable - which one that was. It is one control, stated plainly,
+            // at the top of the page.
+            ?>
             <?php if ($active_provider): ?>
-                <p style="margin: 10px 0 0 0; padding-top: 10px; border-top: 1px solid #3a3f4b;">
-                    <i class="fa fa-check-circle" style="color: #27ae60;"></i>
-                    <strong>Global Default:</strong>
-                    <?= htmlspecialchars($available_providers[$active_provider['provider']]['name'] ?? ucfirst($active_provider['provider'])) ?>
-                    (<?= htmlspecialchars($active_provider['model']) ?>)
-                </p>
+                <div style="margin: 14px 0 0 0; padding-top: 12px; border-top: 1px solid #3a3f4b;">
+                    <form method="POST" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <label for="active_llm" style="margin:0;font-weight:600;white-space:nowrap;">
+                            <i class="fa fa-wand-magic-sparkles me-1" style="color:#27ae60;"></i>
+                            LLM used for analysis:
+                        </label>
+                        <select name="provider_id" id="active_llm" class="form-control"
+                                style="max-width:420px;width:auto;">
+                            <?php foreach ($providers as $p): ?>
+                                <option value="<?= (int)$p['id'] ?>" <?= $p['is_active'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($available_providers[$p['provider']]['name'] ?? ucfirst($p['provider'])) ?>
+                                    &mdash; <?= htmlspecialchars($p['model']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" name="set_default_provider" class="btn btn-success btn-sm">
+                            <i class="fa fa-check-circle me-1"></i> Use this
+                        </button>
+                        <?php if (count($providers) === 1): ?>
+                            <small style="color:#95a5a6;">Add another provider to switch between them.</small>
+                        <?php endif; ?>
+                    </form>
+                </div>
             <?php else: ?>
                 <p style="margin: 10px 0 0 0; padding-top: 10px; border-top: 1px solid #3a3f4b; color: #f39c12;">
                     <i class="fa fa-exclamation-triangle"></i>

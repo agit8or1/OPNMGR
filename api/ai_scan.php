@@ -54,7 +54,10 @@ try {
         $stmt = db()->prepare("SELECT * FROM ai_settings WHERE provider = ? AND is_active = TRUE");
         $stmt->execute([$provider]);
     } else {
-        $stmt = db()->query("SELECT * FROM ai_settings WHERE is_active = TRUE LIMIT 1");
+        // ORDER BY id: if more than one row is somehow active, the same provider
+        // must run every time. Silently alternating between two LLMs would be
+        // worse than picking the wrong one.
+        $stmt = db()->query("SELECT * FROM ai_settings WHERE is_active = TRUE ORDER BY id LIMIT 1");
     }
     $ai_settings = $stmt->fetch();
 

@@ -6,6 +6,40 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.69.1
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+**Which LLM ran was whatever the database returned first.**
+
+`is_active` defaults to `1` in the schema, and the insert never overrode it:
+
+```php
+INSERT INTO ai_settings (provider, api_key, model) VALUES (?, ?, ?)
+```
+
+So adding a second provider quietly made it active alongside the first, and the
+scan then did:
+
+```sql
+SELECT * FROM ai_settings WHERE is_active = TRUE LIMIT 1   -- no ORDER BY
+```
+
+A later provider is now added **inactive**; the first one configured becomes
+active, because otherwise nothing would be. The scan orders by id before taking a
+row - if two are somehow active, the same provider runs every time. Silently
+alternating between two LLMs is worse than picking the wrong one.
+
+### Added
+
+- **One explicit selector at the top of the page** - *"LLM used for analysis"* -
+  listing each configured provider with its model, since two providers can differ
+  only by model. Choosing which LLM runs was previously a "Set as Default" button
+  on whichever provider card you happened to scroll to.
+
+---
+
 ## Version 3.69.0
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ask The Provider'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Whichever Row Came First'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Whichever Row Came First',
+            'changes' => [
+                'FIXED: Adding a second AI provider quietly made it active alongside the first. is_active defaults to 1 in the schema and the insert never overrode it, and the scan then took WHERE is_active = TRUE LIMIT 1 with no ordering - so which LLM actually ran was whatever the database returned first. A later provider is now added inactive, and the first one configured becomes active because otherwise nothing would be',
+                'ADDED: One explicit selector at the top of the page - "LLM used for analysis" - listing each configured provider with its model, since two providers can differ only by model. Choosing which LLM runs was previously a "Set as Default" button on whichever provider card you happened to scroll to',
+                'FIXED: The scan orders by id before taking one row. If two are somehow active, the same provider runs every time: silently alternating between two LLMs is worse than picking the wrong one',
+                'ADDED: Seven assertions covering the selector and the insert',
+            ],
+        ],
         [
             'version' => '3.69.0',
             'date' => '2026-09-17',
