@@ -128,6 +128,22 @@ T::ok(in_array('totp_secret', $schema['users'] ?? [], true), 'users.totp_secret 
 T::group('Every written column exists');
 
 $problems = [];
+$missingTables = [];
+
+// Tables that legitimately are not in the shipped schema: temporary tables, and
+// names built at runtime. Anything else naming a table the schema does not have
+// is a statement that cannot run.
+$tableAllowlist = ['tmp', 'temp'];
+
+$noteTable = function (string $rel, string $t, string $verb) use ($schema, $tableAllowlist, &$missingTables): bool {
+    if (isset($schema[$t])) { return true; }
+    if (in_array($t, $tableAllowlist, true) || str_starts_with($t, 'tmp_') || str_starts_with($t, 'temp_')) {
+        return false;
+    }
+    $missingTables[] = "{$verb} {$rel}: {$t}";
+    return false;
+};
+
 foreach ($files as $rel) {
     $src = (string) file_get_contents($root . '/' . $rel);
 
@@ -135,7 +151,7 @@ foreach ($files as $rel) {
     if (preg_match_all('/INSERT\s+(?:IGNORE\s+)?INTO\s+[`"]?(\w+)[`"]?\s*\(([^)]*)\)/is', $src, $m, PREG_SET_ORDER)) {
         foreach ($m as $hit) {
             $t = strtolower($hit[1]);
-            if (!isset($schema[$t])) { continue; }          // table not modelled here
+            if (!$noteTable($rel, $t, 'INSERT')) { continue; }
             if (str_contains($hit[2], '$') || str_contains($hit[2], '{')) { continue; } // dynamic
             foreach (explode(',', $hit[2]) as $col) {
                 $col = strtolower(trim(trim($col), "`\" \t\n"));
@@ -151,7 +167,12 @@ foreach ($files as $rel) {
     if (preg_match_all('/UPDATE\s+[`"]?(\w+)[`"]?\s+SET\s+(.*?)(?:\bWHERE\b|["\';])/is', $src, $m, PREG_SET_ORDER)) {
         foreach ($m as $hit) {
             $t = strtolower($hit[1]);
-            if (!isset($schema[$t]) || strlen($hit[2]) > 2000) { continue; }
+            // Require an actual assignment. The pattern is case-insensitive and
+            // otherwise matches English: "Update ring set to 'canary'" in a log
+            // message reads as UPDATE ring SET.
+            if (!str_contains($hit[2], '=')) { continue; }
+            if (!$noteTable($rel, $t, 'UPDATE')) { continue; }
+            if (strlen($hit[2]) > 2000) { continue; }
             if (preg_match_all('/(?:^|,)\s*[`"]?(\w+)[`"]?\s*=/', $hit[2], $cols)) {
                 foreach ($cols[1] as $col) {
                     $col = strtolower($col);
@@ -170,6 +191,21 @@ foreach ($problems as $p) {
     fwrite(STDERR, "  offending statement: {$p}\n");
 }
 T::eq(0, count($problems), 'no INSERT or UPDATE names a column the schema lacks');
+
+T::group('Every written table exists');
+
+// This test checked the columns of a statement and skipped the statement
+// entirely when its table was not in the schema - "table not modelled here".
+// A table the schema does not have is not unmodelled; it is a statement that
+// cannot run. api/repair_agent_ssh.php and api/ssh_install_agent.php both wrote
+// to activity_log, which exists in no schema and no migration, and both were
+// scanned by this file and passed. The 500 was found by clicking the button.
+
+$missingTables = array_values(array_unique($missingTables));
+foreach ($missingTables as $m) {
+    fwrite(STDERR, "  writes to a table the schema lacks: {$m}\n");
+}
+T::eq(0, count($missingTables), 'no INSERT or UPDATE names a table the schema lacks');
 
 T::group('Names that caused past outages stay gone');
 

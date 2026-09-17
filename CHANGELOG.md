@@ -6,6 +6,30 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.56.1
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**The test that should have caught the `activity_log` 500 was skipping it by design.**
+
+```php
+if (!isset($schema[$t])) { continue; }          // table not modelled here
+```
+
+A table the schema does not have is not unmodelled - it is a statement that
+cannot run. Both files that wrote to `activity_log` were scanned by this test and
+passed it. The 500 was found by clicking the button.
+
+- It now fails when an INSERT or UPDATE names a table the schema lacks, allowing
+  only genuine temporary tables. Verified by reintroducing the `activity_log`
+  insert and confirming the test caught it.
+- The UPDATE pattern is case-insensitive and was matching English: *"Update ring
+  set to 'canary'"* in a log message read as `UPDATE ring SET`. It now requires
+  an actual assignment in the SET clause.
+
+---
+
 ## Version 3.56.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

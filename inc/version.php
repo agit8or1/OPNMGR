@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Repair That Would Have Broken It'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Table Not Modelled Here'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.56.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Table Not Modelled Here',
+            'changes' => [
+                'FIXED: The schema contract test skipped any statement whose table was not in the schema - "table not modelled here" - which is exactly the case it most needed to catch. A table the schema does not have is not unmodelled; it is a statement that cannot run. Both files that wrote to activity_log were scanned by this test and passed, and the 500 was found by clicking the button instead',
+                'ADDED: It now fails when an INSERT or UPDATE names a table the schema lacks, allowing only genuine temporary tables. Verified by reintroducing the activity_log insert and confirming the test caught it',
+                'FIXED: The UPDATE pattern is case-insensitive and matched English prose - "Update ring set to" in a log message read as UPDATE ring SET. It now requires an actual assignment in the SET clause',
+            ],
+        ],
         [
             'version' => '3.56.0',
             'date' => '2026-09-17',
