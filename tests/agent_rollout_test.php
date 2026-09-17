@@ -173,12 +173,11 @@ check('schema.sql carries the pilot column', str_contains($schema, 'agent_rollou
 $dash = (string)@file_get_contents($root . '/dashboard.php');
 check('the dashboard shows the application version',
     str_contains($dash, 'class="dash-version"') && str_contains($dash, 'APP_VERSION'));
-check('...and the agent version it publishes',
-    str_contains($dash, 'AGENT_VERSION'),
-    'the number that decides what firewalls are offered');
+check('it shows the application version only',
+    !str_contains($dash, 'AGENT_VERSION'),
+    'the agent version belongs to the rollout surface, not the dashboard header');
 check('the version chip escapes its output',
-    substr_count($dash, 'htmlspecialchars(APP_VERSION)') >= 1
-    && substr_count($dash, 'htmlspecialchars(AGENT_VERSION)') >= 1);
+    substr_count($dash, 'htmlspecialchars(APP_VERSION)') >= 1);
 check('it sits in the toolbar at the top of the page',
     (bool)preg_match('/dash-version.*?dash-refresh-ctl/s', $dash),
     'ahead of the refresh control in the top toolbar');

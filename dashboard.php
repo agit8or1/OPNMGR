@@ -114,8 +114,7 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 .dash-version {
     flex-shrink: 0;
     display: inline-flex;
-    align-items: baseline;
-    gap: 7px;
+    align-items: center;
     font-size: 0.78rem;
     padding: 6px 11px;
     border-radius: 6px;
@@ -127,8 +126,6 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 }
 .dash-version:hover { border-color: var(--accent); color: var(--text-secondary); }
 .dash-version .v-app { font-weight: 600; color: var(--text-primary); font-family: monospace; }
-.dash-version .v-sep { opacity: 0.4; }
-.dash-version .v-agent { font-family: monospace; }
 .dash-refresh-ctl { flex-shrink: 0; }
 .dash-refresh-ctl select {
     font-size: 0.8rem;
@@ -320,10 +317,8 @@ try {
       <?php endforeach; ?>
     </div>
     <a class="dash-version" href="/updates.php"
-       title="OPNManager <?php echo htmlspecialchars(APP_VERSION); ?> (<?php echo htmlspecialchars(APP_VERSION_DATE); ?>) &middot; newest agent <?php echo htmlspecialchars(AGENT_VERSION); ?>">
+       title="OPNManager <?php echo htmlspecialchars(APP_VERSION); ?> (<?php echo htmlspecialchars(APP_VERSION_DATE); ?>)">
       <span class="v-app">v<?php echo htmlspecialchars(APP_VERSION); ?></span>
-      <span class="v-sep">&middot;</span>
-      <span class="v-agent">agent <?php echo htmlspecialchars(AGENT_VERSION); ?></span>
     </a>
     <div class="dash-refresh-ctl">
       <select id="autoRefreshSelect" onchange="setAutoRefresh()">

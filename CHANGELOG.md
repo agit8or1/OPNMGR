@@ -6,6 +6,25 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.55.1
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+- **The dashboard version chip shows the application version only.**
+
+  ```
+  v3.55.1
+  ```
+
+  The agent version was added beside it in 3.55.0 on the reasoning that it
+  decides what firewalls are offered. That is true, but it belongs to the rollout
+  surface - `scripts/agent_rollout.php` already reports it with the stage and the
+  firewalls behind it, which is the context that makes the number mean anything.
+  The dashboard header is not that context.
+
+---
+
 ## Version 3.55.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
