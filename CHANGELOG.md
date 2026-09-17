@@ -6,6 +6,34 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.63.3
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+- **The walkthrough and highlight MP4s and the caption file moved from the
+  `v3.31.0` release to `v3.63.2`**, where the interface they show matches the code
+  the tag points at.
+
+  They were fetched from the old release rather than re-recorded, so the
+  published bytes are unchanged - the sizes match exactly - and they were removed
+  from `v3.31.0` only after the upload to `v3.63.2` was confirmed.
+
+  ```
+  v3.31.0   os-opnmanager-agent-1.6.3.tar.gz
+  v3.63.2   os-opnmanager-agent-1.6.7.tar.gz
+            opnmanager-walkthrough-1080p.mp4
+            opnmanager-highlight-1080p.mp4
+            walkthrough.vtt
+  ```
+
+### Note
+
+This retires the caveat recorded in 3.63.2. The videos no longer hang from a tag
+five weeks older than the interface in them.
+
+---
+
 ## Version 3.63.2
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Release Assets'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Moved To Where They Belong'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.63.3',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Moved To Where They Belong',
+            'changes' => [
+                'CHANGED: The walkthrough and highlight MP4s and the caption file moved from the v3.31.0 release to v3.63.2, where the interface they show matches the code the tag points at. They were fetched from the old release rather than re-recorded, so the published bytes are unchanged - the sizes match exactly - and removed from v3.31.0 only after the upload was confirmed',
+                'NOTE: This retires the caveat recorded in 3.63.2. The videos no longer hang from a tag five weeks older than the interface in them; v3.31.0 carries only its own agent tarball again',
+            ],
+        ],
         [
             'version' => '3.63.2',
             'date' => '2026-09-17',
