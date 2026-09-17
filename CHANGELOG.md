@@ -6,6 +6,49 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.65.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**Recent Changes showed a one-line summary and threw the rest away.**
+
+```php
+$message_lines = explode("\n", $commit['commit']['message']);
+echo htmlspecialchars($message_lines[0]);
+```
+
+Every commit body - where the reasoning actually lives - was discarded. The
+subject stays prominent; the body is behind a disclosure, collapsed by default
+because ten commits with full bodies is a wall of text. Attribution trailers are
+stripped: they are not part of the explanation.
+
+**`.commit-item` hardcoded dark-theme greys.**
+
+```css
+.commit-item { color: #cbd5e1; }
+.commit-item .text-white { color: #e2e8f0 !important; }
+```
+
+Close to invisible on the light theme. It barely showed while only a one-line
+subject was rendered, and became a wall of unreadable text the moment the body
+was. Theme variables now.
+
+### Changed
+
+- **The sidebar is a quarter shorter.** Rows from 42px to 34px, no vertical row
+  margin - 1px each side is 2px per row, 44px over the whole menu, for separation
+  the hover highlight already provides - and tighter section labels.
+
+  ```
+  rowHeight       42px  ->  34px
+  contentHeight  ~1140px -> 902px
+  ```
+
+  The whole menu now fits a laptop viewport without scrolling.
+
+---
+
 ## Version 3.64.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

@@ -200,12 +200,55 @@ include __DIR__ . '/inc/header.php';
     color: var(--text-primary);
 }
 
+/* These were hardcoded dark-theme greys, unreadable on the light theme - which
+   barely showed while only a one-line subject was rendered, and became a wall of
+   near-invisible text once the commit body was. Theme variables instead. */
 .commit-item {
-    color: #cbd5e1;
+    color: var(--text-secondary);
 }
 
 .commit-item .text-white {
-    color: #e2e8f0 !important;
+    color: var(--text-primary) !important;
+}
+
+.commit-subject {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Collapsed by default: ten commits with full bodies is a wall of text, and the
+   subject is usually all you want. Opening one should not cost a page load. */
+.commit-details > summary {
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    user-select: none;
+}
+.commit-details > summary::-webkit-details-marker { display: none; }
+.commit-details > summary::before {
+    content: '\25B8';
+    display: inline-block;
+    transition: transform 0.15s;
+}
+.commit-details[open] > summary::before { transform: rotate(90deg); }
+.commit-details > summary:hover { opacity: 1; }
+
+.commit-body {
+    color: var(--text-secondary);
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    background: rgba(127, 127, 127, 0.10);
+    border-left: 3px solid rgba(127, 127, 127, 0.35);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: inherit;
 }
 
 .warning-box ul,
@@ -464,9 +507,28 @@ include __DIR__ . '/inc/header.php';
                             </div>
                             <div>
                                 <?php
-                                $message_lines = explode("\n", $commit['commit']['message']);
-                                echo htmlspecialchars($message_lines[0]);
+                                // This printed $message_lines[0] and discarded the rest,
+                                // so every commit showed as a one-line summary while the
+                                // body - which is where the reasoning actually lives -
+                                // was thrown away. The subject stays prominent; the body
+                                // is there for anyone who wants it.
+                                $message = (string) ($commit['commit']['message'] ?? '');
+                                $split   = preg_split("/\r?\n/", $message, 2);
+                                $subject = trim($split[0] ?? '');
+                                $body    = trim($split[1] ?? '');
+
+                                // Attribution trailers are not part of the explanation.
+                                $body = trim(preg_replace(
+                                    '/^(Co-Authored-By|Signed-off-by|Co-authored-by):.*$/mi', '', $body
+                                ));
                                 ?>
+                                <div class="commit-subject"><?php echo htmlspecialchars($subject); ?></div>
+                                <?php if ($body !== ''): ?>
+                                <details class="commit-details mt-2">
+                                    <summary>Details</summary>
+                                    <pre class="commit-body"><?php echo htmlspecialchars($body); ?></pre>
+                                </details>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

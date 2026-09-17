@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Eight Thousand Undelivered'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Body Was Thrown Away'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.65.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'The Body Was Thrown Away',
+            'changes' => [
+                'FIXED: Recent Changes on the system update page printed $message_lines[0] and discarded the rest of every commit message, so each entry showed as a one-line summary while the body - where the reasoning actually is - was thrown away. The subject stays prominent and the body is available behind a disclosure, collapsed by default because ten commits with full bodies is a wall of text',
+                'CHANGED: Attribution trailers are stripped from the displayed body. They are not part of the explanation',
+                'FIXED: .commit-item hardcoded dark-theme greys (#cbd5e1, #e2e8f0) which are close to invisible on the light theme. That barely showed while only a one-line subject was rendered and became a wall of unreadable text once the body was. Theme variables now',
+                'CHANGED: The sidebar is a quarter shorter: rows from 42px to 34px, no vertical row margin - 1px each side is 2px per row and 44px over the whole menu, for separation the hover highlight already provides - and tighter section labels. Measured 1,140px of content down to 902px, so the whole menu fits a laptop viewport without scrolling',
+            ],
+        ],
         [
             'version' => '3.64.0',
             'date' => '2026-09-17',
