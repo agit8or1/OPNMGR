@@ -74,5 +74,32 @@ check('a port claimed by a live session is left alone',
 check('a failed read degrades instead of throwing',
     (bool) preg_match('/catch \(Throwable \$e\)[\s\S]{0,220}return \[\'expired\' => 0/', $src));
 
+// --- the reconciler must work where it actually runs -------------------------
+//
+// It kills processes with posix_kill(). SIGTERM is a pcntl constant and pcntl is
+// not loaded under PHP-FPM, so the first web request that started a tunnel hit
+// "Uncaught Error: Undefined constant SIGTERM" and returned 500. It had only
+// been exercised from the CLI, where pcntl is present and the constant resolves.
+// manage_ssh_tunnel.php already used the numeric signal for this reason.
+
+check('no bare SIGTERM constant in a web-reachable path',
+    !preg_match('/posix_kill\([^,]+,\s*SIGTERM\s*\)/', $src),
+    'pcntl is CLI-only here; the constant is a fatal under PHP-FPM');
+check('the numeric signal is used instead',
+    (bool) preg_match('/posix_kill\([^,]+,\s*15\)/', $src));
+
+$tunnel = (string) @file_get_contents($root . '/scripts/manage_ssh_tunnel.php');
+check('the existing convention is unchanged',
+    (bool) preg_match('/posix_kill\(intval\(\$pid\), 15\)/', $tunnel),
+    'this file already knew, and is where the convention came from');
+
+$proxy = (string) @file_get_contents($root . '/firewall_proxy_ondemand.php');
+check('the tunnel request declares it wants JSON',
+    str_contains($proxy, "'Accept': 'application/json'"),
+    'without it requireLogin() answers an expired session with a 302 to login');
+check('a 401 is reported as an expired session',
+    str_contains($proxy, 'session has expired'),
+    '"Network error" was shown for an expired session and a server fatal alike');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

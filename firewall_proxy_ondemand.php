@@ -123,12 +123,22 @@ if (!$firewall) {
             const formData = new FormData();
             formData.append('firewall_id', firewallId);
 
+            // Accept declares what we can handle, which is what requireLogin()
+            // keys off: without it an expired session returns a 302 to the login
+            // page, res.json() throws on the HTML, and the catch below reported
+            // "Network error" for what was actually "log in again".
             fetch('/start_tunnel_async.php', {
                 method: 'POST',
                 credentials: 'include',
+                headers: { 'Accept': 'application/json' },
                 body: formData
             })
-            .then(res => res.json())
+            .then(res => {
+                if (res.status === 401) {
+                    throw new Error('Your session has expired. Sign in again to open a tunnel.');
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.success && data.url) {
                     document.getElementById('statusText').innerHTML = '<span class="success">&#x2713; Tunnel established! Connecting...</span>';
@@ -152,7 +162,12 @@ if (!$firewall) {
             })
             .catch(err => {
                 console.error('Tunnel creation error:', err);
-                document.getElementById('statusText').innerHTML = '<span class="error">&#x2717; Network error - please try again</span>';
+                // Show what actually went wrong where we know it. "Network
+                // error" was shown for an expired session and for a server-side
+                // fatal alike, which is how a PHP error in the tunnel path looked
+                // like a connectivity problem.
+                const msg = (err && err.message) ? err.message : 'Network error - please try again';
+                document.getElementById('statusText').innerHTML = '<span class="error">&#x2717; ' + msg + '</span>';
                 document.getElementById('tunnelStatus').textContent = 'Error';
                 document.getElementById('spinner').classList.add('hidden');
 

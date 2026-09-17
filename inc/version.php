@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Column Reserved For Nothing'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Constant The Web Server Does Not Have'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.67.2',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'A Constant The Web Server Does Not Have',
+            'changes' => [
+                'FIXED: Starting a tunnel from the interface returned a 500. The tunnel session reconciler added in 3.59.0 kills processes with posix_kill($pid, SIGTERM), and SIGTERM is a pcntl constant that PHP-FPM does not load - so every tunnel started from the UI hit "Uncaught Error: Undefined constant SIGTERM". It had only ever been exercised from the CLI, where pcntl is present and the constant resolves, which is exactly why it looked fine. scripts/manage_ssh_tunnel.php already used the numeric signal for this reason and the convention was there to follow',
+                'FIXED: The failure reported itself as "Network error - please try again", which was wrong twice over. start_tunnel_async.php is consumed as JSON but sent no Accept header, so requireLogin() answered an expired session with a 302 to the login page; res.json() threw on the HTML and the catch printed the same message it printed for a server fatal. The request declares Accept: application/json now, a 401 is reported as an expired session, and any other error shows what actually happened',
+                'ADDED: Five assertions covering both, including that no web-reachable path references a pcntl constant',
+            ],
+        ],
         [
             'version' => '3.67.1',
             'date' => '2026-09-17',

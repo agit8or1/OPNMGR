@@ -126,7 +126,12 @@ function reconcile_tunnel_sessions(): array
         if ((int) $row['is_expired'] === 1) {
             // Past its time: close it and take the tunnel down with it.
             foreach ($pids as $pid) {
-                posix_kill($pid, SIGTERM);
+                // 15, not SIGTERM: the constant comes from pcntl, which is not
+                // loaded under PHP-FPM. This runs from both the CLI evaluator and
+                // a web request that starts a tunnel, and referencing the
+                // constant made the web path a fatal.
+                // manage_ssh_tunnel.php already did it this way.
+                posix_kill($pid, 15);
             }
             $stmt = db()->prepare(
                 "UPDATE ssh_access_sessions
@@ -161,7 +166,7 @@ function reconcile_tunnel_sessions(): array
             continue;
         }
         foreach (tunnel_ssh_pids($port) as $pid) {
-            posix_kill($pid, SIGTERM);
+            posix_kill($pid, 15); // SIGTERM; the constant is pcntl-only
             $orphanedProcesses++;
         }
     }

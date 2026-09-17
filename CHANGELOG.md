@@ -6,6 +6,45 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.67.2
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+**Starting a tunnel from the interface returned a 500.**
+
+```
+Uncaught Error: Undefined constant "SIGTERM" in scripts/manage_ssh_access.php:164
+#3 start_tunnel_async.php(67): start_tunnel()
+```
+
+The session reconciler added in 3.59.0 kills processes with
+`posix_kill($pid, SIGTERM)`. `SIGTERM` is a **pcntl** constant, and pcntl is not
+loaded under PHP-FPM - so every tunnel started from the UI was a fatal. It had
+only ever been exercised from the CLI, where pcntl is present and the constant
+resolves, which is exactly why it looked fine.
+
+`scripts/manage_ssh_tunnel.php` already used the numeric signal for this reason:
+
+```php
+posix_kill(intval($pid), 15); // SIGTERM
+```
+
+The convention was there to follow.
+
+**And the failure reported itself as a network problem.**
+
+`start_tunnel_async.php` is consumed as JSON but sent no `Accept` header, so
+`requireLogin()` answered an expired session with a 302 to the login page.
+`res.json()` threw on the HTML, and the `catch` printed *"Network error - please
+try again"* - the same message it printed for a server-side fatal. Two very
+different faults, one misleading message, and neither of them a network problem.
+
+The request declares `Accept: application/json` now, a 401 is reported as an
+expired session, and any other error shows what actually happened.
+
+---
+
 ## Version 3.67.1
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 
