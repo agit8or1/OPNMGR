@@ -110,12 +110,19 @@ check('adding a later provider says it is not in use yet',
 
 check('there is one explicit selector for the LLM in use',
     str_contains($page, 'LLM used for analysis:') && str_contains($page, "id=\"active_llm\""));
-check('the model is a control of its own, not part of the provider label',
-    str_contains($page, 'id="active_model"')
-    && !preg_match('/id="active_llm"[\s\S]{0,600}&mdash;/', $page),
-    'two providers can differ only by model, and the model must be changeable here');
+check('the list spans every configured provider',
+    str_contains($page, '<optgroup label="<?= htmlspecialchars($group[\'label\'])')
+    && str_contains($page, '$selectable[] = ['),
+    'with two keys configured the choice is a model; the provider follows from it');
+check('one field carries both decisions',
+    str_contains($page, "\$group['row']['id'] . '::' . \$m['id']")
+    && str_contains($page, "explode('::', \$choice, 2)"),
+    'provider and model chosen separately can be submitted inconsistent with each other');
+check('a model id containing a separator is not truncated',
+    str_contains($page, "explode('::', \$choice, 2)"),
+    'splitting on every separator would corrupt such an id');
 check('it submits through the existing default-provider handler',
-    (bool) preg_match('/active_llm[\s\S]{0,2000}name="set_default_provider"/', $page),
+    (bool) preg_match('/active_llm[\s\S]{0,6000}name="set_default_provider"/', $page),
     'that handler already deactivates the others first');
 
 check('the scan picks deterministically',
@@ -129,46 +136,45 @@ check('the scan picks deterministically',
 // baked into that option's label: changing which model ran meant opening the Edit
 // modal. Provider and model are now two selects side by side.
 
-check('the model select sits beside the provider select',
-    str_contains($page, 'id="active_model"') && str_contains($page, 'name="model"'));
-check('the provider option no longer carries the model in its label',
-    !preg_match('/id="active_llm"[\s\S]{0,600}&mdash;[\s\S]{0,120}\$p\[.model.\]/', $page),
-    'a provider list that embeds the model cannot offer a second model for it');
-check('changing the provider refills the model list',
-    str_contains($page, 'onchange="onActiveProviderChanged(this)"')
-    && str_contains($page, 'function onActiveProviderChanged'));
-check('the list is filled on load, not only on change',
-    (bool) preg_match('/DOMContentLoaded[\s\S]{0,300}onActiveProviderChanged/', $page),
-    'otherwise the dropdown is empty until the provider is touched');
-check('the configured rows reach the script',
-    str_contains($page, 'const configuredProviders'));
+check('the ratings sit with the control they inform',
+    (bool) preg_match('/id="active_llm"[\s\S]{0,4000}FOR CONFIG REVIEW|id="active_llm"[\s\S]{0,4000}For config review/i', $page),
+    'a table of advice a scroll away from the control it advises is decoration');
+check('the table is itself a selector',
+    (bool) preg_match('/<input type="radio" name="llm"/', $page),
+    'the rating and the act of choosing belong in the same place');
+check('the radio and the dropdown cannot disagree',
+    str_contains($page, "input[type=radio][name=\"llm\"][value=")
+    && str_contains($page, "document.getElementById('active_llm').value = this.value"),
+    'two controls for one value must mirror, or the hidden one wins silently');
 check('the model in use is listed even when the catalogue lacks it',
-    (bool) preg_match("/add\(row\.model, row\.model \+ '  - in use'\)/", $page),
+    (bool) preg_match('/if \(!isset\(\$ids\[\$p\[.model.\]\]\)\)/', $page),
     'a list claiming to show what is in use must contain what is in use');
 check('the submit persists the chosen model',
-    (bool) preg_match('/set_default_provider[\s\S]{0,900}UPDATE ai_settings SET model = \? WHERE id = \?/', $page),
-    'a dropdown that does not save is worse than no dropdown');
+    (bool) preg_match('/set_default_provider[\s\S]{0,1400}UPDATE ai_settings SET model = \? WHERE id = \?/', $page),
+    'a selector that does not save is worse than no selector');
 check('an empty model does not blank the stored one',
     (bool) preg_match('/if \(\$model !== \'\'\) \{/', $page));
 
-// --- the curated list must not be the stale list it warns about ---------------
-//
-// The comment above the catalogue explains that a hardcoded list goes stale, and
-// named gpt-4 as the example. Anthropic's entry was refreshed; OpenAI's and
-// Google's were left as the exact lists the comment complains about.
+// --- discovery covers every configured provider ------------------------------
 
-foreach (['openai' => 'gpt-4o', 'anthropic' => 'claude-opus-5', 'google' => 'gemini-2.5-pro'] as $prov => $model) {
-    check("the {$prov} catalogue offers a current model ({$model})", str_contains($page, $model));
-}
-check('every provider with suggestions marks a default choice',
-    (function () use ($page): bool {
-        foreach (['openai', 'anthropic', 'google'] as $prov) {
-            if (!preg_match("/'{$prov}' => \[[\s\S]{0,1400}?'hint'/", $page, $m)) { return false; }
-            if (!str_contains($m[0], "'suggested' => true")) { return false; }
-        }
-        return true;
-    })(),
-    'a list of five with none recommended leaves the choice unmade');
+check('discovery is reachable from the selector',
+    str_contains($page, 'function fetchActiveModels')
+    && str_contains($page, 'onclick="fetchActiveModels()"'));
+check('every configured provider is asked, not just the active one',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,900}configuredProviders\.filter/', $page),
+    'asking only the active one leaves the others showing a hand-written list');
+check('results land in the group they belong to',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,2600}g\.label === name/', $page));
+check('each discovered option carries its provider row',
+    (bool) preg_match("/o\.value = row\.id \+ '::' \+ id/", $page),
+    'a bare model id could not say which key to use');
+check('it does not offer a duplicate of a model already listed',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,2600}known\.has\(id\)/', $page));
+check('a provider with no listing endpoint is skipped',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,700}discoverable !== false/', $page));
+check('one provider failing does not lose the others',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,2600}\.catch\(err => \(\{ row: row/', $page),
+    'Promise.all rejects on the first failure unless each call catches its own');
 
 // --- the stored key must not be handed to the browser -------------------------
 //
@@ -189,10 +195,19 @@ check('the row handed to the edit modal has its secret removed',
 check('the edit field is not prefilled with it',
     !str_contains($page, "edit_api_key').value = provider.api_key"),
     're-encrypting the ciphertext produces a key that decrypts to a ciphertext');
-check('the edit field is optional, so blank-means-keep is reachable',
-    (bool) preg_match('/id="edit_api_key"(?:(?!>)[\s\S])*?placeholder="Leave blank/', $page)
-    && !preg_match('/id="edit_api_key"(?:(?!>)[\s\S])*?\brequired\b/', $page),
-    'the handler has always had the branch; the form made it unreachable');
+check('the edit field is optional',
+    !preg_match('/id="edit_api_key"(?:(?!>)[\s\S])*?\brequired\b/', $page));
+check('editing a provider edits the key and nothing else',
+    !str_contains($page, 'edit_model_input') && !str_contains($page, 'edit_model_select'),
+    'the model is chosen in the list above; a second control for it let the modal win silently');
+check('the edit handler no longer writes a model',
+    (bool) preg_match('/edit_provider[\s\S]{0,900}UPDATE ai_settings SET api_key = \?, updated_at = NOW\(\) WHERE id = \?/', $page)
+    && !preg_match('/edit_provider[\s\S]{0,900}SET model = \?/', $page));
+check('an empty key closes without changing anything',
+    str_contains($page, 'the stored key is unchanged'),
+    'silently storing an empty key would lock the provider out');
+check('the modal says where the model is chosen',
+    str_contains($page, 'chosen in &ldquo;LLM used for analysis&rdquo;'));
 check('both key fields are password inputs',
     substr_count($page, '<input type="password" name="api_key"') === 2,
     'a key in a text input is shoulder-surfable and lands in browser autofill');
@@ -206,22 +221,10 @@ check('the card still shows only a masked key',
 // --- the catalogue must not be the only source of models ----------------------
 //
 // Discovery existed, but only inside the Add and Edit modals - the one place you
-// are not looking when changing the model of a provider already configured. The
-// dropdown beside the provider therefore offered exactly what this file knew,
-// which for OpenAI was five GPT-4 era ids.
+// are not looking when changing the model of a provider already configured. It
+// is now beside the selector and covers every configured provider; those
+// assertions live with the selector block above.
 
-check('discovery is reachable from the main selector',
-    str_contains($page, 'function fetchActiveModels')
-    && str_contains($page, 'onclick="fetchActiveModels()"'));
-check('it asks for the selected provider, not the modal one',
-    (bool) preg_match('/fetchActiveModels[\s\S]{0,700}configuredProviders\.find/', $page));
-check('it appends rather than replacing the suggestions',
-    (bool) preg_match('/fetchActiveModels[\s\S]{0,2200}modelSelect\.appendChild\(group\)/', $page),
-    'replacing them would drop the model currently in use from the list');
-check('it does not offer a duplicate of a model already listed',
-    (bool) preg_match('/fetchActiveModels[\s\S]{0,2200}known\.has\(id\)/', $page));
-check('a provider with no listing endpoint says so instead of spinning',
-    (bool) preg_match('/fetchActiveModels[\s\S]{0,600}discoverable === false/', $page));
 check('a session that expired mid-fetch is reported as such',
     substr_count($page, 'Your session has expired. Sign in again.') === 2);
 

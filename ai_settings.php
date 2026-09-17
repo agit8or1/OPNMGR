@@ -77,20 +77,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (isset($_POST['edit_provider'])) {
-        $provider_id = $_POST['provider_id'];
-        $model = $_POST['model'];
+        // Editing a provider means replacing its key. The model is chosen in the
+        // list at the top of the page, which spans every configured provider, so
+        // carrying a model field here as well gave two places to set one value -
+        // and the modal's copy silently won.
+        $provider_id = (int) ($_POST['provider_id'] ?? 0);
         $api_key = trim((string) ($_POST['api_key'] ?? ''));
 
-        // Blank means 'leave the stored key alone' - the UI never echoes it back.
         if ($api_key === '') {
-            $stmt = db()->prepare("UPDATE ai_settings SET model = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$model, $provider_id]);
+            $message = "No new key entered - the stored key is unchanged.";
+            $message_type = 'info';
         } else {
-            $stmt = db()->prepare("UPDATE ai_settings SET model = ?, api_key = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$model, opnmgr_encrypt($api_key), $provider_id]);
+            $stmt = db()->prepare("UPDATE ai_settings SET api_key = ?, updated_at = NOW() WHERE id = ?");
+            $stmt->execute([opnmgr_encrypt($api_key), $provider_id]);
+            $message = "API key updated successfully!";
+            $message_type = 'success';
         }
-        $message = "Provider updated successfully!";
-        $message_type = 'success';
     }
 
     if (isset($_POST['delete_provider'])) {
@@ -102,7 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
 
     if (isset($_POST['set_default_provider'])) {
-        $provider_id = (int) ($_POST['provider_id'] ?? 0);
+        // "<provider row id>::<model id>" - the list spans providers, so the one
+        // control carries both decisions. A model id may itself contain colons,
+        // so split on the first separator only.
+        $choice = (string) ($_POST['llm'] ?? '');
+        [$chosen_id, $chosen_model] = array_pad(explode('::', $choice, 2), 2, '');
+        $provider_id = (int) ($chosen_id !== '' ? $chosen_id : ($_POST['provider_id'] ?? 0));
         // Deactivate all providers
         db()->query("UPDATE ai_settings SET is_active = FALSE");
         // Activate only the selected one
@@ -113,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // a provider and picking which of its models to run are two decisions,
         // and making the second one reachable only through the Edit modal meant
         // the page appeared to offer one choice where it holds two.
-        $model = trim((string) ($_POST['model'] ?? ''));
+        $model = trim($chosen_model !== '' ? $chosen_model : (string) ($_POST['model'] ?? ''));
         if ($model !== '') {
             $stmt = db()->prepare("UPDATE ai_settings SET model = ? WHERE id = ?");
             $stmt->execute([$model, $provider_id]);
@@ -548,98 +555,153 @@ $available_providers = [
             // reliable - which one that was. It is one control, stated plainly,
             // at the top of the page.
             ?>
+            <?php
+            // One list, every configured provider.
+            //
+            // The control was two dropdowns, provider then model, which made the
+            // provider a decision you had to make before you could see what it
+            // offered. With an OpenAI key and a Claude key configured, the thing
+            // actually being chosen is a model - the provider follows from it.
+            // So the models of every configured provider are in one list, grouped
+            // by provider, and picking one selects both. With a single provider
+            // configured the list is simply that provider's models.
+            $selectable = [];
+            foreach ($providers as $p) {
+                $catalogue = $available_providers[$p['provider']]['models'] ?? [];
+                $ids = [];
+                foreach ($catalogue as $m) { $ids[$m['id']] = $m; }
+                // The model in use is always offered, even if the catalogue has
+                // never heard of it.
+                if (!isset($ids[$p['model']])) {
+                    $ids[$p['model']] = ['id' => $p['model'], 'stars' => null, 'cost' => null, 'note' => ''];
+                }
+                $selectable[] = [
+                    'row'    => $p,
+                    'label'  => $available_providers[$p['provider']]['name'] ?? ucfirst($p['provider']),
+                    'models' => array_values($ids),
+                ];
+            }
+            ?>
             <?php if ($active_provider): ?>
                 <div style="margin: 14px 0 0 0; padding-top: 12px; border-top: 1px solid #3a3f4b;">
-                    <form method="POST" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                        <label for="active_llm" style="margin:0;font-weight:600;white-space:nowrap;">
-                            <i class="fa fa-wand-magic-sparkles me-1" style="color:#27ae60;"></i>
-                            LLM used for analysis:
-                        </label>
-                        <select name="provider_id" id="active_llm" class="form-control"
-                                style="max-width:260px;width:auto;" onchange="onActiveProviderChanged(this)">
-                            <?php foreach ($providers as $p): ?>
-                                <option value="<?= (int)$p['id'] ?>" <?= $p['is_active'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($available_providers[$p['provider']]['name'] ?? ucfirst($p['provider'])) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <label for="active_model" style="margin:0;font-weight:600;white-space:nowrap;">Model:</label>
-                        <select name="model" id="active_model" class="form-control"
-                                style="max-width:420px;width:auto;"></select>
-                        <button type="button" id="active_fetch_btn" class="btn btn-secondary btn-sm"
-                                onclick="fetchActiveModels()"
-                                title="Ask the provider which models it currently serves">
-                            <i class="fa fa-rotate me-1"></i> Fetch from provider
-                        </button>
-                        <button type="submit" name="set_default_provider" class="btn btn-success btn-sm">
-                            <i class="fa fa-check-circle me-1"></i> Use this
-                        </button>
-                        <span id="active_model_hint" style="color:#95a5a6;font-size:.875rem;flex-basis:100%;"></span>
-                    </form>
-                    <?php
-                    $active_type = $active_provider['provider'] ?? '';
-                    $rated = $available_providers[$active_type]['models'] ?? [];
-                    ?>
-                    <?php if ($rated): ?>
-                        <table class="table table-sm" style="margin:14px 0 0 0;font-size:.875rem;">
+                    <form method="POST">
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                            <label for="active_llm" style="margin:0;font-weight:600;white-space:nowrap;">
+                                <i class="fa fa-wand-magic-sparkles me-1" style="color:#27ae60;"></i>
+                                LLM used for analysis:
+                            </label>
+                            <select name="llm" id="active_llm" class="form-control"
+                                    style="max-width:520px;width:auto;">
+                                <?php foreach ($selectable as $group): ?>
+                                    <optgroup label="<?= htmlspecialchars($group['label']) ?>">
+                                        <?php foreach ($group['models'] as $m): ?>
+                                            <?php
+                                            $value = $group['row']['id'] . '::' . $m['id'];
+                                            $current = $group['row']['is_active'] && $group['row']['model'] === $m['id'];
+                                            $stars = !empty($m['stars'])
+                                                ? str_repeat('*', (int) $m['stars']) . str_repeat('.', 5 - (int) $m['stars'])
+                                                : 'unrated';
+                                            ?>
+                                            <option value="<?= htmlspecialchars($value) ?>" <?= $current ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($m['id']) ?>
+                                                &nbsp;<?= htmlspecialchars($stars) ?>
+                                                <?= !empty($m['cost']) ? '&nbsp;' . htmlspecialchars($m['cost']) : '' ?>
+                                                <?= !empty($m['suggested']) ? ' - recommended' : '' ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="button" id="active_fetch_btn" class="btn btn-secondary btn-sm"
+                                    onclick="fetchActiveModels()"
+                                    title="Ask every configured provider which models it currently serves">
+                                <i class="fa fa-rotate me-1"></i> Fetch from provider
+                            </button>
+                            <button type="submit" name="set_default_provider" class="btn btn-success btn-sm">
+                                <i class="fa fa-check-circle me-1"></i> Use this
+                            </button>
+                            <span id="active_model_hint" style="color:#95a5a6;font-size:.875rem;flex-basis:100%;"></span>
+                        </div>
+
+                        <?php // The ratings sit with the control they inform. ?>
+                        <table class="table table-sm" style="margin:12px 0 0 0;font-size:.875rem;">
                             <thead>
                                 <tr>
-                                    <th style="width:26%;">Model</th>
-                                    <th style="width:16%;" title="Rated for reasoning over a firewall rule set, not in general">For config review</th>
-                                    <th style="width:10%;" title="Relative band, not a price - see the note below">Cost</th>
-                                    <th style="width:22%;">Measured here</th>
+                                    <th style="width:4%;"></th>
+                                    <?php if (count($selectable) > 1): ?>
+                                        <th style="width:12%;">Provider</th>
+                                    <?php endif; ?>
+                                    <th style="width:22%;">Model</th>
+                                    <th style="width:14%;" title="Rated for reasoning over a firewall rule set, not in general">For config review</th>
+                                    <th style="width:8%;" title="Relative band, not a price - see the note below">Cost</th>
+                                    <th style="width:20%;">Measured here</th>
                                     <th>Why you would pick it</th>
                                 </tr>
                             </thead>
                             <tbody>
-                            <?php foreach ($rated as $m): ?>
-                                <?php
-                                $is_current = ($active_provider['model'] ?? '') === $m['id'];
-                                $seen = $measured[$m['id']] ?? null;
-                                ?>
-                                <tr<?= $is_current ? ' style="background:rgba(39,174,96,.12);"' : '' ?>>
-                                    <td>
-                                        <strong><?= htmlspecialchars($m['id']) ?></strong>
-                                        <?php if ($is_current): ?>
-                                            <span style="color:#27ae60;font-size:.8rem;"> &mdash; in use</span>
-                                        <?php elseif (!empty($m['suggested'])): ?>
-                                            <span style="color:#2980b9;font-size:.8rem;"> &mdash; recommended</span>
+                            <?php foreach ($selectable as $group): ?>
+                                <?php foreach ($group['models'] as $m): ?>
+                                    <?php
+                                    $value = $group['row']['id'] . '::' . $m['id'];
+                                    $is_current = $group['row']['is_active'] && $group['row']['model'] === $m['id'];
+                                    $seen = $measured[$m['id']] ?? null;
+                                    ?>
+                                    <tr<?= $is_current ? ' style="background:rgba(39,174,96,.12);"' : '' ?>>
+                                        <td>
+                                            <?php // Same name as the dropdown: the table is the selector too. ?>
+                                            <input type="radio" name="llm" value="<?= htmlspecialchars($value) ?>"
+                                                   <?= $is_current ? 'checked' : '' ?>
+                                                   onchange="document.getElementById('active_llm').value = this.value;"
+                                                   aria-label="Use <?= htmlspecialchars($m['id']) ?>">
+                                        </td>
+                                        <?php if (count($selectable) > 1): ?>
+                                            <td style="color:#bdc3c7;"><?= htmlspecialchars($group['label']) ?></td>
                                         <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if (!empty($m['stars'])): ?>
-                                            <span style="color:#f1c40f;letter-spacing:1px;"
-                                                  title="<?= (int)$m['stars'] ?> out of 5 for firewall config review">
-                                                <?= str_repeat('&#9733;', (int) $m['stars']) ?><span style="color:#7f8c8d;"><?= str_repeat('&#9734;', 5 - (int) $m['stars']) ?></span>
-                                            </span>
-                                        <?php else: ?>
-                                            <span style="color:#95a5a6;" title="Not rated here - run it and compare">unrated</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= $m['cost'] ? htmlspecialchars($m['cost']) : '<span style="color:#95a5a6;">&mdash;</span>' ?></td>
-                                    <td>
-                                        <?php if ($seen): ?>
-                                            <?= number_format($seen['avg_tokens']) ?> tokens/scan
-                                            <span style="color:#95a5a6;">(<?= $seen['scans'] ?> scan<?= $seen['scans'] === 1 ? '' : 's' ?>, <?= $seen['avg_seconds'] ?>s)</span>
-                                        <?php else: ?>
-                                            <span style="color:#95a5a6;">not run here yet</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="color:#bdc3c7;"><?= htmlspecialchars($m['note'] ?? '') ?></td>
-                                </tr>
+                                        <td>
+                                            <strong><?= htmlspecialchars($m['id']) ?></strong>
+                                            <?php if ($is_current): ?>
+                                                <span style="color:#27ae60;font-size:.8rem;"> &mdash; in use</span>
+                                            <?php elseif (!empty($m['suggested'])): ?>
+                                                <span style="color:#2980b9;font-size:.8rem;"> &mdash; recommended</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (!empty($m['stars'])): ?>
+                                                <span style="color:#f1c40f;letter-spacing:1px;"
+                                                      title="<?= (int)$m['stars'] ?> out of 5 for firewall config review">
+                                                    <?= str_repeat('&#9733;', (int) $m['stars']) ?><span style="color:#7f8c8d;"><?= str_repeat('&#9734;', 5 - (int) $m['stars']) ?></span>
+                                                </span>
+                                            <?php else: ?>
+                                                <span style="color:#95a5a6;" title="Not rated here - run it and compare">unrated</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?= !empty($m['cost']) ? htmlspecialchars($m['cost']) : '<span style="color:#95a5a6;">&mdash;</span>' ?></td>
+                                        <td>
+                                            <?php if ($seen): ?>
+                                                <?= number_format($seen['avg_tokens']) ?> tokens/scan
+                                                <span style="color:#95a5a6;">(<?= $seen['scans'] ?> scan<?= $seen['scans'] === 1 ? '' : 's' ?>, <?= $seen['avg_seconds'] ?>s)</span>
+                                            <?php else: ?>
+                                                <span style="color:#95a5a6;">not run here yet</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="color:#bdc3c7;"><?= htmlspecialchars($m['note'] ?? '') ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
                             <?php endforeach; ?>
                             </tbody>
                         </table>
-                        <small style="color:#95a5a6;display:block;margin-top:6px;">
-                            Stars rate a model for reasoning over a rule set, not in general, and are
-                            this project's judgement rather than a benchmark. Cost is a relative band:
-                            per-token prices differ by account and change without this page changing,
-                            so no figure is quoted. &ldquo;Measured here&rdquo; is your own scan history
-                            and is the only number on this row that is not an opinion.
+                    </form>
+                    <small style="color:#95a5a6;display:block;margin-top:6px;">
+                        Stars rate a model for reasoning over a rule set, not in general, and are
+                        this project's judgement rather than a benchmark. Cost is a relative band:
+                        per-token prices differ by account and change without this page changing,
+                        so no figure is quoted. &ldquo;Measured here&rdquo; is your own scan history
+                        and is the only number on this row that is not an opinion.
+                    </small>
+                    <?php if (count($selectable) === 1): ?>
+                        <small style="color:#95a5a6;display:block;margin-top:4px;">
+                            Add another provider and its models appear in this list too.
                         </small>
-                    <?php endif; ?>
-                    <?php if (count($providers) === 1): ?>
-                        <small style="color:#95a5a6;display:block;margin-top:6px;">Add another provider to switch between them.</small>
                     <?php endif; ?>
                 </div>
             <?php else: ?>
@@ -806,29 +868,23 @@ $available_providers = [
                 <label>Provider</label>
                 <input type="text" id="edit_provider_name" class="form-control" readonly style="background: #15181e; opacity: 0.8;">
             </div>
+            <?php
+            // The key, and nothing else. The model is chosen in the list at the
+            // top of the page, which spans every configured provider; a second
+            // model field here meant two controls for one value.
+            ?>
             <div class="form-group">
-                <label>Model *</label>
-                <select id="edit_model_select" class="form-control" onchange="onEditModelPicked(this)">
-                    <option value="">Select a model</option>
-                </select>
-                <input type="text" name="model" id="edit_model_input" class="form-control"
-                       style="margin-top:8px;" required
-                       placeholder="Model id - pick above or type one">
-                <small style="color:#95a5a6;display:block;margin-top:4px;">
-                    Any model id the provider accepts will work, including one newer than this list.
-                </small>
-            </div>
-            <div class="form-group">
-                <label>API Key *</label>
+                <label>API Key</label>
                 <input type="password" name="api_key" id="edit_api_key" class="form-control"
                        autocomplete="new-password" spellcheck="false"
-                       placeholder="Leave blank to keep the current key">
+                       placeholder="Paste a new key to replace the stored one">
                 <small style="color: #95a5a6; display: block; margin-top: 5px;">
-                    Stored encrypted. Leave blank to change the model without touching the key.
+                    Stored encrypted. Leave blank to close without changing it.
+                    The model is chosen in &ldquo;LLM used for analysis&rdquo; above.
                 </small>
             </div>
             <button type="submit" name="edit_provider" class="btn btn-primary">
-                <i class="fa fa-save me-2"></i> Update Provider
+                <i class="fa fa-save me-2"></i> Replace key
             </button>
         </form>
     </div>
@@ -843,58 +899,18 @@ const configuredProviders = <?= json_encode(array_map(static function (array $ro
 }, $providers), JSON_UNESCAPED_SLASHES) ?>;
 const csrfToken = '<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>';
 
-// Fill the model dropdown for the selected provider: the curated suggestions for
-// its type, plus whatever that row is configured with - which may be a model the
-// catalogue has never heard of, and must not be silently dropped from the list
-// that claims to show what is in use.
-function onActiveProviderChanged(select) {
-    const row = configuredProviders.find(r => String(r.id) === String(select.value));
-    const modelSelect = document.getElementById('active_model');
-    if (!row || !modelSelect) { return; }
-
-    modelSelect.innerHTML = '';
-    const seen = new Set();
-    const add = (id, label, group) => {
-        if (!id || seen.has(id)) { return; }
-        seen.add(id);
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = label;
-        if (id === row.model) { option.selected = true; }
-        (group || modelSelect).appendChild(option);
-    };
-
-    add(row.model, row.model + '  - in use');
-
-    const entry = providerModels[row.provider];
-    const suggestions = (entry && entry.models) || [];
-    if (suggestions.length) {
-        const group = document.createElement('optgroup');
-        group.label = 'Suggested';
-        suggestions.forEach(model => add(
-            model.id,
-            model.id + '  ' + ratingLabel(model)
-                + (model.suggested ? '  - recommended' : '')
-                + (model.note ? '  (' + model.note + ')' : ''),
-            group
-        ));
-        if (group.children.length) { modelSelect.appendChild(group); }
-    }
-}
-
-// Five filled stars is "best for reasoning over a rule set", not "best overall".
-// An unrated model says so: a guess rendered as stars is indistinguishable from
-// a measurement, which is the whole problem with writing figures down by hand.
-function ratingLabel(model) {
-    const stars = model.stars
-        ? '*'.repeat(model.stars) + '.'.repeat(5 - model.stars)
-        : 'unrated';
-    return stars + (model.cost ? '  ' + model.cost : '');
-}
-
+// The list is rendered server side now - one group per configured provider, with
+// each model's rating already in its label - so there is no client-side builder
+// to keep in step with it. Selecting a row's radio mirrors into the dropdown so
+// the two controls cannot disagree about what is about to be submitted.
 document.addEventListener('DOMContentLoaded', () => {
     const select = document.getElementById('active_llm');
-    if (select) { onActiveProviderChanged(select); }
+    if (!select) { return; }
+    select.addEventListener('change', () => {
+        const radio = document.querySelector('input[type=radio][name="llm"][value="'
+            + CSS.escape(select.value) + '"]');
+        if (radio) { radio.checked = true; }
+    });
 });
 
 function showAddModal() {
@@ -944,12 +960,6 @@ function updateModels(select) {
     fetchBtn.disabled = !entry.discoverable;
     if (!entry.discoverable) {
         fetchBtn.title = 'This provider does not publish a model list';
-    }
-}
-
-function onEditModelPicked(select) {
-    if (select.value) {
-        document.getElementById('edit_model_input').value = select.value;
     }
 }
 
@@ -1005,52 +1015,66 @@ function fetchModels() {
 // Add and Edit modals, which is the one place you are not looking when you want
 // to change the model of a provider that is already configured.
 function fetchActiveModels() {
-    const select = document.getElementById('active_llm');
-    const row = configuredProviders.find(r => String(r.id) === String(select.value));
     const btn = document.getElementById('active_fetch_btn');
     const hint = document.getElementById('active_model_hint');
-    if (!row) { return; }
+    const select = document.getElementById('active_llm');
+    const original = btn.innerHTML;
 
-    const entry = providerModels[row.provider];
-    if (entry && entry.discoverable === false) {
-        hint.textContent = (entry.name || row.provider) + ' does not publish a model list - type the id in Edit.';
+    // The list spans providers, so discovery does too: every configured provider
+    // is asked, and each one's results land in its own group. Asking only the
+    // active provider would leave the others showing a hand-written catalogue
+    // while the one you happened to be using showed the truth.
+    const targets = configuredProviders.filter(r => {
+        const entry = providerModels[r.provider];
+        return !entry || entry.discoverable !== false;
+    });
+    if (!targets.length) {
+        hint.textContent = 'No configured provider publishes a model list.';
         return;
     }
 
-    const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Fetching...';
     hint.textContent = '';
 
-    fetch('/api/ai_models.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
-                   'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ provider: row.provider, csrf: csrfToken })
-    })
-    .then(r => r.status === 401
-        ? Promise.reject(new Error('Your session has expired. Sign in again.'))
-        : r.json())
-    .then(data => {
-        if (!data.success) {
-            hint.textContent = data.error || 'Could not list models.';
-            return;
-        }
-        const modelSelect = document.getElementById('active_model');
-        const known = new Set([...modelSelect.options].map(o => o.value));
-        const group = document.createElement('optgroup');
-        group.label = 'Available from provider (' + data.count + ')';
-        data.models.forEach(id => {
-            if (known.has(id)) { return; }
-            const o = document.createElement('option');
-            o.value = id; o.textContent = id;
-            group.appendChild(o);
+    Promise.all(targets.map(row =>
+        fetch('/api/ai_models.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                       'X-CSRF-Token': csrfToken },
+            body: JSON.stringify({ provider: row.provider, csrf: csrfToken })
+        })
+        .then(r => r.status === 401
+            ? Promise.reject(new Error('Your session has expired. Sign in again.'))
+            : r.json())
+        .then(data => ({ row: row, data: data }))
+        .catch(err => ({ row: row, data: { success: false, error: err.message } }))
+    )).then(results => {
+        const notes = [];
+        results.forEach(({ row, data }) => {
+            const name = (providerModels[row.provider] || {}).name || row.provider;
+            if (!data.success) {
+                notes.push(name + ': ' + (data.error || 'could not list models'));
+                return;
+            }
+            const group = [...select.querySelectorAll('optgroup')]
+                .find(g => g.label === name) || select.appendChild(
+                    Object.assign(document.createElement('optgroup'), { label: name }));
+            const known = new Set([...group.querySelectorAll('option')]
+                .map(o => o.value.split('::').slice(1).join('::')));
+            let added = 0;
+            data.models.forEach(id => {
+                if (known.has(id)) { return; }
+                const o = document.createElement('option');
+                o.value = row.id + '::' + id;
+                o.textContent = id + '  unrated';
+                group.appendChild(o);
+                added++;
+            });
+            notes.push(name + ': ' + data.count + ' offered, ' + added + ' new');
         });
-        if (group.children.length) { modelSelect.appendChild(group); }
-        hint.textContent = data.count + ' model(s) returned by the provider. '
-            + 'Pick one and press "Use this".';
+        hint.textContent = notes.join('  -  ') + '. Pick one and press "Use this".';
     })
-    .catch(err => { hint.textContent = err.message || 'Could not reach the provider.'; })
     .finally(() => { btn.disabled = false; btn.innerHTML = original; });
 }
 
@@ -1062,29 +1086,8 @@ function showEditModal(provider) {
     const providerInfo = providerModels[provider.provider];
     document.getElementById('edit_provider_name').value = providerInfo ? providerInfo.name : provider.provider;
 
-    // Populate model dropdown with available models for this provider
-    const editModelSelect = document.getElementById('edit_model_select');
-    editModelSelect.innerHTML = '<option value="">Select model</option>';
+    // No model controls here any more: the modal edits the key alone.
 
-    // The configured model may not be in the suggestions at all - it could predate
-    // them or postdate them - so the text field holds the truth and the list is
-    // only a shortcut.
-    if (providerInfo && providerInfo.models) {
-        providerInfo.models.forEach(model => {
-            const option = document.createElement('option');
-            option.value = model.id;
-            option.textContent = model.id
-                + (model.suggested ? '  - recommended' : '')
-                + (model.note ? '  (' + model.note + ')' : '');
-            if (model.id === provider.model) {
-                option.selected = true;
-            }
-            editModelSelect.appendChild(option);
-        });
-    }
-    document.getElementById('edit_model_input').value = provider.model || '';
-
-    // Set API key
     // Left blank deliberately: the stored key is not sent to the browser, and a
     // blank field means "keep the key that is already stored".
     document.getElementById('edit_api_key').value = '';

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Rated, Banded, And Measured'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One List, Every Provider'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.8',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'One List, Every Provider',
+            'changes' => [
+                'CHANGED: The LLM control is one list spanning every configured provider, grouped by provider. With an OpenAI key and a Claude key configured it shows both providers\' models together; with one provider configured it shows that provider\'s. The thing being chosen is a model - the provider follows from it - so choosing a provider first, before you could see what it offered, was a step that existed only because the form was built that way',
+                'CHANGED: The ratings table sits with the control it informs and is itself a selector: each row has a radio that mirrors into the dropdown, so the advice and the act of choosing are in the same place',
+                'CHANGED: Editing a provider edits its API key and nothing else. The model field in that modal was a second control for a value now chosen in the list above, and when the two disagreed the modal won silently. An empty key closes without changing anything rather than storing nothing as the key',
+                'CHANGED: "Fetch from provider" asks every configured provider rather than only the active one, and each provider\'s results land in its own group. One provider failing no longer loses the others\' results',
+                'FIXED: The provider row id travels with the model id in one field, so a saved choice can never pair a model with the wrong key. The split takes the first separator only, so a model id containing one is not truncated',
+            ],
+        ],
         [
             'version' => '3.69.7',
             'date' => '2026-09-17',
