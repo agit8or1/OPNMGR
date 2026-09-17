@@ -6,6 +6,48 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.57.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Added
+
+**A copy-paste reinstall command under every firewall, bound to that firewall.**
+
+```
+fetch -o - https://manager.example/downloads/plugins/install_opnmanager_agent.sh \
+  | env OPNMGR_BASE_URL=https://manager.example \
+        OPNMGR_HARDWARE_ID=188c37cbdaf5896d681581be47ae8b08 sh
+```
+
+When an agent stops, the recovery is someone at that firewall's console. Twice
+this week that meant composing the installer invocation from memory.
+
+**Why it carries the hardware id.** A generic command has a worse failure than
+being wrong. A firewall that has lost its `/usr/local/etc` files - a rebuilt box -
+would generate a fresh identity and enrol as a *new* record, silently abandoning
+its history, alerts and backups while the install reports success. With the id,
+it rejoins as itself.
+
+- **The installer accepts `OPNMGR_HARDWARE_ID` and seeds it only when the
+  firewall has none.** An id already present is never overwritten; the installer
+  says so and carries on. That is what makes the command safe to run on a healthy
+  firewall - it reinstalls the agent and leaves identity, credentials and
+  configuration untouched.
+- A malformed id is refused rather than written, and a seeded id file is `0600`.
+- A firewall with no hardware id recorded is called out on the page, rather than
+  quietly given a command that cannot bind it.
+- Copying falls back to `execCommand` where `navigator.clipboard` is unavailable,
+  which is over plain http - often exactly where a broken fleet is being worked
+  on.
+
+### Added
+
+- `tests/agent_reinstall_command_test.php` - twenty-one assertions, including
+  that the id write sits in the `else` branch of the existence test, and that the
+  installer still removes neither the hardware id nor the stored credentials.
+
+---
+
 ## Version 3.56.1
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

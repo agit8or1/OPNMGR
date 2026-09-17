@@ -42,6 +42,37 @@ if [ ! -f /usr/local/etc/inc/config.inc ]; then
     exit 1
 fi
 
+# Identity.
+#
+# OPNMGR_HARDWARE_ID lets the manager hand a firewall a command that rejoins it
+# to its own record rather than enrolling it as a new one. It is only ever used
+# to seed a firewall that has no identity - a rebuilt box, or one whose
+# /usr/local/etc files were lost. An id already on the firewall is never
+# overwritten, so reinstalling on a working firewall cannot change what it
+# reports or detach it from its history.
+HARDWARE_ID_FILE=/usr/local/etc/opnmanager_hardware_id
+if [ -n "$OPNMGR_HARDWARE_ID" ]; then
+    if ! echo "$OPNMGR_HARDWARE_ID" | grep -Eq '^[0-9a-f]{32}$'; then
+        echo "ERROR: OPNMGR_HARDWARE_ID is not a 32 character hex id"
+        exit 1
+    fi
+
+    if [ -f "$HARDWARE_ID_FILE" ]; then
+        EXISTING_ID=$(cat "$HARDWARE_ID_FILE" 2>/dev/null)
+        if [ "$EXISTING_ID" = "$OPNMGR_HARDWARE_ID" ]; then
+            echo "Identity: $EXISTING_ID (unchanged)"
+        else
+            echo "Identity: keeping the id already on this firewall: $EXISTING_ID"
+            echo "          The command supplied $OPNMGR_HARDWARE_ID, which was NOT applied."
+            echo "          Delete $HARDWARE_ID_FILE first if you intend to rebind this firewall."
+        fi
+    else
+        echo "$OPNMGR_HARDWARE_ID" > "$HARDWARE_ID_FILE"
+        chmod 600 "$HARDWARE_ID_FILE"
+        echo "Identity: seeded $OPNMGR_HARDWARE_ID (this firewall had none)"
+    fi
+fi
+
 echo "Downloading plugin..."
 cd /tmp
 fetch -q "$PLUGIN_URL" -o opnmanager-agent.tar.gz

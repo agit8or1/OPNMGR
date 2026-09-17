@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Table Not Modelled Here'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Reinstall This One'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.57.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Reinstall This One',
+            'changes' => [
+                'ADDED: Every firewall page carries a copy-paste command that reinstalls the agent on that firewall, with a copy button. When an agent stops, the recovery is someone at that firewall\'s console - twice this week that meant composing the installer invocation from memory',
+                'ADDED: The command carries that firewall\'s own hardware id, so a box that has lost its /usr/local/etc files rejoins as the same record. A generic command has a worse failure than being wrong: the firewall enrols as a NEW record, silently abandoning its history, alerts and backups while looking like a success',
+                'ADDED: The installer accepts OPNMGR_HARDWARE_ID and seeds it only when the firewall has none. An id already present is never overwritten - it says so and carries on - which is what makes running this on a healthy firewall safe. It reinstalls the agent and leaves identity, credentials and configuration untouched',
+                'ADDED: A malformed id is refused rather than written, and a seeded id file is created 0600',
+                'ADDED: A firewall with no hardware id recorded is called out in the page rather than quietly given a command that cannot bind it',
+                'ADDED: Copying falls back to execCommand where navigator.clipboard is unavailable, which is over plain http - often exactly where a broken fleet is being worked on',
+                'ADDED: tests/agent_reinstall_command_test.php, twenty-one assertions, including that the id write sits in the else branch of the existence test and that the installer still removes neither the hardware id nor the stored credentials',
+            ],
+        ],
         [
             'version' => '3.56.1',
             'date' => '2026-09-17',

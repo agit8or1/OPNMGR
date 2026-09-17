@@ -679,6 +679,55 @@ include __DIR__ . '/inc/header.php';
                                                 <i class="fas fa-tools"></i> Update/Repair Agent
                                             </button>
                                         </div>
+
+                                        <?php
+                                        // Reinstall command for THIS firewall.
+                                        //
+                                        // Carries this firewall's hardware id, so a box that has lost its
+                                        // identity rejoins as this record rather than enrolling as a new
+                                        // one. The installer never overwrites an id already present, so
+                                        // running this on a working firewall changes nothing about who it
+                                        // is - it reinstalls the agent and leaves configuration, hardware
+                                        // id and stored credentials alone.
+                                        //
+                                        // It exists because the alternative, when an agent stops, is an
+                                        // operator at a console composing this from memory.
+                                        $reinstall_base = opnmgr_server_url();
+                                        $reinstall_hwid = (string)($firewall['hardware_id'] ?? '');
+                                        if ($reinstall_base !== ''):
+                                            $reinstall_cmd = 'fetch -o - ' . $reinstall_base . '/downloads/plugins/install_opnmanager_agent.sh \\' . "\n"
+                                                . '  | env OPNMGR_BASE_URL=' . $reinstall_base;
+                                            if (preg_match('/^[0-9a-f]{32}$/', $reinstall_hwid)) {
+                                                $reinstall_cmd .= ' \\' . "\n" . '        OPNMGR_HARDWARE_ID=' . $reinstall_hwid;
+                                            }
+                                            $reinstall_cmd .= ' sh';
+                                        ?>
+                                        <div class="mb-3" style="background-color: rgba(108,117,125,0.12); padding: 0.75rem; border-radius: 0.25rem; border-left: 3px solid #6c757d;">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <strong><i class="fas fa-terminal"></i> Reinstall at the console:</strong><br>
+                                                    <small>Run on <?php echo htmlspecialchars($firewall['hostname']); ?> when it cannot be reached. Keeps its identity, settings and history.</small>
+                                                </div>
+                                                <button class="btn btn-sm btn-outline-secondary flex-shrink-0 ms-2"
+                                                        onclick="copyReinstallCmd(this)" title="Copy to clipboard">
+                                                    <i class="fas fa-copy"></i> Copy
+                                                </button>
+                                            </div>
+                                            <pre id="reinstallCmd" class="mt-2 mb-0 p-2" style="background:#0d1117;color:#c9d1d9;border-radius:4px;font-size:0.72rem;white-space:pre-wrap;word-break:break-all;"><?php echo htmlspecialchars($reinstall_cmd); ?></pre>
+                                            <?php if (!preg_match('/^[0-9a-f]{32}$/', $reinstall_hwid)): ?>
+                                            <small class="text-warning d-block mt-1">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                This firewall has no hardware ID recorded, so the command cannot bind a
+                                                rebuilt box back to this record - it would enrol as a new firewall.
+                                            </small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php else: ?>
+                                        <div class="mb-3 text-muted" style="font-size:0.8rem;">
+                                            <i class="fas fa-info-circle"></i>
+                                            Set this manager's URL in Settings to show a reinstall command.
+                                        </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -2081,6 +2130,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Repair Agent via SSH
+function copyReinstallCmd(btn) {
+    // The command is multi-line with shell continuations; it is copied exactly
+    // as displayed so it pastes into a console and runs as-is.
+    const text = document.getElementById('reinstallCmd').innerText;
+    const done = () => {
+        const original = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied';
+        setTimeout(() => { btn.innerHTML = original; }, 1500);
+    };
+    // navigator.clipboard needs a secure context and is not always available.
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { alert('Copy failed - select the text manually.'); }
+    document.body.removeChild(ta);
+}
+
 function repairAgent() {
     if (!confirm('Update/Repair the agent on this firewall?\n\nThis will:\n• SSH into the firewall\n• Stop any running agent processes\n• Download and install the latest agent\n• Configure and start the agent\n\nNote: This requires SSH access to be configured.\n\nContinue?')) {
         return;
