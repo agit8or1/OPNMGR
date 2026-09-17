@@ -1,5 +1,9 @@
 <?php
 
+// opnmgr_decrypt() lives here. Without it every stored credential reaches the
+// SMTP server as ciphertext.
+require_once __DIR__ . '/crypto.php';
+
 if (!function_exists('smtp_safe_error')) {
     /**
      * An SMTP failure an operator can act on, with any credential removed.
@@ -20,8 +24,11 @@ if (!function_exists('smtp_safe_error')) {
                 $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
                 $stmt->execute([$name]);
                 $value = (string) ($stmt->fetchColumn() ?: '');
-                if (function_exists('decrypt_setting_value')) {
-                    $value = (string) decrypt_setting_value($value);
+                // decrypt_setting_value() is not a function in this codebase and
+                // never has been, so this guard was always false and the
+                // redaction compared the ciphertext against the message.
+                if (function_exists('opnmgr_decrypt')) {
+                    $value = (string) (opnmgr_decrypt($value) ?? '');
                 }
                 if ($value !== '' && strlen($value) > 3) {
                     $message = str_ireplace($value, '[redacted]', $message);
@@ -34,16 +41,140 @@ if (!function_exists('smtp_safe_error')) {
         return substr(trim($message), 0, 500);
     }
 }
+if (!function_exists('smtp_plain_secret')) {
+    /**
+     * A stored credential in the form the SMTP server expects.
+     *
+     * Returns '' rather than the ciphertext when decryption fails, because
+     * authenticating with an encrypted blob produces a 535 that reads like a
+     * wrong password and sends you looking at the wrong thing entirely.
+     */
+    function smtp_plain_secret(string $stored): string
+    {
+        if ($stored === '' || !function_exists('opnmgr_decrypt')) {
+            return $stored;
+        }
+        $plain = opnmgr_decrypt($stored);
+        if ($plain === null) {
+            error_log('OPNMGR: could not decrypt an SMTP credential; refusing to send the stored ciphertext as a password');
+            return '';
+        }
+        return $plain;
+    }
+}
+
 /**
  * Simple SMTP Mailer
  * Direct SMTP connection without external dependencies
  */
 
+if (!function_exists('smtp_verify_credentials')) {
+    /**
+     * Connect, negotiate TLS and authenticate. Send nothing.
+     *
+     * Exists because the configuration page's "test" opened a socket and closed
+     * it, which passes with no credentials at all - so it could never detect a
+     * rejected password, the one failure it was being used to rule out.
+     *
+     * @return true|string true on success, otherwise a safe error message
+     */
+    function smtp_verify_credentials(array $smtp_settings)
+    {
+        $host       = (string) ($smtp_settings['smtp_host'] ?? '');
+        $port       = (int) ($smtp_settings['smtp_port'] ?? 0);
+        $encryption = (string) ($smtp_settings['smtp_encryption'] ?? 'tls');
+        $username   = smtp_plain_secret((string) ($smtp_settings['smtp_username'] ?? ''));
+        $password   = smtp_plain_secret((string) ($smtp_settings['smtp_password'] ?? ''));
+
+        if ($host === '' || $port === 0) {
+            return 'SMTP host and port are required.';
+        }
+        if ($username === '' || $password === '') {
+            return 'SMTP username and password are required. '
+                 . 'If a password is stored, it could not be decrypted.';
+        }
+
+        $errno = 0;
+        $errstr = '';
+        $target = ($encryption === 'ssl') ? "ssl://{$host}" : $host;
+        $socket = @fsockopen($target, $port, $errno, $errstr, 10);
+        if (!$socket) {
+            return smtp_safe_error("Connection failed: {$errstr} ({$errno})");
+        }
+        stream_set_timeout($socket, 10);
+
+        $read = static function () use ($socket): string {
+            $out = '';
+            while (($line = fgets($socket, 515)) !== false) {
+                $out .= $line;
+                if (strlen($line) < 4 || $line[3] !== '-') {
+                    break;
+                }
+            }
+            return $out;
+        };
+        $say = static function (string $cmd) use ($socket): void {
+            fputs($socket, $cmd . "\r\n");
+        };
+
+        try {
+            if (strpos($read(), '220') !== 0) {
+                return 'Server did not greet with 220.';
+            }
+
+            $say('EHLO ' . gethostname());
+            $read();
+
+            if ($encryption === 'tls') {
+                $say('STARTTLS');
+                if (strpos($read(), '220') !== 0) {
+                    return 'STARTTLS refused by the server.';
+                }
+                if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+                    return 'TLS negotiation failed.';
+                }
+                $say('EHLO ' . gethostname());
+                $read();
+            }
+
+            $say('AUTH LOGIN');
+            if (strpos($read(), '334') !== 0) {
+                return 'Server did not offer AUTH LOGIN.';
+            }
+            $say(base64_encode($username));
+            if (strpos($read(), '334') !== 0) {
+                return 'Server rejected the username.';
+            }
+            $say(base64_encode($password));
+            $final = $read();
+            if (strpos($final, '235') !== 0) {
+                // The message that matters: this is what 8,497 alerts hit.
+                return smtp_safe_error('Authentication failed: ' . trim($final));
+            }
+
+            return true;
+        } catch (Throwable $e) {
+            return smtp_safe_error($e->getMessage());
+        } finally {
+            @fputs($socket, "QUIT\r\n");
+            @fclose($socket);
+        }
+    }
+}
+
 function send_smtp_email($smtp_settings, $to, $subject, $message, $from_address, $from_name = '') {
     $host = $smtp_settings['smtp_host'];
     $port = (int)$smtp_settings['smtp_port'];
-    $username = $smtp_settings['smtp_username'];
-    $password = $smtp_settings['smtp_password'];
+
+    // Callers read these straight out of `settings`, where secrets are stored
+    // as `enc:v1:...`. Nothing decrypted them, so the ciphertext was handed to
+    // AUTH and every server answered 535. Decrypting here rather than in each
+    // caller means there is one place that can get it wrong, and it is this one.
+    //
+    // opnmgr_decrypt() returns plaintext unchanged, so a value stored before
+    // encryption existed still works.
+    $username = smtp_plain_secret($smtp_settings['smtp_username'] ?? '');
+    $password = smtp_plain_secret($smtp_settings['smtp_password'] ?? '');
     $encryption = $smtp_settings['smtp_encryption'] ?? 'tls';
     
     $from = $from_name ? "$from_name <$from_address>" : $from_address;

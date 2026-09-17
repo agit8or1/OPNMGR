@@ -95,22 +95,24 @@ function test_smtp_connection() {
         return "SMTP host and port are required for testing.";
     }
 
-    // Simple connection test
-    $errno = 0;
-    $errstr = '';
+    // This opened a TCP socket, closed it, and reported success. It never
+    // authenticated, so it passed for any reachable host - with the wrong
+    // password, with no password, with no username at all. That is why the
+    // alert channel could fail 8,497 times on 535 Authentication failed while
+    // this button said the configuration was fine: the one thing it could not
+    // detect was the only thing wrong.
+    //
+    // It authenticates now, through the same code the alerts use, and sends no
+    // mail. A passing test means the credentials work.
+    require_once __DIR__ . '/inc/smtp_mailer.php';
 
-    if ($smtp_encryption === 'ssl') {
-        $socket = @fsockopen('ssl://' . $smtp_host, $smtp_port, $errno, $errstr, 5);
-    } else {
-        $socket = @fsockopen($smtp_host, $smtp_port, $errno, $errstr, 5);
-    }
-
-    if (!$socket) {
-        return "Connection failed: $errstr ($errno)";
-    }
-
-    fclose($socket);
-    return true;
+    return smtp_verify_credentials([
+        'smtp_host'       => $smtp_host,
+        'smtp_port'       => $smtp_port,
+        'smtp_username'   => $smtp_username,
+        'smtp_password'   => $smtp_password,
+        'smtp_encryption' => $smtp_encryption,
+    ]);
 }
 
 include __DIR__ . '/inc/header.php';

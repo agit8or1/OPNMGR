@@ -59,6 +59,39 @@ function raise(string $type, array $opts): void {
 }
 
 /** Resolve unless this is a dry run. */
+/**
+ * Close open incidents whose object is no longer reported at all.
+ *
+ * Each condition below resolves by iterating what the agent currently reports,
+ * so an object that disappears is never visited and its incident stays open
+ * forever - still counting toward the notification repeat limit. Services are
+ * the clearest case: health_ingest_services() deletes rows the agent stops
+ * reporting, precisely so a stale row cannot linger, and the incident it raised
+ * then outlived the row that justified it.
+ *
+ * Eight `service.stopped` incidents were open for services no longer present on
+ * either firewall, and they mailed out the moment SMTP started working again.
+ *
+ * @param array<int,string> $seen object_keys reported in this evaluation
+ */
+function resolve_vanished(string $type, int $fwId, array $seen, string $reason = 'no longer reported'): void {
+    try {
+        $stmt = db()->prepare(
+            "SELECT object_key FROM alert_incidents
+              WHERE alert_type = ? AND firewall_id = ? AND status = 'open'
+                AND object_key IS NOT NULL AND object_key <> ''"
+        );
+        $stmt->execute([$type, $fwId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $key) {
+            if (!in_array((string)$key, $seen, true)) {
+                resolve($type, $fwId, (string)$key, $reason);
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('OPNMGR: could not sweep vanished ' . $type . ' incidents: ' . $e->getMessage());
+    }
+}
+
 function resolve(string $type, ?int $fwId, ?string $key = null, string $reason = 'condition cleared'): void {
     global $dryRun, $resolved;
     if ($dryRun) {
@@ -166,8 +199,10 @@ foreach ($firewalls as $fw) {
     // --- VPN ----------------------------------------------------------------
     $vpns = db()->prepare('SELECT * FROM firewall_vpn_tunnels WHERE firewall_id = ? AND enabled = 1');
     $vpns->execute([$id]);
+    $seenTunnels = [];
     foreach ($vpns->fetchAll(PDO::FETCH_ASSOC) as $t) {
         $key = $t['vpn_type'] . '/' . $t['name'];
+        $seenTunnels[] = $key;
         $up  = in_array(strtolower((string)$t['status']), ['up', 'connected'], true);
 
         if (!$stale && !$up) {
@@ -179,6 +214,11 @@ foreach ($firewalls as $fw) {
         } else {
             resolve('vpn.down', $id, $key, 'tunnel is up');
         }
+    }
+    // A tunnel that has been deleted or disabled stops being reported, and its
+    // incident would otherwise stay open against a tunnel that no longer exists.
+    if (!$stale) {
+        resolve_vanished('vpn.down', $id, $seenTunnels, 'tunnel is no longer reported');
     }
 
     // --- CARP ---------------------------------------------------------------
@@ -195,7 +235,9 @@ foreach ($firewalls as $fw) {
     // --- services -----------------------------------------------------------
     $svcs = db()->prepare('SELECT * FROM firewall_services WHERE firewall_id = ? AND enabled = 1');
     $svcs->execute([$id]);
+    $seenServices = [];
     foreach ($svcs->fetchAll(PDO::FETCH_ASSOC) as $svc) {
+        $seenServices[] = (string)$svc['name'];
         if (!$stale && (int)$svc['running'] === 0) {
             raise('service.stopped', [
                 'firewall_id' => $id, 'object_key' => $svc['name'],
@@ -205,6 +247,12 @@ foreach ($firewalls as $fw) {
         } else {
             resolve('service.stopped', $id, $svc['name'], 'service is running');
         }
+    }
+    // A service the agent has stopped reporting - disabled, or removed with the
+    // package - leaves no row to iterate, so without this its incident never
+    // closes.
+    if (!$stale) {
+        resolve_vanished('service.stopped', $id, $seenServices, 'service is no longer reported');
     }
 
     // --- certificates -------------------------------------------------------
@@ -386,6 +434,35 @@ foreach (cron_jobs() as $job) {
     ]);
 }
 say(sprintf('Scheduled jobs: %d watched', count($watched)));
+
+// An incident against a firewall that no longer exists can never be resolved by
+// evaluation, because nothing iterates a deleted firewall. One such incident was
+// open against `__opnmgr_test_a`, a fixture firewall removed long ago, and it
+// mailed out with everything else once SMTP started working.
+if (!$dryRun) {
+    try {
+        $orphans = db()->query(
+            "SELECT i.id, i.alert_type, i.firewall_id
+               FROM alert_incidents i
+          LEFT JOIN firewalls f ON f.id = i.firewall_id
+              WHERE i.status = 'open' AND i.firewall_id IS NOT NULL AND f.id IS NULL"
+        )->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($orphans as $o) {
+            db()->prepare(
+                "UPDATE alert_incidents
+                    SET status = 'resolved', resolved_at = NOW(),
+                        suppressed_reason = 'firewall no longer exists'
+                  WHERE id = ? AND status = 'open'"
+            )->execute([$o['id']]);
+            $resolved++;
+            say(sprintf('RESOLVE %-21s fw=%s (firewall no longer exists)',
+                $o['alert_type'], $o['firewall_id']));
+        }
+    } catch (Throwable $e) {
+        error_log('OPNMGR: could not sweep orphaned incidents: ' . $e->getMessage());
+    }
+}
 
 say(sprintf('Detection complete: %d raised/updated, %d resolved', $raised, $resolved));
 

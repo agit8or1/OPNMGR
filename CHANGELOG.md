@@ -6,6 +6,75 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.64.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**8,497 alert notifications failed, every one of them, and the credentials were correct.**
+
+```
+535-5.7.8 Username and Password not accepted
+```
+
+Secrets are stored as `enc:v1:...`. Nothing decrypted them before `AUTH`, so the
+ciphertext was being offered as the password. The only decrypt attempt in the
+mail path called `decrypt_setting_value()` - a function that **does not exist in
+this codebase and never has** - wrapped in `function_exists()`, so the guard was
+permanently false and quietly did nothing while reading as a safeguard.
+
+Decryption now happens once, inside `send_smtp_email()`, so there is a single
+place that can get it wrong. A failed decryption sends nothing rather than the
+ciphertext: offering an encrypted blob as a password produces a 535 that reads
+like a wrong password and sends you looking at the wrong thing entirely.
+
+**The test button could not have caught it.**
+
+```php
+$socket = @fsockopen($smtp_host, $smtp_port, ...);
+fclose($socket);
+return true;
+```
+
+It opened a TCP socket and closed it. It never authenticated, so it passed with
+the wrong password, with no password, and with no username at all. The one
+failure it could not detect was the only thing wrong. It authenticates now,
+through the same code the alerts use, and sends no mail.
+
+### Found
+
+**Restoring delivery released a backlog: twelve open incidents mailed at once,
+ten of them stale.**
+
+Each condition resolves by iterating what the agent *currently* reports, so an
+object that stops being reported is never visited and its incident stays open
+forever - still counting toward the notification repeat limit.
+`health_ingest_services()` deletes rows the agent stops reporting, deliberately,
+so that a stale row cannot linger - and eight `service.stopped` incidents
+outlived the rows that justified them.
+
+- `resolve_vanished()` closes incidents whose object is no longer reported, for
+  services and VPN tunnels. It is skipped when the firewall is stale, because
+  reporting nothing is not the same as nothing being wrong.
+- A sweep for incidents against firewalls that no longer exist. One was open
+  against `__opnmgr_test_a`, a fixture firewall deleted long ago; nothing
+  iterates a deleted firewall, so it could never have resolved.
+
+Open incidents went from twelve to two, both of them real certificate expiries.
+
+### Changed
+
+- Two accounts created for screenshot capture held placeholder addresses
+  (`screenshot@localhost`, `screenshots@local`) and, being administrators,
+  received every alert. Their addresses were cleared, so alerts reach real
+  mailboxes and stop being recorded as partial failures.
+
+### Added
+
+- `tests/smtp_delivery_test.php` - twenty-four assertions across both defects.
+
+---
+
 ## Version 3.63.3
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

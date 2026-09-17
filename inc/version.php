@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Moved To Where They Belong'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Eight Thousand Undelivered'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,23 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.64.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Eight Thousand Undelivered',
+            'changes' => [
+                'FIXED: 8,497 alert notifications failed, every one of them, with 535 Username and Password not accepted. The credentials were correct. Secrets are stored as enc:v1:... and nothing decrypted them before AUTH, so the ciphertext was being offered as the password. Decryption now happens once, inside send_smtp_email(), so there is a single place that can get it wrong',
+                'FOUND: The only decrypt attempt in the mail path called decrypt_setting_value(), a function that does not exist in this codebase and never has, wrapped in function_exists() - so the guard was permanently false and quietly did nothing while reading as a safeguard',
+                'FIXED: A failed decryption now sends nothing rather than the ciphertext. Offering an encrypted blob as a password produces a 535 that reads like a wrong password and sends you looking at the wrong thing',
+                'FIXED: The SMTP settings test opened a TCP socket, closed it, and reported success. It never authenticated, so it passed with the wrong password, with no password, and with no username at all - the one failure it could not detect was the only thing wrong. It authenticates now through the same code the alerts use, and sends no mail',
+                'FOUND: Restoring delivery released a backlog of twelve open incidents that mailed at once, ten of them stale. Each condition resolves by iterating what the agent currently reports, so an object that stops being reported is never visited and its incident stays open forever, still counting toward the notification repeat limit. health_ingest_services() deletes rows the agent stops reporting - deliberately - so eight service.stopped incidents outlived the rows that justified them',
+                'ADDED: resolve_vanished() closes incidents whose object is no longer reported, for services and VPN tunnels, skipped when the firewall is stale because reporting nothing is not the same as nothing being wrong',
+                'ADDED: A sweep for incidents against firewalls that no longer exist. One was open against __opnmgr_test_a, a fixture firewall deleted long ago, and nothing iterates a deleted firewall so it could never have resolved',
+                'ADDED: tests/smtp_delivery_test.php, twenty-four assertions across both defects',
+                'CHANGED: Two user accounts created for screenshot capture held placeholder addresses (screenshot@localhost, screenshots@local) and, being administrators, received every alert. Their addresses were cleared, so alerts reach real mailboxes and stop being recorded as partial failures',
+            ],
+        ],
         [
             'version' => '3.63.3',
             'date' => '2026-09-17',
