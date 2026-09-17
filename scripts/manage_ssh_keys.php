@@ -57,7 +57,7 @@ function wait_for_command($command_id, $timeout = 120) {
 
 function test_ssh_key($firewall_ip, $key_file) {
     $test_cmd = sprintf(
-        "timeout 8 ssh -i %s -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes root@%s 'echo SSH_KEY_VALID' 2>&1",
+        "timeout 8 ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=5 -o BatchMode=yes root@%s 'echo SSH_KEY_VALID' 2>&1",
         escapeshellarg($key_file),
         escapeshellarg($firewall_ip)
     );

@@ -6,6 +6,54 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.60.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+**SSH no longer trusts a firewall on sight.**
+
+All thirteen call sites passed `StrictHostKeyChecking=no`. That silently accepts
+an unknown host - and this manager holds root keys to every firewall in the
+fleet, so first contact is exactly the moment verification matters. It also
+handles a *changed* key almost undiagnosably: ssh connects but refuses port
+forwarding, which is how a stale host key surfaced as `Proxy Error: Failed to
+connect to 127.0.0.1:8101` with nothing anywhere mentioning host keys.
+
+They now use `accept-new` against a managed `known_hosts` at
+`/etc/opnmgr/known_hosts`.
+
+### Added
+
+- **`scripts/pin_host_keys.php`** pins a firewall's host keys after verifying
+  them **over the agent channel** - authenticated and signed independently of SSH
+  - rather than over SSH, where verifying SSH with SSH proves nothing. A key the
+  firewall does not report is refused, not written.
+
+  The first dry run refused three keys per firewall:
+
+  ```
+  0.0.0.0   REJECT   SHA256:WOwIRoyYOUueNymcfX6MibyR3pdJbR2xGFBvlXnDKdg
+  ```
+
+  `ip_address` is `0.0.0.0` on every row, and scanning it reaches the manager
+  rather than the firewall - so the check correctly declined to pin the local
+  host's own keys under a firewall's name. Placeholder addresses are skipped now.
+
+- **AI Analysis is in the sidebar.** The page existed and was linked only from a
+  firewall's detail page, so the answer to "AI analysis is disabled" was a URL you
+  had to be told. The error message names the path too.
+
+### Fixed
+
+- **`is_tunnel_active()` never matched.** It looked for `ssh.*-L {port}:` while
+  the tunnel is started with `-L 127.0.0.1:{port}:` - the loopback prefix was
+  added to stop tunnels being reachable off-box, and this check was never
+  updated. So `start_tunnel`'s "already running, reuse it" branch was
+  unreachable, and a second connect re-bound a live port.
+
+---
+
 ## Version 3.59.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

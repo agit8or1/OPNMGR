@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Free In The Table, Busy On The Machine'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Verified On First Contact'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.60.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Verified On First Contact',
+            'changes' => [
+                'CHANGED: All thirteen SSH call sites moved from StrictHostKeyChecking=no to accept-new against a managed known_hosts at /etc/opnmgr/known_hosts. Disabling the check meant first contact with any firewall was trusted blindly, and this manager holds root keys to the whole fleet, so first contact is exactly when verification matters',
+                'ADDED: scripts/pin_host_keys.php pins a firewall\'s host keys after verifying them over the agent channel - which is authenticated and signed independently of SSH - rather than over SSH, where verifying SSH with SSH proves nothing. A key the firewall does not report is refused, not written',
+                'FOUND: The first dry run refused to pin three keys per firewall, because ip_address is 0.0.0.0 on every row and scanning it reaches the manager rather than the firewall. The verification correctly declined to pin the local host\'s keys under a firewall\'s name; placeholder addresses are now skipped outright',
+                'FIXED: is_tunnel_active() looked for "ssh.*-L {port}:" while the tunnel is started with -L 127.0.0.1:{port}: - the loopback prefix was added to stop tunnels being reachable off-box and this check was never updated. It never matched, so start_tunnel\'s "already running, reuse it" branch was unreachable and a second connect re-bound a live port',
+                'ADDED: AI Analysis is in the sidebar. The page existed, was linked only from a firewall\'s detail page, and the answer to "AI analysis is disabled" was a URL you had to be told. The error message now names the path as well',
+                'ADDED: tests/ssh_host_key_test.php asserts no caller disables the check, that every caller shares one known_hosts, and that pinning verifies out-of-band',
+            ],
+        ],
         [
             'version' => '3.59.0',
             'date' => '2026-09-17',

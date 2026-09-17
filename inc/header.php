@@ -260,6 +260,14 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-clock"></i></span>
         <span class="sidebar-label">Scheduled Jobs</span>
       </a>
+      <?php // AI Analysis reached the product with no way to find it: the page
+            // was linked only from a firewall's detail page, so the answer to
+            // "AI Analysis is disabled - where do I enable it?" was a URL you
+            // had to be told. ?>
+      <a class="sidebar-item <?php echo isActive('ai_settings.php') ?>" href="/ai_settings.php">
+        <span class="sidebar-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
+        <span class="sidebar-label">AI Analysis</span>
+      </a>
       <a class="sidebar-item <?php echo isActive(['logs.php','nginx_logs.php']) ?>" href="/logs.php">
         <span class="sidebar-icon"><i class="fas fa-list-alt"></i></span>
         <span class="sidebar-label">Logs</span>

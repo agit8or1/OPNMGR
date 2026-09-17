@@ -71,7 +71,7 @@ try {
     // ssh -f -N -L 8103:localhost:443 root@firewall_ip
     $ssh_key = '/var/www/.ssh/opnsense_key';
     $ssh_cmd = sprintf(
-        'ssh -f -N -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -L 127.0.0.1:%d:127.0.0.1:443 root@%s 2>&1',
+        'ssh -f -N -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -L 127.0.0.1:%d:127.0.0.1:443 root@%s 2>&1',
         escapeshellarg($ssh_key),
         $tunnel_port,
         escapeshellarg($target_ip)

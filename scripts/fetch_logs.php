@@ -66,7 +66,7 @@ function fetchLogType($firewall, $ssh_key, $log_type, $lines) {
     $log_path = $log_paths[$log_type];
     
     // Fetch last N lines via SSH
-    $command = "ssh -i {$ssh_key} -o StrictHostKeyChecking=no -o ConnectTimeout=10 {$username}@{$ip} 'tail -n {$lines} {$log_path} 2>/dev/null || echo \"Log not available\"'";
+    $command = "ssh -i {$ssh_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=10 {$username}@{$ip} 'tail -n {$lines} {$log_path} 2>/dev/null || echo \"Log not available\"'";
     
     $output = [];
     $return_code = 0;

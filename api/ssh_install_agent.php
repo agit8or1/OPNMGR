@@ -69,7 +69,7 @@ $plugin_install_cmd = 'fetch -o - ' . escapeshellarg($plugin_download_url)
     . ' | env OPNMGR_BASE_URL=' . escapeshellarg(opnmgr_server_url()) . ' sh';
 
 // Build SSH command with timeout
-$ssh_options = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3";
+$ssh_options = "-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=3";
 
 // Step 1: Test SSH connectivity
 $output_lines[] = "Testing SSH connection to {$host}:{$port}...";

@@ -28,10 +28,17 @@ function get_firewall_by_id($firewall_id) {
 }
 
 function is_tunnel_active($port) {
-    // Check if tunnel is already running on this port (any destination IP)
-    $cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep";
-    exec($cmd, $output);
-    return !empty($output);
+    // This matched 'ssh.*-L {port}:' while the tunnel is started with
+    // -L 127.0.0.1:{port}: - the loopback prefix was added to stop tunnels being
+    // reachable off-box, and this check was never updated. So it never matched,
+    // and start_tunnel's "already running, reuse it" branch was unreachable:
+    // a second connect re-bound a live port and, now that a failed forward is
+    // fatal, failed outright with "bind [127.0.0.1]:{port}: Address already in
+    // use" instead of handing back the working tunnel.
+    //
+    // tunnel_ssh_pids() (scripts/manage_ssh_access.php, already required here)
+    // matches on the executable being ssh rather than on a loose ps pattern.
+    return tunnel_ssh_pids((int) $port) !== [];
 }
 
 function start_tunnel($firewall, $duration_minutes = 30) {
@@ -96,7 +103,7 @@ function start_tunnel($firewall, $duration_minutes = 30) {
         // 0, the session is recorded active, and the user meets "Proxy Error:
         // Failed to connect to 127.0.0.1:<port>" against a process that is
         // running and forwarding nothing.
-        "timeout 10 ssh -i %s -o StrictHostKeyChecking=no -o ExitOnForwardFailure=yes -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%s:%s:%s -N -f root@%s 2>&1",
+        "timeout 10 ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ExitOnForwardFailure=yes -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%s:%s:%s -N -f root@%s 2>&1",
         escapeshellarg($key_file),
         $port,
         $tunnel_target,

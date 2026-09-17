@@ -143,7 +143,7 @@ foreach ($sessions as $session) {
 
         // Step 2: Test SSH key
         $test_cmd = sprintf(
-            "timeout 8 ssh -i %s -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes root@%s 'echo SSH_KEY_VALID' 2>&1",
+            "timeout 8 ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=5 -o BatchMode=yes root@%s 'echo SSH_KEY_VALID' 2>&1",
             escapeshellarg($key_file),
             escapeshellarg($fw_ip)
         );
@@ -174,7 +174,7 @@ foreach ($sessions as $session) {
 
         // Step 3: Re-establish the SSH tunnel
         $ssh_cmd = sprintf(
-            "ssh -i %s -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%d:localhost:%d -N -f root@%s 2>&1",
+            "ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%d:localhost:%d -N -f root@%s 2>&1",
             escapeshellarg($key_file),
             $port,
             $fw_web_port,

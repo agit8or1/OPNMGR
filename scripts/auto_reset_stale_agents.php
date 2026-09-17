@@ -173,7 +173,7 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
         log_message('INFO', "Attempting SSH connection to $target...", $firewall_id);
 
         // Build SSH command
-        $ssh_opts = "-i '$ssh_key_path' -o BatchMode=yes -o ConnectTimeout=$timeout -o StrictHostKeyChecking=no";
+        $ssh_opts = "-i '$ssh_key_path' -o BatchMode=yes -o ConnectTimeout=$timeout -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts";
 
         // Download and execute reinstall script
         $reset_script = buildAgentReinstallCommand($reinstall_host, (int)$firewall_id)

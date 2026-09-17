@@ -70,7 +70,12 @@ try {
         http_response_code(403);
         echo json_encode([
             'success' => false,
-            'error'   => 'AI analysis is disabled. Enable it in AI Settings after reviewing what is transmitted.',
+            // Naming the page is not enough when the page is not in the menu:
+            // "Enable it in AI Settings" was answered with "where?". The path
+            // is the answer.
+            'error'   => 'AI analysis is disabled. Enable it at Settings > AI Analysis (/ai_settings.php), '
+                       . 'after reviewing what is transmitted to the provider.',
+            'settings_url' => '/ai_settings.php',
         ]);
         exit;
     }
@@ -296,7 +301,7 @@ function fetchFirewallConfig($firewall) {
     // Fetch config.xml from firewall
     $escaped_ip = escapeshellarg($ip);
     $escaped_key = escapeshellarg($key_file);
-    $command = "ssh -i {$escaped_key} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{$escaped_ip} 'cat /conf/config.xml' 2>&1";
+    $command = "ssh -i {$escaped_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=10 root@{$escaped_ip} 'cat /conf/config.xml' 2>&1";
     $output = shell_exec($command);
 
     if (empty($output) || strpos($output, 'Permission denied') !== false || strpos($output, 'Connection refused') !== false) {
@@ -356,7 +361,7 @@ function fetchFirewallLogs($firewall, $log_types = ['filter', 'system', 'resolve
 
         $log_path = escapeshellarg($log_paths[$log_type]);
         $escaped_lines = (int)$lines;
-        $command = "ssh -i {$escaped_key} -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@{$escaped_ip} 'tail -n {$escaped_lines} {$log_path}' 2>/dev/null";
+        $command = "ssh -i {$escaped_key} -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=10 root@{$escaped_ip} 'tail -n {$escaped_lines} {$log_path}' 2>/dev/null";
         $output = shell_exec($command);
 
         if (!empty($output) && strpos($output, 'Permission denied') === false && strpos($output, 'not found') === false) {

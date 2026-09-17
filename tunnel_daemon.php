@@ -131,7 +131,7 @@ function establishTunnel($firewall_info) {
     // This creates a reverse tunnel where the firewall connects to us
     // and we forward local port to firewall's web interface (port 80, not 443)
     $key_path = "/etc/opnmgr/keys/id_firewall_{$firewall_id}";
-    $ssh_cmd = "ssh -i $key_path -o StrictHostKeyChecking=no -o ConnectTimeout=5 " .
+    $ssh_cmd = "ssh -i $key_path -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=5 " .
                "-o ServerAliveInterval=60 -o ServerAliveCountMax=2 " .
                "-L 127.0.0.1:$tunnel_port:localhost:80 -N root@$wan_ip";
     

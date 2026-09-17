@@ -80,7 +80,7 @@ BASE_URL="$5"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
-SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o BatchMode=yes -o ConnectTimeout=10"
 
 log "[INFO] Starting agent repair..."
 log "[INFO] Firewall ID: $FIREWALL_ID"
