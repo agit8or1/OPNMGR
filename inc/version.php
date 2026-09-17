@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Page With Sections, Not A Menu'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Two Choices, Two Dropdowns'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.4',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Two Choices, Two Dropdowns',
+            'changes' => [
+                'FIXED: The AI page offered one dropdown where it holds two decisions. It listed configured rows as "OpenAI - gpt-4-turbo", so with a single provider configured it had a single option and the model was baked into that option\'s label - changing which model ran meant opening the Edit modal. Provider and model are two selects side by side now, and the model is saved by the same button',
+                'FIXED: The model list is filled on page load rather than only when the provider is touched, so it is never an empty dropdown',
+                'ADDED: The model currently in use is always the first entry, marked "in use", even when it is not in the curated catalogue. A list claiming to show what is running has to contain what is running',
+                'FIXED: The OpenAI and Google catalogues were the stale lists the comment directly above them warns about - gpt-4-turbo/gpt-4/gpt-3.5-turbo and a lone gemini-pro, with no entry marked recommended. Anthropic\'s had been refreshed and theirs had not. Both now list current models with a recommended default, and a test fails if any provider offers suggestions without marking one',
+            ],
+        ],
         [
             'version' => '3.69.3',
             'date' => '2026-09-17',

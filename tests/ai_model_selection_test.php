@@ -37,8 +37,9 @@ check('the model can be typed', str_contains($page, 'name="model" id="model_inpu
     'a release on the provider side must not need a release here');
 check('the select only fills the field', str_contains($page, 'function onModelPicked'),
     'the catalogue is a suggestion, not a constraint');
-check('the select is not the submitted field',
-    !preg_match('/<select name="model"/', $page));
+check('the modal select only fills the free-text field',
+    (bool) preg_match('/<select id="model_select"(?![^>]*\sname=)/', $page),
+    'in the Add Provider modal the catalogue is a suggestion, not the submitted value');
 
 // --- suggestions carry a reason ----------------------------------------------
 
@@ -109,9 +110,10 @@ check('adding a later provider says it is not in use yet',
 
 check('there is one explicit selector for the LLM in use',
     str_contains($page, 'LLM used for analysis:') && str_contains($page, "id=\"active_llm\""));
-check('it lists provider and model together',
-    (bool) preg_match('/active_llm[\s\S]{0,600}\$p\[.model.\]/', $page),
-    'two providers can differ only by model');
+check('the model is a control of its own, not part of the provider label',
+    str_contains($page, 'id="active_model"')
+    && !preg_match('/id="active_llm"[\s\S]{0,600}&mdash;/', $page),
+    'two providers can differ only by model, and the model must be changeable here');
 check('it submits through the existing default-provider handler',
     (bool) preg_match('/active_llm[\s\S]{0,900}name="set_default_provider"/', $page),
     'that handler already deactivates the others first');
@@ -119,6 +121,54 @@ check('it submits through the existing default-provider handler',
 check('the scan picks deterministically',
     str_contains($scan, 'WHERE is_active = TRUE ORDER BY id LIMIT 1'),
     'silently alternating between two LLMs is worse than picking the wrong one');
+
+// --- choosing a provider and choosing its model are two controls --------------
+//
+// The page showed one dropdown. It listed configured rows as "OpenAI - gpt-4-turbo",
+// so with a single provider configured it had a single option, and the model was
+// baked into that option's label: changing which model ran meant opening the Edit
+// modal. Provider and model are now two selects side by side.
+
+check('the model select sits beside the provider select',
+    str_contains($page, 'id="active_model"') && str_contains($page, 'name="model"'));
+check('the provider option no longer carries the model in its label',
+    !preg_match('/id="active_llm"[\s\S]{0,600}&mdash;[\s\S]{0,120}\$p\[.model.\]/', $page),
+    'a provider list that embeds the model cannot offer a second model for it');
+check('changing the provider refills the model list',
+    str_contains($page, 'onchange="onActiveProviderChanged(this)"')
+    && str_contains($page, 'function onActiveProviderChanged'));
+check('the list is filled on load, not only on change',
+    (bool) preg_match('/DOMContentLoaded[\s\S]{0,300}onActiveProviderChanged/', $page),
+    'otherwise the dropdown is empty until the provider is touched');
+check('the configured rows reach the script',
+    str_contains($page, 'const configuredProviders'));
+check('the model in use is listed even when the catalogue lacks it',
+    (bool) preg_match("/add\(row\.model, row\.model \+ '  - in use'\)/", $page),
+    'a list claiming to show what is in use must contain what is in use');
+check('the submit persists the chosen model',
+    (bool) preg_match('/set_default_provider[\s\S]{0,900}UPDATE ai_settings SET model = \? WHERE id = \?/', $page),
+    'a dropdown that does not save is worse than no dropdown');
+check('an empty model does not blank the stored one',
+    (bool) preg_match('/if \(\$model !== \'\'\) \{/', $page));
+
+// --- the curated list must not be the stale list it warns about ---------------
+//
+// The comment above the catalogue explains that a hardcoded list goes stale, and
+// named gpt-4 as the example. Anthropic's entry was refreshed; OpenAI's and
+// Google's were left as the exact lists the comment complains about.
+
+foreach (['openai' => 'gpt-4o', 'anthropic' => 'claude-opus-5', 'google' => 'gemini-2.5-pro'] as $prov => $model) {
+    check("the {$prov} catalogue offers a current model ({$model})", str_contains($page, $model));
+}
+check('every provider with suggestions marks a default choice',
+    (function () use ($page): bool {
+        foreach (['openai', 'anthropic', 'google'] as $prov) {
+            if (!preg_match("/'{$prov}' => \[[\s\S]{0,1400}?'hint'/", $page, $m)) { return false; }
+            if (!str_contains($m[0], "'suggested' => true")) { return false; }
+        }
+        return true;
+    })(),
+    'a list of five with none recommended leaves the choice unmade');
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

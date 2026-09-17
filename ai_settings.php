@@ -102,12 +102,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
 
     if (isset($_POST['set_default_provider'])) {
+        $provider_id = (int) ($_POST['provider_id'] ?? 0);
         // Deactivate all providers
         db()->query("UPDATE ai_settings SET is_active = FALSE");
         // Activate only the selected one
         $stmt = db()->prepare("UPDATE ai_settings SET is_active = TRUE WHERE id = ?");
-        $stmt->execute([$_POST['provider_id']]);
-        $message = "Default AI provider updated successfully!";
+        $stmt->execute([$provider_id]);
+
+        // The model is chosen by the second dropdown beside the provider. Picking
+        // a provider and picking which of its models to run are two decisions,
+        // and making the second one reachable only through the Edit modal meant
+        // the page appeared to offer one choice where it holds two.
+        $model = trim((string) ($_POST['model'] ?? ''));
+        if ($model !== '') {
+            $stmt = db()->prepare("UPDATE ai_settings SET model = ? WHERE id = ?");
+            $stmt->execute([$model, $provider_id]);
+        }
+        $message = "AI provider and model updated successfully!";
         $message_type = 'success';
     }
 }
@@ -137,6 +148,8 @@ $available_providers = [
         'icon' => 'fa-brain',
         'discoverable' => true,
         'models' => [
+            ['id' => 'gpt-4o',      'note' => 'current generation, 128K context', 'suggested' => true],
+            ['id' => 'gpt-4.1',     'note' => 'larger context, stronger reasoning'],
             ['id' => 'gpt-4-turbo', 'note' => '128K context, 4096 output tokens'],
             ['id' => 'gpt-4',       'note' => 'older, smaller context'],
             ['id' => 'gpt-3.5-turbo', 'note' => 'cheapest, weakest reasoning'],
@@ -162,7 +175,9 @@ $available_providers = [
         'icon' => 'fa-google',
         'discoverable' => false,
         'models' => [
-            ['id' => 'gemini-pro', 'note' => 'older generation'],
+            ['id' => 'gemini-2.5-pro',   'note' => 'strongest reasoning', 'suggested' => true],
+            ['id' => 'gemini-2.0-flash', 'note' => 'cheaper, for frequent scans'],
+            ['id' => 'gemini-pro',       'note' => 'older generation'],
         ],
         'hint' => 'Check ai.google.dev for the current model ids and enter one below.',
     ],
@@ -501,14 +516,16 @@ $available_providers = [
                             LLM used for analysis:
                         </label>
                         <select name="provider_id" id="active_llm" class="form-control"
-                                style="max-width:420px;width:auto;">
+                                style="max-width:260px;width:auto;" onchange="onActiveProviderChanged(this)">
                             <?php foreach ($providers as $p): ?>
                                 <option value="<?= (int)$p['id'] ?>" <?= $p['is_active'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($available_providers[$p['provider']]['name'] ?? ucfirst($p['provider'])) ?>
-                                    &mdash; <?= htmlspecialchars($p['model']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <label for="active_model" style="margin:0;font-weight:600;white-space:nowrap;">Model:</label>
+                        <select name="model" id="active_model" class="form-control"
+                                style="max-width:420px;width:auto;"></select>
                         <button type="submit" name="set_default_provider" class="btn btn-success btn-sm">
                             <i class="fa fa-check-circle me-1"></i> Use this
                         </button>
@@ -698,7 +715,54 @@ $available_providers = [
 
 <script>
 const providerModels = <?= json_encode($available_providers, JSON_UNESCAPED_SLASHES) ?>;
+// The rows that exist, so the model dropdown beside the provider can be filled
+// from the catalogue for whichever provider is selected.
+const configuredProviders = <?= json_encode(array_map(static function (array $row): array {
+    return ['id' => (int)$row['id'], 'provider' => $row['provider'], 'model' => $row['model']];
+}, $providers), JSON_UNESCAPED_SLASHES) ?>;
 const csrfToken = '<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>';
+
+// Fill the model dropdown for the selected provider: the curated suggestions for
+// its type, plus whatever that row is configured with - which may be a model the
+// catalogue has never heard of, and must not be silently dropped from the list
+// that claims to show what is in use.
+function onActiveProviderChanged(select) {
+    const row = configuredProviders.find(r => String(r.id) === String(select.value));
+    const modelSelect = document.getElementById('active_model');
+    if (!row || !modelSelect) { return; }
+
+    modelSelect.innerHTML = '';
+    const seen = new Set();
+    const add = (id, label, group) => {
+        if (!id || seen.has(id)) { return; }
+        seen.add(id);
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = label;
+        if (id === row.model) { option.selected = true; }
+        (group || modelSelect).appendChild(option);
+    };
+
+    add(row.model, row.model + '  - in use');
+
+    const entry = providerModels[row.provider];
+    const suggestions = (entry && entry.models) || [];
+    if (suggestions.length) {
+        const group = document.createElement('optgroup');
+        group.label = 'Suggested';
+        suggestions.forEach(model => add(
+            model.id,
+            model.id + (model.suggested ? '  - recommended' : '') + (model.note ? '  (' + model.note + ')' : ''),
+            group
+        ));
+        if (group.children.length) { modelSelect.appendChild(group); }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('active_llm');
+    if (select) { onActiveProviderChanged(select); }
+});
 
 function showAddModal() {
     document.getElementById('addModal').style.display = 'block';
