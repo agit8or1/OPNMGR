@@ -543,6 +543,12 @@ try {
     }
     
     // Include agent update information
+    if (!empty($agent_update_check['update_held'])) {
+        // Told, but not instructed: the agent must not act on this.
+        $response['agent_update_held'] = true;
+        $response['latest_version'] = $agent_update_check['latest_version'];
+        $response['agent_rollout_stage'] = $agent_update_check['rollout_stage'];
+    }
     if ($agent_update_check['update_available']) {
         $response['agent_update_available'] = true;
         $response['latest_version'] = $agent_update_check['latest_version'];
@@ -665,16 +671,40 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
     $current_clean = preg_replace('/[^0-9.]/', '', $current_agent_version);
     $latest_clean = preg_replace('/[^0-9.]/', '', $latest_agent_version);
     
-    // Get firewall hostname for self-healing
-    $stmt = db()->prepare('SELECT hostname FROM firewalls WHERE id = ?');
+    // Get firewall hostname for self-healing, and its rollout pilot flag
+    $stmt = db()->prepare('SELECT hostname, agent_rollout_pilot FROM firewalls WHERE id = ?');
     $stmt->execute([$firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     $hostname = $firewall['hostname'] ?? 'unknown';
+    $is_pilot = (bool) ($firewall['agent_rollout_pilot'] ?? 0);
     
     // Log version comparison for debugging
     error_log("Agent version check: current='$current_clean' latest='$latest_clean' fw_id=$firewall_id");
     
     if (version_compare($current_clean, $latest_clean, '<')) {
+        // A newer version exists. Whether this firewall is told to install it is
+        // a separate question, and used to not be asked at all: syncing
+        // AGENT_VERSION to production deployed it to the whole fleet within one
+        // check-in. The rollout stage is bound to a specific version, so a newly
+        // published one is held until somebody promotes it by name.
+        require_once __DIR__ . '/inc/agent_rollout.php';
+        if (!agent_rollout_allows($is_pilot)) {
+            $rollout = agent_rollout_state();
+            error_log(sprintf(
+                'agent_checkin.php: agent %s held from fw_id=%d (stage=%s%s)',
+                $latest_agent_version, $firewall_id, $rollout['stage'],
+                $rollout['superseded'] ? ', not yet promoted' : ''
+            ));
+            // The manager still knows, and still shows it. Suppressing the offer
+            // must not mean hiding that an update exists.
+            return [
+                'update_available' => false,
+                'update_held'      => true,
+                'rollout_stage'    => $rollout['stage'],
+                'latest_version'   => $latest_agent_version,
+            ];
+        }
+
         // Agent update is available. The host below was the maintainer's own,
         // typed in here, so every install told its firewalls to fetch agent
         // updates from a third party. It comes from configuration now; if that

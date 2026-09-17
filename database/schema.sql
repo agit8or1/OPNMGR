@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.48.0.
+-- Generated from the reference installation for OPNManager v3.50.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -1132,6 +1132,7 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `last_update_result` varchar(32) DEFAULT NULL,
   `last_update_error` varchar(255) DEFAULT NULL,
   `last_update_attempt_at` timestamp NULL DEFAULT NULL,
+  `agent_rollout_pilot` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Receives agent releases at rollout stage pilot',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),

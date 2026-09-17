@@ -6,6 +6,80 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.51.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Found
+
+**Publishing an agent version was deploying it.**
+
+There was no step between the two. Syncing `AGENT_VERSION` to production made the
+server advertise it, and every firewall fetched and installed it on its next
+check-in:
+
+```
+19:24:36  POST /agent_checkin.php               200  642    <- 1.6.7 advertised
+19:24:36  GET  install_opnmanager_agent.sh      200  9616
+19:24:36  GET  os-opnmanager-agent-1.6.7.tar.gz 200  33599
+```
+
+About two minutes from publish to installed, fleet-wide. So "release the agent"
+and "change every firewall right now" were the same action, with no way to do the
+first without the second. It fired twice on 2026-09-16: 1.6.6 installed itself on
+fw48 unprompted, and 1.6.7 did the same while the revert was being typed - that
+download had completed 45 seconds earlier.
+
+### Added
+
+- **A rollout stage** - `held`, `pilot` or `fleet` - consulted by
+  `agent_checkin.php` before an update is offered. Holding suppresses
+  `agent_update_available`, the field the agent acts on, so a held version is
+  never installed.
+- **`scripts/agent_rollout.php`** shows what is held and who is behind it, marks
+  pilot firewalls, and promotes a version. It reports by default and moves only
+  with `--apply`, printing which firewalls a promotion would reach first:
+
+  ```
+  $ php scripts/agent_rollout.php
+  Published agent version : 1.6.7
+  Rollout stage           : held
+    stored stage 'held' was promoted for (no version), so 1.6.7 is held.
+    Publishing does not deploy: promote this version by name to release it.
+
+  1 firewall(s) behind 1.6.7:
+    held   fw51   edge-fw.example.net      1.6.3
+  ```
+
+- **`firewalls.agent_rollout_pilot`**, defaulting to 0. Stage `pilot` with nobody
+  marked offers the update to nobody rather than everybody: the failure mode has
+  to be the conservative one.
+- `database/migrations/0021_staged_agent_rollout.sql`, defaulting to held with no
+  version promoted, so an installation upgrading into this gets the gate closed.
+- `tests/agent_rollout_test.php`.
+
+### Changed
+
+- **The stage is bound to a version, not left as a standing mode.**
+  `agent_rollout_stage` applies only to `agent_rollout_version`. When a newer
+  version is published the stored stage no longer matches it, and the new version
+  is held.
+
+  This is the part that matters. A plain on/off flag would sit at `fleet` after
+  the first release and deploy every release after that on publish - the original
+  behaviour, one forgotten setting away. Binding the stage to a version makes the
+  safe state the one you get by forgetting, and makes promoting a release a
+  deliberate act naming what it promotes.
+
+- **Holding an update does not hide it.** The check-in response carries
+  `agent_update_held` and the stage, because suppressing the offer must not trade
+  one silent surprise for another.
+- An unrecognised stage degrades to `held`, so a typo in a setting cannot release
+  to the fleet.
+- `scripts/build_agent_package.sh` prints the promote step after a build, so the
+  gate is discoverable at the moment it matters.
+
+---
+
 ## Version 3.50.0
 **Released**: September 16, 2026 | **Agent**: v1.6.7
 

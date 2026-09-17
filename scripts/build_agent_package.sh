@@ -84,3 +84,8 @@ echo "  size:   $(wc -c < "$TARBALL") bytes"
 echo "  sha256: $(sha256sum "$TARBALL" | cut -d' ' -f1)"
 echo
 echo "Next: php scripts/sign_release.php --publish && php scripts/check_versions.php --fix"
+echo
+echo "Publishing does not deploy. The new version is held until promoted:"
+echo "  php scripts/agent_rollout.php                        # what is held, and who is behind"
+echo "  php scripts/agent_rollout.php --pilot <id> --stage pilot --apply"
+echo "  php scripts/agent_rollout.php --stage fleet --apply"

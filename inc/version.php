@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One Entry, One Line'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Publish Is Not Deploy'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,24 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.51.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Publish Is Not Deploy',
+            'changes' => [
+                'FOUND: Publishing an agent version was deploying it. Syncing AGENT_VERSION to production made every firewall fetch and install the new agent on its next check-in, within about two minutes, with no step in between - so "release the agent" and "change every firewall right now" were one action. It fired twice on 2026-09-16: 1.6.6 installed itself on fw48 unprompted, and 1.6.7 did the same while the revert was being typed, the download having completed 45 seconds earlier',
+                'ADDED: A rollout stage - held, pilot or fleet - consulted by agent_checkin.php before an update is offered. Holding suppresses agent_update_available, which is the field the agent acts on, so a held version is never installed',
+                'CHANGED: The stage is bound to a version, not left as a standing mode. agent_rollout_stage applies only to agent_rollout_version, so when a newer version is published the stored stage no longer matches and the new version is held. The safe state is the one you get by forgetting, and promoting a release has to name the version it promotes - a flag left at "fleet" cannot deploy the next release',
+                'ADDED: scripts/agent_rollout.php shows what is held and who is behind it, marks pilot firewalls, and promotes a version. It reports by default and moves only with --apply, printing which firewalls a promotion would reach before making it',
+                'ADDED: firewalls.agent_rollout_pilot, defaulting to 0. Stage "pilot" with nobody marked offers the update to nobody rather than everybody: the failure mode has to be the conservative one',
+                'CHANGED: Holding an update does not hide it. The check-in response carries agent_update_held and the rollout stage, because suppressing the offer must not trade one silent surprise for another',
+                'ADDED: An unrecognised stage degrades to held, so a typo in a setting cannot release to the fleet',
+                'ADDED: database/migrations/0021_staged_agent_rollout.sql, defaulting to held with no version promoted. An installation upgrading into this gets the gate closed',
+                'ADDED: tests/agent_rollout_test.php. The property under test is not that a flag exists but that a stage left at "fleet" does not deploy the next release the moment it is published - the gate is otherwise only as good as somebody\'s memory',
+                'CHANGED: scripts/build_agent_package.sh prints the promote step after a build, so the gate is discoverable at the moment it matters',
+            ],
+        ],
         [
             'version' => '3.50.0',
             'date' => '2026-09-16',
