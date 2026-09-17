@@ -165,5 +165,31 @@ $schema = (string)@file_get_contents($root . '/database/schema.sql');
 check('schema.sql carries the pilot column', str_contains($schema, 'agent_rollout_pilot'),
     'regenerate with scripts/generate_schema.sh or fresh installs break');
 
+// --- the dashboard must state which version is running ------------------------
+//
+// The published version drives what firewalls are offered, so "which version is
+// this" should not require reading a file on the server.
+
+$dash = (string)@file_get_contents($root . '/dashboard.php');
+check('the dashboard shows the application version',
+    str_contains($dash, 'class="dash-version"') && str_contains($dash, 'APP_VERSION'));
+check('...and the agent version it publishes',
+    str_contains($dash, 'AGENT_VERSION'),
+    'the number that decides what firewalls are offered');
+check('the version chip escapes its output',
+    substr_count($dash, 'htmlspecialchars(APP_VERSION)') >= 1
+    && substr_count($dash, 'htmlspecialchars(AGENT_VERSION)') >= 1);
+check('it sits in the toolbar at the top of the page',
+    (bool)preg_match('/dash-version.*?dash-refresh-ctl/s', $dash),
+    'ahead of the refresh control in the top toolbar');
+check('APP_VERSION_DATE is not older than the newest changelog entry',
+    (function () use ($root): bool {
+        $v = (string)@file_get_contents($root . '/inc/version.php');
+        if (!preg_match("/APP_VERSION_DATE', '([0-9-]+)'/", $v, $d)) { return false; }
+        if (!preg_match("/'date' => '([0-9-]+)'/", $v, $e)) { return false; }
+        return $d[1] >= $e[1];
+    })(),
+    'the date is shown in the dashboard tooltip, so a stale one is visible');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

@@ -6,6 +6,35 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.55.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Added
+
+**The dashboard states its own version.**
+
+In the top toolbar, beside the refresh control:
+
+```
+v3.55.0 · agent 1.6.7
+```
+
+Two numbers, because they answer different questions. The application version is
+what is running here; the agent version is what the manager publishes, and since
+3.51.0 it is what every firewall is offered once a release is promoted. Finding
+either one meant reading a file on the server.
+
+The chip links to the updates page, and its tooltip carries the release date.
+
+### Fixed
+
+- **`APP_VERSION_DATE` had been left at `2026-09-16` through four releases.**
+  Each bump updated `APP_VERSION_NAME` and not the date beside it, and nothing
+  caught it because nothing displayed it. It is in the dashboard tooltip now, and
+  a test fails if it falls behind the newest changelog entry.
+
+---
+
 ## Version 3.54.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A 403 Nobody Saw'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Which Version Is This'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.55.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Which Version Is This',
+            'changes' => [
+                'ADDED: The dashboard states its own version in the top toolbar - the application version and the agent version it publishes to the fleet. Answering "which version is this" meant reading a file on the server, and the agent number in particular decides what every firewall is offered',
+                'FIXED: APP_VERSION_DATE had been left at 2026-09-16 through four releases. Each bump updated APP_VERSION_NAME and not the date beside it, which nothing checked because nothing displayed it. It is in the dashboard tooltip now, and a test fails if it falls behind the newest changelog entry',
+                'ADDED: The chip links to the updates page and is a single line on a phone rather than overflowing the toolbar',
+            ],
+        ],
         [
             'version' => '3.54.0',
             'date' => '2026-09-17',
