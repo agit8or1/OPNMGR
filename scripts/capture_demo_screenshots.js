@@ -197,7 +197,23 @@ const FREEZE_CSS = `*,*::before,*::after{animation:none!important;
     const check = await page.evaluate(() => ({
       theme: document.documentElement.getAttribute('data-theme'),
       overflow: document.documentElement.scrollWidth > window.innerWidth + 2,
-      skeleton: /Loading\.\.\.|Please wait|spinner-border/i.test(document.body.innerHTML),
+      // Only count a placeholder that is actually on screen. Testing
+      // body.innerHTML flagged any page carrying a hidden "Loading..." row that
+      // JavaScript later replaces - settings.php has one in an unopened tunnels
+      // table - so every run reported a skeleton that was not there, which
+      // teaches you to ignore the warning and defeats the check.
+      skeleton: (() => {
+        const rx = /Loading\.\.\.|Please wait/i;
+        return [...document.querySelectorAll('body *')].some((el) => {
+          if (el.children.length) return false; // leaf nodes carry the text
+          const hit = rx.test(el.textContent || '') || el.classList.contains('spinner-border');
+          if (!hit) return false;
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const st = getComputedStyle(el);
+          return st.visibility !== 'hidden' && st.display !== 'none' && st.opacity !== '0';
+        });
+      })(),
       broken: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).length,
     }));
     manifest.push({ name, url: t.url, theme: t.theme, tab: t.tab || null,

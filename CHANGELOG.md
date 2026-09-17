@@ -6,6 +6,45 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.63.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+- **All 28 documentation screenshots regenerated** against the current build, so
+  they show the version in the header and the grouped admin menu rather than a
+  product two days out of date.
+- Captures were taken in an **isolated environment that was dismantled
+  afterwards**: a throwaway database, web root, account and server, all removed,
+  with the production database confirmed untouched. The fixture's own assertion
+  that a demo fleet has no command-queue rows passed.
+- The annotated figures in the User Guide were **re-rendered against the new
+  images and checked marker by marker**, because coordinates placed over one
+  screenshot are not automatically right over another.
+
+### Fixed
+
+- **The capture script reported a skeleton page on every run.**
+
+  ```
+  settings-dark                dark   309KB  SKELETON?
+  ```
+
+  It tested `body.innerHTML` against `/Loading\.\.\.|Please wait|spinner-border/`
+  regardless of visibility, and `settings.php` carries one in an unopened tunnels
+  table that JavaScript replaces:
+
+  ```html
+  <tbody id="tunnels-table-body">
+    <tr><td colspan="8"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>
+  ```
+
+  A real skeleton would have been indistinguishable from the false alarm everyone
+  had learned to ignore. It now counts only a placeholder that is actually on
+  screen.
+
+---
+
 ## Version 3.62.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ten Entries, One Row'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Recaptured'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.63.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Recaptured',
+            'changes' => [
+                'CHANGED: All 28 documentation screenshots regenerated against the current build, so they show the version in the header and the grouped admin menu rather than a product two days out of date',
+                'FIXED: The capture script reported a skeleton page on every run. It tested body.innerHTML for "Loading..." regardless of visibility, and settings.php carries one in an unopened tunnels table that JavaScript replaces - so a real skeleton would have been indistinguishable from the false alarm everyone had learned to ignore. It now only counts a placeholder that is on screen',
+                'CHANGED: Captures were taken in an isolated environment and it was dismantled afterwards - a throwaway database, web root, account and server, all removed, with the production database confirmed untouched. The fixture\'s own assertion that a demo fleet has no command-queue rows passed',
+                'ADDED: The annotated figures in the User Guide were re-rendered against the new images and checked marker by marker, because coordinates placed over one screenshot are not automatically right over another',
+            ],
+        ],
         [
             'version' => '3.62.0',
             'date' => '2026-09-17',
