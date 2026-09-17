@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Forwarding Nothing'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Free In The Table, Busy On The Machine'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.59.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Free In The Table, Busy On The Machine',
+            'changes' => [
+                'FIXED: The tunnel port allocator logged "Port pair 8100/8101 shows as free in DB but one is in use on system" and skipped to the next pair. Skipping is right, but nothing reconciled the two views, so the range leaked a pair at a time until it would be exhausted',
+                'FOUND: Drift ran in both directions and nothing ever corrected either. A session past expires_at stayed active forever - the status enum has an "expired" value that no code has ever set - so an abandoned session reserved its port permanently. A session whose ssh process had died stayed active too, holding a port nothing was listening on. And an ssh process outliving its session held a port the table called free, which is the case that produced the warning',
+                'ADDED: reconcile_tunnel_sessions() runs before allocation. It expires sessions past their window and takes their tunnels down, closes sessions whose tunnel is gone, and kills tunnels with no session behind them - bounded to the tunnel port range, and never touching a port a live session claims',
+                'FIXED: Process matching does not use pgrep -f. Its pattern appears in the command line of the shell running it, so "pgrep -f -- \'-L 127.0.0.1:8199:\'" reported a match for a port with no tunnel at all. Reconciliation kills what that returns, so it matches on the executable being ssh and excludes its own pid',
+                'ADDED: tests/tunnel_port_reconcile_test.php, and both drift directions were exercised against the live table with throwaway rows: an expired session became expired, a session with no tunnel became closed, and neither live tunnel was disturbed',
+            ],
+        ],
         [
             'version' => '3.58.0',
             'date' => '2026-09-17',

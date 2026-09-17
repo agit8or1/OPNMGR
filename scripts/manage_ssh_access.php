@@ -42,7 +42,149 @@ function get_manager_public_ip() {
     return null;
 }
 
+/**
+ * PIDs of the ssh processes forwarding a given tunnel port.
+ *
+ * Matched on the -L argument rather than a pidfile, because the tunnel is
+ * started with -f and nothing records which process ended up owning the port.
+ */
+function tunnel_ssh_pids(int $port): array
+{
+    // Deliberately not pgrep -f: its pattern appears in the command line of the
+    // shell running it, so `pgrep -f -- "-L 127.0.0.1:8199:"` reports a match
+    // for a port with no tunnel at all. Reconciliation kills what this returns,
+    // so it matches on the executable being ssh and on this process's own pid
+    // being excluded, rather than on a string that can match the search itself.
+    $lines = [];
+    exec('ps -eo pid=,comm=,args= 2>/dev/null', $lines);
+
+    $needle = "-L 127.0.0.1:{$port}:";
+    $self   = getmypid();
+    $pids   = [];
+
+    foreach ($lines as $line) {
+        if (!preg_match('/^\s*(\d+)\s+(\S+)\s+(.*)$/', $line, $m)) {
+            continue;
+        }
+        [$_, $pid, $comm, $args] = $m;
+        $pid = (int) $pid;
+
+        if ($pid === $self || $comm !== 'ssh') {
+            continue;
+        }
+        if (str_contains($args, $needle)) {
+            $pids[] = $pid;
+        }
+    }
+
+    return $pids;
+}
+
+/**
+ * Make the session table and the machine agree about which ports are in use.
+ *
+ * They drifted in both directions and nothing ever reconciled them:
+ *
+ *   - A session past expires_at stayed 'active' forever. The status enum has
+ *     an 'expired' value and no code ever set it, so an abandoned session
+ *     reserved its port permanently.
+ *   - A session whose ssh process had died stayed 'active', reserving a port
+ *     that nothing was listening on.
+ *   - An ssh process outliving its session held the port while the table
+ *     called it free - which is the case that produced "Port pair 8100/8101
+ *     shows as free in DB but one is in use on system".
+ *
+ * The allocator detected that last one and skipped to the next pair, which is
+ * correct but only treats the symptom: the range leaks a pair at a time until
+ * it is exhausted.
+ *
+ * @return array{expired:int, orphaned_sessions:int, orphaned_processes:int}
+ */
+function reconcile_tunnel_sessions(): array
+{
+    $expired = 0;
+    $orphanedSessions = 0;
+    $orphanedProcesses = 0;
+
+    try {
+        $active = db()->query(
+            "SELECT id, tunnel_port, (expires_at < NOW()) AS is_expired
+               FROM ssh_access_sessions WHERE status = 'active'"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('OPNMGR: could not read tunnel sessions to reconcile: ' . $e->getMessage());
+        return ['expired' => 0, 'orphaned_sessions' => 0, 'orphaned_processes' => 0];
+    }
+
+    $liveSessionPorts = [];
+
+    foreach ($active as $row) {
+        $id   = (int) $row['id'];
+        $port = (int) $row['tunnel_port'];
+        $pids = tunnel_ssh_pids($port);
+
+        if ((int) $row['is_expired'] === 1) {
+            // Past its time: close it and take the tunnel down with it.
+            foreach ($pids as $pid) {
+                posix_kill($pid, SIGTERM);
+            }
+            $stmt = db()->prepare(
+                "UPDATE ssh_access_sessions
+                    SET status = 'expired', closed_reason = 'expired'
+                  WHERE id = ? AND status = 'active'"
+            );
+            $stmt->execute([$id]);
+            $expired++;
+            continue;
+        }
+
+        if (!$pids) {
+            // Still within its window, but the tunnel is gone. Holding the port
+            // helps nobody; the session cannot be revived by keeping the row.
+            $stmt = db()->prepare(
+                "UPDATE ssh_access_sessions
+                    SET status = 'closed', closed_reason = 'tunnel process gone'
+                  WHERE id = ? AND status = 'active'"
+            );
+            $stmt->execute([$id]);
+            $orphanedSessions++;
+            continue;
+        }
+
+        $liveSessionPorts[$port] = true;
+    }
+
+    // Processes outliving their session. Bounded to the tunnel range, and only
+    // where no active session claims the port, so nothing else is touched.
+    for ($port = TUNNEL_PORT_MIN; $port <= TUNNEL_PORT_MAX; $port++) {
+        if (isset($liveSessionPorts[$port])) {
+            continue;
+        }
+        foreach (tunnel_ssh_pids($port) as $pid) {
+            posix_kill($pid, SIGTERM);
+            $orphanedProcesses++;
+        }
+    }
+
+    if ($expired || $orphanedSessions || $orphanedProcesses) {
+        error_log(sprintf(
+            'OPNMGR tunnel reconcile: %d expired, %d sessions without a tunnel, %d tunnels without a session',
+            $expired, $orphanedSessions, $orphanedProcesses
+        ));
+    }
+
+    return [
+        'expired'            => $expired,
+        'orphaned_sessions'  => $orphanedSessions,
+        'orphaned_processes' => $orphanedProcesses,
+    ];
+}
+
 function find_available_tunnel_port() {
+
+    // Reconcile first, or the range leaks a pair at a time: every stale row and
+    // every orphaned process permanently removes a port pair from circulation.
+    reconcile_tunnel_sessions();
 
     // Get ports already in use (both tunnel_port AND tunnel_port-1 for nginx)
     $stmt = db()->query("SELECT tunnel_port FROM ssh_access_sessions WHERE status = 'active'");

@@ -6,6 +6,55 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.59.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**The port allocator saw the drift and could only step around it.**
+
+```
+Port pair 8100/8101 shows as free in DB but one is in use on system
+```
+
+Skipping to the next pair is the right immediate move, but nothing reconciled the
+two views, so the range leaked a pair at a time until it would be exhausted.
+
+Drift ran in **both** directions:
+
+- A session past `expires_at` stayed `active` forever. The status enum has an
+  `expired` value and **no code has ever set it**, so an abandoned session
+  reserved its port permanently.
+- A session whose ssh process had died stayed `active` too, holding a port
+  nothing was listening on.
+- An ssh process outliving its session held a port the table called free - the
+  case that produced the warning.
+
+`reconcile_tunnel_sessions()` now runs before allocation. It expires sessions
+past their window and takes their tunnels down, closes sessions whose tunnel is
+gone, and kills tunnels with no session behind them - bounded to the tunnel port
+range, and never touching a port a live session claims.
+
+**Process matching is not `pgrep -f`.** Its pattern appears in the command line
+of the shell running it:
+
+```
+$ pgrep -f -- "-L 127.0.0.1:8199:"
+450087          # the shell running the search, on a port with no tunnel
+```
+
+Reconciliation kills what that returns, so matching requires the executable to be
+`ssh` and excludes the caller's own pid.
+
+### Added
+
+- `tests/tunnel_port_reconcile_test.php`. Both drift directions were also
+  exercised against the live table with throwaway rows: an expired session became
+  `expired`, a session with no tunnel became `closed`, and neither live tunnel was
+  disturbed.
+
+---
+
 ## Version 3.58.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
