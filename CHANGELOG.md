@@ -6,6 +6,41 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.57.1
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**"Agent Repair in Progress - 0% - Initializing..." never moved.**
+
+Two halves that each looked reasonable and disagreed. `repair_agent_ssh.php`
+built its session id like this:
+
+```php
+$session_id = uniqid('repair_', true);   // repair_6aac18540585c6.65557273
+```
+
+and `api/repair_status.php` validates it:
+
+```php
+preg_match('/^[A-Za-z0-9_-]{1,64}$/', $session_id)   // the dot fails
+```
+
+So every repair ever started was rejected by its own status endpoint. Session
+ids are hex now.
+
+That alone would have shown an error. It did not, because the poller had no
+branch for a failed response - `if (data.success)` and nothing else - so a 400
+produced no error, no stop, and no message. The modal just stayed at zero.
+
+- Any outcome now ends the poll and says what happened.
+- A five minute ceiling on the poll, so it cannot spin indefinitely when
+  something upstream stops answering.
+- Tests assert that a generated session id passes the validator that consumes
+  it, and that the old format would still be rejected.
+
+---
+
 ## Version 3.57.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

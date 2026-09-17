@@ -50,7 +50,11 @@ if (!file_exists($ssh_key)) {
 }
 
 // Create a unique session ID for tracking this repair operation
-$session_id = uniqid('repair_', true);
+// uniqid(..., true) returns something like "repair_6aac18540585c6.65557273".
+// api/repair_status.php validates the session id against ^[A-Za-z0-9_-]+$, which
+// that dot fails - so every repair ever started was rejected by its own status
+// endpoint, and the progress modal sat at "Initializing... 0%" forever. Hex only.
+$session_id = 'repair_' . bin2hex(random_bytes(8));
 $log_file = "/tmp/agent_repair_{$session_id}.log";
 
 // Start the repair process in the background

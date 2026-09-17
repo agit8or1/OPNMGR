@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Reinstall This One'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Initializing Forever'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.57.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Initializing Forever',
+            'changes' => [
+                'FIXED: The Agent Repair progress modal sat at "Initializing... 0%" forever. repair_agent_ssh.php built its session id with uniqid(..., true), which embeds a dot, and api/repair_status.php validates the id against ^[A-Za-z0-9_-]+$ - so every repair ever started was rejected by its own status endpoint. Session ids are hex now',
+                'FIXED: The poller ignored an unsuccessful status response entirely. There was no else branch, so a 400 produced no error, no stop and no message - the modal simply stayed at zero. Any outcome now ends the poll and says what happened',
+                'ADDED: A five minute ceiling on the poll, so it cannot spin indefinitely when something upstream stops answering',
+                'ADDED: Assertions that a generated session id passes the validator that consumes it, and that the old format would still be rejected. Both halves looked individually reasonable and disagreed, which is the only way this bug was possible',
+            ],
+        ],
         [
             'version' => '3.57.0',
             'date' => '2026-09-17',

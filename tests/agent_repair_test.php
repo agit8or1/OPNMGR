@@ -129,5 +129,51 @@ check('no scp step remains',
 check('it still requires a session', str_contains($repair, "isset(\$_SESSION['user_id'])"));
 check('it still verifies CSRF', str_contains($repair, 'csrf_verify'));
 
+// --- the progress modal must never hang -------------------------------------
+//
+// Reported as "Agent Repair in Progress / 0% / Initializing... - just hangs".
+// Two bugs met: repair_agent_ssh.php built its session id with
+// uniqid(..., true), which embeds a dot, and repair_status.php validates the id
+// against ^[A-Za-z0-9_-]+$ - so every repair ever started was rejected by its
+// own status endpoint. The poller then ignored success:false entirely, with no
+// else branch, so the modal sat at 0% forever instead of saying so.
+
+$status = (string) @file_get_contents($root . '/api/repair_status.php');
+$page   = (string) @file_get_contents($root . '/firewall_details.php');
+
+check('the session id is not built with uniqid',
+    !str_contains($repairCode, "uniqid('repair_'"),
+    'uniqid(..., true) embeds a dot that the status endpoint rejects');
+
+check('the session id is hex only', str_contains($repairCode, "bin2hex(random_bytes("));
+
+// The generated id must actually satisfy the validator that consumes it. This
+// is the assertion that would have caught the original bug: both halves looked
+// individually reasonable and disagreed.
+$validator = '/^[A-Za-z0-9_-]{1,64}$/';
+check('the status endpoint still uses the validator this test assumes',
+    str_contains($status, '[A-Za-z0-9_-]{1,64}'),
+    'if this changed, update the pattern below');
+
+$sample = 'repair_' . bin2hex(random_bytes(8));
+check('a generated session id passes the status validator',
+    (bool) preg_match($validator, $sample),
+    "rejected {$sample}");
+
+check('the id format that used to be generated would still be rejected',
+    !preg_match($validator, uniqid('repair_', true)),
+    'confirms the validator is what broke it, not something else');
+
+check('the poller reacts to an unsuccessful status response',
+    (bool) preg_match('/if \(!data\.success\)/', $page),
+    'falling through on success:false is what left the modal at 0%');
+check('the poller stops polling when that happens',
+    (bool) preg_match('/if \(!data\.success\)[\s\S]{0,160}finish\(interval/', $page));
+check('the poller has an overall timeout',
+    str_contains($page, 'MAX_MS') && str_contains($page, 'Repair timed out'),
+    'a poll with no deadline spins forever when something upstream stops answering');
+check('the session id is encoded into the status URL',
+    str_contains($page, 'encodeURIComponent(sessionId)'));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

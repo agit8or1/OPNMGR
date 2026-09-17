@@ -2200,10 +2200,34 @@ function repairAgent() {
 }
 
 function pollRepairStatus(sessionId, btn, originalHtml) {
+    // Give up rather than spin forever. The repair itself is bounded, so a poll
+    // still running after this means something upstream stopped answering.
+    const startedAt = Date.now();
+    const MAX_MS = 5 * 60 * 1000;
+
+    const finish = (interval, message) => {
+        clearInterval(interval);
+        hideRepairProgress();
+        alert(message);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    };
+
     const interval = setInterval(() => {
-        fetch('api/repair_status.php?session_id=' + sessionId)
+        if (Date.now() - startedAt > MAX_MS) {
+            finish(interval, '❌ Repair timed out after 5 minutes.\n\nCheck the agent log on the manager.');
+            return;
+        }
+        fetch('api/repair_status.php?session_id=' + encodeURIComponent(sessionId))
         .then(response => response.json())
         .then(data => {
+            // A response saying success:false used to fall through to nothing at
+            // all, so the modal sat at "Initializing... 0%" indefinitely. Any
+            // outcome now ends the poll and says what happened.
+            if (!data.success) {
+                finish(interval, '❌ ' + (data.error || 'Repair status unavailable'));
+                return;
+            }
             if (data.success) {
                 updateRepairProgress(data.progress, data.current_step);
 
