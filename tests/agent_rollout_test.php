@@ -123,6 +123,42 @@ check('it adds the pilot column idempotently',
 check('nothing is a pilot by default', str_contains($migration, 'NOT NULL DEFAULT 0'),
     "stage 'pilot' with no pilots must reach nobody, not everybody");
 
+// --- the stage change must be auditable --------------------------------------
+//
+// Promoting is the act that lets a release reach firewalls. It used to happen
+// implicitly on publish, with no record anywhere of who released what to whom.
+
+// Matched by pattern rather than by literal: a literal would read as this test
+// file requiring inc/audit.php from tests/, and referenced_files_test.php would
+// correctly report that as a broken reference.
+check('agent_rollout.php pulls in the audit helper',
+    (bool)preg_match('/require_once __DIR__ \. .\/audit\.php./', $rollout));
+check('a successful promotion is audited',
+    (bool)preg_match("/audit_log\('agent\.rollout\.stage', \[\s*'object_type'/", $rollout));
+check('a rejected stage is audited as a failure',
+    str_contains($rollout, 'rejected unknown rollout stage')
+    && (bool)preg_match('/\'success\'  => false/', $rollout),
+    'a refused promotion is worth a record too');
+check('a failed settings write is audited as a failure',
+    str_contains($rollout, 'failed to promote agent'));
+check('the entry records the transition, not just the destination',
+    str_contains($rollout, "'previous_stage'   => \$before['stored_stage']")
+    && str_contains($rollout, "'previous_version' => \$before['promoted_version']"),
+    'a destination alone does not say what changed');
+check('the entry records how many firewalls it reaches',
+    str_contains($rollout, "'reaches'          => \$reach"),
+    'the useful question later is who this opened the update to');
+check('reach is counted before the write',
+    (bool)preg_match('/\$reach\s*=\s*0;.*?foreach \(agent_rollout_targets\(\).*?db\(\)->prepare/s', $rollout));
+check('the version is the audited object',
+    (bool)preg_match('/\'object_type\' => \'agent_version\',\s*\'object_id\'   => \$published/', $rollout));
+
+$cli = (string)@file_get_contents($root . '/scripts/agent_rollout.php');
+check('pilot changes are audited too',
+    str_contains($cli, "audit_log('agent.rollout.pilot'"),
+    'at stage pilot this is what decides which firewalls a release reaches');
+check('the pilot entry names the firewalls', str_contains($cli, "'firewall_ids' => \$ids"));
+
 // --- the published schema must match -----------------------------------------
 
 $schema = (string)@file_get_contents($root . '/database/schema.sql');

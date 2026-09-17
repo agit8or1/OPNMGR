@@ -28,6 +28,7 @@
  */
 
 require_once __DIR__ . '/agent_version.php';
+require_once __DIR__ . '/audit.php';
 
 if (!defined('AGENT_ROLLOUT_STAGES')) {
     define('AGENT_ROLLOUT_STAGES', ['held', 'pilot', 'fleet']);
@@ -113,10 +114,26 @@ if (!function_exists('agent_rollout_promote')) {
     function agent_rollout_promote(string $stage): array
     {
         if (!in_array($stage, AGENT_ROLLOUT_STAGES, true)) {
+            audit_log('agent.rollout.stage', [
+                'success'  => false,
+                'message'  => "rejected unknown rollout stage '{$stage}'",
+                'metadata' => ['requested_stage' => $stage],
+            ]);
             return ['ok' => false, 'message' => "unknown stage '{$stage}'"];
         }
 
         $published = (string) LATEST_AGENT_VERSION;
+
+        // Capture what it was, so the entry records a transition rather than
+        // just a destination. Counted before the write, because promoting is
+        // what changes who the update reaches.
+        $before = agent_rollout_state();
+        $reach  = 0;
+        foreach (agent_rollout_targets() as $t) {
+            if ($stage === 'fleet' || ($stage === 'pilot' && $t['pilot'])) {
+                $reach++;
+            }
+        }
 
         try {
             $sql = 'INSERT INTO settings (`name`, `value`) VALUES (?, ?)
@@ -125,8 +142,36 @@ if (!function_exists('agent_rollout_promote')) {
             db()->prepare($sql)->execute(['agent_rollout_version', $published]);
         } catch (Throwable $e) {
             error_log('OPNMGR: could not record agent rollout stage: ' . $e->getMessage());
+            audit_log('agent.rollout.stage', [
+                'success'  => false,
+                'message'  => "failed to promote agent {$published} to '{$stage}'",
+                'metadata' => ['stage' => $stage, 'version' => $published, 'error' => $e->getMessage()],
+            ]);
             return ['ok' => false, 'message' => 'could not write settings: ' . $e->getMessage()];
         }
+
+        // Promoting is the act that lets a release reach firewalls, and it used
+        // to happen implicitly on publish with no record anywhere. The reach
+        // count is the part worth reading later: it says how many firewalls this
+        // opened the update to, not merely which stage was chosen.
+        audit_log('agent.rollout.stage', [
+            'object_type' => 'agent_version',
+            'object_id'   => $published,
+            'message'     => sprintf(
+                'agent %s promoted to stage \'%s\' (was \'%s\' for %s); reaches %d firewall(s)',
+                $published, $stage, $before['stored_stage'],
+                $before['promoted_version'] === '' ? 'no version' : $before['promoted_version'],
+                $reach
+            ),
+            'metadata'    => [
+                'version'          => $published,
+                'stage'            => $stage,
+                'previous_stage'   => $before['stored_stage'],
+                'previous_version' => $before['promoted_version'],
+                'effective_before' => $before['stage'],
+                'reaches'          => $reach,
+            ],
+        ]);
 
         return ['ok' => true, 'message' => "agent {$published} is now at stage '{$stage}'"];
     }

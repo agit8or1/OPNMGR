@@ -58,9 +58,24 @@ function set_pilots(string $csv, int $value): void
     $in   = implode(',', array_fill(0, count($ids), '?'));
     $stmt = db()->prepare("UPDATE firewalls SET agent_rollout_pilot = ? WHERE id IN ({$in})");
     $stmt->execute(array_merge([$value], $ids));
+    $changed = $stmt->rowCount();
+
+    // Auditable for the same reason a stage change is: at stage 'pilot' this is
+    // what decides which firewalls a release reaches.
+    audit_log('agent.rollout.pilot', [
+        'object_type' => 'agent_version',
+        'object_id'   => (string) LATEST_AGENT_VERSION,
+        'message'     => sprintf('%s agent rollout pilot on firewall(s) %s',
+            $value ? 'set' : 'cleared', implode(', ', $ids)),
+        'metadata'    => [
+            'firewall_ids' => $ids,
+            'pilot'        => (bool) $value,
+            'rows_changed' => $changed,
+        ],
+    ]);
 
     printf("%s pilot on %d firewall(s): %s\n",
-        $value ? 'Set' : 'Cleared', $stmt->rowCount(), implode(', ', $ids));
+        $value ? 'Set' : 'Cleared', $changed, implode(', ', $ids));
 }
 
 if (isset($opts['pilot']))   { set_pilots((string) $opts['pilot'], 1); }

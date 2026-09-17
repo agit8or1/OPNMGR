@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Publish Is Not Deploy'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Who Released What'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.52.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Who Released What',
+            'changes' => [
+                'ADDED: Agent rollout stage changes are written to the audit log. Promoting is the act that lets a release reach firewalls, and until 3.51.0 it happened implicitly on publish with no record anywhere of who released what to whom - the only way to know an agent version had gone out was to notice the version change on a firewall afterwards',
+                'ADDED: The entry records the transition rather than the destination - previous stage, previous version, and the stage that was actually in effect - because "promoted to fleet" alone does not say what changed',
+                'ADDED: It also records how many firewalls the promotion reaches, counted before the write. That is the question worth asking of the log later: not which stage was chosen, but who it opened the update to',
+                'ADDED: Pilot changes are audited as agent.rollout.pilot, naming the firewalls. At stage pilot that setting is what decides which firewalls a release reaches, so it belongs in the same trail',
+                'ADDED: A rejected stage and a failed settings write are both audited as failures. A refused promotion is worth a record too',
+                'ADDED: Ten assertions in tests/agent_rollout_test.php covering the audit trail',
+            ],
+        ],
         [
             'version' => '3.51.0',
             'date' => '2026-09-17',

@@ -6,6 +6,48 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.52.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Added
+
+**Agent rollout stage changes are written to the audit log.**
+
+Promoting is the act that lets a release reach firewalls. Until 3.51.0 it
+happened implicitly on publish, with no record anywhere of who released what to
+whom - the only way to know an agent version had gone out was to notice the
+version change on a firewall afterwards.
+
+```
+agent 1.6.7 promoted to stage 'fleet' (was 'held' for 1.6.7); reaches 1 firewall(s)
+```
+
+```json
+{
+    "version": "1.6.7",
+    "stage": "fleet",
+    "previous_stage": "held",
+    "previous_version": "1.6.7",
+    "effective_before": "held",
+    "reaches": 1
+}
+```
+
+- **The entry records the transition, not the destination.** Previous stage,
+  previous version, and the stage that was actually in effect, because "promoted
+  to fleet" alone does not say what changed.
+- **It records how many firewalls the promotion reaches**, counted before the
+  write. That is the question worth asking of the log later: not which stage was
+  chosen, but who it opened the update to.
+- **Pilot changes are audited** as `agent.rollout.pilot`, naming the firewalls.
+  At stage `pilot` that setting is what decides which firewalls a release
+  reaches, so it belongs in the same trail.
+- **A rejected stage and a failed settings write are audited as failures.** A
+  refused promotion is worth a record too.
+- Ten further assertions in `tests/agent_rollout_test.php`.
+
+---
+
 ## Version 3.51.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
