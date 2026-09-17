@@ -208,6 +208,8 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 let refreshInterval;
 let isRefreshing = false;
 
@@ -404,7 +406,7 @@ function cancelCommand(id) {
     
     fetch('/api/admin_queue.php?action=cancel_command', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({id: id})
     })
     .then(response => response.json())
@@ -423,7 +425,7 @@ function deleteCommand(id) {
     
     fetch('/api/admin_queue.php?action=delete_command', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({id: id})
     })
     .then(response => response.json())
@@ -442,7 +444,7 @@ function clearAllCommands() {
     
     fetch('/api/admin_queue.php?action=clear_command_queue', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'}
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'}
     })
     .then(response => response.json())
     .then(data => {
@@ -461,7 +463,7 @@ function cancelRequest(id) {
     
     fetch('/api/admin_queue.php?action=cancel_request', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({id: id})
     })
     .then(response => response.json())
@@ -480,7 +482,7 @@ function deleteRequest(id) {
     
     fetch('/api/admin_queue.php?action=delete_request', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({id: id})
     })
     .then(response => response.json())
@@ -499,7 +501,7 @@ function clearAllRequests() {
     
     fetch('/api/admin_queue.php?action=clear_request_queue', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'}
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'}
     })
     .then(response => response.json())
     .then(data => {
@@ -518,7 +520,7 @@ function purgeOldRecords() {
 
     fetch('/api/admin_queue.php?action=purge_old_commands', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({retention_days: 7})
     })
     .then(response => response.json())

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-16'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'By Whom'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A 403 Nobody Saw'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.54.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'A 403 Nobody Saw',
+            'changes' => [
+                'FIXED: The Repair Agent button on the firewall page posted only firewall_id, with no CSRF token anywhere, so csrf_verify() refused it with a 403 and the button had never worked. Reported from the browser console as "/api/repair_agent_ssh.php:1 Failed to load resource: 403"',
+                'FIXED: Reset Agent was broken differently and worse: it read its token from document.querySelector(\'[name="csrf_token"]\'), an element that does not exist on that page - the only hidden input there is name="csrf" - so querySelector returned null and .value threw a TypeError before any request was made',
+                'FIXED: Twenty-two more POSTs to CSRF-protected endpoints sent no token, across seven pages: the firewall page (agent update, enrollment key, speedtest, and both SSH key operations), the admin queue (all seven actions), alerts, logs, network tools, dev features and settings. Six of those pages had no token available to JavaScript at all',
+                'CHANGED: JSON callers send X-CSRF-Token rather than a body field. A JSON body never populates $_POST, so a token placed there reaches nothing - every one of these endpoints already accepted the header',
+                'ADDED: tests/csrf_callers_test.php scans every page for POSTs to endpoints that verify CSRF and fails if one carries no token. Nothing caught any of this because the failure is invisible from the server: a refused POST looks exactly like an attack being blocked, which is what csrf_verify() is for. Only the browser console showed it',
+            ],
+        ],
         [
             'version' => '3.53.0',
             'date' => '2026-09-17',

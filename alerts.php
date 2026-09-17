@@ -443,6 +443,8 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 function testEmail() {
     const testEmail = prompt('Enter email address to send test alert to:', '<?php echo htmlspecialchars($settings['email_from_address']); ?>');
     if (!testEmail) {
@@ -457,7 +459,7 @@ function testEmail() {
     
     fetch('/api/test_email.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         credentials: 'same-origin',
         body: JSON.stringify({test_email: testEmail})
     })
@@ -488,7 +490,7 @@ function testPushover() {
     
     fetch('/api/test_pushover.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         credentials: 'same-origin',
         body: JSON.stringify({test_user_key: testUserKey})
     })

@@ -579,6 +579,8 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 // Debug: Test Bootstrap modal functionality
 </script>
 
@@ -871,7 +873,7 @@ function resetAllTunnels() {
     
     fetch('/api/tunnel_reset.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'action=reset_all'
     })
         .then(response => response.json())
@@ -929,7 +931,7 @@ function cleanupZombies() {
             const promises = zombies.map(tunnel => 
                 fetch('/api/tunnel_reset.php', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
                     body: `action=kill_tunnel&pid=${tunnel.pid}`
                 })
                 .then(response => response.json())
@@ -961,7 +963,7 @@ function killTunnel(pid) {
     
     fetch('/api/tunnel_reset.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
         body: `action=kill_tunnel&pid=${pid}`
     })
         .then(response => response.json())
@@ -1000,6 +1002,7 @@ function killTunnel(sessionId) {
     
     const formData = new FormData();
     formData.append('session_id', sessionId);
+    formData.append('csrf_token', csrfToken);
     
     fetch('/api/tunnel_management.php?action=kill_tunnel', {
         method: 'POST',

@@ -360,6 +360,8 @@ $changelogEntries = getChangelogEntries(5);
 
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 function updateDocumentation() {
     const btn = event.target;
     const statusDiv = document.getElementById("updateStatus");
@@ -372,7 +374,7 @@ function updateDocumentation() {
     
     fetch("/api/update_docs.php", {
         method: "POST",
-        headers: {"Content-Type": "application/json"}
+        headers: {'X-CSRF-Token': csrfToken, "Content-Type": "application/json"}
     })
     .then(response => response.json())
     .then(data => {

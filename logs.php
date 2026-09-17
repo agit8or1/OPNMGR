@@ -283,6 +283,8 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 let autoRefreshInterval = null;
 let refreshIntervalSeconds = 10; // Changed from 5 to 10 seconds
 
@@ -329,7 +331,7 @@ function cleanupLogs() {
     if (confirm('This will permanently delete logs older than 30 days. Are you sure?')) {
         fetch('/api/cleanup_logs.php', {
             method: 'POST',
-            headers: {
+            headers: {'X-CSRF-Token': csrfToken, 
                 'Content-Type': 'application/json',
             }
         })
@@ -353,7 +355,7 @@ function clearAllLogs() {
         if (confirm('Are you absolutely sure? This will delete all system logs permanently.')) {
             fetch('/api/clear_all_logs.php', {
                 method: 'POST',
-                headers: {
+                headers: {'X-CSRF-Token': csrfToken, 
                     'Content-Type': 'application/json',
                 }
             })

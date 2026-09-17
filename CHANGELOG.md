@@ -6,6 +6,54 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.54.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**Buttons that had never worked, failing where only the browser could see it.**
+
+Reported from the console:
+
+```
+/api/repair_agent_ssh.php:1  Failed to load resource: the server responded with a status of 403
+```
+
+The Repair Agent button posted `firewall_id` and nothing else, so `csrf_verify()`
+refused it. Reset Agent, next to it, was broken differently and worse: it read
+its token from an element that does not exist on that page -
+
+```js
+'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
+```
+
+The only hidden input there is `name="csrf"`, so `querySelector` returned `null`
+and `.value` threw before any request was made.
+
+Neither was a one-off. **Twenty-two more POSTs to CSRF-protected endpoints sent
+no token**, across seven pages: the firewall page (agent update, enrollment key,
+speedtest, both SSH key operations), the admin queue (all seven actions), alerts,
+logs, network tools, dev features and settings. Six of those pages had no token
+available to JavaScript at all.
+
+- **JSON callers now send `X-CSRF-Token`.** A JSON body never populates `$_POST`,
+  so a token placed there reaches nothing. Every one of these endpoints already
+  accepted the header.
+- Pages that had no token in scope now define one from `csrf_token()`.
+
+### Added
+
+- `tests/csrf_callers_test.php` scans every page for POSTs to endpoints that
+  verify CSRF and fails if one carries no token.
+
+  Nothing caught any of this because **the failure is invisible from the
+  server's side**: a refused POST looks exactly like an attack being blocked,
+  which is what `csrf_verify()` is for. There is no error log, no alert, no
+  failed job - only a console message in whoever's browser happened to click the
+  button.
+
+---
+
 ## Version 3.53.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

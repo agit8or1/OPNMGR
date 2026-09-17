@@ -264,6 +264,8 @@ require_once __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
 const firewallId = <?= $firewall_id ?>;
 
 function selectFirewall(id) {
@@ -290,7 +292,7 @@ function runDiagnostic(tool, params) {
     
     fetch('/api/run_diagnostic.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'X-CSRF-Token': csrfToken, 'Content-Type': 'application/json'},
         body: JSON.stringify({
             firewall_id: firewallId,
             tool: tool,

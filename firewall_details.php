@@ -2098,8 +2098,9 @@ function repairAgent() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRF-Token': csrfToken
         },
-        body: 'firewall_id=<?php echo $id; ?>'
+        body: 'firewall_id=<?php echo $id; ?>&csrf_token=' + encodeURIComponent(csrfToken)
     })
     .then(response => response.json())
     .then(data => {
@@ -2240,9 +2241,9 @@ function resetAgent() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
+            'X-CSRF-Token': csrfToken
         },
-        body: 'firewall_id=<?php echo $id; ?>'
+        body: 'firewall_id=<?php echo $id; ?>&csrf_token=' + encodeURIComponent(csrfToken)
     })
     .then(response => response.json())
     .then(data => {
@@ -2279,9 +2280,10 @@ function updateAgent(firewallId) {
     fetch('/api/trigger_agent_update.php', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
         },
-        body: JSON.stringify({firewall_id: firewallId})
+        body: JSON.stringify({firewall_id: firewallId, csrf: csrfToken})
     })
     .then(response => response.json())
     .then(data => {
@@ -2312,9 +2314,10 @@ function generateEnrollmentKey() {
     fetch('api/enrollment_key.php', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
         },
-        body: JSON.stringify({firewall_id: <?php echo $id; ?>})
+        body: JSON.stringify({firewall_id: <?php echo $id; ?>, csrf: csrfToken})
     })
     .then(response => response.json())
     .then(data => {
@@ -2875,7 +2878,7 @@ function triggerSpeedtest() {
 
     fetch(`/api/trigger_speedtest.php?firewall_id=${firewallId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
     })
     .then(response => response.json())
     .then(data => {
@@ -3488,10 +3491,11 @@ async function regenerateSSHKeys() {
     try {
         const response = await fetch('/api/manage_ssh_keys.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({
                 action: 'regenerate',
-                firewall_id: currentFirewallId
+                firewall_id: currentFirewallId,
+                csrf: csrfToken
             })
         });
         const data = await response.json();
@@ -3514,11 +3518,12 @@ async function deleteSSHKey(keyId) {
     try {
         const response = await fetch('/api/manage_ssh_keys.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
             body: JSON.stringify({
                 action: 'delete',
                 firewall_id: currentFirewallId,
-                key_id: keyId
+                key_id: keyId,
+                csrf: csrfToken
             })
         });
         const data = await response.json();
