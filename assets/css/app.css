@@ -390,6 +390,45 @@ a.text-muted:hover {
     padding: 4px 0;
 }
 
+/* Collapsible sidebar group.
+   The admin section is ten entries on a sidebar that already has twenty above
+   it. Grouping keeps every one of them reachable while costing one row. */
+.sidebar-group-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    display: flex;
+    align-items: center;
+}
+.sidebar-chevron {
+    margin-left: auto;
+    font-size: 0.7rem;
+    opacity: 0.55;
+    transition: transform 0.18s ease;
+    flex-shrink: 0;
+}
+.sidebar-group-toggle.is-open .sidebar-chevron { transform: rotate(180deg); }
+
+/* grid-template-rows animates to content height without hardcoding one.
+   The items are wrapped in a single inner element on purpose: 0fr sizes only the
+   first grid row, so ten sibling links would each get their own auto-sized row
+   and the group would never actually collapse. */
+.sidebar-group {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.18s ease;
+}
+.sidebar-group-inner { overflow: hidden; min-height: 0; }
+.sidebar-group.is-open { grid-template-rows: 1fr; }
+
+/* The chevron is the only thing in the rail that is not a destination, so it
+   is hidden when the labels are. */
+.app-sidebar:not(:hover):not(.pinned) .sidebar-chevron { opacity: 0; }
+
 .sidebar-section-label {
     font-size: 0.65rem;
     font-weight: 600;

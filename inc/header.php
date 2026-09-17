@@ -244,7 +244,33 @@ function isActive($page) {
     <?php if ($show_admin_section): ?>
     <!-- ADMIN / OPERATIONS section -->
     <div class="sidebar-section">
-      <div class="sidebar-section-label"><?php echo can('settings.manage') ? 'Admin' : 'Operations'; ?></div>
+      <?php
+      // The admin section carries ten entries, which on a sidebar that already
+      // has twenty above it is most of the scrolling. They are grouped rather
+      // than removed: everything is still one click away, but the list is not
+      // ten items long until you want it to be.
+      //
+      // It opens by itself when you are already on one of its pages, so
+      // navigating into the section never leaves you looking at a collapsed
+      // group containing the page you are on.
+      $admin_pages = [
+          'users.php', 'settings.php', 'branding.php', 'smtp_settings.php',
+          'proxy_settings.php', 'settings_tasks.php', 'ai_settings.php',
+          'logs.php', 'nginx_logs.php', 'admin_queue.php', 'health_monitor.php',
+          'system_update.php', 'updates.php', 'system_backup.php', 'about.php',
+      ];
+      $admin_open = in_array(basename($_SERVER['PHP_SELF'] ?? ''), $admin_pages, true);
+      $admin_label = can('settings.manage') ? 'Admin' : 'Operations';
+      ?>
+      <button type="button" class="sidebar-item sidebar-group-toggle<?php echo $admin_open ? ' is-open' : ''; ?>"
+              id="adminGroupToggle" aria-expanded="<?php echo $admin_open ? 'true' : 'false'; ?>"
+              aria-controls="adminGroup">
+        <span class="sidebar-icon"><i class="fas fa-screwdriver-wrench"></i></span>
+        <span class="sidebar-label"><?php echo htmlspecialchars($admin_label); ?></span>
+        <span class="sidebar-chevron"><i class="fas fa-chevron-down"></i></span>
+      </button>
+      <div class="sidebar-group<?php echo $admin_open ? ' is-open' : ''; ?>" id="adminGroup">
+      <div class="sidebar-group-inner">
       <?php if (can('user.manage')): ?>
       <a class="sidebar-item <?php echo isActive('users.php') ?>" href="/users.php">
         <span class="sidebar-icon"><i class="fas fa-users"></i></span>
@@ -299,6 +325,8 @@ function isActive($page) {
         <span class="sidebar-icon"><i class="fas fa-info-circle"></i></span>
         <span class="sidebar-label">About</span>
       </a>
+      </div><!-- /.sidebar-group-inner -->
+      </div><!-- /#adminGroup -->
     </div>
     <?php endif; ?>
 
@@ -384,6 +412,36 @@ if (function_exists('can') && can('settings.manage')) {
 @media (max-width: 992px) { .opnmgr-search { display: none; } }
 </style>
 <script>
+// Admin group collapse. The open state is remembered per browser, except that a
+// page inside the group always renders it open - PHP decides that, so the group
+// is correct before any script runs and never flashes shut on the page you are
+// looking at.
+(function () {
+  var toggle = document.getElementById('adminGroupToggle');
+  var group  = document.getElementById('adminGroup');
+  if (!toggle || !group) return;
+
+  var KEY = 'opnmgr-admin-group';
+  var onAdminPage = group.classList.contains('is-open');
+
+  if (!onAdminPage) {
+    try {
+      if (localStorage.getItem(KEY) === 'open') {
+        group.classList.add('is-open');
+        toggle.classList.add('is-open');
+        toggle.setAttribute('aria-expanded', 'true');
+      }
+    } catch (e) { /* private mode, blocked storage: leave it closed */ }
+  }
+
+  toggle.addEventListener('click', function () {
+    var open = group.classList.toggle('is-open');
+    toggle.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    try { localStorage.setItem(KEY, open ? 'open' : 'closed'); } catch (e) {}
+  });
+})();
+
 (function () {
   var input = document.getElementById('globalSearch');
   var panel = document.getElementById('globalSearchResults');

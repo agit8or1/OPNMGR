@@ -6,6 +6,46 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.62.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+**The admin section is a collapsible group.**
+
+It carried ten entries on a sidebar that already had twenty above it, which was
+most of the scrolling. Nothing was removed - everything is still one click away,
+and the section costs one row until you want it.
+
+- The group **opens by itself when you are already on one of its pages**, decided
+  in PHP rather than in script, so it is correct before anything runs and never
+  flashes shut on the page you are looking at.
+- The open state is remembered per browser. A blocked or private-mode
+  `localStorage` leaves it closed rather than throwing.
+- The chevron is hidden when the sidebar is a rail, since it is the only thing
+  there that is not a destination.
+
+### Fixed
+
+- **The first implementation did not collapse at all.** `grid-template-rows: 0fr`
+  sizes only the *first* grid row, so ten sibling links each got their own
+  auto-sized row:
+
+  ```
+  dashboard (non-admin page)  {"open":false, "groupHeight":440}
+  ```
+
+  Closed by every measure except the one that mattered. The items are wrapped in
+  a single inner element now, and the collapsed height was measured rather than
+  assumed:
+
+  ```
+  dashboard (non-admin page)  {"open":false, "groupHeight":0}
+  settings  (admin page)      {"open":true,  "groupHeight":431}
+  ```
+
+---
+
 ## Version 3.61.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

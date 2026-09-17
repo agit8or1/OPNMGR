@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Two Documentation Systems'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ten Entries, One Row'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.62.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Ten Entries, One Row',
+            'changes' => [
+                'CHANGED: The admin section of the sidebar is a collapsible group. It carried ten entries on a sidebar that already had twenty above it, which was most of the scrolling. Nothing was removed - everything is still one click away, and the section now costs one row until you want it',
+                'ADDED: The group opens by itself when you are already on one of its pages, decided in PHP rather than script, so it is correct before anything runs and never flashes shut on the page you are looking at',
+                'ADDED: The open state is remembered per browser, and a blocked or private-mode localStorage leaves it closed rather than throwing',
+                'FIXED: The first implementation did not collapse at all. grid-template-rows: 0fr sizes only the first grid row, so ten sibling links each got their own auto-sized row and the group stayed 440px tall while reporting itself closed. The items are wrapped in a single inner element now, and the collapsed height was measured rather than assumed',
+                'CHANGED: The chevron is hidden when the sidebar is a rail, since it is the only thing there that is not a destination',
+            ],
+        ],
         [
             'version' => '3.61.0',
             'date' => '2026-09-17',
