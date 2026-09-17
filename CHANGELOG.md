@@ -6,6 +6,70 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.68.0
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Found
+
+**A firewall with SSH open to the world scanned clean.**
+
+The AI security scan deleted findings *after* the model produced them, through a
+keyword filter whose SSH and web-GUI patterns matched the dangerous case rather
+than the safe one:
+
+```
+'ssh.*0\.0\.0\.0'      ->  "SSH is exposed to 0.0.0.0/0 on the WAN interface"
+'ssh.*unrestricted'     ->  "SSH is unrestricted and reachable from the internet"
+'ssh access.*from any'  ->  "SSH access allowed from any source address"
+'web interface.*http'   ->  "Web interface exposed over plain HTTP to the internet"
+```
+
+Every one of those is a finding the prompt explicitly instructs the model to
+raise as **CRITICAL**, and every one was removed before it reached the report.
+
+Those pattern lists are now empty. The intended suppression - *SSH restricted to
+specific source IPs is fine* - is a judgement about the rule set, which the model
+makes from the configuration and the prompt explains at length. A regex over
+finding text cannot tell restricted from unrestricted, and here it got it exactly
+backwards.
+
+### Fixed
+
+- **The keyword filter matched substrings** against the JSON of each finding, and
+  the list contained `log` and `nat`:
+
+  ```
+  Alternate gateway lacks failover monitoring    DELETED (matched "nat")
+  Designated management VLAN is not isolated     DELETED (matched "nat")
+  ```
+
+  Anything mentioning `login` or `technology` went the same way. Matching is on
+  word boundaries now, and the list is down to `log retention` and
+  `log availability` - the two things a thirty-line sample genuinely cannot
+  support.
+
+- **The prompt said `DO NOT MENTION LOGS AT ALL`** directly above the section
+  that sends log excerpts and asks which threats appear in them.
+
+- **`max_tokens` raised from 2000 to 8000.** Two thousand covered the grade,
+  score, risk level, summary, concerns, recommendations, improvements *and* log
+  analysis together, which is most of why the output read as thin.
+
+### Changed
+
+- Findings must carry severity, the configuration element they are based on,
+  concrete impact and a specific remediation - and must not be raised at all if
+  nothing in the configuration can be pointed at. Generic hardening advice is
+  explicitly discouraged: the reader has this firewall in front of them.
+
+### Added
+
+- `tests/ai_scan_findings_test.php`, including that configuration redaction still
+  holds and still aborts rather than falling back. That must not regress while
+  filters are being loosened.
+
+---
+
 ## Version 3.67.2
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 

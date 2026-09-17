@@ -431,7 +431,10 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "1. SSH root login when configuration shows <permitrootlogin>1</permitrootlogin> - THIS IS SECURE when SSH rules restrict source IPs\n";
     $prompt .= "2. SSH access restricted to specific source IP addresses - THIS IS EXCELLENT SECURITY\n";
     $prompt .= "3. Root login over SSH when firewall rules limit SSH to management IPs - THIS IS INDUSTRY BEST PRACTICE\n";
-    $prompt .= "4. Logging configuration or log availability - DO NOT MENTION LOGS AT ALL\n";
+    // "DO NOT MENTION LOGS AT ALL" sat directly above a section that sends log
+    // excerpts and asks for threats found in them. The model was told both to
+    // analyse the logs and to say nothing about them.
+    $prompt .= "4. Log retention or log completeness - only a short sample is sent, so it cannot be judged from here\n";
     $prompt .= "5. Any service (SSH, HTTP, HTTPS) with source IP restrictions to specific management IPs\n";
     $prompt .= "6. NAT port forward rules - These are intentional and required for services like Plex, media servers, etc. - NEVER FLAG NAT RULES\n\n";
 
@@ -472,6 +475,20 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "5. Key Concerns (list specific issues)\n";
     $prompt .= "6. Recommendations (actionable steps)\n";
     $prompt .= "7. Improvement Opportunities\n\n";
+
+    // Each finding should be checkable. A concern with no evidence cannot be
+    // confirmed or dismissed by the person reading it, which is how a report
+    // ends up feeling like an opinion rather than an analysis.
+    $prompt .= "For every finding, give:\n";
+    $prompt .= "- severity: critical, high, medium, low or info\n";
+    $prompt .= "- title: what is wrong, in one line\n";
+    $prompt .= "- evidence: the specific configuration element you based it on - the rule\n";
+    $prompt .= "  description, interface, port, or XML element. Quote it. If you cannot point\n";
+    $prompt .= "  at something in the configuration above, do not raise the finding.\n";
+    $prompt .= "- impact: what an attacker or an outage could do with it, concretely\n";
+    $prompt .= "- remediation: the specific change to make, not a general principle\n\n";
+    $prompt .= "Be specific to THIS configuration. Generic hardening advice that would apply\n";
+    $prompt .= "to any firewall is not useful; the reader has this firewall in front of them.\n\n";
 
     $prompt .= "Firewall: {$firewall['hostname']} ({$firewall['ip_address']})\n";
     $prompt .= "OPNsense Version: {$config_data['version']}\n";
@@ -548,8 +565,8 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "NEVER include these in concerns, recommendations, or findings:\n";
     $prompt .= "1. SSH root login when restricted to specific source IPs - THIS IS SECURE\n";
     $prompt .= "2. SSH access when restricted to specific source IPs - THIS IS SECURE\n";
-    $prompt .= "3. Absence of logs in the scan - logs may exist but not included\n";
-    $prompt .= "4. Logging configuration - assume logging is properly configured\n";
+    $prompt .= "3. Absence of logs in the scan - only a sample is sent\n";
+    $prompt .= "4. Log retention settings - not visible from the sample\n";
     $prompt .= "5. Any service with source IP restrictions to management networks\n";
     $prompt .= "6. HTTP web interface when restricted to specific management IPs - THIS IS ACCEPTABLE for management access\n";
     $prompt .= "7. Web GUI access when limited to trusted management servers or networks\n";
@@ -652,7 +669,12 @@ function callOpenAI($api_key, $model, $prompt) {
                 ['role' => 'user', 'content' => $prompt]
             ],
             'temperature' => 0.7,
-            'max_tokens' => 2000
+            // 2000 was the ceiling on the whole report - grade, summary,
+            // concerns, recommendations, improvements and log analysis - which
+            // is most of why the output read as thin. The request is a few
+            // thousand tokens of configuration; the answer should not be capped
+            // below what the question deserves.
+            'max_tokens' => 8000
         ])
     ]);
     
@@ -685,7 +707,7 @@ function callAnthropic($api_key, $model, $prompt) {
         ],
         CURLOPT_POSTFIELDS => json_encode([
             'model' => $model,
-            'max_tokens' => 2000,
+            'max_tokens' => 8000, // see the note on the OpenAI call above
             'messages' => [
                 ['role' => 'user', 'content' => $prompt]
             ]
@@ -840,36 +862,47 @@ function formatArrayToString($arr) {
  * Filter out prohibited findings (SSH root login, logging concerns)
  */
 function filterProhibitedFindings($data) {
-    // Keywords that indicate prohibited findings
+    // Phrases that indicate a finding this installation has decided is a false
+    // positive. Matched on word boundaries, as whole phrases.
+    //
+    // These were substrings, and the list included 'log' and 'nat'. stripos()
+    // against the JSON of the whole finding meant "Alternate gateway lacks
+    // failover monitoring" and "Designated management VLAN is not isolated"
+    // were both deleted for containing 'nat', and anything mentioning 'login',
+    // 'technology' or 'catalog' went the same way. Findings were being removed
+    // after the model produced them, silently, which is a large part of why the
+    // analysis read as thin.
+    //
+    // 'log' and 'nat' are gone entirely: a bare noun cannot distinguish "NAT
+    // rules are intentional here" from "the NAT rule exposes the LAN".
     $prohibited_keywords = [
-        'root access', 'root login', 'permitrootlogin', 'ssh root',
-        'disable root', 'restrict root', 'permissive root',
-        'log', 'logging', 'log retention', 'log availability',
-        'enable logging', 'log files',
-        'nat', 'port forward', 'port forwarding', 'plex', 'unrestricted nat'
+        // Retained: this installation only ever sends a 30-line sample, so the
+        // model cannot judge retention or completeness and should not try.
+        'log retention', 'log availability',
     ];
 
-    // Specific SSH patterns to filter (SSH with "any IP", "0.0.0.0/0", etc.)
-    $ssh_false_positive_patterns = [
-        'ssh.*any ip',
-        'ssh.*0\.0\.0\.0',
-        'ssh access.*from any',
-        'ssh.*configured to allow access from any',
-        'restrict ssh access to trusted',
-        'ssh.*unrestricted',
-        'ssh access configuration'
-    ];
+    // These matched the dangerous case, not the safe one.
+    //
+    //   'ssh.*0\.0\.0\.0'  ->  "SSH is exposed to 0.0.0.0/0 on the WAN"
+    //   'ssh.*unrestricted' ->  "SSH is unrestricted and reachable from the internet"
+    //   'ssh access.*from any' -> "SSH access allowed from any source address"
+    //
+    // Every one of those is the finding the prompt explicitly instructs the
+    // model to raise as CRITICAL, and every one was deleted before it reached
+    // the report. A firewall with SSH open to the world scanned clean.
+    //
+    // The intended suppression - "SSH restricted to specific source IPs is
+    // fine" - is a judgement about the rule set, which the model makes from the
+    // configuration and the prompt explains at length. A regex over the finding
+    // text cannot tell restricted from unrestricted, and here it got it exactly
+    // backwards. There is nothing left to keep.
+    $ssh_false_positive_patterns = [];
 
-    // Web GUI/HTTP patterns to filter when restricted to management IPs
-    $web_gui_false_positive_patterns = [
-        'web interface.*http',
-        'http.*web',
-        'web gui.*http',
-        'use of http',
-        'accessible over http',
-        'configure.*https instead of http',
-        'web interface to use https'
-    ];
+    // Same inversion: 'web interface.*http' deletes "Web interface is exposed
+    // over plain HTTP to the internet" as readily as it deletes a note about a
+    // management-only GUI. The prompt states the distinction; a substring match
+    // cannot make it.
+    $web_gui_false_positive_patterns = [];
 
     // Agent update patterns to filter when agent is already up to date
     $agent_false_positive_patterns = [
@@ -890,10 +923,13 @@ function filterProhibitedFindings($data) {
             $finding_text = strtolower(json_encode($finding));
             $is_prohibited = false;
 
-            // Check prohibited keywords
+            // Whole-phrase, word-boundary matching. A substring search here is
+            // what deleted findings for containing 'nat' inside 'Alternate'.
             foreach ($prohibited_keywords as $keyword) {
-                if (stripos($finding_text, $keyword) !== false) {
+                if (preg_match('/\b' . preg_quote($keyword, '/') . '\b/i', $finding_text)) {
                     $is_prohibited = true;
+                    error_log('[AI_SCAN] Filtered finding matching "' . $keyword . '": '
+                              . substr($finding_text, 0, 120));
                     break;
                 }
             }

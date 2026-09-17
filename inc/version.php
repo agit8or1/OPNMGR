@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Constant The Web Server Does Not Have'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Firewall With SSH Open Scanned Clean'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.68.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'A Firewall With SSH Open Scanned Clean',
+            'changes' => [
+                'FOUND: The AI security scan deleted findings after the model produced them, through a keyword filter whose SSH and web-GUI patterns matched the dangerous case rather than the safe one. "ssh.*0\\.0\\.0\\.0" removed "SSH is exposed to 0.0.0.0/0 on the WAN", "ssh.*unrestricted" removed "SSH is unrestricted and reachable from the internet", "web interface.*http" removed "Web interface exposed over plain HTTP to the internet". Each is a finding the prompt explicitly instructs the model to raise as CRITICAL. A firewall with SSH open to the world scanned clean',
+                'FIXED: Those pattern lists are empty. The intended suppression - SSH restricted to specific source IPs is fine - is a judgement about the rule set that the model makes from the configuration, and the prompt explains it at length. A regex over finding text cannot tell restricted from unrestricted, and it got it backwards',
+                'FIXED: The keyword filter matched substrings against the JSON of each finding, and the list contained "log" and "nat". "Alternate gateway lacks failover monitoring" and "Designated management VLAN is not isolated" were both deleted for containing "nat"; anything mentioning "login" or "technology" went the same way. Matching is on word boundaries now, and the list is down to log retention and log availability, which a thirty-line sample genuinely cannot support',
+                'FIXED: The prompt said "DO NOT MENTION LOGS AT ALL" directly above the section that sends log excerpts and asks which threats appear in them',
+                'CHANGED: max_tokens raised from 2000 to 8000. Two thousand tokens covered the grade, score, risk level, summary, concerns, recommendations, improvements and log analysis together, which is most of why the output read as thin',
+                'ADDED: Findings must carry severity, the configuration element they are based on, concrete impact and a specific remediation - and must not be raised at all if nothing in the configuration can be pointed at. Generic hardening advice is explicitly discouraged: the reader has this firewall in front of them',
+                'ADDED: tests/ai_scan_findings_test.php, including that configuration redaction still holds and still aborts rather than falling back, which must not regress while filters are being loosened',
+            ],
+        ],
         [
             'version' => '3.67.2',
             'date' => '2026-09-17',
