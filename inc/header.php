@@ -279,55 +279,15 @@ function isActive($page) {
       <?php endif; ?>
       <?php if (can('settings.manage')): ?>
       <?php
-      // Settings, AI Analysis, Manager Health, System Update and System Backup
-      // are all "configure the manager itself", and sat as five peers among ten
-      // admin entries. They are one nested group now, which is four fewer rows
-      // when it is closed and the same four destinations when it is open.
-      //
-      // It opens by itself on any of its own pages, decided here rather than in
-      // script, so it is right before anything runs.
-      $settings_pages = [
-          'settings.php', 'branding.php', 'smtp_settings.php', 'proxy_settings.php',
-          'ai_settings.php', 'health_monitor.php', 'system_update.php', 'updates.php',
-          'system_backup.php',
-      ];
-      $settings_open = in_array(basename($_SERVER['PHP_SELF'] ?? ''), $settings_pages, true);
+      // Settings is a destination, not a menu. Its sub-pages - General, AI
+      // Analysis, Health, Update, Backup - are cards on the settings page itself,
+      // where they can carry a description of what each one does. A sidebar
+      // dropdown could only ever show their names.
       ?>
-      <button type="button" class="sidebar-item sidebar-group-toggle<?php echo $settings_open ? ' is-open' : ''; ?>"
-              id="settingsGroupToggle" aria-expanded="<?php echo $settings_open ? 'true' : 'false'; ?>"
-              aria-controls="settingsGroup">
+      <a class="sidebar-item <?php echo isActive(['settings.php','branding.php','smtp_settings.php','proxy_settings.php','ai_settings.php','health_monitor.php','system_update.php','updates.php','system_backup.php']) ?>" href="/settings.php">
         <span class="sidebar-icon"><i class="fas fa-sliders-h"></i></span>
         <span class="sidebar-label">Settings</span>
-        <span class="sidebar-chevron"><i class="fas fa-chevron-down"></i></span>
-      </button>
-      <div class="sidebar-group<?php echo $settings_open ? ' is-open' : ''; ?>" id="settingsGroup">
-      <div class="sidebar-group-inner">
-      <a class="sidebar-item sidebar-subitem <?php echo isActive(['settings.php','branding.php','smtp_settings.php','proxy_settings.php']) ?>" href="/settings.php">
-        <span class="sidebar-icon"><i class="fas fa-gear"></i></span>
-        <span class="sidebar-label">General</span>
       </a>
-      <a class="sidebar-item sidebar-subitem <?php echo isActive('ai_settings.php') ?>" href="/ai_settings.php">
-        <span class="sidebar-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
-        <span class="sidebar-label">AI Analysis</span>
-      </a>
-      <?php if (can('health.view')): ?>
-      <a class="sidebar-item sidebar-subitem <?php echo isActive('health_monitor.php') ?>" href="/health_monitor.php">
-        <span class="sidebar-icon"><i class="fas fa-heartbeat"></i></span>
-        <span class="sidebar-label">Health</span>
-      </a>
-      <?php endif; ?>
-      <?php if (can('system.maintenance')): ?>
-      <a class="sidebar-item sidebar-subitem <?php echo isActive(['system_update.php','updates.php']) ?>" href="/system_update.php">
-        <span class="sidebar-icon"><i class="fas fa-sync-alt"></i></span>
-        <span class="sidebar-label">Update</span>
-      </a>
-      <a class="sidebar-item sidebar-subitem <?php echo isActive('system_backup.php') ?>" href="/system_backup.php">
-        <span class="sidebar-icon"><i class="fas fa-database"></i></span>
-        <span class="sidebar-label">Backup</span>
-      </a>
-      <?php endif; ?>
-      </div><!-- /.sidebar-group-inner -->
-      </div><!-- /#settingsGroup -->
       <a class="sidebar-item <?php echo isActive('settings_tasks.php') ?>" href="/settings_tasks.php">
         <span class="sidebar-icon"><i class="fas fa-clock"></i></span>
         <span class="sidebar-label">Scheduled Jobs</span>
@@ -444,8 +404,7 @@ if (function_exists('can') && can('settings.manage')) {
   // over the remembered state, so the group containing the page you are looking
   // at is never shut.
   [
-    { toggle: 'adminGroupToggle',    group: 'adminGroup',    key: 'opnmgr-admin-group' },
-    { toggle: 'settingsGroupToggle', group: 'settingsGroup', key: 'opnmgr-settings-group' }
+    { toggle: 'adminGroupToggle', group: 'adminGroup', key: 'opnmgr-admin-group' }
   ].forEach(function (cfg) {
     var toggle = document.getElementById(cfg.toggle);
     var group  = document.getElementById(cfg.group);

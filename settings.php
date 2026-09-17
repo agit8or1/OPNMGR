@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+// ai_enabled() lives here; without it the AI card's status guard is always false
+// and the card would report "Disabled" on an installation where AI is on.
+require_once __DIR__ . '/inc/ai_redaction.php';
 require_once __DIR__ . '/inc/secrets.php';
 requireLogin();
 requireAdmin();
@@ -225,6 +228,72 @@ include __DIR__ . '/inc/header.php';
 ?>
 <h4>Settings</h4>
 <div class="row g-2">
+  <?php
+  // These were sidebar entries of their own, then briefly a sidebar dropdown.
+  // They belong here: a card can say what the page is for, which a menu entry
+  // cannot, and "configure the manager" is one destination rather than five.
+  ?>
+
+  <!-- AI Analysis -->
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-wand-magic-sparkles fa-2x text-info"></i>
+        </div>
+        <h6 class="card-title">AI Analysis</h6>
+        <p class="card-text text-muted small">
+          <?php
+          // Say whether it is on, because it is off by default and the page is
+          // otherwise indistinguishable from one that is simply unused.
+          echo (function_exists('ai_enabled') && ai_enabled())
+              ? 'Provider and model'
+              : 'Disabled - opt in';
+          ?>
+        </p>
+        <a href="ai_settings.php" class="btn btn-info btn-sm w-100">
+          <i class="fas fa-cog me-1"></i>Configure
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manager Health -->
+  <?php if (!function_exists('can') || can('health.view')): ?>
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-heartbeat fa-2x text-danger"></i>
+        </div>
+        <h6 class="card-title">Manager Health</h6>
+        <p class="card-text text-muted small">This server, not the fleet</p>
+        <a href="health_monitor.php" class="btn btn-danger btn-sm w-100">
+          <i class="fas fa-stethoscope me-1"></i>Open
+        </a>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <!-- System Update -->
+  <?php if (!function_exists('can') || can('system.maintenance')): ?>
+  <div class="col-md-3">
+    <div class="card h-100">
+      <div class="card-body text-center p-2">
+        <div class="mb-2">
+          <i class="fas fa-sync-alt fa-2x text-primary"></i>
+        </div>
+        <h6 class="card-title">System Update</h6>
+        <p class="card-text text-muted small">Update OPNManager itself</p>
+        <a href="system_update.php" class="btn btn-primary btn-sm w-100">
+          <i class="fas fa-download me-1"></i>Check
+        </a>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
   <!-- ACME / Certificates -->
   <div class="col-md-3">
     <div class="card h-100">

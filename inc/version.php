@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Configure The Manager, In One Place'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Page With Sections, Not A Menu'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.3',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'A Page With Sections, Not A Menu',
+            'changes' => [
+                'FIXED: Settings is a link again. 3.69.2 turned it into a collapsing sidebar group with AI Analysis, Health, Update and Backup nested inside it, which was the wrong shape: Settings is a page made of sections, and its sections belong on the page. The four destinations are cards there now, beside the fourteen already present, and the sidebar holds one plain link',
+                'FIXED: tests/ai_redaction_test.php set ai_enabled back to "0" when it finished, commented as restoring the installation default. The default is whatever the operator chose, and on an installation with AI deliberately enabled every full suite run switched it off - silently, days after the fact, attributable to nobody. It now reads the value before the test and puts that value back, including restoring the absence of the row when there was none',
+                'ADDED: A test asserting that restore, because the suite writes to the live database and a test that does not give the installation back as it found it is a defect in the installation, not in the test',
+            ],
+        ],
         [
             'version' => '3.69.2',
             'date' => '2026-09-17',

@@ -127,6 +127,13 @@ T::ok(in_array('User passwords and password hashes', $disclosure['never_sent'], 
       'password hashes are declared as never sent');
 
 // AI is opt-in: absent setting means off.
+//
+// This runs against the live settings table, so capture what the operator
+// actually has before touching it. The restore below used to write a hardcoded
+// "0" and called it "the installation default" - which silently switched AI off
+// on any installation where it was on, every time the suite ran.
+$ai_enabled_before = db()->query("SELECT `value` FROM settings WHERE `name` = 'ai_enabled'")->fetchColumn();
+
 db()->prepare('DELETE FROM settings WHERE name = ?')->execute(['ai_enabled']);
 T::ok(!ai_enabled(), 'with no setting at all, AI is off (opt-in, not opt-out)');
 
@@ -136,7 +143,14 @@ T::ok(!ai_enabled(), 'explicitly disabled is off');
 db()->prepare('UPDATE settings SET value = "1" WHERE name = "ai_enabled"')->execute();
 T::ok(ai_enabled(), 'explicitly enabled is on');
 
-// Restore the installation default.
-db()->prepare('UPDATE settings SET value = "0" WHERE name = "ai_enabled"')->execute();
+// Restore what was there, including its absence.
+if ($ai_enabled_before === false) {
+    db()->prepare('DELETE FROM settings WHERE name = ?')->execute(['ai_enabled']);
+} else {
+    db()->prepare(
+        'INSERT INTO settings (`name`,`value`) VALUES ("ai_enabled", ?)
+         ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)'
+    )->execute([(string) $ai_enabled_before]);
+}
 
 exit(T::summary());

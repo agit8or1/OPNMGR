@@ -142,5 +142,25 @@ if (function_exists('shell_exec') && PHP_SAPI === 'cli') {
         'got ' . var_export($sudoName, true));
 }
 
+// ---------------------------------------------------------------------------
+// A test must give the installation back as it found it
+//
+// tests/ai_redaction_test.php exercises ai_enabled against the live settings
+// table, then "restored the installation default" by writing a hardcoded "0".
+// On an installation where AI was deliberately on, every full suite run switched
+// it off - quietly, and attributed to nobody.
+
+$redaction = (string) @file_get_contents($root . '/tests/ai_redaction_test.php');
+
+check('the ai_enabled test captures the existing value first',
+    str_contains($redaction, '$ai_enabled_before'),
+    'it cannot restore what it never read');
+check('it no longer writes a hardcoded default',
+    !preg_match('/UPDATE settings SET value = "0" WHERE name = "ai_enabled"/', $redaction),
+    '"the installation default" was whatever the operator had chosen');
+check('an absent setting is restored as absent',
+    (bool) preg_match('/\$ai_enabled_before === false[\s\S]{0,200}DELETE FROM settings/', $redaction),
+    'absence is meaningful here - AI is opt-in');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
