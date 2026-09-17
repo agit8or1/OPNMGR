@@ -6,6 +6,23 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.63.1
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+- **The walkthrough was re-recorded and its poster frame regenerated**, so the
+  last stale documentation asset matches the current build: it shows the version
+  in the header and the grouped admin menu.
+- Only the poster is committed, at 1920x1080. The MP4s remain release assets and
+  are gitignored - a binary that regenerates from a script does not need to sit
+  in git history.
+- The demo environment was stood up and dismantled again: throwaway database, web
+  root, account, server, recording and encoded video all removed, production
+  confirmed untouched.
+
+---
+
 ## Version 3.63.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

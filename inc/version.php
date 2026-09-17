@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Recaptured'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Poster Frame'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.63.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Poster Frame',
+            'changes' => [
+                'CHANGED: The walkthrough was re-recorded and its poster frame regenerated, so the last stale documentation asset matches the current build - it shows the version in the header and the grouped admin menu',
+                'CHANGED: Only the poster is committed, at 1920x1080. The MP4s remain release assets and are gitignored: a binary that regenerates from a script does not need to sit in git history',
+                'CHANGED: The demo environment was stood up and dismantled again - throwaway database, web root, account, server, recording and encoded video all removed, production confirmed untouched at two firewalls',
+            ],
+        ],
         [
             'version' => '3.63.0',
             'date' => '2026-09-17',
