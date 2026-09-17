@@ -101,8 +101,41 @@ check('generic advice is discouraged',
 check('the output ceiling was raised from 2000',
     !str_contains($src, "'max_tokens' => 2000"),
     '2000 tokens for grade, summary, concerns, recommendations and log analysis');
-check('both providers raised together',
-    substr_count($src, "'max_tokens' => 8000") === 2);
+check('the OpenAI ceiling is a parameter, not a literal',
+    str_contains($src, 'function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000)'));
+check('a refused ceiling is retried at the limit the API states',
+    str_contains($src, 'max_tokens is too large') && str_contains($src, 'return callOpenAI('),
+    'models differ widely, so a fixed number is wrong for somebody; gpt-4-turbo allows 4096');
+check('the retry cannot loop',
+    (bool) preg_match('/\$allowed > 0 && \$allowed < \$max_tokens/', $src),
+    'it only retries downward, once');
+check('Anthropic is raised too', str_contains($src, "'max_tokens' => 8000,"));
+
+// --- the report must survive being stored ------------------------------------
+//
+// concerns and recommendations were bound to the INSERT exactly as parsed. When
+// the model returned a list of objects - which is what asking for severity,
+// evidence, impact and remediation per finding encourages - the converter
+// recursed and handed back an array, PDO stringified it, and the column held the
+// five characters "Array". The analysis was produced and then discarded at the
+// last step:
+//
+//   id  summary  concerns  recs  improvements
+//   40      490         5     5             5
+//   41      571       576   613           202
+
+check('a section renderer exists', str_contains($src, 'function report_section_text'));
+check('every report section goes through it',
+    substr_count($src, 'report_section_text($analysis[') >= 4,
+    'summary, recommendations, concerns and improvements');
+check('the raw parsed value is no longer bound directly',
+    !preg_match("/\\\$analysis\\['concerns'\\],/", $src),
+    'that is what put the literal string "Array" in the column');
+check('a list of objects keeps its labels',
+    str_contains($src, "str_replace('_', ' '"),
+    'severity/title/remediation are the useful part of a structured finding');
+check('nested values are flattened rather than dropped',
+    (bool) preg_match("/if \\(is_array\\(\\\$v\\)\\) \\{\s*\\\$v = implode/", $src));
 
 // --- redaction must still hold ----------------------------------------------
 

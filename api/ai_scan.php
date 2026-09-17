@@ -171,11 +171,11 @@ try {
         $analysis['grade'],
         $analysis['score'],
         $analysis['risk_level'],
-        $analysis['summary'],
-        $analysis['recommendations'],
-        $analysis['concerns'],
-        $analysis['improvements'],
-        $analysis['full_report'],
+        report_section_text($analysis['summary'] ?? ''),
+        report_section_text($analysis['recommendations'] ?? ''),
+        report_section_text($analysis['concerns'] ?? ''),
+        report_section_text($analysis['improvements'] ?? ''),
+        report_section_text($analysis['full_report'] ?? ''),
         $scan_duration
     ]);
     $report_id = db()->lastInsertId();
@@ -653,7 +653,7 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
 /**
  * Call OpenAI API
  */
-function callOpenAI($api_key, $model, $prompt) {
+function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -674,7 +674,7 @@ function callOpenAI($api_key, $model, $prompt) {
             // is most of why the output read as thin. The request is a few
             // thousand tokens of configuration; the answer should not be capped
             // below what the question deserves.
-            'max_tokens' => 8000
+            'max_tokens' => $max_tokens
         ])
     ]);
     
@@ -685,6 +685,19 @@ function callOpenAI($api_key, $model, $prompt) {
     if ($http_code !== 200) {
         $error_data = json_decode($response, true);
         $error_message = $error_data['error']['message'] ?? 'Unknown error';
+
+        // Each model has its own completion ceiling and they differ widely, so a
+        // fixed number is wrong for somebody. The API says what the limit is
+        // when it refuses; take it at its word and ask again, once.
+        if ($http_code === 400
+            && preg_match('/max_tokens is too large[^0-9]*[0-9]+[^0-9]+at most ([0-9]+)/i', $error_message, $m)) {
+            $allowed = (int) $m[1];
+            if ($allowed > 0 && $allowed < $max_tokens) {
+                error_log("[AI_SCAN] {$model} allows {$allowed} completion tokens; retrying at that limit");
+                return callOpenAI($api_key, $model, $prompt, $allowed);
+            }
+        }
+
         throw new Exception("OpenAI API error: HTTP {$http_code} - {$error_message}");
     }
 
@@ -1089,6 +1102,61 @@ function filterProhibitedFindings($data) {
 /**
  * Recursively convert all arrays to formatted strings
  */
+/**
+ * Render a report section as text, whatever shape the model returned.
+ *
+ * concerns and recommendations were bound to the INSERT exactly as parsed. When
+ * the model returned a list of objects - which is what asking for severity,
+ * evidence, impact and remediation per finding encourages - convertAllArrays\
+ * ToStrings() recursed and handed back an array, PDO stringified it, and the
+ * column ended up containing the five characters "Array".
+ *
+ * The analysis was being produced and then thrown away at the last step.
+ */
+function report_section_text($value): string
+{
+    if ($value === null) {
+        return '';
+    }
+    if (is_string($value)) {
+        return $value;
+    }
+    if (is_scalar($value)) {
+        return (string) $value;
+    }
+    if (!is_array($value)) {
+        return '';
+    }
+
+    $lines = [];
+    foreach ($value as $key => $item) {
+        if (is_scalar($item) || $item === null) {
+            $text = trim((string) $item);
+            if ($text !== '') {
+                $lines[] = is_string($key) ? ucfirst($key) . ': ' . $text : '- ' . $text;
+            }
+            continue;
+        }
+        if (is_array($item)) {
+            // An object per entry: keep the labels, they are the useful part.
+            $parts = [];
+            foreach ($item as $k => $v) {
+                if (is_array($v)) {
+                    $v = implode(', ', array_filter(array_map('strval', $v), 'strlen'));
+                }
+                $v = trim((string) $v);
+                if ($v !== '') {
+                    $parts[] = ucfirst(str_replace('_', ' ', (string) $k)) . ': ' . $v;
+                }
+            }
+            if ($parts) {
+                $lines[] = '- ' . implode("\n  ", $parts);
+            }
+        }
+    }
+    return implode("\n", $lines);
+}
+
 function convertAllArraysToStrings($data) {
     if (!is_array($data)) {
         return $data;

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Firewall With SSH Open Scanned Clean'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Column Contained The Word Array'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.68.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'The Column Contained The Word Array',
+            'changes' => [
+                'FIXED: Scan concerns and recommendations were stored as the five characters "Array". They were bound to the INSERT exactly as parsed, and when the model returned a list of objects - which is what asking for severity, evidence, impact and remediation per finding encourages - the converter recursed, handed back an array, and PDO stringified it. The analysis was being produced and then discarded at the last step. Same firewall, same model, before and after: concerns 5 characters to 576, recommendations 5 to 613, improvements 5 to 202',
+                'ADDED: report_section_text() renders a section whatever shape it arrives in - a string, a list of strings, or a list of objects whose labels are kept, because severity and remediation are the useful part of a structured finding',
+                'FIXED: max_tokens 8000 exceeded what the configured model accepts. gpt-4-turbo allows 4096 and refused the request outright, so raising the ceiling had made scans fail rather than improve. The OpenAI call takes the limit as a parameter and retries once at whatever maximum the API reports, downward only',
+                'CONTEXT: The first scan after these fixes returned a real finding with evidence - repeated probes from a single address against port 2375, the unauthenticated Docker API - quoting the firewall log line it rested on',
+            ],
+        ],
         [
             'version' => '3.68.0',
             'date' => '2026-09-17',

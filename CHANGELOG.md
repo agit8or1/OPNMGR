@@ -6,6 +6,50 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.68.1
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+**Scan concerns and recommendations were stored as the word "Array".**
+
+```
+id  summary  concerns  recs  improvements
+40      490         5     5             5     <- "Array"
+41      571       576   613           202     <- the same scan, stored properly
+```
+
+They were bound to the INSERT exactly as parsed. When the model returned a list
+of *objects* - which is what asking for severity, evidence, impact and
+remediation per finding encourages - `convertAllArraysToStrings()` recursed,
+handed back an array, and PDO stringified it. The analysis was being produced and
+then discarded at the last step, which is most of what "the AI analysis is
+lacking" actually was.
+
+`report_section_text()` renders a section whatever shape it arrives in: a string,
+a list of strings, or a list of objects whose labels are kept - severity and
+remediation are the useful part of a structured finding.
+
+**And `max_tokens` 8000 exceeded what the configured model accepts.**
+
+```
+OpenAI API error: HTTP 400 - max_tokens is too large: 8000.
+This model supports at most 4096 completion tokens
+```
+
+Raising the ceiling had made scans fail outright rather than improve. The OpenAI
+call takes the limit as a parameter and retries once at whatever maximum the API
+reports, downward only - models differ too widely for a fixed number to be right
+for everyone.
+
+### Context
+
+The first scan after these fixes returned a real finding with evidence: repeated
+probes from a single address against port 2375, the unauthenticated Docker API,
+quoting the firewall log line it rested on.
+
+---
+
 ## Version 3.68.0
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 
