@@ -60,6 +60,25 @@ check('an agent too old to report in_use still gets certificate alerts',
     && !preg_match("/in_use'\] !== 'yes'/", $eval),
     'suppressing on anything other than an explicit "no" silently drops alerting for older agents');
 
+// --- a web GUI on plain HTTP presents no certificate -------------------------
+//
+// OPNsense keeps <ssl-certref> populated whether or not the GUI serves TLS, so a
+// firewall with its interface on http still looked like it was using the
+// certificate - and an expiring one raised a warning with nothing to act on,
+// because there is no TLS to renew a certificate for.
+
+check('a webgui certref is discounted when the GUI is not https',
+    str_contains($agent, './system/webgui') && str_contains($agent, 'ssl-certref'),
+    'the reference exists in config.xml regardless of protocol');
+check('only when https is not the protocol',
+    (bool) preg_match('/protocol != "https"/', $agent));
+check('and only when the GUI is the sole reference',
+    (bool) preg_match('/reference_count\.get\(certref, 0\) <= 1/', $agent),
+    'the same certificate bound to an OpenVPN server is still in use, and '
+    . 'suppressing it would trade a harmless alert for a blind spot');
+check('references are counted, not just recorded',
+    str_contains($agent, 'reference_count'));
+
 // --- the shipped package must contain the change -----------------------------
 
 $version = null;

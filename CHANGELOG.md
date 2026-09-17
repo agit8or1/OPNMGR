@@ -6,6 +6,46 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.67.0
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+**A certificate warning on a firewall with no TLS.**
+
+OPNsense keeps `<ssl-certref>` populated whether or not the web GUI serves TLS,
+so a firewall with its interface on plain HTTP still looked like it was using the
+certificate:
+
+```
+PROTOCOL=http
+CERTREF=68baa7d2cc2bb      <- the certificate expiring in 19 days
+```
+
+The warning was true and useless: there is no TLS to renew a certificate for.
+
+Agent v1.6.9 discounts a web GUI certificate reference when
+`system/webgui/protocol` is not `https` - **and only when the GUI is the
+certificate's sole reference**:
+
+```
+GUI on http, cert used only by GUI    ->  in_use = no    (stops alerting)
+GUI on https                          ->  in_use = yes   (still monitored)
+GUI on http but cert also on OpenVPN  ->  in_use = yes   (still monitored)
+```
+
+That last case is why the reference is discounted rather than ignored. The same
+certificate bound to an OpenVPN server is very much in use, and dropping it would
+trade a harmless alert for a blind spot.
+
+### Context
+
+This emptied the incident list. Of the twelve open incidents at the start of the
+day: ten were stale, one was a critical about a certificate nothing served, and
+the last was a warning about a certificate on a firewall with no TLS.
+
+---
+
 ## Version 3.66.0
 **Released**: September 17, 2026 | **Agent**: v1.6.8
 

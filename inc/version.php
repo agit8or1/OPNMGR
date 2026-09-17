@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'True About A Certificate'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'No TLS To Renew For'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'True About A Cer
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.8'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.9'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-17'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.67.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'No TLS To Renew For',
+            'changes' => [
+                'FIXED: A firewall serving its web interface over plain HTTP still raised a certificate expiry warning. OPNsense keeps <ssl-certref> populated whether or not the GUI serves TLS, so the certificate looked in use - and the warning had nothing to act on, because there is no TLS to renew a certificate for',
+                'ADDED: Agent v1.6.9 discounts a web GUI certificate reference when system/webgui/protocol is not https, and only when the GUI is the certificate\'s sole reference. The same certificate bound to an OpenVPN server stays monitored: suppressing that would trade a harmless alert for a blind spot',
+                'CONTEXT: This emptied the incident list. Of the twelve open incidents at the start of the day, ten were stale, one was a critical about a certificate nothing served, and the last was a warning about a certificate on a firewall with no TLS',
+                'ADDED: Four assertions covering the three cases that matter - GUI on http with the certificate used only there, GUI on https, and GUI on http with the certificate also bound elsewhere',
+            ],
+        ],
         [
             'version' => '3.66.0',
             'date' => '2026-09-17',

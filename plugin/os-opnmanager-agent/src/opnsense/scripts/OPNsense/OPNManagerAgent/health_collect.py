@@ -421,6 +421,7 @@ def collect_certificates():
                 all_refids.add(refid)
 
     referenced = set()
+    reference_count = {}
     if all_refids:
         cert_nodes = set()
         for tag in ("cert", "ca"):
@@ -433,6 +434,23 @@ def collect_certificates():
             text = (el.text or "").strip()
             if text and text in all_refids:
                 referenced.add(text)
+                reference_count[text] = reference_count.get(text, 0) + 1
+
+    # A web GUI serving plain HTTP presents no certificate, so its
+    # <ssl-certref> is a reference to something nothing uses. OPNsense keeps the
+    # element populated either way, so the certificate looked in use and an
+    # expiring one raised a warning nobody could act on - there is no TLS to
+    # renew a certificate for.
+    #
+    # Only discounted when the GUI is the certificate's sole reference: the same
+    # certificate bound to an OpenVPN server is still very much in use.
+    webgui = root.find("./system/webgui")
+    if webgui is not None:
+        protocol = (webgui.findtext("protocol") or "").strip().lower()
+        certref = (webgui.findtext("ssl-certref") or "").strip()
+        if protocol and protocol != "https" and certref:
+            if reference_count.get(certref, 0) <= 1:
+                referenced.discard(certref)
 
     certificates = []
 
