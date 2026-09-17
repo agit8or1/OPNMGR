@@ -3,7 +3,7 @@
 # OPNManager Agent Plugin Installer
 # Downloads and installs the OPNManager agent plugin for OPNsense
 
-PLUGIN_VERSION="1.6.7"
+PLUGIN_VERSION="1.6.8"
 
 # Base URL of the manager this firewall belongs to. It is passed in by whatever
 # emitted the install command, because a script served as a static file cannot

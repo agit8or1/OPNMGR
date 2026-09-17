@@ -6,6 +6,58 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.66.0
+**Released**: September 17, 2026 | **Agent**: v1.6.8
+
+### Fixed
+
+**A CRITICAL certificate alert that was true about a certificate and false about
+the firewall.**
+
+```
+CRITICAL  Certificate Web GUI TLS certificate on edge-fw.example.net expires in 4 days
+```
+
+The firewall was serving this:
+
+```
+issuer  = C=US, O=Let's Encrypt, CN=YR2
+notAfter= Dec 16 2026            (89 days)
+```
+
+OPNsense keeps every certificate ever created in `config.xml` - the self-signed
+one generated at install, anything ACME has since superseded, every CA in the
+chain - and all of them were reported and alerted on identically. The expiring
+certificate was an orphan left behind when the box was rebuilt the day before.
+
+- **Agent v1.6.8 reports whether anything references each certificate.** A refid
+  appearing anywhere outside its own `<cert>`/`<ca>` element is a reference -
+  `system/webgui/ssl-certref`, an OpenVPN `certref`, an IPsec or HAProxy binding
+  - so matching on the value catches consumers from plugins we have never heard
+  of.
+
+  ```
+  68a7c3be8afe8  edge-fw.example.net (ACME)     89 days   in_use = yes
+  68a73890e9aa8  Web GUI TLS certificate         4 days   in_use = no
+  ```
+
+- The evaluator resolves rather than raises for a certificate the agent
+  **positively** reports as unused. `NULL` is deliberately not treated as `no`:
+  an agent too old to report `in_use` keeps its certificate alerting, because
+  silently dropping it would be worse than the noise.
+
+On the fleet this resolved one false critical and left the one real warning
+standing - a certificate in use, expiring in 19 days, on a firewall with no ACME
+client configured to renew it.
+
+### Added
+
+- `tests/certificate_alert_test.php`, including that the collector still never
+  reads a private key, and that the published package actually contains the
+  change.
+
+---
+
 ## Version 3.65.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

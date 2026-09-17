@@ -264,6 +264,21 @@ foreach ($firewalls as $fw) {
         $days = (int)$cert['days_remaining'];
         $name = $cert['name'] ?: $cert['refid'];
 
+        // OPNsense keeps every certificate ever created, including the
+        // self-signed one from install and anything ACME has superseded. An
+        // expiring leftover is not an incident: on 2026-09-17 one raised a
+        // CRITICAL "expires in 4 days" while the certificate the GUI was
+        // actually serving had 89.
+        //
+        // Only suppress when the agent positively reports the certificate as
+        // unused. NULL means an agent too old to say, and silently dropping
+        // certificate alerts for those firewalls would be worse than the noise.
+        if (($cert['in_use'] ?? null) === 'no') {
+            resolve('cert.expiring', $id, $cert['refid'], 'certificate is not in use');
+            resolve('cert.expired', $id, $cert['refid'], 'certificate is not in use');
+            continue;
+        }
+
         if ($days < 0) {
             raise('cert.expired', [
                 'firewall_id' => $id, 'object_key' => $cert['refid'],

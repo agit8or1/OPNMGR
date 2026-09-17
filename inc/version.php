@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Body Was Thrown Away'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'True About A Certificate'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,8 +20,8 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Body Was Thr
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.7'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-16'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.8'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-17'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 // First agent release that collects OPNsense health telemetry (gateways, VPN,
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.66.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'True About A Certificate',
+            'changes' => [
+                'FIXED: A CRITICAL "certificate expires in 4 days" was raised for a firewall whose web interface was serving a Let\'s Encrypt certificate with 89 days left. OPNsense keeps every certificate ever created in config.xml - the self-signed one from install, anything ACME has superseded, every CA in the chain - and all of them were alerted on identically. The alert was true about a certificate and false about the firewall',
+                'ADDED: Agent v1.6.8 reports whether anything references each certificate. A refid appearing anywhere outside its own <cert> or <ca> element is a reference - system/webgui/ssl-certref, an OpenVPN certref, an IPsec or HAProxy binding - so matching on the value catches consumers from plugins we have never heard of',
+                'CHANGED: The evaluator resolves rather than raises for a certificate the agent positively reports as unused. NULL is deliberately not treated as "no": an agent too old to report in_use keeps its certificate alerting, because silently dropping it would be worse than the noise',
+                'CONTEXT: On the fleet this resolved one false critical and left the one real warning standing - a certificate in use, expiring in 19 days, on a firewall with no ACME client configured to renew it',
+                'ADDED: tests/certificate_alert_test.php, including that the collector still never reads a private key and that the published package actually contains the change',
+            ],
+        ],
         [
             'version' => '3.65.0',
             'date' => '2026-09-17',

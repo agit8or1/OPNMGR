@@ -398,6 +398,42 @@ def collect_certificates():
     except Exception:
         return None
 
+    # Which certificates anything actually references.
+    #
+    # OPNsense keeps every certificate ever created in config.xml, including the
+    # self-signed one it generates at install and any superseded by ACME. All of
+    # them were reported identically, so an expiring leftover raised the same
+    # alert as the certificate the GUI is actually serving - and on 2026-09-17
+    # that produced a CRITICAL "expires in 4 days" for a certificate nothing
+    # used, while the live Let's Encrypt one had 89 days.
+    #
+    # A refid appearing anywhere outside its own <cert>/<ca> element is a
+    # reference: system/webgui/ssl-certref, an OpenVPN certref, an IPsec or
+    # HAProxy binding. Matching on the value rather than enumerating every
+    # consumer means a reference from a plugin we have never heard of still
+    # counts.
+    root = tree.getroot()
+    all_refids = set()
+    for tag in ("cert", "ca"):
+        for node in root.findall(f"./{tag}"):
+            refid = node.findtext("refid") or ""
+            if refid:
+                all_refids.add(refid)
+
+    referenced = set()
+    if all_refids:
+        cert_nodes = set()
+        for tag in ("cert", "ca"):
+            for node in root.findall(f"./{tag}"):
+                for el in node.iter():
+                    cert_nodes.add(id(el))
+        for el in root.iter():
+            if id(el) in cert_nodes:
+                continue
+            text = (el.text or "").strip()
+            if text and text in all_refids:
+                referenced.add(text)
+
     certificates = []
 
     for tag, cert_type in (("cert", "certificate"), ("ca", "ca")):
@@ -420,6 +456,7 @@ def collect_certificates():
                 "refid": refid[:64],
                 "name": (node.findtext("descr") or "")[:255] or None,
                 "type": cert_type,
+                "in_use": "yes" if refid in referenced else "no",
             }
             if parsed:
                 entry.update({
