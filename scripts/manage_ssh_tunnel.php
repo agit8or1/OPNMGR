@@ -89,7 +89,14 @@ function start_tunnel($firewall, $duration_minutes = 30) {
     // -L port:target:web_port means: Listen on localhost:port, forward to firewall's target:web_port
     // SECURITY: Bind to 127.0.0.1 only - tunnels should ONLY be accessible via tunnel_proxy.php
     $ssh_cmd = sprintf(
-        "timeout 10 ssh -i %s -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%s:%s:%s -N -f root@%s 2>&1",
+        // ExitOnForwardFailure is the difference between a tunnel and the
+        // appearance of one. Without it, ssh treats a failed port bind - the
+        // port already held by a previous tunnel, most often - as a warning,
+        // stays connected, and backgrounds itself. exec() then sees return code
+        // 0, the session is recorded active, and the user meets "Proxy Error:
+        // Failed to connect to 127.0.0.1:<port>" against a process that is
+        // running and forwarding nothing.
+        "timeout 10 ssh -i %s -o StrictHostKeyChecking=no -o ExitOnForwardFailure=yes -o ConnectTimeout=5 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -L 127.0.0.1:%s:%s:%s -N -f root@%s 2>&1",
         escapeshellarg($key_file),
         $port,
         $tunnel_target,

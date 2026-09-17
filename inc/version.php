@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Initializing Forever'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Forwarding Nothing'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.58.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Forwarding Nothing',
+            'changes' => [
+                'FIXED: A tunnel that forwarded nothing was reported as established. ssh treats a failed port bind - the port still held by a previous tunnel, most often - as a warning, so without ExitOnForwardFailure it stayed connected and backgrounded itself under -f. exec() saw return code 0, the session was recorded active, and the proxy met a closed port: "Failed to connect to 127.0.0.1 port 8101". The ssh process was running, authenticated, and forwarding nothing',
+                'FIXED: SSH to a firewall failed with "Permission denied (publickey)" although the manager\'s key was in its authorized_keys all along. OpenSSH silently refuses keys from an over-permissive /root/.ssh, which is indistinguishable from a missing key. Deploying the key also corrects the modes, and that is what restored access',
+                'ADDED: tests/tunnel_forward_test.php. Exit status is load-bearing here - it is the only thing anyone checks - so the option that makes it truthful is now asserted',
+            ],
+        ],
         [
             'version' => '3.57.1',
             'date' => '2026-09-17',

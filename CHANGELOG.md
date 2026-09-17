@@ -6,6 +6,45 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.58.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Fixed
+
+**A tunnel that forwarded nothing was reported as established.**
+
+```
+Proxy Error: Unable to connect to tunnel.
+Failed to connect to 127.0.0.1 port 8101 after 2 ms: Couldn't connect to server
+```
+
+The ssh process was running, authenticated, and forwarding nothing:
+
+```
+ssh -i ... -L 127.0.0.1:8101:localhost:443 -N -f root@...   (alive, no listener)
+```
+
+ssh treats a failed port bind - the port still held by a previous tunnel, most
+often - as a *warning*. Without `ExitOnForwardFailure` it stays connected and
+backgrounds itself under `-f`, so `exec()` sees return code 0, the session is
+recorded `active`, and the proxy meets a closed port. Every layer above believed
+the tunnel existed, because the only thing anyone checked was ssh's exit status.
+
+**And a key that was refused for its directory's permissions.**
+
+SSH to a firewall failed with `Permission denied (publickey)` while the manager's
+key was in its `authorized_keys` all along. OpenSSH silently refuses keys from an
+over-permissive `/root/.ssh`, which from the client side is indistinguishable
+from a key that was never deployed. Deploying the key also corrects the modes,
+and that is what actually restored access.
+
+### Added
+
+- `tests/tunnel_forward_test.php`. Exit status is load-bearing here - it is the
+  only thing anyone checks - so the option that makes it truthful is asserted.
+
+---
+
 ## Version 3.57.1
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
