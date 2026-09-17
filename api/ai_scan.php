@@ -158,12 +158,14 @@ try {
     }
 
     // Save scan report
+    $usage = last_token_usage();
     $stmt = db()->prepare("
         INSERT INTO ai_scan_reports (
             firewall_id, config_snapshot_id, scan_type, provider, model,
             overall_grade, security_score, risk_level, summary, 
-            recommendations, concerns, improvements, full_report, scan_duration
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            recommendations, concerns, improvements, full_report, scan_duration,
+            prompt_tokens, completion_tokens, total_tokens
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $firewall_id,
@@ -179,7 +181,10 @@ try {
         report_section_text($analysis['concerns'] ?? ''),
         report_section_text($analysis['improvements'] ?? ''),
         report_section_text($analysis['full_report'] ?? ''),
-        $scan_duration
+        $scan_duration,
+        $usage['prompt'],
+        $usage['completion'],
+        $usage['total']
     ]);
     $report_id = db()->lastInsertId();
     
@@ -656,6 +661,31 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
 /**
  * Call OpenAI API
  */
+/**
+ * What the last provider call actually consumed.
+ *
+ * Cost was previously shown as a hand-written guess, which cannot be right for a
+ * given account: pricing differs per account and changes without this file
+ * changing. The provider reports its own usage on every response and it was
+ * being decoded and thrown away. It is recorded against the report now, so the
+ * figure on the page is measured rather than assumed.
+ */
+$GLOBALS['opnmgr_last_usage'] = ['prompt' => null, 'completion' => null, 'total' => null];
+
+function record_token_usage(array $usage): void
+{
+    $GLOBALS['opnmgr_last_usage'] = [
+        'prompt'     => isset($usage['prompt']) ? (int) $usage['prompt'] : null,
+        'completion' => isset($usage['completion']) ? (int) $usage['completion'] : null,
+        'total'      => isset($usage['total']) ? (int) $usage['total'] : null,
+    ];
+}
+
+function last_token_usage(): array
+{
+    return $GLOBALS['opnmgr_last_usage'] ?? ['prompt' => null, 'completion' => null, 'total' => null];
+}
+
 function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     curl_setopt_array($ch, [
@@ -705,6 +735,11 @@ function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
     }
 
     $data = json_decode($response, true);
+    record_token_usage([
+        'prompt'     => $data['usage']['prompt_tokens'] ?? null,
+        'completion' => $data['usage']['completion_tokens'] ?? null,
+        'total'      => $data['usage']['total_tokens'] ?? null,
+    ]);
     return $data['choices'][0]['message']['content'] ?? '';
 }
 
@@ -739,6 +774,13 @@ function callAnthropic($api_key, $model, $prompt) {
     }
     
     $data = json_decode($response, true);
+    $in  = $data['usage']['input_tokens'] ?? null;
+    $out = $data['usage']['output_tokens'] ?? null;
+    record_token_usage([
+        'prompt'     => $in,
+        'completion' => $out,
+        'total'      => ($in === null && $out === null) ? null : (int) $in + (int) $out,
+    ]);
     return $data['content'][0]['text'] ?? '';
 }
 

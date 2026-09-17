@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.50.0.
+-- Generated from the reference installation for OPNManager v3.69.6.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -134,6 +134,9 @@ CREATE TABLE IF NOT EXISTS `ai_scan_reports` (
   `improvements` text DEFAULT NULL,
   `full_report` longtext DEFAULT NULL,
   `scan_duration` int(11) DEFAULT NULL,
+  `prompt_tokens` int(11) DEFAULT NULL,
+  `completion_tokens` int(11) DEFAULT NULL,
+  `total_tokens` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_firewall` (`firewall_id`),

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Written From Memory, Not From The Provider'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Rated, Banded, And Measured'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.7',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Rated, Banded, And Measured',
+            'changes' => [
+                'ADDED: Suggested models carry a rating out of five for firewall config review and a relative cost band, shown in the dropdown and in a comparison table under the selector. The model in use and the recommended one are marked, and the rating is explicitly for reasoning over a rule set rather than for quality in general - a fast model can be excellent elsewhere and still miss the interaction between two rules',
+                'ADDED: Every scan now records the token usage the provider reports. It was being decoded and thrown away on every response, so the installation had no idea what a scan cost. The table shows average tokens and duration per model from this installation\'s own scans, which is the only figure on the row that is not an opinion',
+                'CHANGED: Cost is a band, never a price. Per-token pricing differs by account and changes without this page changing, so quoting a figure here would be wrong for somebody and stale for everybody - the trap the model list fell into twice already. A test fails if a dollar figure is ever written into the catalogue',
+                'ADDED: A model nobody has rated is shown as "unrated" rather than as zero stars or a middling guess. gpt-6-astra is listed unrated: an opinion rendered as stars is indistinguishable from a measurement',
+                'ADDED: Migration 0022 adds the token columns. Scans recorded before it are NULL rather than 0, and the page filters them out, so an unmeasured scan is never reported as a free one',
+            ],
+        ],
         [
             'version' => '3.69.6',
             'date' => '2026-09-17',

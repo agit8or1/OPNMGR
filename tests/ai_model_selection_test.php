@@ -242,7 +242,7 @@ check('the catalogue parses', count($catalogue) >= 3);
 
 foreach ($catalogue as $prov => $body) {
     if (!str_contains($body, "'suggested' => true")) { continue; }
-    if (!preg_match("/\['id' => '([^']+)',\s*'note' => '([^']*)'[^\]]*'suggested' => true/", $body, $hit)) {
+    if (!preg_match("/\['id' => '([^']+)',[^\]]*?'note' => '([^']*)'[^\]]*'suggested' => true/", $body, $hit)) {
         check("the {$prov} recommendation is parseable", false);
         continue;
     }
@@ -260,6 +260,62 @@ check('the OpenAI hint does not claim the list is current',
     'a list that cannot stay current should not imply that it is');
 check('discovery is named as the authority',
     (bool) preg_match("/'openai' => \[[\s\S]*?'hint' => '[\s\S]{0,200}Fetch from provider/", $page));
+
+// --- a rating must be distinguishable from a measurement ----------------------
+//
+// Stars and cost are this project's judgement. The danger in rendering them is
+// that an opinion in a table looks exactly like a measurement, so: unknown is
+// shown as "unrated" rather than as zero stars or a middling guess, cost is a
+// relative band rather than a price, and the one real number on the row is
+// labelled as coming from this installation's own scans.
+
+$scan = (string) @file_get_contents($root . '/api/ai_scan.php');
+
+check('models carry a rating for this job', str_contains($page, "'stars' =>"));
+check('models carry a relative cost band', str_contains($page, "'cost' =>"));
+check('the rating is scoped to config review, not to quality in general',
+    str_contains($page, 'not in general'),
+    'a model can be weak here and excellent elsewhere');
+
+check('an unrated model says so rather than scoring zero',
+    str_contains($page, 'unrated'),
+    'zero stars and no opinion are different claims');
+check('the newest model is not given a rating it has not earned',
+    (bool) preg_match("/'gpt-6-astra',\s*'stars' => null/", $page),
+    'rating a model nobody here has run is the stale-catalogue bug wearing stars');
+
+check('no dollar figure is quoted anywhere in the catalogue',
+    !preg_match("/'cost' => '\\\$[0-9]/", $page)
+    && !preg_match('/\$[0-9]+(\.[0-9]+)? ?\/ ?1[MK]/', $page),
+    'per-token prices differ by account and go stale silently');
+check('the page says why no price is quoted',
+    str_contains($page, 'per-token prices differ by account'));
+check('the measured column is named as the only non-opinion',
+    str_contains($page, 'is the only number on this row that is not an opinion'));
+
+// --- and the measurement has to be real ---------------------------------------
+//
+// The provider reports usage on every response. It was decoded and thrown away,
+// so there was no way to show what a scan actually cost.
+
+check('usage is recorded rather than discarded', str_contains($scan, 'function record_token_usage'));
+check('OpenAI usage is captured', str_contains($scan, "\$data['usage']['prompt_tokens']"));
+check('Anthropic usage is captured', str_contains($scan, "\$data['usage']['input_tokens']"));
+check('it is stored with the report',
+    str_contains($scan, 'prompt_tokens, completion_tokens, total_tokens')
+    && str_contains($scan, "\$usage['total']"));
+check('the placeholder count matches the column count',
+    (bool) preg_match('/INSERT INTO ai_scan_reports[\s\S]{0,600}VALUES \((\?(?:, \?){16})\)/', $scan),
+    'seventeen columns need seventeen placeholders');
+
+check('scans from before the columns existed are not reported as zero',
+    str_contains($page, 'WHERE total_tokens IS NOT NULL'),
+    'averaging a NULL as zero would understate every model');
+check('a missing column does not break the page',
+    (bool) preg_match('/catch \(Throwable \$e\) \{\s*\$measured = \[\];/', $page),
+    'the query runs before the migration has necessarily been applied');
+check('the table marks what has not been run here',
+    str_contains($page, 'not run here yet'));
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

@@ -126,6 +126,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get all configured providers
 $providers = db()->query("SELECT * FROM ai_settings ORDER BY created_at DESC")->fetchAll();
 
+// What each model has actually consumed here. The provider reports its usage on
+// every response; until v3.69.7 it was decoded and discarded, so scans that ran
+// before then have no figures and are shown as having none rather than as zero.
+$measured = [];
+try {
+    $rows = db()->query(
+        'SELECT model, COUNT(*) AS scans, AVG(total_tokens) AS avg_tokens,
+                AVG(scan_duration) AS avg_seconds
+         FROM ai_scan_reports
+         WHERE total_tokens IS NOT NULL
+         GROUP BY model'
+    )->fetchAll();
+    foreach ($rows as $row) {
+        $measured[$row['model']] = [
+            'scans'       => (int) $row['scans'],
+            'avg_tokens'  => (int) round((float) $row['avg_tokens']),
+            'avg_seconds' => (int) round((float) $row['avg_seconds']),
+        ];
+    }
+} catch (Throwable $e) {
+    $measured = [];
+}
+
 // Available AI providers, their suggested models, and how to discover the rest.
 //
 // This was a flat list of model ids that went stale where it stood: it still
@@ -134,7 +157,9 @@ $providers = db()->query("SELECT * FROM ai_settings ORDER BY created_at DESC")->
 // A hardcoded catalogue in a self-hosted product is guaranteed to be wrong
 // eventually, so there are three ways to choose a model now:
 //
-//   1. suggestions  - a short curated list with a note on why you would pick it
+//   1. suggestions  - a short curated list with a note on why you would pick it,
+//                     a quality rating out of five for firewall config review, and
+//                     a relative cost band
 //   2. discovery    - "Fetch from provider" asks the provider's own API what it
 //                     currently serves, which is always more current than this file
 //   3. free text    - any model id can be typed, so a release on the provider's
@@ -142,19 +167,32 @@ $providers = db()->query("SELECT * FROM ai_settings ORDER BY created_at DESC")->
 //
 // 'suggested' marks the default choice for a firewall configuration review:
 // enough reasoning to reason about a rule set, without paying for the top tier.
+//
+// 'stars' rates a model for this specific job - reasoning over a rule set - and
+// not in general: a fast cheap model can be excellent at other work and still
+// miss the interaction between two rules. 'cost' is a relative band, not a price.
+//
+// It is deliberately a band. Per-token prices differ by account and change
+// without this file changing, so a dollar figure written here would be wrong for
+// somebody and would go stale for everybody - the same trap the model list fell
+// into twice. Every scan now records the tokens the provider reported, so the
+// figure shown under "measured on this installation" is the real one, and it
+// comes from your own scans rather than from this table.
+//
+// A model with no rating is listed as unrated rather than guessed at.
 $available_providers = [
     'openai' => [
         'name' => 'OpenAI',
         'icon' => 'fa-brain',
         'discoverable' => true,
         'models' => [
-            ['id' => 'gpt-5.5',      'note' => 'strong reasoning for rule-set review', 'suggested' => true],
-            ['id' => 'gpt-6-astra',  'note' => 'newest family'],
-            ['id' => 'gpt-5.5-pro',  'note' => 'top tier, slowest and dearest'],
-            ['id' => 'gpt-5.4',      'note' => 'previous generation'],
-            ['id' => 'gpt-5.4-mini', 'note' => 'cheaper, for frequent scans'],
-            ['id' => 'gpt-4o',       'note' => 'older generation'],
-            ['id' => 'gpt-4-turbo',  'note' => 'older, 4096 output tokens'],
+            ['id' => 'gpt-5.5',      'stars' => 5, 'cost' => '$$$',  'note' => 'strong reasoning for rule-set review', 'suggested' => true],
+            ['id' => 'gpt-6-astra',  'stars' => null, 'cost' => null, 'note' => 'newest family - not yet rated here, try it and compare'],
+            ['id' => 'gpt-5.5-pro',  'stars' => 5, 'cost' => '$$$$', 'note' => 'top tier, slowest and dearest'],
+            ['id' => 'gpt-5.4',      'stars' => 4, 'cost' => '$$$',  'note' => 'previous generation, still strong'],
+            ['id' => 'gpt-5.4-mini', 'stars' => 3, 'cost' => '$$',   'note' => 'cheaper, for frequent scans'],
+            ['id' => 'gpt-4o',       'stars' => 2, 'cost' => '$$',   'note' => 'older generation'],
+            ['id' => 'gpt-4-turbo',  'stars' => 2, 'cost' => '$$',   'note' => 'older, 4096 output tokens'],
         ],
         'hint' => 'This list is a snapshot and your account may serve newer or fewer '
                 . 'models than it names - "Fetch from provider" is always authoritative.',
@@ -164,11 +202,11 @@ $available_providers = [
         'icon' => 'fa-robot',
         'discoverable' => true,
         'models' => [
-            ['id' => 'claude-opus-5',    'note' => '1M context - strongest reasoning for config review', 'suggested' => true],
-            ['id' => 'claude-sonnet-5',  'note' => '1M context - cheaper, still strong'],
-            ['id' => 'claude-haiku-4-5', 'note' => '200K context - cheapest, for frequent scans'],
-            ['id' => 'claude-opus-4-8',  'note' => 'previous generation'],
-            ['id' => 'claude-sonnet-4-6','note' => 'previous generation'],
+            ['id' => 'claude-opus-5',    'stars' => 5, 'cost' => '$$$$', 'note' => '1M context - strongest reasoning for config review', 'suggested' => true],
+            ['id' => 'claude-sonnet-5',  'stars' => 4, 'cost' => '$$$',  'note' => '1M context - cheaper, still strong'],
+            ['id' => 'claude-haiku-4-5', 'stars' => 3, 'cost' => '$',    'note' => '200K context - cheapest, for frequent scans'],
+            ['id' => 'claude-opus-4-8',  'stars' => 4, 'cost' => '$$$$', 'note' => 'previous generation'],
+            ['id' => 'claude-sonnet-4-6','stars' => 3, 'cost' => '$$',   'note' => 'previous generation'],
         ],
         'hint' => 'Model ids carry no date suffix.',
     ],
@@ -177,9 +215,9 @@ $available_providers = [
         'icon' => 'fa-google',
         'discoverable' => false,
         'models' => [
-            ['id' => 'gemini-2.5-pro',   'note' => 'strongest reasoning', 'suggested' => true],
-            ['id' => 'gemini-2.0-flash', 'note' => 'cheaper, for frequent scans'],
-            ['id' => 'gemini-pro',       'note' => 'older generation'],
+            ['id' => 'gemini-2.5-pro',   'stars' => 4, 'cost' => '$$$', 'note' => 'strongest reasoning', 'suggested' => true],
+            ['id' => 'gemini-2.0-flash', 'stars' => 3, 'cost' => '$',   'note' => 'cheaper, for frequent scans'],
+            ['id' => 'gemini-pro',       'stars' => 2, 'cost' => '$$',  'note' => 'older generation'],
         ],
         'hint' => 'Check ai.google.dev for the current model ids and enter one below.',
     ],
@@ -537,10 +575,72 @@ $available_providers = [
                             <i class="fa fa-check-circle me-1"></i> Use this
                         </button>
                         <span id="active_model_hint" style="color:#95a5a6;font-size:.875rem;flex-basis:100%;"></span>
-                        <?php if (count($providers) === 1): ?>
-                            <small style="color:#95a5a6;flex-basis:100%;">Add another provider to switch between them.</small>
-                        <?php endif; ?>
                     </form>
+                    <?php
+                    $active_type = $active_provider['provider'] ?? '';
+                    $rated = $available_providers[$active_type]['models'] ?? [];
+                    ?>
+                    <?php if ($rated): ?>
+                        <table class="table table-sm" style="margin:14px 0 0 0;font-size:.875rem;">
+                            <thead>
+                                <tr>
+                                    <th style="width:26%;">Model</th>
+                                    <th style="width:16%;" title="Rated for reasoning over a firewall rule set, not in general">For config review</th>
+                                    <th style="width:10%;" title="Relative band, not a price - see the note below">Cost</th>
+                                    <th style="width:22%;">Measured here</th>
+                                    <th>Why you would pick it</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($rated as $m): ?>
+                                <?php
+                                $is_current = ($active_provider['model'] ?? '') === $m['id'];
+                                $seen = $measured[$m['id']] ?? null;
+                                ?>
+                                <tr<?= $is_current ? ' style="background:rgba(39,174,96,.12);"' : '' ?>>
+                                    <td>
+                                        <strong><?= htmlspecialchars($m['id']) ?></strong>
+                                        <?php if ($is_current): ?>
+                                            <span style="color:#27ae60;font-size:.8rem;"> &mdash; in use</span>
+                                        <?php elseif (!empty($m['suggested'])): ?>
+                                            <span style="color:#2980b9;font-size:.8rem;"> &mdash; recommended</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if (!empty($m['stars'])): ?>
+                                            <span style="color:#f1c40f;letter-spacing:1px;"
+                                                  title="<?= (int)$m['stars'] ?> out of 5 for firewall config review">
+                                                <?= str_repeat('&#9733;', (int) $m['stars']) ?><span style="color:#7f8c8d;"><?= str_repeat('&#9734;', 5 - (int) $m['stars']) ?></span>
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color:#95a5a6;" title="Not rated here - run it and compare">unrated</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= $m['cost'] ? htmlspecialchars($m['cost']) : '<span style="color:#95a5a6;">&mdash;</span>' ?></td>
+                                    <td>
+                                        <?php if ($seen): ?>
+                                            <?= number_format($seen['avg_tokens']) ?> tokens/scan
+                                            <span style="color:#95a5a6;">(<?= $seen['scans'] ?> scan<?= $seen['scans'] === 1 ? '' : 's' ?>, <?= $seen['avg_seconds'] ?>s)</span>
+                                        <?php else: ?>
+                                            <span style="color:#95a5a6;">not run here yet</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="color:#bdc3c7;"><?= htmlspecialchars($m['note'] ?? '') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <small style="color:#95a5a6;display:block;margin-top:6px;">
+                            Stars rate a model for reasoning over a rule set, not in general, and are
+                            this project's judgement rather than a benchmark. Cost is a relative band:
+                            per-token prices differ by account and change without this page changing,
+                            so no figure is quoted. &ldquo;Measured here&rdquo; is your own scan history
+                            and is the only number on this row that is not an opinion.
+                        </small>
+                    <?php endif; ?>
+                    <?php if (count($providers) === 1): ?>
+                        <small style="color:#95a5a6;display:block;margin-top:6px;">Add another provider to switch between them.</small>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <p style="margin: 10px 0 0 0; padding-top: 10px; border-top: 1px solid #3a3f4b; color: #f39c12;">
@@ -773,11 +873,23 @@ function onActiveProviderChanged(select) {
         group.label = 'Suggested';
         suggestions.forEach(model => add(
             model.id,
-            model.id + (model.suggested ? '  - recommended' : '') + (model.note ? '  (' + model.note + ')' : ''),
+            model.id + '  ' + ratingLabel(model)
+                + (model.suggested ? '  - recommended' : '')
+                + (model.note ? '  (' + model.note + ')' : ''),
             group
         ));
         if (group.children.length) { modelSelect.appendChild(group); }
     }
+}
+
+// Five filled stars is "best for reasoning over a rule set", not "best overall".
+// An unrated model says so: a guess rendered as stars is indistinguishable from
+// a measurement, which is the whole problem with writing figures down by hand.
+function ratingLabel(model) {
+    const stars = model.stars
+        ? '*'.repeat(model.stars) + '.'.repeat(5 - model.stars)
+        : 'unrated';
+    return stars + (model.cost ? '  ' + model.cost : '');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
