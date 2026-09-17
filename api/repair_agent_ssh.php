@@ -56,92 +56,67 @@ $log_file = "/tmp/agent_repair_{$session_id}.log";
 // Start the repair process in the background
 $repair_script = <<<'SCRIPT'
 #!/bin/bash
+#
+# Reinstall the OPNManager agent on a firewall over SSH.
+#
+# This script used to do something else entirely: it downloaded
+# downloads/tunnel_agent.sh - the legacy standalone agent, last touched in
+# October 2025 - and added a cron entry running it every two minutes. On a fleet
+# running the 1.6.x plugin agent that is not a repair; it is a second, obsolete
+# agent checking in alongside the real one. The button could not have done that
+# because sudo blocked it, which is the only reason it never happened.
+#
+# It now runs the same installer as every other install path, so "repair" means
+# the firewall ends up on the published agent version.
 LOG_FILE="$1"
 FIREWALL_ID="$2"
 SSH_KEY="$3"
 WAN_IP="$4"
+BASE_URL="$5"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Starting agent repair..." >> "$LOG_FILE"
-echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Firewall ID: $FIREWALL_ID" >> "$LOG_FILE"
-echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Target: $WAN_IP" >> "$LOG_FILE"
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
-# Test SSH connectivity
-echo "$(date '+%Y-%m-%d %H:%M:%S') [STEP] Testing SSH connection..." >> "$LOG_FILE"
-if sudo -u www-data ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@"$WAN_IP" 'echo "Connected"' 2>&1 | grep -q "Connected"; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] SSH connection successful" >> "$LOG_FILE"
+SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+
+log "[INFO] Starting agent repair..."
+log "[INFO] Firewall ID: $FIREWALL_ID"
+log "[INFO] Target: $WAN_IP"
+
+# Test SSH connectivity.
+#
+# stderr goes to the log, never into the stream being matched. It used to be
+# folded in with 2>&1 and matched with grep -q "Connected" - and sudo's denial
+# message quotes the command it refused, which contains echo "Connected". The
+# check therefore matched the text of its own failure and reported success while
+# nothing had connected at all. That is what "[SUCCESS] SSH connection
+# successful" meant in every log this ever wrote.
+log "[STEP] Testing SSH connection..."
+if ssh $SSH_OPTS root@"$WAN_IP" 'echo OPNMGR_SSH_OK' 2>>"$LOG_FILE" | grep -qx 'OPNMGR_SSH_OK'; then
+    log "[SUCCESS] SSH connection successful"
 else
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] Cannot connect via SSH" >> "$LOG_FILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] Firewall may be blocking SSH or key not authorized" >> "$LOG_FILE"
+    log "[ERROR] Cannot connect via SSH"
+    log "[ERROR] The key may not be authorized on the firewall, or SSH may be blocked"
     exit 1
 fi
 
-# Create repair script on remote system
-echo "$(date '+%Y-%m-%d %H:%M:%S') [STEP] Creating repair script on firewall..." >> "$LOG_FILE"
-cat > /tmp/remote_repair_${FIREWALL_ID}.sh << 'REMOTE'
-#!/bin/sh
-echo "Stopping old agents..."
-pkill -f tunnel_agent 2>/dev/null
-pkill -f opnsense_agent 2>/dev/null
-sleep 2
+# No scp, no temp file on either side: the installer is a single command, which
+# is also the command an operator would run at the console. Nothing to transfer
+# means nothing to go stale between here and the firewall.
+log "[STEP] Installing the published agent..."
+ssh $SSH_OPTS root@"$WAN_IP" \
+    "fetch -o - ${BASE_URL}/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=${BASE_URL} sh" \
+    >> "$LOG_FILE" 2>&1
+RC=$?
 
-echo "Downloading latest agent (v3.8.5)..."
-curl -s -k -f -o /usr/local/bin/tunnel_agent.sh "AGENT_DOWNLOAD_URL_PLACEHOLDER"
-
-if [ ! -f /usr/local/bin/tunnel_agent.sh ]; then
-    echo "ERROR: Failed to download agent"
-    exit 1
-fi
-
-chmod +x /usr/local/bin/tunnel_agent.sh
-
-echo "Setting up cron job..."
-(crontab -l 2>/dev/null | grep -v tunnel_agent; echo "*/2 * * * * /usr/local/bin/tunnel_agent.sh") | crontab -
-
-echo "Starting agent..."
-nohup /usr/local/bin/tunnel_agent.sh > /tmp/agent_repair.log 2>&1 &
-sleep 3
-
-echo "Verifying installation..."
-NEW_VERSION=$(grep "AGENT_VERSION=" /usr/local/bin/tunnel_agent.sh | head -1 | cut -d'"' -f2)
-echo "Installed version: $NEW_VERSION"
-
-if pgrep -f tunnel_agent > /dev/null; then
-    echo "Agent is running"
-else
-    echo "WARNING: Agent may not be running"
-fi
-REMOTE
-
-# Replace firewall ID placeholder
-sed "s/FIREWALL_ID_PLACEHOLDER/$FIREWALL_ID/g" /tmp/remote_repair_${FIREWALL_ID}.sh > /tmp/remote_repair_${FIREWALL_ID}_final.sh
-mv /tmp/remote_repair_${FIREWALL_ID}_final.sh /tmp/remote_repair_${FIREWALL_ID}.sh
-
-# Transfer and execute
-echo "$(date '+%Y-%m-%d %H:%M:%S') [STEP] Transferring repair script to firewall..." >> "$LOG_FILE"
-if sudo -u www-data scp -i "$SSH_KEY" -o StrictHostKeyChecking=no /tmp/remote_repair_${FIREWALL_ID}.sh root@"$WAN_IP":/tmp/repair_agent.sh >> "$LOG_FILE" 2>&1; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] Script transferred" >> "$LOG_FILE"
-else
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] Failed to transfer script" >> "$LOG_FILE"
-    exit 1
-fi
-
-echo "$(date '+%Y-%m-%d %H:%M:%S') [STEP] Executing repair on firewall..." >> "$LOG_FILE"
-sudo -u www-data ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$WAN_IP" 'chmod +x /tmp/repair_agent.sh && /tmp/repair_agent.sh' >> "$LOG_FILE" 2>&1
-
-if [ $? -eq 0 ]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] Agent repair completed successfully" >> "$LOG_FILE"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] Waiting for agent check-in..." >> "$LOG_FILE"
+if [ $RC -eq 0 ]; then
+    log "[SUCCESS] Agent installed"
+    log "[INFO] Waiting for agent check-in..."
     sleep 10
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [COMPLETE] Repair operation finished" >> "$LOG_FILE"
+    log "[COMPLETE] Repair operation finished"
 else
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] Repair execution failed" >> "$LOG_FILE"
+    log "[ERROR] Install failed (ssh exit $RC)"
     exit 1
 fi
-
-# Cleanup
-rm -f /tmp/remote_repair_${FIREWALL_ID}.sh
-
-exit 0
 SCRIPT;
 
 // Write repair script to temp file
@@ -160,11 +135,6 @@ if ($agent_url === '') {
     ]);
     exit;
 }
-$repair_script = str_replace(
-    'AGENT_DOWNLOAD_URL_PLACEHOLDER',
-    $agent_url . '/downloads/tunnel_agent.sh',
-    $repair_script
-);
 
 $script_file = "/tmp/repair_script_{$session_id}.sh";
 file_put_contents($script_file, $repair_script);
@@ -172,22 +142,29 @@ chmod($script_file, 0755);
 
 // Execute in background
 $cmd = sprintf(
-    '%s %s %d %s %s > /dev/null 2>&1 &',
+    '%s %s %d %s %s %s > /dev/null 2>&1 &',
     escapeshellarg($script_file),
     escapeshellarg($log_file),
     $firewall_id,
     escapeshellarg($ssh_key),
-    escapeshellarg($firewall['wan_ip'])
+    escapeshellarg($firewall['wan_ip']),
+    escapeshellarg($agent_url)
 );
 
 exec($cmd);
 
-// Log the operation
-$stmt = db()->prepare("INSERT INTO activity_log (user_id, firewall_id, action, details, created_at) VALUES (?, ?, 'repair_agent_ssh', ?, NOW())");
-$stmt->execute([
-    $_SESSION['user_id'],
-    $firewall_id,
-    "SSH-based agent repair initiated for {$firewall['hostname']}"
+// Log the operation.
+//
+// This wrote to activity_log, a table that does not exist in this schema and
+// appears in no migration - so the request died here with a 500 after having
+// already launched the repair. audit_log is the table this project actually
+// keeps, and it is where every other privileged action is recorded.
+audit_log('agent.repair.ssh', [
+    'object_type' => 'firewall',
+    'object_id'   => (string) $firewall_id,
+    'firewall_id' => $firewall_id,
+    'message'     => "SSH agent repair initiated for {$firewall['hostname']}",
+    'metadata'    => ['session_id' => $session_id, 'wan_ip' => $firewall['wan_ip']],
 ]);
 
 echo json_encode([

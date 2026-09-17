@@ -170,17 +170,25 @@ check('schema.sql carries the pilot column', str_contains($schema, 'agent_rollou
 // The published version drives what firewalls are offered, so "which version is
 // this" should not require reading a file on the server.
 
-$dash = (string)@file_get_contents($root . '/dashboard.php');
-check('the dashboard shows the application version',
-    str_contains($dash, 'class="dash-version"') && str_contains($dash, 'APP_VERSION'));
+// It lives in the global header, beside the brand. It was first put in the
+// dashboard KPI strip, where it rendered correctly and was still missed: small,
+// muted, and to the right of a tile grid that wraps. The top of the page means
+// the top of the page.
+$hdr = (string)@file_get_contents($root . '/inc/header.php');
+check('the page header shows the application version',
+    str_contains($hdr, 'class="brand-version"') && str_contains($hdr, 'APP_VERSION'));
 check('it shows the application version only',
-    !str_contains($dash, 'AGENT_VERSION'),
-    'the agent version belongs to the rollout surface, not the dashboard header');
-check('the version chip escapes its output',
-    substr_count($dash, 'htmlspecialchars(APP_VERSION)') >= 1);
-check('it sits in the toolbar at the top of the page',
-    (bool)preg_match('/dash-version.*?dash-refresh-ctl/s', $dash),
-    'ahead of the refresh control in the top toolbar');
+    !str_contains($hdr, 'AGENT_VERSION'),
+    'the agent version belongs to the rollout surface, not the page header');
+check('the version escapes its output',
+    substr_count($hdr, 'htmlspecialchars(APP_VERSION)') >= 1);
+check('it sits inside the brand link at the top of every page',
+    (bool)preg_match('/header-brand.*?brand-version/s', $hdr));
+check('the dashboard no longer carries a second copy',
+    !str_contains((string)@file_get_contents($root . '/dashboard.php'), 'dash-version'),
+    'two version labels on one page is clutter');
+check('brand-version is styled', str_contains(
+    (string)@file_get_contents($root . '/assets/css/app.css'), '.brand-version'));
 check('APP_VERSION_DATE is not older than the newest changelog entry',
     (function () use ($root): bool {
         $v = (string)@file_get_contents($root . '/inc/version.php');

@@ -198,6 +198,23 @@ a.text-muted:hover {
     color: var(--text-primary);
 }
 
+/* Which version is running, beside the brand. It was first put in the dashboard
+   KPI strip, where it rendered correctly and was still missed: small, muted, and
+   to the right of a tile grid that wraps. The top of the page means the top of
+   the page. */
+.brand-version {
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+
 .logo-header {
     max-height: 28px;
     max-width: 100px;

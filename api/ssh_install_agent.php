@@ -146,11 +146,16 @@ if (strpos($install_result, 'Installation complete') !== false) {
         $output_lines[] = "Hardware ID: {$hw_id}";
     }
 
-    // Log activity
-    $stmt = db()->prepare("INSERT INTO activity_log (user_id, action, details, created_at) VALUES (?, 'ssh_install_agent', ?, NOW())");
-    $stmt->execute([
-        $_SESSION['user_id'],
-        "SSH plugin installation completed for {$host}" . ($hw_id ? " (HW ID: {$hw_id})" : "")
+    // Log activity.
+    //
+    // This wrote to activity_log, a table that does not exist in this schema and
+    // appears in no migration, so a successful install ended in a 500 at the
+    // last line - the same fatal that repair_agent_ssh.php hit. audit_log is
+    // the table this project keeps.
+    audit_log('agent.install.ssh', [
+        'object_type' => 'firewall',
+        'message'     => "SSH plugin installation completed for {$host}",
+        'metadata'    => ['host' => $host, 'hardware_id' => $hw_id ?: null],
     ]);
 
     echo json_encode([

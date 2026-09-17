@@ -111,21 +111,6 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 .dash-stat-body { min-width: 0; }
 .dash-stat-val  { font-size: 1.65rem; font-weight: 700; line-height: 1; }
 .dash-stat-lbl  { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 3px; }
-.dash-version {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.78rem;
-    padding: 6px 11px;
-    border-radius: 6px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    text-decoration: none;
-    white-space: nowrap;
-}
-.dash-version:hover { border-color: var(--accent); color: var(--text-secondary); }
-.dash-version .v-app { font-weight: 600; color: var(--text-primary); font-family: monospace; }
 .dash-refresh-ctl { flex-shrink: 0; }
 .dash-refresh-ctl select {
     font-size: 0.8rem;
@@ -237,7 +222,6 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
     .dash-fw-grid { grid-template-columns: 1fr; }
     .dash-toolbar { flex-direction: column; align-items: stretch; }
     .dash-refresh-ctl select { width: 100%; }
-    .dash-version { justify-content: center; }
 }
 </style>
 
@@ -316,10 +300,6 @@ try {
         </a>
       <?php endforeach; ?>
     </div>
-    <a class="dash-version" href="/updates.php"
-       title="OPNManager <?php echo htmlspecialchars(APP_VERSION); ?> (<?php echo htmlspecialchars(APP_VERSION_DATE); ?>)">
-      <span class="v-app">v<?php echo htmlspecialchars(APP_VERSION); ?></span>
-    </a>
     <div class="dash-refresh-ctl">
       <select id="autoRefreshSelect" onchange="setAutoRefresh()">
         <option value="0">No Auto Refresh</option>

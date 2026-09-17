@@ -6,6 +6,79 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.56.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Found
+
+**The Repair Agent button would have installed the wrong agent.**
+
+Reported as a 403, then - once the token was sent - as a 500. Behind those were
+three defects, in increasing order of seriousness.
+
+**It wrote to a table that does not exist.**
+
+```
+PHP Fatal error: Uncaught PDOException: SQLSTATE[42S02]:
+Base table or view not found: 1146 Table 'opnsense_fw.activity_log' doesn't exist
+```
+
+`activity_log` appears in no schema and no migration. Every request that got as
+far as succeeding died on the last line, *after* the repair had been launched.
+`api/ssh_install_agent.php` carried the identical line.
+
+**Its connectivity test passed on its own failure.**
+
+```sh
+if sudo -u www-data ssh ... 'echo "Connected"' 2>&1 | grep -q "Connected"; then
+```
+
+The script ran `sudo -u www-data` while already running as www-data, which no
+sudoers rule permits. sudo's denial message *quotes the command it refused* - and
+that command contains `echo "Connected"` - so with stderr folded into the stream,
+`grep` matched the text of its own failure:
+
+```
+Sorry, user www-data is not allowed to execute '/usr/bin/ssh ... echo "Connected"' ...
+2026-09-17 12:24:51 [SUCCESS] SSH connection successful
+```
+
+Every `[SUCCESS] SSH connection successful` this ever logged is worthless,
+including the one written against a firewall today. Nothing had connected.
+
+**And the payload was the legacy agent.**
+
+It downloaded `downloads/tunnel_agent.sh` - the standalone agent, last modified
+October 2025 - and added a cron entry running it every two minutes. On a fleet
+running the 1.6.x plugin agent that is not a repair; it is a second, obsolete
+agent checking in beside the real one. The only reason it never happened is that
+sudo blocked the transfer.
+
+### Fixed
+
+- Both endpoints record to `audit_log`, the table this project actually keeps.
+- The repair runs **the same installer as every other install path**, over a
+  single SSH command. No `scp`, no temp file on either side, nothing that can go
+  stale between here and the firewall.
+- No `sudo` to the user the script already runs as.
+- stderr goes to the log, never into the stream being matched, and the success
+  marker is matched as a whole line.
+
+### Changed
+
+- **The version label moved to the page header, beside the brand.** It rendered
+  correctly in the dashboard KPI strip and was still missed: small, muted, and to
+  the right of a tile grid that wraps. The top of the page means the top of the
+  page.
+
+### Added
+
+- `tests/agent_repair_test.php` - eighteen assertions covering all three
+  defects, run against code with comments stripped so the fix's own account of
+  what it replaced does not trip them.
+
+---
+
 ## Version 3.55.1
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

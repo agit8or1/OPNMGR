@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Just The One Number'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Repair That Would Have Broken It'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.56.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'The Repair That Would Have Broken It',
+            'changes' => [
+                'FIXED: Repair Agent returned 500. It wrote to activity_log, a table that exists in no schema and no migration, so every request that got as far as succeeding died on the last line - after the repair had already been launched. api/ssh_install_agent.php had the identical line. Both record to audit_log now',
+                'FOUND: The repair would have installed the wrong agent. Its payload downloaded downloads/tunnel_agent.sh - the legacy standalone agent, last modified October 2025 - and added a cron entry running it every two minutes. On a fleet running the 1.6.x plugin agent that is not a repair; it is a second, obsolete agent checking in beside the real one. The only reason it never happened is that sudo blocked the transfer',
+                'CHANGED: The repair now runs the same installer as every other install path, over a single SSH command. No scp, no temp file on either side, and nothing that can go stale between here and the firewall',
+                'FIXED: The script ran "sudo -u www-data" while already running as www-data, which no sudoers rule permits and none should need to',
+                'FIXED: The SSH connectivity test reported success when it had connected to nothing. It folded stderr into the stream it matched - ssh ... \'echo "Connected"\' 2>&1 | grep -q "Connected" - and sudo\'s denial message quotes the command it refused, which contains that echo. The check matched the text of its own failure. Every "[SUCCESS] SSH connection successful" line this ever logged is worthless, including the one written against fw51 today. stderr goes to the log now, and the marker is matched as a whole line',
+                'CHANGED: The version label moved from the dashboard KPI strip to the page header, beside the brand. It rendered correctly where it was and was still missed: small, muted, and to the right of a tile grid that wraps. The top of the page means the top of the page',
+                'ADDED: tests/agent_repair_test.php, eighteen assertions covering all three defects, asserting against code with comments stripped so the fix\'s own account of what it replaced does not trip them',
+            ],
+        ],
         [
             'version' => '3.55.1',
             'date' => '2026-09-17',

@@ -71,6 +71,7 @@ function isActive($page) {
         <span class="brand-icon"><i class="fas fa-shield-halved"></i></span>
       <?php endif; ?>
       <span class="brand-name"><?php echo htmlentities($brandName) ?></span>
+      <span class="brand-version" title="OPNManager <?php echo htmlspecialchars(APP_VERSION); ?> (<?php echo htmlspecialchars(APP_VERSION_DATE); ?>)">v<?php echo htmlspecialchars(APP_VERSION); ?></span>
     </a>
   </div>
   <div class="header-right">
