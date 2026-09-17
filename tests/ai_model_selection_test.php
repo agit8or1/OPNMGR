@@ -225,5 +225,41 @@ check('a provider with no listing endpoint says so instead of spinning',
 check('a session that expired mid-fetch is reported as such',
     substr_count($page, 'Your session has expired. Sign in again.') === 2);
 
+// --- the recommendation must not be a model the list itself calls old ----------
+//
+// The OpenAI catalogue was refreshed from memory rather than from the provider:
+// gpt-4o was written in and annotated "current generation" while the account was
+// serving gpt-5.5, gpt-5.6 and gpt-6-astra. A hand-written list cannot be kept
+// current - that is why discovery exists - but it can at least be stopped from
+// recommending something it elsewhere describes as superseded.
+
+$catalogue = [];
+if (preg_match('/\$available_providers = \[([\s\S]*?)\n\];/', $page, $m)) {
+    preg_match_all("/'([a-z]+)' => \[([\s\S]*?)\n    \],/", $m[1], $blocks, PREG_SET_ORDER);
+    foreach ($blocks as $b) { $catalogue[$b[1]] = $b[2]; }
+}
+check('the catalogue parses', count($catalogue) >= 3);
+
+foreach ($catalogue as $prov => $body) {
+    if (!str_contains($body, "'suggested' => true")) { continue; }
+    if (!preg_match("/\['id' => '([^']+)',\s*'note' => '([^']*)'[^\]]*'suggested' => true/", $body, $hit)) {
+        check("the {$prov} recommendation is parseable", false);
+        continue;
+    }
+    check("the {$prov} recommendation is not described as old ({$hit[1]})",
+        !preg_match('/\bolder\b|\bprevious generation\b|\bdeprecated\b/i', $hit[2]),
+        'recommending an entry the same list calls superseded is the stale-catalogue bug');
+    check("the {$prov} recommendation is not a superseded family ({$hit[1]})",
+        !preg_match('/^(gpt-4|gpt-3|claude-3|claude-.*-4-|gemini-pro|gemini-1)/', $hit[1]),
+        'these were current when written and stopped being so without the file changing');
+}
+
+check('the OpenAI hint does not claim the list is current',
+    (bool) preg_match("/'openai' => \[[\s\S]*?'hint' => '([^']*)'/", $page, $h)
+    && str_contains($h[1], 'snapshot'),
+    'a list that cannot stay current should not imply that it is');
+check('discovery is named as the authority',
+    (bool) preg_match("/'openai' => \[[\s\S]*?'hint' => '[\s\S]{0,200}Fetch from provider/", $page));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

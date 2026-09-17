@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ask The Provider, Keep The Key'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Written From Memory, Not From The Provider'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.6',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Written From Memory, Not From The Provider',
+            'changes' => [
+                'FIXED: The OpenAI catalogue was refreshed one release earlier from memory rather than from the provider. It named gpt-4o "current generation" while the account was serving 41 GPT-5 variants, gpt-5.6 and gpt-6-astra. It now leads with gpt-5.5 as the recommendation for rule-set review, and lists gpt-6-astra, gpt-5.5-pro, gpt-5.4 and gpt-5.4-mini beside it',
+                'CHANGED: The OpenAI hint no longer implies the list is current. It says the list is a snapshot, that an account may serve newer or fewer models than it names, and that "Fetch from provider" is the authority',
+                'ADDED: A test that fails when a provider recommends a model the same catalogue elsewhere calls older, previous generation or deprecated, or whose id is from a family known to be superseded. The stale-catalogue bug has now recurred twice; it should not need a person to notice it a third time',
+            ],
+        ],
         [
             'version' => '3.69.5',
             'date' => '2026-09-17',

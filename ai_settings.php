@@ -148,14 +148,16 @@ $available_providers = [
         'icon' => 'fa-brain',
         'discoverable' => true,
         'models' => [
-            ['id' => 'gpt-4o',      'note' => 'current generation, 128K context', 'suggested' => true],
-            ['id' => 'gpt-4.1',     'note' => 'larger context, stronger reasoning'],
-            ['id' => 'gpt-4-turbo', 'note' => '128K context, 4096 output tokens'],
-            ['id' => 'gpt-4',       'note' => 'older, smaller context'],
-            ['id' => 'gpt-3.5-turbo', 'note' => 'cheapest, weakest reasoning'],
+            ['id' => 'gpt-5.5',      'note' => 'strong reasoning for rule-set review', 'suggested' => true],
+            ['id' => 'gpt-6-astra',  'note' => 'newest family'],
+            ['id' => 'gpt-5.5-pro',  'note' => 'top tier, slowest and dearest'],
+            ['id' => 'gpt-5.4',      'note' => 'previous generation'],
+            ['id' => 'gpt-5.4-mini', 'note' => 'cheaper, for frequent scans'],
+            ['id' => 'gpt-4o',       'note' => 'older generation'],
+            ['id' => 'gpt-4-turbo',  'note' => 'older, 4096 output tokens'],
         ],
-        'hint' => 'Use "Fetch from provider" for the current list - OpenAI publishes '
-                . 'new models faster than this page can be updated.',
+        'hint' => 'This list is a snapshot and your account may serve newer or fewer '
+                . 'models than it names - "Fetch from provider" is always authoritative.',
     ],
     'anthropic' => [
         'name' => 'Anthropic (Claude)',
