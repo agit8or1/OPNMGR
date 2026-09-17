@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Verified On First Contact'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Two Documentation Systems'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.61.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'Two Documentation Systems',
+            'changes' => [
+                'FOUND: There were two. documentation.php was 669 lines of hardcoded HTML last meaningfully updated in October 2025, and it was the one the sidebar linked. doc_viewer.php rendered the same documentation from the documentation_pages table, scripts/migrate_docs_to_db.php existed to move it there, and the sidebar\'s isActive() already listed both files - a migration started and never finished, leaving the stale copy as the only one anyone could reach',
+                'CHANGED: documentation.php redirects to the database-backed viewer. The URL is kept because it is what is bookmarked and what the sidebar, header search and external links point at',
+                'ADDED: The User Guide is rewritten for v3.61.0 with annotated screenshots - the dashboard, enrollment and the fleet list, fourteen numbered markers across three figures',
+                'ADDED: Annotations are positioned over the image in percentages rather than burned into it, so they stay aligned when the image scales and can be corrected without recapturing. Marker positions were checked against a rendering and moved off the values they were covering',
+                'ADDED: scripts/build_user_documentation.php generates the page, so the content has a source, a diff and a review rather than being edited in the database. It verifies every referenced screenshot exists before writing, and writes only with --apply',
+                'CHANGED: Screenshots come from docs/images/github/, captured against the isolated demo fleet. Every hostname, address and customer in them is fictitious - the alternative is a redaction step that can silently fail',
+                'ADDED: The guide leads with what actually breaks: an agent that stops reporting, what self-heals since 1.6.6, and the per-firewall reinstall command that keeps a firewall\'s identity instead of enrolling it twice',
+            ],
+        ],
         [
             'version' => '3.60.0',
             'date' => '2026-09-17',

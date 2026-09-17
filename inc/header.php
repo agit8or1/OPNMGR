@@ -226,7 +226,7 @@ function isActive($page) {
         <span class="sidebar-label">Audit Log</span>
       </a>
       <?php endif; ?>
-      <a class="sidebar-item <?php echo isActive(['documentation.php','doc_viewer.php']) ?>" href="/documentation.php">
+      <a class="sidebar-item <?php echo isActive(['documentation.php','doc_viewer.php']) ?>" href="/doc_viewer.php?page=documentation">
         <span class="sidebar-icon"><i class="fas fa-book"></i></span>
         <span class="sidebar-label">Documentation</span>
       </a>

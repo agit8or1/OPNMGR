@@ -6,6 +6,47 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.61.0
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Found
+
+**There were two documentation systems, and the stale one was the only one linked.**
+
+`documentation.php` was 669 lines of hardcoded HTML, last meaningfully updated in
+October 2025. `doc_viewer.php` rendered the same documentation from the
+`documentation_pages` table, `scripts/migrate_docs_to_db.php` existed to move it
+there, and the sidebar's `isActive()` already listed *both* files - a migration
+started and never finished. The sidebar pointed at the hardcoded copy.
+
+### Changed
+
+- `documentation.php` redirects to the database-backed viewer. The URL is kept:
+  it is what is bookmarked, and what the sidebar, header search and external
+  links point at.
+- **The User Guide is rewritten** for the current product, with annotated
+  screenshots of the dashboard, enrollment and the fleet list - fourteen numbered
+  markers across three figures.
+- **Annotations are positioned over the image in percentages, not burned into
+  it**, so they stay aligned when the image scales and can be corrected without
+  recapturing. Positions were checked against a rendering and moved off the
+  values they had been covering.
+- Screenshots come from `docs/images/github/`, captured against the isolated demo
+  fleet. Every hostname, address and customer in them is fictitious - the
+  alternative is a redaction step that can silently fail.
+
+### Added
+
+- `scripts/build_user_documentation.php` generates the page, so the content has a
+  source, a diff and a review rather than being edited in the database. It
+  verifies every referenced screenshot exists before writing, and writes only
+  with `--apply`.
+- The guide leads with what actually breaks: an agent that stops reporting, what
+  self-heals since 1.6.6, and the per-firewall reinstall command that keeps a
+  firewall's identity rather than enrolling it twice.
+
+---
+
 ## Version 3.60.0
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 
