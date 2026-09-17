@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = 'danger';
     } elseif (isset($_POST['save_ai_provider'])) {
         $provider = $_POST['provider'];
-        $api_key = $_POST['api_key'];
+        $api_key = trim((string) ($_POST['api_key'] ?? ''));
         $model = $_POST['model'];
         
         // Check if provider already exists
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['edit_provider'])) {
         $provider_id = $_POST['provider_id'];
         $model = $_POST['model'];
-        $api_key = $_POST['api_key'];
+        $api_key = trim((string) ($_POST['api_key'] ?? ''));
 
         // Blank means 'leave the stored key alone' - the UI never echoes it back.
         if ($api_key === '') {
@@ -526,11 +526,17 @@ $available_providers = [
                         <label for="active_model" style="margin:0;font-weight:600;white-space:nowrap;">Model:</label>
                         <select name="model" id="active_model" class="form-control"
                                 style="max-width:420px;width:auto;"></select>
+                        <button type="button" id="active_fetch_btn" class="btn btn-secondary btn-sm"
+                                onclick="fetchActiveModels()"
+                                title="Ask the provider which models it currently serves">
+                            <i class="fa fa-rotate me-1"></i> Fetch from provider
+                        </button>
                         <button type="submit" name="set_default_provider" class="btn btn-success btn-sm">
                             <i class="fa fa-check-circle me-1"></i> Use this
                         </button>
+                        <span id="active_model_hint" style="color:#95a5a6;font-size:.875rem;flex-basis:100%;"></span>
                         <?php if (count($providers) === 1): ?>
-                            <small style="color:#95a5a6;">Add another provider to switch between them.</small>
+                            <small style="color:#95a5a6;flex-basis:100%;">Add another provider to switch between them.</small>
                         <?php endif; ?>
                     </form>
                 </div>
@@ -577,7 +583,17 @@ $available_providers = [
                                 <i class="fa fa-check-circle me-1"></i> Currently Active
                             </button>
                         <?php endif; ?>
-                        <button onclick='showEditModal(<?= json_encode($provider) ?>)' class="btn btn-primary">
+                        <?php
+                        // The row minus its secret. json_encode($provider) put the
+                        // stored ciphertext in the page source of every render, and
+                        // showEditModal() then loaded it into the API key field: a
+                        // save that only meant to change the model re-encrypted the
+                        // ciphertext, leaving a double-wrapped key that decrypts to
+                        // an enc:v1: blob and authenticates as nothing.
+                        $provider_js = $provider;
+                        unset($provider_js['api_key']);
+                        ?>
+                        <button onclick='showEditModal(<?= json_encode($provider_js) ?>)' class="btn btn-primary">
                             <i class="fa fa-edit me-1"></i> Edit
                         </button>
                         <form method="POST" style="display: inline;" onsubmit="return confirm('Delete this provider?');">
@@ -662,7 +678,8 @@ $available_providers = [
             </div>
             <div class="form-group">
                 <label>API Key *</label>
-                <input type="text" name="api_key" class="form-control" required placeholder="sk-...">
+                <input type="password" name="api_key" class="form-control" required
+                       autocomplete="new-password" spellcheck="false" placeholder="sk-...">
                 <small style="color: #95a5a6; display: block; margin-top: 5px;">
                     Your API key is stored securely and never shared.
                 </small>
@@ -701,9 +718,11 @@ $available_providers = [
             </div>
             <div class="form-group">
                 <label>API Key *</label>
-                <input type="text" name="api_key" id="edit_api_key" class="form-control" required placeholder="sk-...">
+                <input type="password" name="api_key" id="edit_api_key" class="form-control"
+                       autocomplete="new-password" spellcheck="false"
+                       placeholder="Leave blank to keep the current key">
                 <small style="color: #95a5a6; display: block; margin-top: 5px;">
-                    Your API key is stored securely and never shared.
+                    Stored encrypted. Leave blank to change the model without touching the key.
                 </small>
             </div>
             <button type="submit" name="edit_provider" class="btn btn-primary">
@@ -866,6 +885,61 @@ function fetchModels() {
     .finally(() => { btn.disabled = false; btn.innerHTML = original; });
 }
 
+// The curated catalogue is a short hand-written list, so the dropdown beside the
+// provider only ever offered what this file happened to know about - five OpenAI
+// entries, all of them GPT-4 era. Discovery already existed, but only inside the
+// Add and Edit modals, which is the one place you are not looking when you want
+// to change the model of a provider that is already configured.
+function fetchActiveModels() {
+    const select = document.getElementById('active_llm');
+    const row = configuredProviders.find(r => String(r.id) === String(select.value));
+    const btn = document.getElementById('active_fetch_btn');
+    const hint = document.getElementById('active_model_hint');
+    if (!row) { return; }
+
+    const entry = providerModels[row.provider];
+    if (entry && entry.discoverable === false) {
+        hint.textContent = (entry.name || row.provider) + ' does not publish a model list - type the id in Edit.';
+        return;
+    }
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Fetching...';
+    hint.textContent = '';
+
+    fetch('/api/ai_models.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                   'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ provider: row.provider, csrf: csrfToken })
+    })
+    .then(r => r.status === 401
+        ? Promise.reject(new Error('Your session has expired. Sign in again.'))
+        : r.json())
+    .then(data => {
+        if (!data.success) {
+            hint.textContent = data.error || 'Could not list models.';
+            return;
+        }
+        const modelSelect = document.getElementById('active_model');
+        const known = new Set([...modelSelect.options].map(o => o.value));
+        const group = document.createElement('optgroup');
+        group.label = 'Available from provider (' + data.count + ')';
+        data.models.forEach(id => {
+            if (known.has(id)) { return; }
+            const o = document.createElement('option');
+            o.value = id; o.textContent = id;
+            group.appendChild(o);
+        });
+        if (group.children.length) { modelSelect.appendChild(group); }
+        hint.textContent = data.count + ' model(s) returned by the provider. '
+            + 'Pick one and press "Use this".';
+    })
+    .catch(err => { hint.textContent = err.message || 'Could not reach the provider.'; })
+    .finally(() => { btn.disabled = false; btn.innerHTML = original; });
+}
+
 function showEditModal(provider) {
     // Set provider ID
     document.getElementById('edit_provider_id').value = provider.id;
@@ -897,7 +971,9 @@ function showEditModal(provider) {
     document.getElementById('edit_model_input').value = provider.model || '';
 
     // Set API key
-    document.getElementById('edit_api_key').value = provider.api_key;
+    // Left blank deliberately: the stored key is not sent to the browser, and a
+    // blank field means "keep the key that is already stored".
+    document.getElementById('edit_api_key').value = '';
 
     // Show modal
     document.getElementById('editModal').style.display = 'block';

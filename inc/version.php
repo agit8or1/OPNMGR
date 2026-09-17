@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Two Choices, Two Dropdowns'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ask The Provider, Keep The Key'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.5',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Ask The Provider, Keep The Key',
+            'changes' => [
+                'FIXED: The model dropdown offered only the five ids hardcoded in this file, all of them GPT-4 era. Live discovery already existed but sat inside the Add and Edit modals - the one place you are not looking when changing the model of a provider that is already configured. "Fetch from provider" is now beside the selector: OpenAI returns 130 models on this installation against the 5 the catalogue knew',
+                'FIXED: The stored API key ciphertext was written into the page source of every render. json_encode($provider) passed the whole row, api_key column included, to showEditModal(), which loaded it into the key field. Changing only the model then re-encrypted the ciphertext, and the double-wrapped result decrypts to an enc:v1: blob that authenticates as nothing - the same failure that produced 8,497 rejected SMTP logins. The row now has its secret removed before it reaches the browser',
+                'FIXED: The edit form marked the key field required, so the handler\'s documented "leave blank to keep the stored key" branch could never be reached through the UI. The field is optional now and says so',
+                'CHANGED: Both API key fields are password inputs with autofill off. A key in a text input is readable over a shoulder and is offered back by the browser afterwards',
+                'FIXED: A key of nothing but whitespace was encrypted and stored as the key. Both handlers trim before deciding whether anything was entered',
+            ],
+        ],
         [
             'version' => '3.69.4',
             'date' => '2026-09-17',

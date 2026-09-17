@@ -115,7 +115,7 @@ check('the model is a control of its own, not part of the provider label',
     && !preg_match('/id="active_llm"[\s\S]{0,600}&mdash;/', $page),
     'two providers can differ only by model, and the model must be changeable here');
 check('it submits through the existing default-provider handler',
-    (bool) preg_match('/active_llm[\s\S]{0,900}name="set_default_provider"/', $page),
+    (bool) preg_match('/active_llm[\s\S]{0,2000}name="set_default_provider"/', $page),
     'that handler already deactivates the others first');
 
 check('the scan picks deterministically',
@@ -169,6 +169,61 @@ check('every provider with suggestions marks a default choice',
         return true;
     })(),
     'a list of five with none recommended leaves the choice unmade');
+
+// --- the stored key must not be handed to the browser -------------------------
+//
+// The card comment said "the stored key is never sent to the browser" and the
+// edit handler's said "the UI never echoes it back". Both were false:
+// json_encode($provider) put the whole row, api_key column included, into the
+// onclick of every provider card, and showEditModal() loaded that ciphertext
+// into the API key field. Saving a model change then re-encrypted the
+// ciphertext, and the double-wrapped result decrypts to an enc:v1: blob that
+// authenticates as nothing - the same class of failure as the 8,497 SMTP
+// rejections. The field was also `required`, so the documented "leave blank to
+// keep the stored key" path could not be reached through the UI at all.
+
+check('the row handed to the edit modal has its secret removed',
+    str_contains($page, "unset(\$provider_js['api_key'])")
+    && !preg_match('/showEditModal\(<\?= json_encode\(\$provider\) \?>\)/', $page),
+    'the ciphertext was in the page source of every render');
+check('the edit field is not prefilled with it',
+    !str_contains($page, "edit_api_key').value = provider.api_key"),
+    're-encrypting the ciphertext produces a key that decrypts to a ciphertext');
+check('the edit field is optional, so blank-means-keep is reachable',
+    (bool) preg_match('/id="edit_api_key"(?:(?!>)[\s\S])*?placeholder="Leave blank/', $page)
+    && !preg_match('/id="edit_api_key"(?:(?!>)[\s\S])*?\brequired\b/', $page),
+    'the handler has always had the branch; the form made it unreachable');
+check('both key fields are password inputs',
+    substr_count($page, '<input type="password" name="api_key"') === 2,
+    'a key in a text input is shoulder-surfable and lands in browser autofill');
+check('neither offers autofill', substr_count($page, 'autocomplete="new-password"') === 2);
+check('whitespace does not count as a key',
+    substr_count($page, "\$api_key = trim((string) (\$_POST['api_key'] ?? ''))") === 2,
+    'a field of spaces would otherwise be encrypted and stored as the key');
+check('the card still shows only a masked key',
+    str_contains($page, 'opnmgr_mask_secret(opnmgr_decrypt('));
+
+// --- the catalogue must not be the only source of models ----------------------
+//
+// Discovery existed, but only inside the Add and Edit modals - the one place you
+// are not looking when changing the model of a provider already configured. The
+// dropdown beside the provider therefore offered exactly what this file knew,
+// which for OpenAI was five GPT-4 era ids.
+
+check('discovery is reachable from the main selector',
+    str_contains($page, 'function fetchActiveModels')
+    && str_contains($page, 'onclick="fetchActiveModels()"'));
+check('it asks for the selected provider, not the modal one',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,700}configuredProviders\.find/', $page));
+check('it appends rather than replacing the suggestions',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,2200}modelSelect\.appendChild\(group\)/', $page),
+    'replacing them would drop the model currently in use from the list');
+check('it does not offer a duplicate of a model already listed',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,2200}known\.has\(id\)/', $page));
+check('a provider with no listing endpoint says so instead of spinning',
+    (bool) preg_match('/fetchActiveModels[\s\S]{0,600}discoverable === false/', $page));
+check('a session that expired mid-fetch is reported as such',
+    substr_count($page, 'Your session has expired. Sign in again.') === 2);
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
