@@ -6,6 +6,35 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.63.2
+**Released**: September 17, 2026 | **Agent**: v1.6.7
+
+### Changed
+
+- **The walkthrough and highlight MP4s were re-recorded and uploaded** to the
+  `v3.31.0` release, alongside `docs/walkthrough.vtt`. They are not tracked files
+  - a binary that regenerates from a script does not belong in git history - so
+  regenerating them was part of publishing them.
+
+  ```
+  opnmanager-walkthrough-1080p.mp4   11.9M   3m43s
+  opnmanager-highlight-1080p.mp4      1.8M     40s
+  walkthrough.vtt                     2405 bytes
+  ```
+
+- The committed poster frame was replaced with one from the take that was
+  actually published, so the still and the video it fronts are the same
+  recording.
+
+### Note
+
+The videos show the v3.63.1 interface while the release they hang from is tagged
+`v3.31.0`, which is five weeks of development older. That was a deliberate choice:
+the alternative was publishing nineteen unpushed commits to a public repository
+in order to host two files.
+
+---
+
 ## Version 3.63.1
 **Released**: September 17, 2026 | **Agent**: v1.6.7
 

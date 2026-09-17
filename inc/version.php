@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Poster Frame'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Release Assets'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.63.2',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Release Assets',
+            'changes' => [
+                'CHANGED: The walkthrough and highlight MP4s were re-recorded and uploaded to the v3.31.0 release, alongside docs/walkthrough.vtt. They are not tracked files - a binary that regenerates from a script does not belong in git history - so regenerating them was part of publishing them',
+                'CHANGED: The committed poster frame was replaced with one from the take that was actually published, so the still and the video it fronts are the same recording',
+                'NOTE: The videos show the v3.63.1 interface while the release they hang from is tagged v3.31.0, which is five weeks of development older. That was a deliberate choice to avoid publishing nineteen unpushed commits to a public repository merely to host two files',
+            ],
+        ],
         [
             'version' => '3.63.1',
             'date' => '2026-09-17',
