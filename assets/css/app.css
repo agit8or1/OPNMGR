@@ -423,6 +423,27 @@ a.text-muted:hover {
     transition: grid-template-rows 0.18s ease;
 }
 .sidebar-group-inner { overflow: hidden; min-height: 0; }
+
+/* A group nested inside a group: indented so the hierarchy is visible, with a
+   rule down the left so the run of children reads as belonging to the toggle
+   above it rather than as more peers. */
+.sidebar-subitem {
+    padding-left: 30px;
+    position: relative;
+}
+.sidebar-subitem::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--border);
+}
+.sidebar-subitem.active::before { background: var(--accent); }
+.app-sidebar:not(:hover):not(.pinned) .sidebar-subitem { padding-left: 16px; }
+.app-sidebar:not(:hover):not(.pinned) .sidebar-subitem::before { opacity: 0; }
 .sidebar-group.is-open { grid-template-rows: 1fr; }
 
 /* The chevron is the only thing in the rail that is not a destination, so it

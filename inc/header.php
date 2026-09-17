@@ -278,21 +278,59 @@ function isActive($page) {
       </a>
       <?php endif; ?>
       <?php if (can('settings.manage')): ?>
-      <a class="sidebar-item <?php echo isActive(['settings.php','branding.php','smtp_settings.php','proxy_settings.php']) ?>" href="/settings.php">
+      <?php
+      // Settings, AI Analysis, Manager Health, System Update and System Backup
+      // are all "configure the manager itself", and sat as five peers among ten
+      // admin entries. They are one nested group now, which is four fewer rows
+      // when it is closed and the same four destinations when it is open.
+      //
+      // It opens by itself on any of its own pages, decided here rather than in
+      // script, so it is right before anything runs.
+      $settings_pages = [
+          'settings.php', 'branding.php', 'smtp_settings.php', 'proxy_settings.php',
+          'ai_settings.php', 'health_monitor.php', 'system_update.php', 'updates.php',
+          'system_backup.php',
+      ];
+      $settings_open = in_array(basename($_SERVER['PHP_SELF'] ?? ''), $settings_pages, true);
+      ?>
+      <button type="button" class="sidebar-item sidebar-group-toggle<?php echo $settings_open ? ' is-open' : ''; ?>"
+              id="settingsGroupToggle" aria-expanded="<?php echo $settings_open ? 'true' : 'false'; ?>"
+              aria-controls="settingsGroup">
         <span class="sidebar-icon"><i class="fas fa-sliders-h"></i></span>
         <span class="sidebar-label">Settings</span>
+        <span class="sidebar-chevron"><i class="fas fa-chevron-down"></i></span>
+      </button>
+      <div class="sidebar-group<?php echo $settings_open ? ' is-open' : ''; ?>" id="settingsGroup">
+      <div class="sidebar-group-inner">
+      <a class="sidebar-item sidebar-subitem <?php echo isActive(['settings.php','branding.php','smtp_settings.php','proxy_settings.php']) ?>" href="/settings.php">
+        <span class="sidebar-icon"><i class="fas fa-gear"></i></span>
+        <span class="sidebar-label">General</span>
       </a>
+      <a class="sidebar-item sidebar-subitem <?php echo isActive('ai_settings.php') ?>" href="/ai_settings.php">
+        <span class="sidebar-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
+        <span class="sidebar-label">AI Analysis</span>
+      </a>
+      <?php if (can('health.view')): ?>
+      <a class="sidebar-item sidebar-subitem <?php echo isActive('health_monitor.php') ?>" href="/health_monitor.php">
+        <span class="sidebar-icon"><i class="fas fa-heartbeat"></i></span>
+        <span class="sidebar-label">Health</span>
+      </a>
+      <?php endif; ?>
+      <?php if (can('system.maintenance')): ?>
+      <a class="sidebar-item sidebar-subitem <?php echo isActive(['system_update.php','updates.php']) ?>" href="/system_update.php">
+        <span class="sidebar-icon"><i class="fas fa-sync-alt"></i></span>
+        <span class="sidebar-label">Update</span>
+      </a>
+      <a class="sidebar-item sidebar-subitem <?php echo isActive('system_backup.php') ?>" href="/system_backup.php">
+        <span class="sidebar-icon"><i class="fas fa-database"></i></span>
+        <span class="sidebar-label">Backup</span>
+      </a>
+      <?php endif; ?>
+      </div><!-- /.sidebar-group-inner -->
+      </div><!-- /#settingsGroup -->
       <a class="sidebar-item <?php echo isActive('settings_tasks.php') ?>" href="/settings_tasks.php">
         <span class="sidebar-icon"><i class="fas fa-clock"></i></span>
         <span class="sidebar-label">Scheduled Jobs</span>
-      </a>
-      <?php // AI Analysis reached the product with no way to find it: the page
-            // was linked only from a firewall's detail page, so the answer to
-            // "AI Analysis is disabled - where do I enable it?" was a URL you
-            // had to be told. ?>
-      <a class="sidebar-item <?php echo isActive('ai_settings.php') ?>" href="/ai_settings.php">
-        <span class="sidebar-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
-        <span class="sidebar-label">AI Analysis</span>
       </a>
       <a class="sidebar-item <?php echo isActive(['logs.php','nginx_logs.php']) ?>" href="/logs.php">
         <span class="sidebar-icon"><i class="fas fa-list-alt"></i></span>
@@ -303,22 +341,6 @@ function isActive($page) {
       <a class="sidebar-item <?php echo isActive('admin_queue.php') ?>" href="/admin_queue.php">
         <span class="sidebar-icon"><i class="fas fa-tasks"></i></span>
         <span class="sidebar-label">Queue</span>
-      </a>
-      <?php endif; ?>
-      <?php if (can('health.view')): ?>
-      <a class="sidebar-item <?php echo isActive('health_monitor.php') ?>" href="/health_monitor.php">
-        <span class="sidebar-icon"><i class="fas fa-heartbeat"></i></span>
-        <span class="sidebar-label">Health</span>
-      </a>
-      <?php endif; ?>
-      <?php if (can('system.maintenance')): ?>
-      <a class="sidebar-item <?php echo isActive(['system_update.php','updates.php']) ?>" href="/system_update.php">
-        <span class="sidebar-icon"><i class="fas fa-sync-alt"></i></span>
-        <span class="sidebar-label">Update</span>
-      </a>
-      <a class="sidebar-item <?php echo isActive('system_backup.php') ?>" href="/system_backup.php">
-        <span class="sidebar-icon"><i class="fas fa-database"></i></span>
-        <span class="sidebar-label">Backup</span>
       </a>
       <?php endif; ?>
       <a class="sidebar-item <?php echo isActive('about.php') ?>" href="/about.php">
@@ -417,28 +439,36 @@ if (function_exists('can') && can('settings.manage')) {
 // is correct before any script runs and never flashes shut on the page you are
 // looking at.
 (function () {
-  var toggle = document.getElementById('adminGroupToggle');
-  var group  = document.getElementById('adminGroup');
-  if (!toggle || !group) return;
+  // One implementation for every collapsible sidebar group. PHP decides whether
+  // a group starts open - it is open on its own pages - and that decision wins
+  // over the remembered state, so the group containing the page you are looking
+  // at is never shut.
+  [
+    { toggle: 'adminGroupToggle',    group: 'adminGroup',    key: 'opnmgr-admin-group' },
+    { toggle: 'settingsGroupToggle', group: 'settingsGroup', key: 'opnmgr-settings-group' }
+  ].forEach(function (cfg) {
+    var toggle = document.getElementById(cfg.toggle);
+    var group  = document.getElementById(cfg.group);
+    if (!toggle || !group) return;
 
-  var KEY = 'opnmgr-admin-group';
-  var onAdminPage = group.classList.contains('is-open');
+    var openedByServer = group.classList.contains('is-open');
 
-  if (!onAdminPage) {
-    try {
-      if (localStorage.getItem(KEY) === 'open') {
-        group.classList.add('is-open');
-        toggle.classList.add('is-open');
-        toggle.setAttribute('aria-expanded', 'true');
-      }
-    } catch (e) { /* private mode, blocked storage: leave it closed */ }
-  }
+    if (!openedByServer) {
+      try {
+        if (localStorage.getItem(cfg.key) === 'open') {
+          group.classList.add('is-open');
+          toggle.classList.add('is-open');
+          toggle.setAttribute('aria-expanded', 'true');
+        }
+      } catch (e) { /* private mode, blocked storage: leave it closed */ }
+    }
 
-  toggle.addEventListener('click', function () {
-    var open = group.classList.toggle('is-open');
-    toggle.classList.toggle('is-open', open);
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    try { localStorage.setItem(KEY, open ? 'open' : 'closed'); } catch (e) {}
+    toggle.addEventListener('click', function () {
+      var open = group.classList.toggle('is-open');
+      toggle.classList.toggle('is-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      try { localStorage.setItem(cfg.key, open ? 'open' : 'closed'); } catch (e) {}
+    });
   });
 })();
 

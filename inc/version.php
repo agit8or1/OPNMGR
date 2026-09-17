@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Whichever Row Came First'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Configure The Manager, In One Place'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.2',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Configure The Manager, In One Place',
+            'changes' => [
+                'CHANGED: AI Analysis, Health, Update and Backup are nested under Settings. All five are "configure the manager itself" and sat as separate peers among ten admin entries; the admin section is four rows shorter closed, with the same destinations open',
+                'ADDED: The group opens by itself on any of its own pages, decided in PHP rather than in script, so it is correct before anything runs and the group holding the page you are looking at is never shut',
+                'CHANGED: One collapse implementation now drives both the admin and settings groups. Two copies would have drifted',
+                'ADDED: scripts/add_ai_provider.php configures a provider with the key read from stdin - never echoed, never in shell history, never in a transcript. It reports only the key\'s length and last four characters, which is enough to confirm the right thing was pasted and not enough to reconstruct it',
+            ],
+        ],
         [
             'version' => '3.69.1',
             'date' => '2026-09-17',

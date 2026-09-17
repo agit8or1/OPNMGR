@@ -6,6 +6,47 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.69.2
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Changed
+
+- **AI Analysis, Health, Update and Backup are nested under Settings.**
+
+  ```
+  Admin
+    Users
+    Settings  v
+      General
+      AI Analysis
+      Health
+      Update
+      Backup
+    Scheduled Jobs
+    Logs
+    Queue
+    About
+  ```
+
+  All five are "configure the manager itself" and sat as separate peers among ten
+  admin entries. The section is four rows shorter closed, with the same
+  destinations open.
+
+- The group **opens by itself on any of its own pages**, decided in PHP rather
+  than in script, so it is correct before anything runs and the group holding the
+  page you are looking at is never shut.
+- **One collapse implementation** now drives both the admin and settings groups.
+  Two copies would have drifted.
+
+### Added
+
+- `scripts/add_ai_provider.php` configures a provider with the key read from
+  stdin - never echoed, never in shell history, never in a transcript. It reports
+  only the key's length and last four characters: enough to confirm the right
+  thing was pasted, not enough to reconstruct it.
+
+---
+
 ## Version 3.69.1
 **Released**: September 17, 2026 | **Agent**: v1.6.9
 

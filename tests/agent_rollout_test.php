@@ -198,5 +198,32 @@ check('APP_VERSION_DATE is not older than the newest changelog entry',
     })(),
     'the date is shown in the dashboard tooltip, so a stale one is visible');
 
+// --- the manager's own configuration lives in one place ----------------------
+//
+// Settings, AI Analysis, Manager Health, System Update and System Backup are all
+// "configure the manager itself" and sat as five peers among ten admin entries.
+
+check('the settings group exists', str_contains($hdr, 'id="settingsGroup"'));
+foreach (['ai_settings.php', 'health_monitor.php', 'system_update.php', 'system_backup.php'] as $page) {
+    check("{$page} is inside it",
+        (bool) preg_match('/id="settingsGroup"[\s\S]{0,2600}' . preg_quote($page, '/') . '/', $hdr));
+}
+check('none of them remain a top-level admin entry',
+    substr_count($hdr, 'href="/ai_settings.php"') === 1
+    && substr_count($hdr, 'href="/health_monitor.php"') === 1
+    && substr_count($hdr, 'href="/system_backup.php"') === 1,
+    'a duplicated entry would appear twice in the menu');
+
+check('the group opens on its own pages, decided server side',
+    str_contains($hdr, '$settings_open = in_array(basename'),
+    'so it is right before any script runs');
+check('children are visually nested', str_contains($hdr, 'sidebar-subitem'));
+check('one collapse implementation serves both groups',
+    (bool) preg_match("/toggle: 'adminGroupToggle'[\s\S]{0,200}toggle: 'settingsGroupToggle'/", $hdr),
+    'two copies would drift');
+check('a server-opened group is not closed by a remembered state',
+    str_contains($hdr, 'openedByServer'),
+    'the group holding the page you are on must never be shut');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
