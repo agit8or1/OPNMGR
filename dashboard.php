@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/inc/firewall_policy.php';
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/firewall_health.php';
 require_once __DIR__ . '/inc/alerting.php';
@@ -18,7 +19,7 @@ $avg_health = 0;
 if (db()) {
     try {
         $stmt = db()->query("
-            SELECT f.id, f.hostname, f.wan_ip, f.lan_ip, f.status, f.version,
+            SELECT f.id, f.hostname, f.wan_ip, f.wan_interface_stats, f.lan_ip, f.status, f.version,
                    f.uptime, f.updates_available, f.last_checkin, f.agent_version,
                    f.reboot_required, f.current_version, f.available_version,
                    f.customer_name,
@@ -354,7 +355,7 @@ try {
           <tr onclick="window.location='/firewall_details.php?id=<?php echo $fw['id'] ?>'">
             <td><span class="status-dot <?php echo $statusClass ?>"></span></td>
             <td><a href="/firewall_details.php?id=<?php echo $fw['id'] ?>" class="dash-fw-name"><?php echo htmlspecialchars($fw['hostname'] ?: 'Unnamed') ?></a></td>
-            <td class="dash-fw-ip"><?php echo htmlspecialchars($fw['wan_ip'] ?: '-') ?></td>
+            <td class="dash-fw-ip"><?php echo htmlspecialchars(firewall_wan_address($fw) ?: '-') ?></td>
             <td><?php if ($fw['customer_name']): ?><span class="dash-fw-cust"><?php echo htmlspecialchars($fw['customer_name']) ?></span><?php else: ?>-<?php endif ?></td>
             <td class="dash-fw-health-cell">
               <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>

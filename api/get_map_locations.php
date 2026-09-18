@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../inc/firewall_policy.php';
 require_once __DIR__ . '/../inc/bootstrap.php';
 
 requireLogin();
@@ -38,6 +39,7 @@ try {
             latitude,
             longitude,
             wan_ip,
+            wan_interface_stats,
             last_checkin
         FROM firewalls
         WHERE (wan_ip IS NOT NULL AND wan_ip != '')
@@ -51,6 +53,9 @@ try {
     // Format firewall data with GeoIP fallback
     $firewall_locations = [];
     foreach ($firewalls as $fw) {
+        // The reported wan_ip can be the LAN address; geolocating that yields
+        // nothing, so the marker silently never appears.
+        $fw['wan_ip'] = firewall_wan_address($fw);
         $lat = (float)$fw['latitude'];
         $lon = (float)$fw['longitude'];
 

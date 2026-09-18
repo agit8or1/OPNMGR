@@ -660,7 +660,21 @@ get_wan_interface_stats() {
 
 # Get system information
 get_system_info() {
-    local wan_ip=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+    # The WAN address is the address on the interface holding the default route,
+    # not whichever address ifconfig prints first. ifconfig lists interfaces in
+    # kernel order, so on a box whose LAN interface sorts ahead of its WAN one
+    # this reported the LAN address and the fleet view showed an RFC1918 address
+    # in a column headed WAN IP.
+    local wan_if=$(route -n get default 2>/dev/null | awk '/interface:/ {print $2}')
+    local wan_ip=""
+    if [ -n "$wan_if" ]; then
+        wan_ip=$(ifconfig "$wan_if" 2>/dev/null | awk '/inet /{print $2; exit}')
+    fi
+    # No default route (or an unexpected ifconfig): the old behaviour is still a
+    # better answer than none.
+    if [ -z "$wan_ip" ]; then
+        wan_ip=$(ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+    fi
     local lan_ip=""
     local version=$(get_opnsense_version)
     local uptime_info=$(uptime | sed 's/.*up //' | sed 's/,.*//')

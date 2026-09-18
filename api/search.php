@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../inc/firewall_policy.php';
 /**
  * Fleet search API — powers the header typeahead.
  *
@@ -33,7 +34,7 @@ echo json_encode([
         'status'   => $f['status'],
         'customer' => $f['customer_name'],
         'site'     => $f['site_name'],
-        'wan_ip'   => $f['wan_ip'],
+        'wan_ip'   => firewall_wan_address($f),
         'url'      => 'firewall_details.php?id=' . (int)$f['id'],
     ], $fleet['results']),
     'customers' => array_map(fn($c) => [

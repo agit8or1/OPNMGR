@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/inc/firewall_policy.php';
 
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/timezone_selector.php';
@@ -270,7 +271,8 @@ include __DIR__ . '/inc/header.php';
                                     
                                     // Network Configuration
                                     $stats_tooltip .= "🌐 NETWORK CONFIG:\n";
-                                    $stats_tooltip .= "  • WAN IPv4: " . ($firewall['wan_ip'] ? htmlspecialchars($firewall['wan_ip']) : 'Not Available') . "\n";
+                                    $wan_display = firewall_wan_address($firewall);
+                                    $stats_tooltip .= "  • WAN IPv4: " . ($wan_display ? htmlspecialchars($wan_display) : 'Not Available') . "\n";
                                     $stats_tooltip .= "  • LAN IP: " . ($firewall['lan_ip'] ? htmlspecialchars($firewall['lan_ip']) : 'Not Available') . "\n";
                                     $stats_tooltip .= "  • IPv6: " . ($firewall['ipv6_address'] ? htmlspecialchars($firewall['ipv6_address']) : 'Not Available') . "\n\n";
                                     

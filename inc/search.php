@@ -246,7 +246,7 @@ if (!function_exists('search_fleet')) {
         $whereSql = implode(' AND ', $where);
 
         $sql = "
-            SELECT f.id, f.hostname, f.status, f.wan_ip, f.lan_ip, f.ipv6_address,
+            SELECT f.id, f.hostname, f.status, f.wan_ip, f.wan_interface_stats, f.lan_ip, f.ipv6_address,
                    f.version, f.agent_version, f.last_checkin, f.wan_interfaces,
                    f.customer_id, f.site_id,
                    c.name AS customer_name, c.code AS customer_code,

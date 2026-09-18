@@ -417,3 +417,55 @@ SH;
         return $sh . policy_script_footer();
     }
 }
+
+/**
+ * The firewall's actual WAN address.
+ *
+ * The agent reports wan_ip as
+ *
+ *     ifconfig | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}'
+ *
+ * which is the first IPv4 address ifconfig happens to print, in interface
+ * order - not the WAN interface's address. On a box whose LAN interface sorts
+ * ahead of its WAN interface that is the LAN address, and the fleet view then
+ * shows an RFC1918 address in a column headed WAN IP.
+ *
+ * The agent also sends wan_interface_stats, which carries each interface with
+ * its address and gateway, so the right answer is already here. The interface
+ * holding a default gateway is the one facing the internet; prefer it, and fall
+ * back to the reported wan_ip when the stats are absent or unparseable (an older
+ * agent, or a check-in that predates the field).
+ */
+function firewall_wan_address(array $firewall): string
+{
+    $fallback = trim((string) ($firewall['wan_ip'] ?? ''));
+
+    $raw = $firewall['wan_interface_stats'] ?? '';
+    if (is_string($raw) && $raw !== '') {
+        $stats = json_decode($raw, true);
+        if (is_array($stats)) {
+            // An interface with a gateway is a route off this network.
+            foreach ($stats as $iface) {
+                if (!is_array($iface)) { continue; }
+                $ip = trim((string) ($iface['ip_address'] ?? ''));
+                $gw = trim((string) ($iface['gateway'] ?? ''));
+                if ($ip !== '' && $gw !== '' && $ip !== '0.0.0.0') {
+                    return $ip;
+                }
+            }
+            // No gateway anywhere: prefer a routable address over a private one,
+            // which is still a better guess than the first line of ifconfig.
+            foreach ($stats as $iface) {
+                if (!is_array($iface)) { continue; }
+                $ip = trim((string) ($iface['ip_address'] ?? ''));
+                if ($ip === '' || $ip === '0.0.0.0') { continue; }
+                if (filter_var($ip, FILTER_VALIDATE_IP,
+                        FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    return $ip;
+                }
+            }
+        }
+    }
+
+    return $fallback;
+}

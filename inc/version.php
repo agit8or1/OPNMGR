@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Scheduled Scans Actually Scan'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The First Line Of ifconfig Is Not The WAN'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.71.1',
+            'date' => '2026-09-18',
+            'type' => 'patch',
+            'title' => 'The First Line Of ifconfig Is Not The WAN',
+            'changes' => [
+                'FIXED: The fleet view showed an RFC1918 address under WAN IP. The agent reported wan_ip as the first IPv4 address ifconfig prints, in kernel interface order, which is the WAN address only when the WAN interface happens to come first. On a firewall whose LAN interface is named ahead of its WAN interface it reported the LAN address',
+                'ADDED: firewall_wan_address() derives the address from wan_interface_stats, which the agent has been sending all along and which carries each interface with its address and gateway. The interface holding a default gateway is the one facing the internet; failing that a routable address is preferred over a private one, and the reported value remains the fallback for agents predating the field',
+                'FIXED: The map geolocated the reported address, so a firewall reporting a private one was looked up, found nowhere, and silently given no marker. It now geolocates the derived address',
+                'CHANGED: The dashboard, fleet list, network tools, search and map all derive the address the same way, and each query fetches the column it derives from - deriving from a column that was never selected would silently return the old wrong value',
+                'FIXED: The agent now reads the address from the interface holding the default route, falling back to the old behaviour when there is no default route. AGENT_VERSION is deliberately unchanged, so nothing is deployed to any firewall by this release',
+            ],
+        ],
         [
             'version' => '3.71.0',
             'date' => '2026-09-18',

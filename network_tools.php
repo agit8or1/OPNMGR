@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/inc/firewall_policy.php';
 /**
  * Network Diagnostic Tools
  * Real-time diagnostic tools using direct SSH commands
@@ -30,7 +31,7 @@ if ($firewall_id > 0) {
 }
 
 // Get all firewalls for dropdown
-$stmt = db()->query("SELECT id, hostname, wan_ip FROM firewalls ORDER BY hostname");
+$stmt = db()->query("SELECT id, hostname, wan_ip, wan_interface_stats FROM firewalls ORDER BY hostname");
 $firewalls = $stmt->fetchAll();
 // Everything that might redirect has run; start the page.
 require_once __DIR__ . '/inc/header.php';
@@ -54,7 +55,7 @@ require_once __DIR__ . '/inc/header.php';
                         <option value="">-- Select a firewall --</option>
                         <?php foreach ($firewalls as $fw): ?>
                             <option value="<?= $fw['id'] ?>" <?= $fw['id'] == $firewall_id ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($fw['hostname']) ?> (<?= htmlspecialchars($fw['wan_ip']) ?>)
+                                <?= htmlspecialchars($fw['hostname']) ?> (<?= htmlspecialchars(firewall_wan_address($fw)) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -68,7 +69,7 @@ require_once __DIR__ . '/inc/header.php';
                 <div class="card-body">
                     <h5 class="card-title text-primary"><i class="fas fa-check-circle me-2"></i>Selected Firewall</h5>
                     <p class="mb-1"><strong><?= htmlspecialchars($firewall['hostname']) ?></strong></p>
-                    <p class="mb-0 text-muted">WAN IP: <?= htmlspecialchars($firewall['wan_ip']) ?></p>
+                    <p class="mb-0 text-muted">WAN IP: <?= htmlspecialchars(firewall_wan_address($firewall)) ?></p>
                 </div>
             </div>
         </div>
