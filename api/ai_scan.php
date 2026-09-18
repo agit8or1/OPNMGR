@@ -686,7 +686,31 @@ function last_token_usage(): array
     return $GLOBALS['opnmgr_last_usage'] ?? ['prompt' => null, 'completion' => null, 'total' => null];
 }
 
-function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
+function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000, array $overrides = []) {
+    // The name of the completion-limit parameter, and whether the model accepts a
+    // temperature at all, differ by model generation. The API names the parameter
+    // it wants when it refuses, so the request adapts rather than carrying a table
+    // of model names that would go stale the way the model catalogue twice did.
+    $limit_param = $overrides['limit_param'] ?? 'max_tokens';
+    $send_temperature = $overrides['temperature'] ?? true;
+
+    $payload = [
+        'model' => $model,
+        'messages' => [
+            ['role' => 'system', 'content' => 'You are a cybersecurity expert specializing in firewall configuration analysis.'],
+            ['role' => 'user', 'content' => $prompt]
+        ],
+        // 2000 was the ceiling on the whole report - grade, summary, concerns,
+        // recommendations, improvements and log analysis - which is most of why
+        // the output read as thin. The request is a few thousand tokens of
+        // configuration; the answer should not be capped below what the question
+        // deserves.
+        $limit_param => $max_tokens,
+    ];
+    if ($send_temperature) {
+        $payload['temperature'] = 0.7;
+    }
+
     $ch = curl_init('https://api.openai.com/v1/chat/completions');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -695,20 +719,7 @@ function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
             'Content-Type: application/json',
             'Authorization: Bearer ' . $api_key
         ],
-        CURLOPT_POSTFIELDS => json_encode([
-            'model' => $model,
-            'messages' => [
-                ['role' => 'system', 'content' => 'You are a cybersecurity expert specializing in firewall configuration analysis.'],
-                ['role' => 'user', 'content' => $prompt]
-            ],
-            'temperature' => 0.7,
-            // 2000 was the ceiling on the whole report - grade, summary,
-            // concerns, recommendations, improvements and log analysis - which
-            // is most of why the output read as thin. The request is a few
-            // thousand tokens of configuration; the answer should not be capped
-            // below what the question deserves.
-            'max_tokens' => $max_tokens
-        ])
+        CURLOPT_POSTFIELDS => json_encode($payload)
     ]);
     
     $response = curl_exec($ch);
@@ -727,8 +738,31 @@ function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000) {
             $allowed = (int) $m[1];
             if ($allowed > 0 && $allowed < $max_tokens) {
                 error_log("[AI_SCAN] {$model} allows {$allowed} completion tokens; retrying at that limit");
-                return callOpenAI($api_key, $model, $prompt, $allowed);
+                return callOpenAI($api_key, $model, $prompt, $allowed, $overrides);
             }
+        }
+
+        // "Unsupported parameter: 'max_tokens' is not supported with this model.
+        // Use 'max_completion_tokens' instead." - the GPT-5 generation renamed it.
+        // The message names the replacement, so use the name it asked for.
+        if ($http_code === 400
+            && preg_match("/Unsupported parameter: '([a-z_]+)'[^']*Use '([a-z_]+)' instead/i", $error_message, $m)
+            && $m[1] === $limit_param
+            && $m[2] !== $limit_param) {
+            error_log("[AI_SCAN] {$model} wants {$m[2]} rather than {$m[1]}; retrying");
+            return callOpenAI($api_key, $model, $prompt, $max_tokens,
+                ['limit_param' => $m[2], 'temperature' => $send_temperature]);
+        }
+
+        // Some models accept only their default temperature and refuse the
+        // parameter outright. It is an optional nicety here, so drop it and ask
+        // again rather than failing the scan over it.
+        if ($http_code === 400 && $send_temperature
+            && preg_match("/'temperature'/i", $error_message)
+            && preg_match('/unsupported|not supported|does not support/i', $error_message)) {
+            error_log("[AI_SCAN] {$model} refuses a temperature; retrying without one");
+            return callOpenAI($api_key, $model, $prompt, $max_tokens,
+                ['limit_param' => $limit_param, 'temperature' => false]);
         }
 
         throw new Exception("OpenAI API error: HTTP {$http_code} - {$error_message}");

@@ -102,7 +102,7 @@ check('the output ceiling was raised from 2000',
     !str_contains($src, "'max_tokens' => 2000"),
     '2000 tokens for grade, summary, concerns, recommendations and log analysis');
 check('the OpenAI ceiling is a parameter, not a literal',
-    str_contains($src, 'function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000)'));
+    str_contains($src, 'function callOpenAI($api_key, $model, $prompt, $max_tokens = 8000, array $overrides = [])'));
 check('a refused ceiling is retried at the limit the API states',
     str_contains($src, 'max_tokens is too large') && str_contains($src, 'return callOpenAI('),
     'models differ widely, so a fixed number is wrong for somebody; gpt-4-turbo allows 4096');
@@ -144,6 +144,38 @@ check('the configuration is still redacted before it leaves',
     'this is the one thing that must never regress while loosening filters');
 check('a redaction failure still aborts rather than falling back',
     str_contains($src, 'Configuration could not be redacted'));
+
+// --- the request must adapt to the model, not the other way round -------------
+//
+// Switching to a GPT-5 model made every scan fail with HTTP 400: "Unsupported
+// parameter: 'max_tokens' is not supported with this model. Use
+// 'max_completion_tokens' instead." The newer generation renamed the field, and
+// the request had the old name compiled in - so recommending a current model
+// broke the feature that recommended it.
+//
+// The fix is deliberately not a table of model names mapped to parameter names:
+// that is the stale-catalogue bug again. The API states which parameter it wants
+// when it refuses, so the retry uses the name it was given.
+
+check('the completion limit parameter is not hardcoded',
+    str_contains($raw, "\$limit_param = \$overrides['limit_param'] ?? 'max_tokens'"),
+    'the name differs by model generation');
+check('a rename is taken from the error message',
+    str_contains($raw, "Unsupported parameter: '([a-z_]+)'[^']*Use '([a-z_]+)' instead"),
+    'the API names the replacement; a hardcoded map would go stale');
+check('the retry only renames the parameter it sent',
+    str_contains($raw, '$m[1] === $limit_param'),
+    'a message about some other parameter must not be treated as this one');
+check('the retry cannot loop on an unchanged name',
+    str_contains($raw, '$m[2] !== $limit_param'));
+check('a refused temperature is dropped rather than failing the scan',
+    (bool) preg_match("/\\\$send_temperature\s*&&[\s\S]{0,200}temperature[\s\S]{0,200}'temperature' => false/", $raw),
+    'temperature is a nicety here; the analysis is not worth losing over it');
+check('the downward token retry carries the overrides forward',
+    str_contains($raw, 'return callOpenAI($api_key, $model, $prompt, $allowed, $overrides);'),
+    'otherwise the second retry would undo the first one');
+check('the payload is built once and encoded',
+    str_contains($raw, 'CURLOPT_POSTFIELDS => json_encode($payload)'));
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

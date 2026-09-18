@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'One List, Every Provider'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Request Adapts To The Model'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.69.9',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'The Request Adapts To The Model',
+            'changes' => [
+                'FIXED: Scans failed outright on any GPT-5 generation model with HTTP 400 - "Unsupported parameter: max_tokens is not supported with this model. Use max_completion_tokens instead." The newer models renamed the field and the request had the old name compiled in, so moving to a current model broke the feature that recommended moving to one',
+                'CHANGED: The retry takes the parameter name from the error message rather than from a table of model names mapped to parameter names, which is the stale-catalogue bug in another costume. It renames only the parameter it actually sent and cannot loop on an unchanged name',
+                'ADDED: A model that refuses a temperature has the parameter dropped and the request retried, rather than losing the analysis over an optional nicety',
+                'VERIFIED: First measured scan on this installation - 104,054 tokens, 26 seconds, against 85 seconds on the previous model',
+            ],
+        ],
         [
             'version' => '3.69.8',
             'date' => '2026-09-17',
