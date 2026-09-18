@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.6.9"
+AGENT_VERSION="1.7.0"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 # Update transcripts get their own file. The installer's output used to be

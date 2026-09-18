@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Is Not The Same As Safe'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Agent 1.7.0, Published And Held'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,8 +20,8 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Is Not Th
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.6.9'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-17'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.7.0'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-18'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 // First agent release that collects OPNsense health telemetry (gateways, VPN,
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.72.1',
+            'date' => '2026-09-18',
+            'type' => 'patch',
+            'title' => 'Agent 1.7.0, Published And Held',
+            'changes' => [
+                'ADDED: Agent 1.7.0. It reads the WAN address from the interface holding the default route rather than taking whichever address ifconfig prints first, which on a firewall whose LAN interface is named ahead of its WAN one was the LAN address. It falls back to the old behaviour when there is no default route, so a box mid-reconfiguration still reports something',
+                'PUBLISHED, NOT DEPLOYED: the rollout stage was promoted for 1.6.9, so 1.7.0 is held and nothing is being offered to any firewall. Releasing it is a separate, explicit act that names the version',
+                'FIXED: README.md and CHANGELOG.md had drifted to 3.69.2 across nine releases while VERSION and the in-app changelog moved on. scripts/check_versions.php had been reporting it the whole time',
+            ],
+        ],
         [
             'version' => '3.72.0',
             'date' => '2026-09-18',

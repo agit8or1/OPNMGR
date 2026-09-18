@@ -2,7 +2,188 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: September 16, 2026
+**Last Updated**: September 18, 2026
+
+---
+
+## Version 3.72.1
+**Released**: September 18, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **Agent 1.7.0**, reading the WAN address from the interface holding the default
+  route rather than whichever address `ifconfig` prints first.
+
+  Published, not deployed. The rollout stage was promoted for 1.6.9, so 1.7.0 is
+  held and nothing is being offered to any firewall. Releasing it names the
+  version explicitly.
+
+### Fixed
+
+- **README.md and CHANGELOG.md had drifted to 3.69.2** across nine releases.
+  `scripts/check_versions.php` had been reporting it the whole time.
+
+---
+
+## Version 3.72.0
+**Released**: September 18, 2026 | **Agent**: v1.6.9
+
+### Added
+
+- **The fleet table shows each firewall's most recent scan grade beside its health.**
+
+  The two measure different things. Health is reachability and service state; the
+  grade is what the configuration review concluded. A firewall sat at 100% health
+  on the page used to judge the fleet at a glance while its management interface
+  was reachable from any source on the internet.
+
+  The grade links to the report it came from, and carries its score, risk level
+  and date. A firewall never scanned shows a dash and says so, because a blank
+  cell reads as "fine". A grade older than thirty days is dimmed: it describes a
+  configuration that may no longer exist.
+
+---
+
+## Version 3.71.1
+**Released**: September 18, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **The fleet view showed an RFC1918 address under a column headed WAN IP.**
+
+  The agent reported it as the first IPv4 address `ifconfig` prints, in kernel
+  interface order - the WAN address only when the WAN interface happens to be
+  named first. On a firewall whose LAN interface comes first it reported the LAN
+  address.
+
+  `firewall_wan_address()` derives it from `wan_interface_stats`, which the agent
+  was already sending and which carries each interface with its address and
+  gateway. So the display is correct for firewalls that were never touched. The
+  map had the same bug with a quieter symptom: it geolocated a private address,
+  found nothing, and silently placed no marker.
+
+---
+
+## Version 3.71.0
+**Released**: September 18, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **Scheduled AI scanning had never run once.** Four faults, each alone enough:
+  the scheduler called `performAIScan()`, which has never existed; `api/ai_scan.php`
+  ran its whole body on include; that file resolved an include against the working
+  directory and died under the CLI; and cron ran as an account that cannot read
+  the SSH keys. A scan is now `opnmgr_run_ai_scan()`, called by both the endpoint
+  and the scheduler.
+
+- **`api/ai_scan.php` resolved one include against the working directory.** Under
+  the web server that directory is `api/`, so it worked there and nowhere else.
+
+### Added
+
+- **`scripts/deploy.sh`**, carrying the exclusions that were retyped by hand.
+  `logs/` is among them; without it each deploy overwrote production's logs.
+
+---
+
+## Version 3.70.1
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **An exemption list headed "ABSOLUTE PROHIBITION" whose entries carried
+  conditions.** The heading was unconditional and the entries were not, so SSH
+  root login was suppressed whether or not its condition held - and until the rule
+  digest existed the condition could not be checked at all. A firewall with
+  `permitrootlogin=1` and port 22 open to any source scanned clean.
+
+- **Cited rules were accurate and unreadable** - pasted XML fragments and lines
+  echoing back the rule table's own column headings.
+
+- **Viewing a report opened a new tab.** A popup blocker swallowing
+  `window.open` made a finished scan look like it had done nothing.
+
+---
+
+## Version 3.70.0
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **Scans analysed a rule set they had never been given.**
+
+  OPNsense keeps firewall rules in two places: the legacy `<filter>` section,
+  which on a current installation is usually `<filter/>` - self-closing and empty
+  - and `<OPNsense><Firewall><Filter><rules>`. A reader that stops at the section
+  named "filter" concludes the firewall has no rules at all.
+
+  `ai_rule_digest()` normalises both into one table placed ahead of the XML. It is
+  built from the redacted document, never the raw one.
+
+- **The prompt said "NEVER FLAG NAT RULES", without qualification.** A port
+  forward is how an administrative interface usually reaches the internet.
+
+---
+
+## Version 3.69.7
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Added
+
+- **Model ratings and relative cost bands**, with measured token usage from this
+  installation's own scans - the provider reports usage on every response and it
+  was being decoded and discarded. Cost is a band, never a price: per-token
+  pricing differs by account and changes without this page changing.
+
+---
+
+## Version 3.69.6
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **The OpenAI catalogue was refreshed from memory rather than from the provider**,
+  naming `gpt-4o` "current generation" while the account served 41 GPT-5 variants.
+  A test now fails when a provider recommends a model the catalogue itself calls
+  older or superseded.
+
+---
+
+## Version 3.69.5
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **The stored API key ciphertext was written into the page source of every
+  render**, and loaded into the edit field - so saving a model change re-encrypted
+  it, producing a double-wrapped key that authenticates as nothing.
+
+- **The model dropdown offered only hardcoded ids.** "Fetch from provider" is now
+  beside the selector; the account serves 130 models against the 5 listed.
+
+---
+
+## Version 3.69.4
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **The AI page offered one dropdown where it holds two decisions**, with the
+  model welded into the provider's label.
+
+---
+
+## Version 3.69.3
+**Released**: September 17, 2026 | **Agent**: v1.6.9
+
+### Fixed
+
+- **Settings became a page again, not a collapsing menu.** Its sections belong on
+  the page; the sidebar holds one plain link.
+
+- **`tests/ai_redaction_test.php` set `ai_enabled` back to "0" when it finished**,
+  commented as restoring the installation default. The default is whatever the
+  operator chose, so every full suite run switched AI off silently.
 
 ---
 
