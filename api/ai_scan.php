@@ -8,7 +8,7 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../inc/ai_redaction.php';
 
 header('Content-Type: application/json');
-require_once '../inc/agent_version.php';
+require_once __DIR__ . '/../inc/agent_version.php';
 require_once __DIR__ . '/../inc/firewall_policy.php';
 
 

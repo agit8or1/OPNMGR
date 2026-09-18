@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Conditional Exemptions, Readable Citations'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'An Include That Only Worked From One Directory'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.70.2',
+            'date' => '2026-09-18',
+            'type' => 'patch',
+            'title' => 'An Include That Only Worked From One Directory',
+            'changes' => [
+                'FIXED: api/ai_scan.php resolved one include relative to the working directory rather than to its own location. Under the web server the working directory happens to be api/, so it worked there and nowhere else - scripts/run_auto_scans.php died on "require_once(../inc/agent_version.php): Failed to open stream" every time it ran. Its eleven neighbours in the same file all use __DIR__',
+                'ADDED: A test that fails on any include in api/ resolved against the working directory',
+            ],
+        ],
         [
             'version' => '3.70.1',
             'date' => '2026-09-17',

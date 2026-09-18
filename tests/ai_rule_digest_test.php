@@ -229,5 +229,21 @@ check('no AI report is opened in a new tab',
     !preg_match('/ai_reports\.php[^`\'"]*`?[^>]{0,80}target="_blank"/', $details)
     && !str_contains($details, "window.open(`/ai_reports.php"));
 
+// --- includes must not depend on the working directory ------------------------
+//
+// api/ai_scan.php resolved one of its includes relative to the CWD rather than
+// to its own location. Under the web SAPI the CWD happens to be api/, so it
+// worked; from the CLI it did not, and scripts/run_auto_scans.php died on
+//
+//   require_once(../inc/agent_version.php): Failed to open stream
+//
+// every time it ran. Its eleven neighbours in the same file all use __DIR__.
+
+check('no include in api/ resolves against the working directory',
+    !preg_match("/require(_once)? '\\.\\.\\//", $scanRaw),
+    'the CWD is api/ under the web server and anything at all from the CLI');
+check('the agent version include is anchored to the file',
+    str_contains($scanRaw, "require_once __DIR__ . '/../inc/agent_version.php'"));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
