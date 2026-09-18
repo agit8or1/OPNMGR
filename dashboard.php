@@ -23,9 +23,28 @@ if (db()) {
                    f.uptime, f.updates_available, f.last_checkin, f.agent_version,
                    f.reboot_required, f.current_version, f.available_version,
                    f.customer_name,
-                   fa.last_checkin as agent_last_checkin
+                   fa.last_checkin as agent_last_checkin,
+                   r.overall_grade AS scan_grade,
+                   r.security_score AS scan_score,
+                   r.risk_level AS scan_risk,
+                   r.created_at AS scan_at,
+                   r.id AS scan_report_id
             FROM firewalls f
             LEFT JOIN firewall_agents fa ON f.id = fa.firewall_id AND fa.agent_type = 'primary'
+            -- The most recent scan per firewall. Health measures whether the box
+            -- is reachable and its services are up; it says nothing about whether
+            -- the configuration is safe. A firewall can sit at 100% health with
+            -- its management interface open to the internet, which is exactly
+            -- what this fleet was doing.
+            LEFT JOIN (
+                SELECT s1.firewall_id, s1.id, s1.overall_grade, s1.security_score,
+                       s1.risk_level, s1.created_at
+                FROM ai_scan_reports s1
+                JOIN (
+                    SELECT firewall_id, MAX(id) AS id
+                    FROM ai_scan_reports GROUP BY firewall_id
+                ) s2 ON s2.id = s1.id
+            ) r ON r.firewall_id = f.id
             ORDER BY f.hostname ASC
         ");
         $firewalls = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -336,6 +355,7 @@ try {
             <th>WAN IP</th>
             <th>Customer</th>
             <th>Health</th>
+            <th title="Grade from the most recent AI configuration scan. Health and this measure different things.">Scan</th>
             <th>Uptime</th>
             <th>Checkin</th>
             <th>Agent</th>
@@ -360,6 +380,27 @@ try {
             <td class="dash-fw-health-cell">
               <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>
               <span class="dash-fw-health-pct"><?php echo $health ?>%</span>
+            </td>
+            <td class="dash-fw-scan" onclick="event.stopPropagation()">
+              <?php if (!empty($fw['scan_grade'])):
+                  $grade = strtoupper($fw['scan_grade']);
+                  $gradeClass = in_array($grade[0], ['A', 'B'], true) ? 'good'
+                              : ($grade[0] === 'C' ? 'warn' : 'bad');
+                  // A grade from months ago describes a configuration that may
+                  // no longer exist, so its age is shown rather than implied.
+                  $scanAge = (time() - strtotime($fw['scan_at'])) / 86400;
+                  $staleScan = $scanAge > 30;
+              ?>
+                <a href="/ai_reports.php?report_id=<?php echo (int)$fw['scan_report_id'] ?>"
+                   class="scan-grade <?php echo $gradeClass ?><?php echo $staleScan ? ' stale' : '' ?>"
+                   title="<?php echo htmlspecialchars(
+                       'Security score ' . (int)$fw['scan_score'] . ', risk ' . $fw['scan_risk']
+                       . ', scanned ' . date('Y-m-d', strtotime($fw['scan_at']))) ?>">
+                  <?php echo htmlspecialchars($grade) ?>
+                </a>
+              <?php else: ?>
+                <span class="scan-grade none" title="This firewall has never been scanned">&ndash;</span>
+              <?php endif ?>
             </td>
             <td><?php echo htmlspecialchars($shortUptime) ?></td>
             <td><?php echo $checkinText ?></td>

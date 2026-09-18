@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The First Line Of ifconfig Is Not The WAN'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Is Not The Same As Safe'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.72.0',
+            'date' => '2026-09-18',
+            'type' => 'minor',
+            'title' => 'Health Is Not The Same As Safe',
+            'changes' => [
+                'ADDED: The fleet table shows the grade from each firewall\'s most recent AI configuration scan, beside its health. The two measure different things - health is reachability and service state, the grade is what the configuration review concluded - and showing only the first meant a firewall could sit at 100% health on the page used to judge the fleet at a glance while its management interface was reachable from any source on the internet',
+                'ADDED: The grade links to the report it came from, so it is a number with its findings attached rather than one to argue with. Clicking it does not trigger the row navigation to firewall details',
+                'ADDED: A firewall that has never been scanned shows a dash and says so, because a blank cell reads as "fine". A grade older than thirty days is dimmed and outlined, since it describes a configuration that may no longer exist; hovering any grade gives the score, risk level and scan date',
+                'FIXED: The join takes the newest report per firewall rather than joining ai_scan_reports directly, which would have listed a firewall once per scan it has ever had',
+            ],
+        ],
         [
             'version' => '3.71.1',
             'date' => '2026-09-18',
