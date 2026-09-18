@@ -444,7 +444,14 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     // analyse the logs and to say nothing about them.
     $prompt .= "4. Log retention or log completeness - only a short sample is sent, so it cannot be judged from here\n";
     $prompt .= "5. Any service (SSH, HTTP, HTTPS) with source IP restrictions to specific management IPs\n";
-    $prompt .= "6. NAT port forward rules - These are intentional and required for services like Plex, media servers, etc. - NEVER FLAG NAT RULES\n\n";
+    // "NEVER FLAG NAT RULES" was absolute, and a port forward is how an
+    // administrative interface usually reaches the internet. The intent was to
+    // stop the scan flagging ordinary service publishing; as written it also
+    // suppressed the exposure of management interfaces, which is the thing most
+    // worth reporting.
+    $prompt .= "6. Ordinary service NAT port forwards (web, mail, media, game servers) - these are intentional publishing, do not flag them. "
+             . "DO flag a forward or rule that exposes an ADMINISTRATIVE or MANAGEMENT interface to an unrestricted source: "
+             . "firewall or router GUIs, Proxmox, Webmin, cPanel, IPMI/iDRAC/iLO, database admin panels, or remote-access daemons.\n\n";
 
     $prompt .= "**SECURE CONFIGURATION EXAMPLE**:\n";
     $prompt .= "If you see <permitrootlogin>1</permitrootlogin> AND firewall rules showing SSH restricted to specific IPs:\n";
@@ -525,6 +532,15 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
         // No fallback to the raw document: a parse failure must not become a
         // disclosure.
         throw new RuntimeException('Configuration could not be redacted: ' . $redacted['error']);
+    }
+
+    // The rule set first, normalised, because it is the part the analysis is
+    // actually about and the XML buries it under a heading that does not
+    // announce itself. See ai_rule_digest().
+    $digest = ai_rule_digest($redacted['xml']);
+    if ($digest !== '') {
+        $prompt .= $digest;
+        $prompt .= "FULL CONFIGURATION XML (for everything else):\n";
     }
 
     $prompt .= $redacted['xml'] . "\n\n";

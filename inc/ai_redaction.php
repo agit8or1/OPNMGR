@@ -250,6 +250,114 @@ if (!function_exists('ai_prepare_config')) {
      *
      * @return array{ok:bool, error:string, xml:string, summary:string, redacted:array}
      */
+    /**
+     * A normalised view of the firewall's rules, whichever section holds them.
+     *
+     * OPNsense keeps rules in two places. The legacy `<filter>` section is the
+     * one whose name says "filter", and on a current installation it is often
+     * `<filter/>` - self-closing and empty. The rules that are actually compiled
+     * into pf live in `<OPNsense><Firewall><Filter><rules>`, several hundred
+     * lines further down under a heading that does not announce itself.
+     *
+     * A reader that stops at `<filter/>` concludes the firewall has no rules at
+     * all. That happened here: one installation has 61 MVC rules including
+     *
+     *     interface=wan  source=any  destination=(self)  port=443  action=pass
+     *
+     * which is the WAN-facing web GUI, and an analysis based on the empty legacy
+     * section could neither find it nor rule it out.
+     *
+     * The digest is built from the REDACTED document, never the raw one, so it
+     * cannot become a route around ai_redact_config().
+     */
+    function ai_rule_digest(string $redactedXml): string {
+        $previous = libxml_use_internal_errors(true);
+        $doc = simplexml_load_string($redactedXml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        if ($doc === false) {
+            return '';
+        }
+
+        $rows = [];
+        $selfRules = 0;
+
+        $val = static function ($node, string $path): string {
+            $v = $node->{$path} ?? null;
+            return $v === null ? '' : trim((string) $v);
+        };
+
+        // Legacy <filter><rule>
+        if (isset($doc->filter->rule)) {
+            foreach ($doc->filter->rule as $r) {
+                $src = isset($r->source->any) ? 'any'
+                     : ($val($r->source, 'network') ?: $val($r->source, 'address') ?: 'any');
+                $dst = isset($r->destination->any) ? 'any'
+                     : ($val($r->destination, 'network') ?: $val($r->destination, 'address') ?: 'any');
+                $rows[] = [
+                    'origin' => 'legacy',
+                    'iface'  => $val($r, 'interface'),
+                    'action' => $val($r, 'type') ?: 'pass',
+                    'proto'  => $val($r, 'protocol') ?: 'any',
+                    'src'    => $src,
+                    'dst'    => $dst,
+                    'port'   => $val($r->destination ?? new SimpleXMLElement('<x/>'), 'port'),
+                    'on'     => isset($r->disabled) && trim((string) $r->disabled) === '1' ? 'no' : 'yes',
+                    'descr'  => $val($r, 'descr'),
+                ];
+            }
+        }
+
+        // Current <OPNsense><Firewall><Filter><rules><rule>
+        if (isset($doc->OPNsense->Firewall->Filter->rules->rule)) {
+            foreach ($doc->OPNsense->Firewall->Filter->rules->rule as $r) {
+                $enabled = $val($r, 'enabled');
+                $rows[] = [
+                    'origin' => 'mvc',
+                    'iface'  => $val($r, 'interface'),
+                    'action' => $val($r, 'action') ?: 'pass',
+                    'proto'  => $val($r, 'protocol') ?: 'any',
+                    'src'    => $val($r, 'source_net') ?: 'any',
+                    'dst'    => $val($r, 'destination_net') ?: 'any',
+                    'port'   => $val($r, 'destination_port'),
+                    'on'     => $enabled === '0' ? 'no' : 'yes',
+                    'descr'  => $val($r, 'description'),
+                ];
+            }
+        }
+
+        if (!$rows) {
+            return "FIREWALL RULES: none found in either <filter> or "
+                 . "<OPNsense><Firewall><Filter><rules>.\n\n";
+        }
+
+        $out  = "FIREWALL RULES (normalised from both rule sections)\n";
+        $out .= "Rules live in two places in an OPNsense configuration: the legacy\n";
+        $out .= "<filter> section, which is frequently empty, and the current\n";
+        $out .= "<OPNsense><Firewall><Filter><rules> section. Both are listed here.\n";
+        $out .= "Treat THIS table as the authoritative rule set. An empty <filter/>\n";
+        $out .= "element in the XML below does NOT mean the firewall has no rules.\n\n";
+        $out .= "A destination of (self) means the firewall itself - its own\n";
+        $out .= "management interfaces, not a host behind it.\n\n";
+        $out .= sprintf("%-7s %-9s %-6s %-6s %-22s %-22s %-10s %-4s %s\n",
+                        'SOURCE', 'INTERFACE', 'ACTION', 'PROTO', 'FROM', 'TO', 'PORT', 'ON', 'DESCRIPTION');
+
+        foreach ($rows as $row) {
+            if (stripos($row['dst'], 'self') !== false && $row['on'] === 'yes'
+                && strcasecmp($row['action'], 'pass') === 0) {
+                $selfRules++;
+            }
+            $out .= sprintf("%-7s %-9s %-6s %-6s %-22s %-22s %-10s %-4s %s\n",
+                $row['origin'], substr($row['iface'], 0, 9), substr($row['action'], 0, 6),
+                substr($row['proto'], 0, 6), substr($row['src'], 0, 22), substr($row['dst'], 0, 22),
+                substr($row['port'], 0, 10), $row['on'], substr($row['descr'], 0, 46));
+        }
+
+        $out .= sprintf("\n%d rule(s) total; %d enabled pass rule(s) target the firewall itself.\n\n",
+                        count($rows), $selfRules);
+        return $out;
+    }
+
     function ai_prepare_config(string $xml, ?int $firewallId = null): array {
         $result = ai_redact_config($xml);
 

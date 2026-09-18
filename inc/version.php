@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Request Adapts To The Model'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Rules Are Not Where The Name Says'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.70.0',
+            'date' => '2026-09-17',
+            'type' => 'minor',
+            'title' => 'The Rules Are Not Where The Name Says',
+            'changes' => [
+                'FIXED: Scans analysed a rule set they had never been given. OPNsense keeps firewall rules in two places: the legacy <filter> section, which on a current installation is usually <filter/> - self-closing and empty - and <OPNsense><Firewall><Filter><rules>, further down under a heading that does not announce itself. A reader that stops at the section named "filter" concludes the firewall has no rules at all, so every statement the scan made about "the WAN policy" was inference from NAT entries alone',
+                'ADDED: ai_rule_digest() normalises both sections into one table placed ahead of the XML, marked as authoritative, noting explicitly that an empty <filter/> does not mean there are no rules, and counting how many enabled pass rules target the firewall itself. It is built from the redacted document, never the raw one, so it cannot become a route around ai_redact_config()',
+                'CHANGED: The prompt said "NEVER FLAG NAT RULES", without qualification. A port forward is how an administrative interface usually reaches the internet, so an instruction meant to stop noise about published services also suppressed the finding most worth having. Ordinary service publishing is still not flagged; a forward exposing a management interface now is',
+                'VERIFIED: On one installation the fix moved a confirmed WAN-facing web GUI from an inferred finding to a cited one, correctly separated an exposed HTTPS listener from a permitted-but-closed HTTP port, dropped a false "SSH exposed to the internet", and surfaced two findings it could not previously see - an any-to-any rule on OPT1 and IDS running with its signature-update cron disabled. Prompt cost rose about 2,000 tokens',
+            ],
+        ],
         [
             'version' => '3.69.9',
             'date' => '2026-09-17',
