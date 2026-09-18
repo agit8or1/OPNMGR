@@ -27,7 +27,11 @@ cron_run_begin('run_auto_scans');
 
 // AI provider settings are loaded from database, no separate file needed
 
-$log_file = '/var/log/opnsense_auto_scans.log';
+// /var/log is not writable by the account this runs as, so file_put_contents()
+// failed silently and every log_message() call lost half its output - the echo
+// reached the cron redirect, the file write went nowhere. /var/log/opnmgr is
+// group-writable by www-data and is where the rest of the jobs log.
+$log_file = '/var/log/opnmgr/opnsense_auto_scans.log';
 
 function log_message($message) {
     global $log_file;
@@ -44,6 +48,7 @@ try {
         fas.firewall_id,
         fas.scan_frequency,
         fas.preferred_provider,
+        fas.scan_type,
         f.hostname,
         f.ip_address
     FROM firewall_ai_settings fas
@@ -81,29 +86,23 @@ try {
                 continue;
             }
 
-            // Include the AI scan library
+            // One scan, run through the same function the web endpoint calls,
+            // so a scheduled scan and a manual one cannot diverge. Including
+            // this file used to run a scan by itself; it defines functions now.
             require_once __DIR__ . '/../api/ai_scan.php';
 
-            // Run the scan (always with logs)
             log_message("Starting AI scan for $hostname...");
 
-            // performAIScan() is defined nowhere and never has been. The only
-            // scan entry point is performAIAnalysis() in api/ai_scan.php, whose
-            // signature is different - it wants the AI settings, the firewall's
-            // configuration and the log data, none of which this script
-            // collects. So scheduled scanning has never run; this script is not
-            // in any crontab and nothing invokes it.
-            //
-            // The table it reads (firewall_ai_settings, with auto_scan_enabled
-            // and next_scan_at) is real and carries rows, so the feature is
-            // unfinished rather than abandoned. Failing loudly here is honest;
-            // calling a function that does not exist was not.
-            fwrite(STDERR,
-                "Scheduled AI scanning is not implemented.\n" .
-                "This script calls performAIScan(), which does not exist. Wiring it to\n" .
-                "performAIAnalysis() in api/ai_scan.php needs the AI settings, the\n" .
-                "firewall configuration and the log data assembled first.\n");
-            exit(1);
+            // $fw is the firewall_ai_settings row; $firewall is the firewalls
+            // row fetched above. The schedule lives on the former.
+            $scan_type = $fw['scan_type'] ?? 'config_only';
+            $result = opnmgr_run_ai_scan((int) $firewall_id, $scan_type, $provider ?: null);
+
+            $scan_result = [
+                'success'   => (bool) ($result['success'] ?? false),
+                'error'     => $result['error'] ?? '',
+                'report_id' => $result['data']['report_id'] ?? null,
+            ];
 
             if ($scan_result['success']) {
                 log_message("SUCCESS: AI scan completed for $hostname (Report ID: {$scan_result['report_id']})");

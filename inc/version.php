@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'An Include That Only Worked From One Directory'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Scheduled Scans Actually Scan'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.71.0',
+            'date' => '2026-09-18',
+            'type' => 'minor',
+            'title' => 'Scheduled Scans Actually Scan',
+            'changes' => [
+                'FIXED: Scheduled AI scanning had never run once. The toggle saved, the schedule was stored, and four separate faults each independently prevented a scan: the scheduler called performAIScan(), a function that has never existed; api/ai_scan.php ran its entire body on include, so reaching its functions meant running a scan with no firewall id and exiting; that file resolved one include against the working directory and so died immediately under the CLI; and the cron entry ran as an account that cannot read /etc/opnmgr/keys/*, which are www-data 0600',
+                'CHANGED: A scan is now opnmgr_run_ai_scan(), called by both the web endpoint and the scheduler, so a scheduled scan and a manual one cannot drift apart. The web entry point is guarded by PHP_SAPI so including the file never runs a scan or sends headers',
+                'FIXED: The cron entry moved from the administrator account to www-data, the account that owns the SSH keys. It failed on "Load key: Permission denied" before the scan could start',
+                'FIXED: The scheduler logged to /var/log/opnsense_auto_scans.log, which the service account cannot write, so every file write failed silently while the echo went to the cron redirect. It logs under /var/log/opnmgr with the rest of the jobs',
+                'FIXED: The scan type was read from the firewalls row rather than the firewall_ai_settings row that holds the schedule',
+                'ADDED: scripts/deploy.sh, carrying the exclusions that were previously retyped by hand. logs/ is among them - without it each deploy overwrote production log files with stale copies from the working tree',
+                'VERIFIED: A scheduled run completed against a firewall configured for config_with_logs - report 45, 24,117 tokens, next scan advanced to the following week',
+            ],
+        ],
         [
             'version' => '3.70.2',
             'date' => '2026-09-18',

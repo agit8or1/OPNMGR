@@ -7,31 +7,29 @@
 require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../inc/ai_redaction.php';
 
-header('Content-Type: application/json');
 require_once __DIR__ . '/../inc/agent_version.php';
 require_once __DIR__ . '/../inc/firewall_policy.php';
-
-
 require_once __DIR__ . '/../inc/secrets.php';
-if (!isLoggedIn()) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-    exit;
-}
 
-$response = ['success' => false, 'error' => ''];
+/**
+ * Run one scan and return its outcome.
+ *
+ * This was the body of the endpoint, executed on include. Including the file to
+ * reach fetchFirewallConfig() - which is what scripts/run_auto_scans.php needs -
+ * therefore ran a whole scan with no firewall id, sent headers, and exited. So
+ * scheduled scanning could not be built on it, and was not: the script called a
+ * performAIScan() that has never existed.
+ *
+ * It is a function now, called by the endpoint below and by the scheduler, so
+ * the two cannot drift apart.
+ *
+ * `http_code` is advisory for the web caller and ignored elsewhere.
+ */
+function opnmgr_run_ai_scan(int $firewall_id, string $scan_type = 'config_only', ?string $provider = null): array
+{
+    $response = ['success' => false, 'error' => '', 'http_code' => 200];
 
-try {
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (!isset($input['firewall_id'])) {
-        throw new Exception('Firewall ID is required');
-    }
-    
-    $firewall_id = (int)$input['firewall_id'];
-    $scan_type = $input['scan_type'] ?? 'config_only';
-    $provider = $input['provider'] ?? null;
-    
+    try {
     // Get firewall details
     $stmt = db()->prepare("SELECT * FROM firewalls WHERE id = ?");
     $stmt->execute([$firewall_id]);
@@ -70,17 +68,14 @@ try {
     // product depends on it: configuration search, security checks, health,
     // updates, drift, alerting and backups all work without it.
     if (!ai_enabled()) {
-        http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            // Naming the page is not enough when the page is not in the menu:
-            // "Enable it in AI Settings" was answered with "where?". The path
-            // is the answer.
-            'error'   => 'AI analysis is disabled. Enable it at Settings > AI Analysis (/ai_settings.php), '
-                       . 'after reviewing what is transmitted to the provider.',
-            'settings_url' => '/ai_settings.php',
-        ]);
-        exit;
+        // Naming the page is not enough when the page is not in the menu:
+        // "Enable it in AI Settings" was answered with "where?". The path is
+        // the answer.
+        $response['http_code'] = 403;
+        $response['error'] = 'AI analysis is disabled. Enable it at Settings > AI Analysis (/ai_settings.php), '
+                           . 'after reviewing what is transmitted to the provider.';
+        $response['settings_url'] = '/ai_settings.php';
+        return $response;
     }
 
     $config_data = fetchFirewallConfig($firewall);
@@ -268,18 +263,51 @@ try {
         'scan_duration' => $scan_duration
     ];
     
-} catch (Exception $e) {
-    $response['error'] = 'Internal server error';
-    $error_msg = "AI Scan Error: " . $e->getMessage();
-    error_log($error_msg);
+    } catch (Exception $e) {
+        $response['error'] = 'Internal server error';
+        $error_msg = "AI Scan Error: " . $e->getMessage();
+        error_log($error_msg);
 
-    // Also write to dedicated AI scan log for easier debugging
-    $log_file = '/var/log/opnmgr_ai_scan.log';
-    $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($log_file, "[$timestamp] $error_msg\n", FILE_APPEND);
+        // Also write to dedicated AI scan log for easier debugging
+        $log_file = '/var/log/opnmgr_ai_scan.log';
+        $timestamp = date('Y-m-d H:i:s');
+        file_put_contents($log_file, "[$timestamp] $error_msg\n", FILE_APPEND);
+    }
+
+    return $response;
 }
 
-echo json_encode($response);
+// Web entry point. Guarded so the file can be included from the CLI for its
+// functions without running a scan or sending headers.
+if (PHP_SAPI !== 'cli') {
+    header('Content-Type: application/json');
+
+    if (!isLoggedIn()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+        exit;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (!isset($input['firewall_id'])) {
+        echo json_encode(['success' => false, 'error' => 'Firewall ID is required']);
+        exit;
+    }
+
+    $result = opnmgr_run_ai_scan(
+        (int) $input['firewall_id'],
+        $input['scan_type'] ?? 'config_only',
+        $input['provider'] ?? null
+    );
+
+    $code = $result['http_code'] ?? 200;
+    unset($result['http_code']);
+    if ($code !== 200) {
+        http_response_code($code);
+    }
+    echo json_encode($result);
+}
 
 /**
  * Fetch firewall configuration via SSH
