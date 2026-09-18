@@ -157,5 +157,77 @@ check('the blanket prohibition is gone',
     !str_contains($scan, 'NEVER FLAG NAT RULES'),
     'it covered the exposure of management interfaces too');
 
+// --- an exemption with a condition must not be written as absolute ------------
+//
+// "ABSOLUTE PROHIBITION - DO NOT CREATE FINDINGS FOR" headed a list whose
+// entries carried conditions: "SSH root login ... THIS IS SECURE when SSH rules
+// restrict source IPs". The heading is unconditional and the entry is not, and
+// the heading won - root login was suppressed whether or not the condition held.
+// The condition was also unverifiable until the rule digest existed, since the
+// model saw an empty <filter/>. A firewall with permitrootlogin=1 and port 22
+// open to any source scanned clean on the most dangerous combination there is.
+
+check('the heading no longer claims to be absolute',
+    !str_contains($scan, 'ABSOLUTE PROHIBITION'),
+    'an unconditional heading over conditional entries is the defect');
+check('the exemptions are named conditional',
+    str_contains($scan, 'CONDITIONAL EXEMPTIONS'));
+check('the condition must be verified rather than assumed',
+    str_contains($scan, 'Verify each condition against the rule table above; do not assume it'));
+check('root login is a finding when SSH is open to any source',
+    str_contains($scan, 'root login IS a finding - report it as CRITICAL'),
+    'this is the case the old wording silenced');
+check('an unsettled condition is stated rather than resolved in favour of the exemption',
+    str_contains($scan, 'say so in the finding rather than assuming the exemption'));
+check('what is NOT exempt is stated outside the exemption list',
+    (bool) preg_match('/NOT exempt, and to be judged on their own merits[\s\S]{0,200}passwordauth/', $scan),
+    'an entry inside an exemption list saying "this is not exempt" reads as one');
+check('password authentication is called out',
+    str_contains($scan, 'SSH password authentication'));
+
+// --- a citation must be readable ---------------------------------------------
+//
+// affected_rules came back accurate and unreadable: pasted XML fragments and
+// lines repeating the column headings of the rule table the model was given.
+
+check('a citation format is specified',
+    str_contains($scan, '<interface> | <action> <proto> <source> -> <destination>:<port>'));
+check('XML fragments are explicitly refused',
+    str_contains($scan, 'Do NOT paste XML fragments'));
+check('citations are bounded',
+    str_contains($scan, 'Cite at most 4 entries per finding'),
+    'a finding citing twenty rules establishes nothing');
+
+$fmt = ai_format_affected_rules(
+    "\u{2022} \"SOURCE INTERFACE ACTION PROTO FROM any TO (self) PORT 443 DESCRIPTION HTTPS Allow\"\n"
+    . "\u{2022} \"<rule><interface>wan</interface><destination_port>443</destination_port></rule>\"\n"
+    . "wan | pass TCP any -> (self):443 | HTTPS Allow\n"
+    . "N/A\n");
+
+check('each citation becomes one entry', count($fmt) === 3,
+    'N/A is not a citation and is dropped');
+check('bullets and quoting are stripped',
+    !str_contains($fmt[0]['text'], '"') && !str_contains($fmt[0]['text'], "\u{2022}"));
+check('repeated column headings are removed',
+    !str_contains($fmt[0]['text'], 'INTERFACE') && str_contains($fmt[0]['text'], 'HTTPS Allow'),
+    'the model echoed the table header back as if it were data');
+check('an XML fragment is reduced to its fields rather than dropped',
+    str_contains($fmt[1]['text'], 'interface=wan') && $fmt[1]['parsed'],
+    'a citation that cannot be parsed is still evidence; hiding it would make an old report look unsupported');
+check('a citation already in the requested shape is left alone',
+    $fmt[2]['text'] === 'wan | pass TCP any -> (self):443 | HTTPS Allow');
+check('reports stored before the format change still render',
+    ai_format_affected_rules('<webgui><protocol>https</protocol></webgui>')[0]['text'] === 'protocol=https');
+
+// --- a report opens where you are --------------------------------------------
+
+$details = (string) @file_get_contents($root . '/firewall_details.php');
+check('finishing a scan navigates in place',
+    str_contains($details, "window.location.href = `/ai_reports.php?report_id=\${data.report_id}`"),
+    'a popup blocker swallowing window.open made a finished scan look like it had done nothing');
+check('no AI report is opened in a new tab',
+    !preg_match('/ai_reports\.php[^`\'"]*`?[^>]{0,80}target="_blank"/', $details)
+    && !str_contains($details, "window.open(`/ai_reports.php"));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

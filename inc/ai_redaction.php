@@ -391,3 +391,54 @@ if (!function_exists('ai_prepare_config')) {
                 'summary' => $summary, 'redacted' => $result['redacted']];
     }
 }
+
+/**
+ * Render a finding's cited rules.
+ *
+ * The model returned accurate citations in an unreadable shape: pasted XML
+ * fragments, and lines repeating the column headings of the rule table it was
+ * given. The prompt now asks for
+ *
+ *     wan | pass TCP any -> (self):443 | HTTPS Allow
+ *
+ * but reports already stored hold the old shape, so this normalises both. XML
+ * fragments are reduced to their meaningful attributes rather than dropped -
+ * a citation that cannot be parsed is still evidence, and hiding it would make
+ * an old report look like it cited nothing.
+ */
+function ai_format_affected_rules(string $raw): array
+{
+    $out = [];
+    foreach (preg_split('/\r?\n/', $raw) as $line) {
+        $line = trim($line);
+        $line = ltrim($line, "•-* \t");
+        $line = trim($line, " \"'");
+        if ($line === '' || strcasecmp($line, 'N/A') === 0) { continue; }
+
+        // An XML fragment: keep the fields that identify the rule.
+        if (str_starts_with($line, '<')) {
+            $fields = [];
+            if (preg_match_all('/<([a-z_]+)>([^<]{1,60})<\/\1>/i', $line, $m, PREG_SET_ORDER)) {
+                $keep = ['interface', 'source_net', 'destination_net', 'destination_port',
+                         'description', 'descr', 'protocol', 'action', 'target', 'port',
+                         'network', 'protocol', 'enabled'];
+                foreach ($m as $hit) {
+                    if (in_array(strtolower($hit[1]), $keep, true)) {
+                        $fields[] = $hit[1] . '=' . $hit[2];
+                    }
+                }
+            }
+            $out[] = ['text' => $fields ? implode('  ', $fields) : $line, 'parsed' => (bool) $fields];
+            continue;
+        }
+
+        // A headerless dump of the rule table's columns.
+        if (stripos($line, 'SOURCE') === 0 && stripos($line, 'INTERFACE') !== false) {
+            $line = preg_replace('/\b(SOURCE|INTERFACE|ACTION|PROTO|FROM|TO|PORT|ON|DESCRIPTION)\b\s*/', '', $line);
+            $line = trim(preg_replace('/\s{2,}/', ' ', $line));
+        }
+
+        $out[] = ['text' => $line, 'parsed' => true];
+    }
+    return $out;
+}

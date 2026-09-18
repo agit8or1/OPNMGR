@@ -435,10 +435,27 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "CRITICAL SECURITY ANALYSIS RULES - READ FIRST:\n";
     $prompt .= "==========================================================\n\n";
 
-    $prompt .= "**ABSOLUTE PROHIBITION - DO NOT CREATE FINDINGS FOR**:\n";
-    $prompt .= "1. SSH root login when configuration shows <permitrootlogin>1</permitrootlogin> - THIS IS SECURE when SSH rules restrict source IPs\n";
+    // "ABSOLUTE PROHIBITION" over a list whose entries carry conditions is the
+    // defect itself: the heading is unconditional, the entries are not, and the
+    // heading wins.
+    $prompt .= "**CONDITIONAL EXEMPTIONS - do not create findings for the following, PROVIDED the stated condition holds. Verify each condition against the rule table above; do not assume it.**:\n";
+    // Items 1 and 3 each stated a condition - "when SSH rules restrict source
+    // IPs" - under a heading reading ABSOLUTE PROHIBITION. The heading won: root
+    // login was suppressed whether or not the condition held. The condition was
+    // also unverifiable until the rule digest existed, because the model saw an
+    // empty <filter/> and had no rules to check against, so it assumed the
+    // exemption applied. A firewall with permitrootlogin=1 AND port 22 open to
+    // any source therefore scanned clean on the most dangerous combination there
+    // is - the same inversion as the false-positive patterns that once matched
+    // "SSH is unrestricted" and deleted it.
+    //
+    // Item 3 was item 1 restated, which added emphasis without adding meaning.
+    $prompt .= "1. SSH root login (<permitrootlogin>1</permitrootlogin>) ONLY when the rule table above shows SSH reachable solely from specific source addresses. "
+             . "This exemption is conditional and you must verify it against that table. "
+             . "If any enabled pass rule allows port 22 from \"any\" to (self), root login IS a finding - report it as CRITICAL and cite the rule. "
+             . "If the rule table does not settle the question, say so in the finding rather than assuming the exemption.\n";
     $prompt .= "2. SSH access restricted to specific source IP addresses - THIS IS EXCELLENT SECURITY\n";
-    $prompt .= "3. Root login over SSH when firewall rules limit SSH to management IPs - THIS IS INDUSTRY BEST PRACTICE\n";
+    $prompt .= "3. Root login over SSH when the rule table shows SSH limited to management addresses - this is the same condition as 1, verified the same way\n";
     // "DO NOT MENTION LOGS AT ALL" sat directly above a section that sends log
     // excerpts and asks for threats found in them. The model was told both to
     // analyse the logs and to say nothing about them.
@@ -452,6 +469,12 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "6. Ordinary service NAT port forwards (web, mail, media, game servers) - these are intentional publishing, do not flag them. "
              . "DO flag a forward or rule that exposes an ADMINISTRATIVE or MANAGEMENT interface to an unrestricted source: "
              . "firewall or router GUIs, Proxmox, Webmin, cPanel, IPMI/iDRAC/iLO, database admin panels, or remote-access daemons.\n\n";
+
+    // Stated after the list, not inside it: an entry in an exemption list that
+    // says "this is not exempt" reads as an exemption to anything skimming.
+    $prompt .= "\nNOT exempt, and to be judged on their own merits: SSH password authentication "
+             . "(<passwordauth>1</passwordauth>), management interfaces reachable from unrestricted sources, "
+             . "and any rule whose source is \"any\" and whose destination is (self).\n\n";
 
     $prompt .= "**SECURE CONFIGURATION EXAMPLE**:\n";
     $prompt .= "If you see <permitrootlogin>1</permitrootlogin> AND firewall rules showing SSH restricted to specific IPs:\n";
@@ -661,6 +684,15 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "\n**IMPORTANT**: Return ONLY raw JSON (no markdown, no code blocks, no formatting).\n";
     $prompt .= "Format response as JSON with keys: grade, score, risk_level, summary, concerns, recommendations, improvements, findings\n";
     $prompt .= "Each finding should have: source (either 'config' or 'logs'), category, severity, title, description, recommendation, affected_rules\n";
+    // affected_rules came back as pasted XML fragments and headerless column
+    // dumps - accurate, and unreadable. What is wanted is a citation: which rule,
+    // on which interface, from where, to what. One short line each.
+    $prompt .= "affected_rules must be an array of SHORT citation strings, one per rule or setting, each on the pattern:\n";
+    $prompt .= "    <interface> | <action> <proto> <source> -> <destination>:<port> | <description>\n";
+    $prompt .= "  for example:  wan | pass TCP any -> (self):443 | HTTPS Allow\n";
+    $prompt .= "  or, for a setting rather than a rule:  system | webgui protocol=https port=443\n";
+    $prompt .= "Do NOT paste XML fragments, and do NOT repeat the column headings from the rule table. "
+             . "Cite at most 4 entries per finding - the ones that actually establish it.\n";
     $prompt .= "IMPORTANT: Tag each finding with 'source':\n";
     $prompt .= "- Use 'config' for findings from firewall configuration analysis (rules, settings, etc.)\n";
     $prompt .= "- Use 'logs' for findings from log file analysis (threats, suspicious activity, attacks)";

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/inc/ai_redaction.php';
 // AI Security Reports
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
@@ -605,12 +606,19 @@ $stats = db()->query("
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($finding['affected_rules']): ?>
-                                    <div style="margin-top: 12px; padding: 10px; background: #1a1d23; border-left: 3px solid #ff5555; border-radius: 4px;">
-                                        <strong style="color: #ff5555;">Affected Rules/Configuration:</strong><br>
-                                        <div style="font-family: 'Courier New', monospace; font-size: 12px; margin-top: 8px; color: #e0e0e0;">
-                                            <?= nl2br(htmlspecialchars($finding['affected_rules'])) ?>
+                                    <?php $cited = ai_format_affected_rules((string) $finding['affected_rules']); ?>
+                                    <?php if ($cited): ?>
+                                        <div style="margin-top: 12px; padding: 10px 12px; background: #1a1d23; border-left: 3px solid #ff5555; border-radius: 4px;">
+                                            <strong style="color: #ff5555;">Affected rules and settings</strong>
+                                            <ul style="margin: 8px 0 0 0; padding-left: 18px; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; color: #e0e0e0; line-height: 1.7;">
+                                                <?php foreach ($cited as $c): ?>
+                                                    <li style="margin-bottom: 2px;<?= $c['parsed'] ? '' : 'color:#95a5a6;word-break:break-all;' ?>">
+                                                        <?= htmlspecialchars($c['text']) ?>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
                                         </div>
-                                    </div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -645,12 +653,19 @@ $stats = db()->query("
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($finding['affected_rules']): ?>
-                                    <div style="margin-top: 12px; padding: 10px; background: #1a1d23; border-left: 3px solid #ff5555; border-radius: 4px;">
-                                        <strong style="color: #ff5555;">Affected Rules/Configuration:</strong><br>
-                                        <div style="font-family: 'Courier New', monospace; font-size: 12px; margin-top: 8px; color: #e0e0e0;">
-                                            <?= nl2br(htmlspecialchars($finding['affected_rules'])) ?>
+                                    <?php $cited = ai_format_affected_rules((string) $finding['affected_rules']); ?>
+                                    <?php if ($cited): ?>
+                                        <div style="margin-top: 12px; padding: 10px 12px; background: #1a1d23; border-left: 3px solid #ff5555; border-radius: 4px;">
+                                            <strong style="color: #ff5555;">Affected rules and settings</strong>
+                                            <ul style="margin: 8px 0 0 0; padding-left: 18px; font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; color: #e0e0e0; line-height: 1.7;">
+                                                <?php foreach ($cited as $c): ?>
+                                                    <li style="margin-bottom: 2px;<?= $c['parsed'] ? '' : 'color:#95a5a6;word-break:break-all;' ?>">
+                                                        <?= htmlspecialchars($c['text']) ?>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
                                         </div>
-                                    </div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>

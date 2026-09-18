@@ -1592,9 +1592,11 @@ function runManualScan() {
             loadAISettings();
             loadRecentReports();
             
-            // Show report in modal or redirect
+            // Navigate in place. A scan finishing is not a reason to take over a
+            // second tab, and a popup blocker silently swallowing window.open
+            // made a completed scan look like it had gone nowhere.
             if (data.report_id) {
-                window.open(`/ai_reports.php?report_id=${data.report_id}`, '_blank');
+                window.location.href = `/ai_reports.php?report_id=${data.report_id}`;
             }
         } else {
             showToast('Error running AI scan: ' + (data.error || 'Unknown error'), 'danger');
@@ -1643,7 +1645,7 @@ function loadRecentReports() {
                         <td><span class="badge bg-${riskClass}">${report.risk_level || 'unknown'}</span></td>
                         <td>${report.finding_count || 0} findings</td>
                         <td class="text-end">
-                            <a href="/ai_reports.php?report_id=${report.id}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <a href="/ai_reports.php?report_id=${report.id}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-eye"></i> View
                             </a>
                             <button onclick="deleteReport(${report.id}, event)" class="btn btn-sm btn-outline-danger ms-1">

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-17'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Rules Are Not Where The Name Says'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Conditional Exemptions, Readable Citations'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.70.1',
+            'date' => '2026-09-17',
+            'type' => 'patch',
+            'title' => 'Conditional Exemptions, Readable Citations',
+            'changes' => [
+                'FIXED: "ABSOLUTE PROHIBITION - DO NOT CREATE FINDINGS FOR" headed a list whose entries carried conditions - "SSH root login ... THIS IS SECURE when SSH rules restrict source IPs". The heading was unconditional and the entries were not, and the heading won: root login was suppressed whether or not the condition held. Until the rule digest existed the condition could not even be checked, so it was simply assumed. A firewall with permitrootlogin=1 and port 22 open to any source scanned clean on the most dangerous combination there is',
+                'CHANGED: The list is now headed CONDITIONAL EXEMPTIONS, each condition must be verified against the rule table, an unsettled condition is stated in the finding rather than resolved in favour of the exemption, and root login with SSH open to any source is explicitly a CRITICAL finding. Item 3 was item 1 restated and has been replaced',
+                'FIXED: SSH password authentication was drifting in and out of reports because it sat adjacent to the root-login exemptions without being covered by them. What is NOT exempt is now stated outside the exemption list',
+                'FIXED: affected_rules came back accurate and unreadable - pasted XML fragments and lines echoing back the column headings of the rule table. The prompt now specifies a one-line citation format, refuses XML, and caps citations at four per finding',
+                'ADDED: ai_format_affected_rules() normalises citations for display, including those already stored in the old shape. An XML fragment is reduced to its identifying fields rather than hidden, so an existing report does not come to look unsupported',
+                'FIXED: Viewing an AI report no longer opens a new tab, from either the View button or the redirect after a scan completes. A popup blocker swallowing window.open made a finished scan look like it had done nothing',
+            ],
+        ],
         [
             'version' => '3.70.0',
             'date' => '2026-09-17',
