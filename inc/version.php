@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-18'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Agent 1.7.0, Published And Held'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Alerts You Can Choose'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.73.0',
+            'date' => '2026-09-20',
+            'type' => 'minor',
+            'title' => 'Alerts You Can Choose',
+            'changes' => [
+                'ADDED: Alert policy, configurable per firewall and per object. Below firewalls.alerts_enabled there was nothing: either every condition for every object, or silence. A tunnel that is down by design could only be quietened by muting the whole firewall, which hid everything that mattered along with it',
+                'ADDED: Each of the nineteen conditions can be set to Alert, Muted or Inherit on a firewall, and the object-scoped ones - VPN tunnels, services, gateways, certificates - can be muted individually. A tunnel is listed under the exact key the evaluator raises it by, so a policy cannot be written against a name that never matches',
+                'ADDED: Two conditions that did not exist. speedtest.slow alerts when the most recent speed test is below a threshold, and latency.high when latency averaged over the sustained window is above one. Both are opt-in and silent until a threshold is set for that firewall: "slow" and "high" are site-specific, and a global default would either never fire or fire constantly',
+                'ADDED: Thresholds are per scope as well. A branch circuit and a datacentre circuit are not slow at the same number',
+                'FIXED: Muting a condition now closes the incidents it has already opened. Left alone, a muted condition would keep its incident open forever - nothing re-raises it, so nothing resolves it, and it counts against the notification repeat limit indefinitely',
+                'CHANGED: Policy is enforced inside raise(), the one point every condition passes through, so a condition added later cannot forget to honour it. A test asserts every raisable condition appears in the catalogue the UI is built from',
+                'NOTE: Absence of a policy row means alert, exactly as before, so this release changes no alerting behaviour until someone uses it',
+            ],
+        ],
         [
             'version' => '3.72.1',
             'date' => '2026-09-18',

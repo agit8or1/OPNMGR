@@ -34,11 +34,13 @@ require_once __DIR__ . '/../inc/maintenance.php';
 require_once __DIR__ . '/../inc/firewall_health.php';
 require_once __DIR__ . '/../inc/alerts.php';
 require_once __DIR__ . '/../inc/config_restore.php';
+require_once __DIR__ . '/../inc/alert_policy.php';
 
 $dryRun  = in_array('--dry-run', $argv, true);
 $verbose = in_array('--verbose', $argv, true) || $dryRun;
 
 $raised = 0;
+$suppressed = 0;   // conditions a policy declined to raise
 $resolved = 0;
 
 function say(string $msg): void {
@@ -50,7 +52,27 @@ function say(string $msg): void {
 
 /** Raise unless this is a dry run. */
 function raise(string $type, array $opts): void {
-    global $dryRun, $raised;
+    global $dryRun, $raised, $suppressed;
+
+    // Policy is enforced here rather than at each condition, because this is the
+    // one place every condition passes through and a new condition therefore
+    // cannot forget to honour it.
+    $fwId = isset($opts['firewall_id']) ? (int) $opts['firewall_id'] : null;
+    $key  = $opts['object_key'] ?? null;
+
+    if (!alert_policy_allows($type, $fwId, $key)) {
+        $suppressed++;
+        say(sprintf('MUTED  %-22s fw=%s %s', $type, $fwId ?? '-', $key ?? ''));
+        // Muting must also close what is already open. Otherwise silencing a
+        // condition leaves its incident open forever: nothing re-raises it, so
+        // nothing resolves it, and it sits in the open count and against the
+        // notification repeat limit for good.
+        if (!$dryRun && $fwId !== null) {
+            resolve($type, $fwId, $key, 'muted by alert policy');
+        }
+        return;
+    }
+
     $raised++;
     say(sprintf('RAISE  %-22s fw=%s %s', $type, $opts['firewall_id'] ?? '-', $opts['title'] ?? ''));
     if (!$dryRun) {
@@ -310,6 +332,72 @@ foreach ($firewalls as $fw) {
     $stats->execute([$id, $sustained]);
     $s = $stats->fetch(PDO::FETCH_ASSOC);
 
+    // --- circuit quality: slow speed tests and sustained latency ---------------
+    //
+    // Both stay silent until someone sets a threshold for this firewall: see
+    // alert_policy_is_opt_in(). Neither has a defensible global default.
+
+    $slowLimit = alert_policy_opt_in_threshold('speedtest.slow', $id);
+    if ($slowLimit !== null) {
+        // Only a recent test says anything about the circuit now. This
+        // installation's speedtest data stopped in December and an average taken
+        // over all of it would be reporting on a circuit as it was nine months
+        // ago.
+        $st = db()->prepare(
+            'SELECT download_mbps, upload_mbps, test_date
+               FROM firewall_speedtest
+              WHERE firewall_id = ? AND test_date >= (NOW() - INTERVAL 7 DAY)
+              ORDER BY test_date DESC LIMIT 1'
+        );
+        $st->execute([$id]);
+        $test = $st->fetch(PDO::FETCH_ASSOC);
+
+        if (!$test) {
+            // No recent test is not a slow circuit. Saying nothing is correct;
+            // an alert here would be about the collector, not the link.
+            resolve('speedtest.slow', $id, null, 'no speed test in the last 7 days');
+        } elseif ((float) $test['download_mbps'] < $slowLimit) {
+            raise('speedtest.slow', [
+                'firewall_id' => $id,
+                'severity' => 'warning',
+                'title'  => sprintf('%s measured %.0f Mbit/s down, below %.0f',
+                                    $host, (float) $test['download_mbps'], $slowLimit),
+                'detail' => sprintf('Up %.0f Mbit/s, tested %s.',
+                                    (float) $test['upload_mbps'], $test['test_date']),
+            ]);
+        } else {
+            resolve('speedtest.slow', $id, null, 'speed back above threshold');
+        }
+    }
+
+    $latencyLimit = alert_policy_opt_in_threshold('latency.high', $id);
+    if ($latencyLimit !== null) {
+        // Averaged, for the same reason CPU and memory are: one spike during a
+        // backup is not an incident. A circuit is bad when it is bad for a while.
+        $lat = db()->prepare(
+            'SELECT AVG(latency_ms) AS avg_ms, MAX(latency_ms) AS max_ms, COUNT(*) AS samples
+               FROM firewall_latency
+              WHERE firewall_id = ? AND measured_at >= (NOW() - INTERVAL ? MINUTE)'
+        );
+        $lat->execute([$id, $sustained]);
+        $l = $lat->fetch(PDO::FETCH_ASSOC);
+
+        if ($l && (int) $l['samples'] >= 3) {
+            if ((float) $l['avg_ms'] >= $latencyLimit) {
+                raise('latency.high', [
+                    'firewall_id' => $id,
+                    'severity' => 'warning',
+                    'title'  => sprintf('%s averaged %.0f ms over %d minutes, above %.0f',
+                                        $host, (float) $l['avg_ms'], $sustained, $latencyLimit),
+                    'detail' => sprintf('Peak %.0f ms across %d samples.',
+                                        (float) $l['max_ms'], (int) $l['samples']),
+                ]);
+            } else {
+                resolve('latency.high', $id, null, 'latency back below threshold');
+            }
+        }
+    }
+
     if ($s && (int)$s['samples'] >= 2) {
         foreach ([
             ['memory.high', (float)$s['mem'],  $memLimit,  'Memory'],
@@ -479,7 +567,9 @@ if (!$dryRun) {
     }
 }
 
-say(sprintf('Detection complete: %d raised/updated, %d resolved', $raised, $resolved));
+say(sprintf('Detection complete: %d raised/updated, %d resolved%s',
+    $raised, $resolved,
+    $suppressed > 0 ? sprintf(', %d muted by policy', $suppressed) : ''));
 
 // ---------------------------------------------------------------------------
 // Notification pass

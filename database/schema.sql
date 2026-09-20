@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.69.6.
+-- Generated from the reference installation for OPNManager v3.72.1.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -244,6 +244,23 @@ CREATE TABLE IF NOT EXISTS `alert_notifications` (
   UNIQUE KEY `notification_name` (`notification_name`),
   KEY `idx_enabled` (`enabled`),
   KEY `idx_type` (`notification_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `alert_policies` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `alert_type` varchar(50) NOT NULL,
+  `firewall_id` int(11) NOT NULL DEFAULT 0,
+  `object_key` varchar(191) NOT NULL DEFAULT '',
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `threshold` varchar(50) DEFAULT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_scope` (`alert_type`,`firewall_id`,`object_key`),
+  KEY `idx_lookup` (`alert_type`,`firewall_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

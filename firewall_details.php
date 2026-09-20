@@ -8,6 +8,7 @@ header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/security_posture.php';
 require_once __DIR__ . '/inc/agent_version.php';
+require_once __DIR__ . '/inc/alert_policy.php';
 requireLogin();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -125,6 +126,62 @@ if (isset($_GET['updated']) && $_GET['updated'] == '1') {
                  . htmlspecialchars(substr($warn, 9)) . '. No rules were changed.';
     } elseif ($warn === 'queue_failed') {
         $notice .= ' Web GUI restriction could not be queued; no rules were changed.';
+    }
+}
+
+// Handle alert policy updates
+//
+// "Inherit" deletes the row rather than storing a third state, so a scope that
+// is not overridden has no row at all and the resolution order stays a simple
+// most-specific-wins lookup. A per-object mute is only ever a mute: ticking a
+// tunnel cannot turn an alert on that the firewall or the global policy has
+// switched off, which keeps the specific-beats-general rule from becoming a way
+// to accidentally re-enable something deliberately silenced elsewhere.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_alert_policy'])) {
+    if (!csrf_verify($_POST['csrf_token'] ?? '')) {
+        $notice = 'CSRF verification failed.';
+    } elseif (!can('settings.manage')) {
+        $notice = 'You do not have permission to change alert policy.';
+    } else {
+        $catalogue = alert_policy_catalogue();
+        $changed = 0;
+        foreach (($_POST['policy'] ?? []) as $type => $cfg) {
+            if (!isset($catalogue[$type])) { continue; }   // not a condition we raise
+
+            $state = $cfg['state'] ?? 'inherit';
+            $threshold = trim((string)($cfg['threshold'] ?? ''));
+            if ($threshold !== '' && !is_numeric($threshold)) { $threshold = ''; }
+
+            if ($state === 'inherit' && $threshold === '') {
+                alert_policy_clear($type, $id, null);
+            } else {
+                alert_policy_set($type, $id, null,
+                                 $state !== 'off',
+                                 $threshold === '' ? null : $threshold);
+            }
+            $changed++;
+
+            if (($catalogue[$type]['scope'] ?? '') === 'object') {
+                $muted = array_map('strval', (array)($cfg['mute'] ?? []));
+                foreach (alert_policy_objects($type, $id) as $obj) {
+                    if (in_array((string)$obj['k'], $muted, true)) {
+                        alert_policy_set($type, $id, (string)$obj['k'], false, null, 'muted individually');
+                    } else {
+                        alert_policy_clear($type, $id, (string)$obj['k']);
+                    }
+                }
+            }
+        }
+        alert_policy_flush_cache();
+        $notice = sprintf('Alert policy saved (%d condition%s).', $changed, $changed === 1 ? '' : 's');
+        if (function_exists('audit_log')) {
+            audit_log('alert.policy.updated', [
+                'object_type' => 'firewall',
+                'object_id'   => (string)$id,
+                'firewall_id' => $id,
+                'message'     => 'Alert policy updated',
+            ]);
+        }
     }
 }
 
@@ -315,6 +372,11 @@ include __DIR__ . '/inc/header.php';
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab">
                                 <i class="fas fa-lock me-2"></i>Security
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alertpolicy" type="button" role="tab">
+                                <i class="fas fa-bell me-2"></i>Alerts
                             </button>
                         </li>
                     
@@ -3776,6 +3838,133 @@ initializeSSHKeys();
                         </div>
                     </div><!-- End Security Tab -->
                     
+                        <!-- Alerts Tab -->
+                        <?php
+                        // Which conditions this firewall may raise, and for which
+                        // objects. Below firewalls.alerts_enabled there was nothing
+                        // between "every alert" and "none", so a single tunnel that
+                        // is down by design could only be silenced by muting the
+                        // firewall - taking everything that mattered with it.
+                        $ap_catalogue = alert_policy_catalogue();
+                        $ap_rows = [];
+                        foreach (alert_policy_for_firewall($id) as $r) {
+                            $ap_rows[$r['alert_type'] . '|' . (int)$r['firewall_id'] . '|' . $r['object_key']] = $r;
+                        }
+                        $ap_state = function (string $type, string $obj = '') use ($ap_rows, $id): array {
+                            foreach ([
+                                [$id, $obj],
+                                [$id, ''],
+                                [0, ''],
+                            ] as [$fw, $o]) {
+                                if ($obj === '' && $o !== '') { continue; }
+                                $k = "{$type}|{$fw}|{$o}";
+                                if (isset($ap_rows[$k])) {
+                                    return [
+                                        'set'     => ((int)$ap_rows[$k]['firewall_id'] === $id && $ap_rows[$k]['object_key'] === $obj),
+                                        'enabled' => (int)$ap_rows[$k]['enabled'] === 1,
+                                        'threshold' => $ap_rows[$k]['threshold'],
+                                        'note'    => $ap_rows[$k]['note'],
+                                        'from'    => (int)$ap_rows[$k]['firewall_id'] === 0 ? 'all firewalls' : 'this firewall',
+                                    ];
+                                }
+                            }
+                            return ['set' => false, 'enabled' => true, 'threshold' => null, 'note' => null, 'from' => 'default'];
+                        };
+                        ?>
+                        <div class="tab-pane fade" id="alertpolicy" role="tabpanel">
+                          <div class="card mb-3">
+                            <div class="card-body">
+                              <h5 class="card-title mb-1"><i class="fas fa-bell me-2"></i>Alert policy</h5>
+                              <p class="text-muted small mb-3">
+                                Conditions this firewall may raise. Unset means inherited &mdash; nothing here
+                                turns an alert on that was not already on, it only takes alerting away.
+                                <?php if ((int)($firewall['alerts_enabled'] ?? 1) !== 1): ?>
+                                  <br><span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>
+                                  Alerts are switched off for this firewall entirely, so none of the below applies.</span>
+                                <?php endif ?>
+                              </p>
+
+                              <form method="POST" id="alertPolicyForm">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+                                <input type="hidden" name="save_alert_policy" value="1">
+                                <table class="table table-sm align-middle">
+                                  <thead>
+                                    <tr>
+                                      <th style="width:34%">Condition</th>
+                                      <th style="width:16%">State</th>
+                                      <th style="width:16%">Threshold</th>
+                                      <th>Applies to</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                  <?php foreach ($ap_catalogue as $type => $meta):
+                                      $st = $ap_state($type);
+                                      $optIn = alert_policy_is_opt_in($type);
+                                  ?>
+                                    <tr>
+                                      <td>
+                                        <strong><?= htmlspecialchars($meta['label']) ?></strong>
+                                        <div class="text-muted small"><code><?= htmlspecialchars($type) ?></code>
+                                          <?php if ($optIn): ?>
+                                            <span class="badge bg-secondary ms-1" title="Silent until you set a threshold: there is no defensible global default">opt-in</span>
+                                          <?php endif ?>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <select name="policy[<?= htmlspecialchars($type) ?>][state]" class="form-select form-select-sm">
+                                          <option value="inherit" <?= $st['set'] ? '' : 'selected' ?>>Inherit<?= $st['set'] ? '' : ' (' . htmlspecialchars($st['from']) . ')' ?></option>
+                                          <option value="on"  <?= ($st['set'] && $st['enabled']) ? 'selected' : '' ?>>Alert</option>
+                                          <option value="off" <?= ($st['set'] && !$st['enabled']) ? 'selected' : '' ?>>Muted</option>
+                                        </select>
+                                      </td>
+                                      <td>
+                                        <?php if ($meta['threshold']): ?>
+                                          <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control"
+                                                   name="policy[<?= htmlspecialchars($type) ?>][threshold]"
+                                                   value="<?= htmlspecialchars((string)($st['set'] ? $st['threshold'] : '')) ?>"
+                                                   placeholder="<?= $optIn ? 'required' : 'inherit' ?>">
+                                            <span class="input-group-text"><?= htmlspecialchars($meta['threshold']) ?></span>
+                                          </div>
+                                        <?php else: ?>
+                                          <span class="text-muted small">&mdash;</span>
+                                        <?php endif ?>
+                                      </td>
+                                      <td>
+                                        <?php $objs = $meta['scope'] === 'object' ? alert_policy_objects($type, $id) : []; ?>
+                                        <?php if ($meta['scope'] !== 'object'): ?>
+                                          <span class="text-muted small">the firewall</span>
+                                        <?php elseif (!$objs): ?>
+                                          <span class="text-muted small">no objects reported yet</span>
+                                        <?php else: ?>
+                                          <div class="d-flex flex-wrap gap-2">
+                                          <?php foreach ($objs as $o):
+                                              $ost = $ap_state($type, $o['k']); ?>
+                                            <label class="border rounded px-2 py-1 small d-inline-flex align-items-center gap-1"
+                                                   title="Mute this one only">
+                                              <input type="checkbox"
+                                                     name="policy[<?= htmlspecialchars($type) ?>][mute][]"
+                                                     value="<?= htmlspecialchars($o['k']) ?>"
+                                                     <?= ($ost['set'] && !$ost['enabled']) ? 'checked' : '' ?>>
+                                              <span><?= htmlspecialchars($o['label']) ?></span>
+                                            </label>
+                                          <?php endforeach ?>
+                                          </div>
+                                          <div class="text-muted small mt-1">Ticked = muted for that object only.</div>
+                                        <?php endif ?>
+                                      </td>
+                                    </tr>
+                                  <?php endforeach ?>
+                                  </tbody>
+                                </table>
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                  <i class="fas fa-save me-2"></i>Save alert policy
+                                </button>
+                              </form>
+                            </div>
+                          </div>
+                        </div>
+
                     </div><!-- End tab-content -->
 
 <?php include __DIR__ . '/inc/footer.php'; ?>

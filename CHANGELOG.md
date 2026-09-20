@@ -6,6 +6,34 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.73.0
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **Alert policy, per firewall and per object.**
+
+  Below `firewalls.alerts_enabled` there was nothing: either every condition for
+  every object, or silence. A tunnel down by design could only be quietened by
+  muting the whole firewall, which hid everything that mattered with it.
+
+  Each condition can be set to Alert, Muted or Inherit on a firewall, and the
+  object-scoped ones - tunnels, services, gateways, certificates - muted
+  individually. Resolution is most-specific-first; no row means alert, exactly as
+  before, so nothing changes until someone uses it.
+
+- **`speedtest.slow` and `latency.high`**, both opt-in and silent until a
+  threshold is set for that firewall. "Slow" and "high" are site-specific; a
+  global default would either never fire or fire constantly.
+
+### Fixed
+
+- **Muting a condition now closes the incidents it already opened.** Otherwise a
+  muted condition keeps its incident open forever - nothing re-raises it, so
+  nothing resolves it, and it counts against the repeat limit indefinitely.
+
+---
+
 ## Version 3.72.1
 **Released**: September 18, 2026 | **Agent**: v1.7.0
 
