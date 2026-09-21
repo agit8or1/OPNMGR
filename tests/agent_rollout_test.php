@@ -87,8 +87,19 @@ check('inc/agent_rollout.php exists', $rollout !== '');
 check('the stage is compared against the published version',
     (bool)preg_match('/\$superseded\s*=\s*\(\$promoted\s*!==\s*\$published\)/', $rollout),
     'without this the flag is just a mode somebody forgets to reset');
+// The rule moved into agent_rollout_decide() so it could be exercised without
+// writing to the live settings - a test that flipped the real auto-promote
+// switch once promoted a release to the whole fleet for real. Assert the
+// behaviour rather than the shape of the line that implements it.
 check('a superseded stage degrades to held',
-    (bool)preg_match("/\\\$stage\s*=\s*\\\$superseded\s*\?\s*'held'/", $rollout));
+    (bool)preg_match("/'stage'\s*=>\s*\\\$superseded\s*\?\s*'held'/", $rollout));
+check('and does so in practice',
+    (function () {
+        require_once dirname(__DIR__) . '/inc/agent_rollout.php';
+        $d = agent_rollout_decide('9.9.9', '1.0.0', 'fleet', false);
+        return $d['stage'] === 'held' && $d['promote'] === false;
+    })(),
+    'a stage promoted for an older version must not carry over');
 check('an unknown stored stage degrades to held',
     (bool)preg_match("/in_array\(\\\$stored, AGENT_ROLLOUT_STAGES, true\)\) \{\s*\\\$stored = 'held'/", $rollout));
 check('the default stage is held', str_contains($rollout, "agent_rollout_setting('agent_rollout_stage', 'held')"));

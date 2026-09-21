@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Alerts You Can Choose'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A New Agent, Said Out Loud'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.74.0',
+            'date' => '2026-09-20',
+            'type' => 'minor',
+            'title' => 'A New Agent, Said Out Loud',
+            'changes' => [
+                'FIXED: The manager knew a newer agent existed and showed it nowhere. agent_rollout_state() and LATEST_AGENT_VERSION appeared only in agent_checkin.php, scripts/ and tests, so with 1.7.0 published and held the only way to find out was to run a CLI script - while the rollout header claimed "the manager still knows an update exists and still shows it". The fleet table now shows the pending version beside the running one, marked held when it is not being offered',
+                'ADDED: An Agent Updates card in Settings: published version, rollout stage, how many firewalls are behind it, and a switch for automatic updates. With it on, a newly published version goes to the whole fleet and each firewall installs it on its next check-in without being asked; off - the default - a new version is held until promoted by name',
+                'FIXED: inc/agent_rollout.php used db() without requiring bootstrap. Every settings read fell back to its default and every write failed silently into its own catch, which looks exactly like a gate that is working',
+                'CHANGED: The rollout decision is a pure function, agent_rollout_decide(), so it can be exercised without writing to live settings. The test that first covered auto-promotion switched the real setting on; agents check in every two minutes, one did so inside that window, and 1.7.0 was promoted to the fleet for real. A test must not be able to deploy software',
+                'DEPLOYED: agent 1.7.0 to both firewalls, deliberately and one at a time',
+            ],
+        ],
         [
             'version' => '3.73.0',
             'date' => '2026-09-20',

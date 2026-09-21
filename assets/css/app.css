@@ -1728,3 +1728,27 @@ pre code {
 [data-theme="dark"] .scan-grade.good { color: #4ade80; }
 [data-theme="dark"] .scan-grade.warn { color: #fbbf24; }
 [data-theme="dark"] .scan-grade.bad  { color: #f87171; }
+
+/* A published agent version a firewall has not taken yet. Held or not, the
+   manager knows it exists and the fleet view is where that belongs. */
+.agent-upgrade {
+    margin-left: 4px;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #2980b9;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.agent-upgrade:hover { text-decoration: underline; }
+.agent-held {
+    margin-left: 3px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(245,158,11,.18);
+    color: #b45309;
+    font-size: .6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+[data-theme="dark"] .agent-upgrade { color: #6cb6ff; }
+[data-theme="dark"] .agent-held { color: #fbbf24; }

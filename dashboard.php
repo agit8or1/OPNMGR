@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/firewall_policy.php';
+require_once __DIR__ . '/inc/agent_rollout.php';
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/firewall_health.php';
 require_once __DIR__ . '/inc/alerting.php';
@@ -363,6 +364,7 @@ try {
           </tr>
         </thead>
         <tbody>
+          <?php $agentRollout = agent_rollout_state(); ?>
           <?php foreach ($firewalls as $fw):
             $health = $fw['health_score'];
             $healthClass = $health >= 80 ? 'good' : ($health >= 50 ? 'warn' : 'bad');
@@ -404,7 +406,24 @@ try {
             </td>
             <td><?php echo htmlspecialchars($shortUptime) ?></td>
             <td><?php echo $checkinText ?></td>
-            <td>v<?php echo htmlspecialchars($fw['agent_version'] ?: '?') ?></td>
+            <td>
+              <?php
+              // The manager knew a newer agent existed and said so only on the
+              // command line. A version sitting unoffered behind a held stage is
+              // exactly the thing worth seeing on the page you check the fleet on.
+              $agentNow = $fw['agent_version'] ?: '';
+              $agentNew = ($agentNow !== '' && $agentNow !== AGENT_VERSION);
+              ?>
+              v<?php echo htmlspecialchars($agentNow ?: '?') ?>
+              <?php if ($agentNew): ?>
+                <a href="/settings.php#agent_auto_promote" class="agent-upgrade"
+                   title="v<?php echo htmlspecialchars(AGENT_VERSION) ?> is published; rollout stage is <?php
+                          echo htmlspecialchars($agentRollout['stage']) ?>">
+                  &rarr; <?php echo htmlspecialchars(AGENT_VERSION) ?>
+                  <?php if ($agentRollout['stage'] === 'held'): ?><span class="agent-held">held</span><?php endif ?>
+                </a>
+              <?php endif ?>
+            </td>
             <td>
               <?php if ($fw['reboot_required']): ?><span class="badge" style="background:var(--warning);color:#000">Reboot</span><?php endif ?>
               <?php if ($fw['updates_available']): ?><span class="badge" style="background:rgba(59,130,246,0.15);color:var(--accent)">Update</span><?php endif ?>

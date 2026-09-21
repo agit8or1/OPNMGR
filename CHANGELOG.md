@@ -6,6 +6,37 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.74.0
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **The manager knew a newer agent existed and showed it nowhere.** With v1.7.0
+  published and held, the only way to find out was a CLI script - while the
+  rollout header claimed the manager "still shows it". The fleet table now shows
+  the pending version beside the running one, marked `held` when it is not being
+  offered.
+
+- **`inc/agent_rollout.php` used `db()` without requiring bootstrap**, so every
+  settings read fell back to its default and every write failed silently into its
+  own catch - which looks exactly like a gate that is working.
+
+### Added
+
+- **Agent Updates card in Settings**: published version, stage, how many
+  firewalls are behind, and a switch for automatic updates. On, a newly published
+  version deploys itself to the fleet; off - the default - it is held until
+  promoted by name.
+
+### Changed
+
+- **The rollout decision is a pure function.** The test that first covered
+  auto-promotion switched the real setting on; agents check in every two minutes,
+  one did so inside that window, and v1.7.0 was promoted to the fleet for real. A
+  test must not be able to deploy software.
+
+---
+
 ## Version 3.73.0
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

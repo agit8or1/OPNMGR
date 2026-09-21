@@ -4,6 +4,7 @@ require_once __DIR__ . '/inc/bootstrap.php';
 // and the card would report "Disabled" on an installation where AI is on.
 require_once __DIR__ . '/inc/ai_redaction.php';
 require_once __DIR__ . '/inc/secrets.php';
+require_once __DIR__ . '/inc/agent_rollout.php';
 requireLogin();
 requireAdmin();
 
@@ -44,6 +45,23 @@ $backup_retention_min_keep = $rows['backup_retention_min_keep'] ?? '3';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (!csrf_verify($_POST['csrf'] ?? '')) { $notice = 'Bad CSRF'; }
   else {
+    // Agent updates: whether a newly published agent deploys itself.
+    //
+    // The staged gate exists because publishing an agent used to mean changing
+    // every firewall within two minutes with no step in between. Turning this on
+    // restores that deliberately, for an operator who would rather their agents
+    // kept themselves current than be asked each time.
+    if (!empty($_POST['save_agent_updates'])) {
+      if (!function_exists('can') || can('system.maintenance')) {
+        agent_rollout_set_auto_promote(!empty($_POST['agent_auto_promote']));
+        $notice = !empty($_POST['agent_auto_promote'])
+          ? 'Agent auto-update enabled. A newly published agent version will deploy to the whole fleet.'
+          : 'Agent auto-update disabled. New versions are held until promoted.';
+      } else {
+        $notice = 'You do not have permission to change agent updates.';
+      }
+    }
+
     // General Settings (Timezone and FQDN)
     if (!empty($_POST['save_general'])) {
       $timezone = trim($_POST['timezone'] ?? 'UTC');
@@ -271,6 +289,76 @@ include __DIR__ . '/inc/header.php';
         <a href="health_monitor.php" class="btn btn-danger btn-sm w-100">
           <i class="fas fa-stethoscope me-1"></i>Open
         </a>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <!-- Agent Updates -->
+  <?php
+  // What the manager knew but showed nowhere. agent_rollout_state() and
+  // LATEST_AGENT_VERSION appeared only in agent_checkin.php, scripts/ and tests,
+  // so "a new agent is available" was visible on the command line and in no page
+  // at all - while the rollout header claimed the manager "still shows it".
+  $ar_state = agent_rollout_state();
+  $ar_auto  = agent_rollout_auto_promote_enabled();
+  $ar_behind = 0;
+  try {
+      $ar_behind = (int) db()->query(
+          "SELECT COUNT(*) FROM firewalls WHERE agent_version IS NOT NULL AND agent_version <> ''
+             AND agent_version <> " . db()->quote($ar_state['version'])
+      )->fetchColumn();
+  } catch (Throwable $e) { $ar_behind = 0; }
+  ?>
+  <?php if (!function_exists('can') || can('system.maintenance')): ?>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body p-3">
+        <h6 class="card-title">
+          <i class="fas fa-download me-2 text-info"></i>Agent Updates
+          <?php if ($ar_behind > 0): ?>
+            <span class="badge bg-warning text-dark ms-1"><?= $ar_behind ?> behind</span>
+          <?php endif ?>
+        </h6>
+        <p class="card-text text-muted small mb-2">
+          Published <strong>v<?= htmlspecialchars($ar_state['version']) ?></strong>,
+          stage <strong><?= htmlspecialchars($ar_state['stage']) ?></strong><?php
+            if ($ar_state['superseded'] && !$ar_auto): ?> &mdash; held, because the stored stage was
+            promoted for v<?= htmlspecialchars($ar_state['promoted_version'] ?: 'nothing') ?><?php
+            endif ?>.
+          <?php if ($ar_behind > 0 && $ar_state['stage'] === 'held' && !$ar_auto): ?>
+            <br><span class="text-warning">
+              <i class="fas fa-exclamation-triangle me-1"></i>
+              <?= $ar_behind ?> firewall<?= $ar_behind === 1 ? '' : 's' ?> could take this update but
+              <?= $ar_behind === 1 ? 'is' : 'are' ?> not being offered it.
+            </span>
+          <?php endif ?>
+        </p>
+        <form method="POST" class="mb-0">
+          <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
+          <input type="hidden" name="save_agent_updates" value="1">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" role="switch"
+                   id="agent_auto_promote" name="agent_auto_promote" value="1"
+                   <?= $ar_auto ? 'checked' : '' ?>>
+            <label class="form-check-label small" for="agent_auto_promote">
+              Update agents automatically
+            </label>
+          </div>
+          <p class="text-muted small mb-2">
+            <?php if ($ar_auto): ?>
+              On. A newly published version goes to the whole fleet, and each firewall
+              installs it on its next check-in - about two minutes - without being asked.
+            <?php else: ?>
+              Off. A new version is held until promoted by name, so publishing a release
+              and changing every firewall stay separate acts.
+            <?php endif ?>
+          </p>
+          <button type="submit" class="btn btn-info btn-sm">
+            <i class="fas fa-save me-1"></i>Save
+          </button>
+          <a href="/firewalls.php" class="btn btn-outline-secondary btn-sm">View fleet</a>
+        </form>
       </div>
     </div>
   </div>
