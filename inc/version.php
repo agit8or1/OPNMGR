@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A New Agent, Said Out Loud'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Severity By What Is Reachable'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.74.1',
+            'date' => '2026-09-20',
+            'type' => 'patch',
+            'title' => 'Severity By What Is Reachable',
+            'changes' => [
+                'FIXED: Grading was overly aggressive because severity had no rubric. The prompt described the grade bands and left the severity of each finding to the model, which rated hardening gaps as medium and high and then graded down against its own inflation. Severity is now anchored to what an attacker can reach: critical means internet-reachable and administrative, low means a hardening gap with no path in from the internet',
+                'FIXED: DNSSEC disabled, a permissive any-to-any policy on a VPN interface, a plain-HTTP web GUI with no internet-facing rule permitting it, WAN ICMP, and unreferenced expiring certificates are all calibrated as low, each with the reason stated - a rule with no reason is one the next model ignores. A VPN peer is admitted by cryptographic key, so a permissive VPN interface is open to people who already hold a key, not to the internet',
+                'CHANGED: The grade now follows from the findings actually raised rather than being a separate judgement: any critical grades D or F, only low and info grades A. A firewall with nothing outstanding but hardening preferences is an A',
+                'CHANGED: Intentional publishing of non-administrative services - web, mail, DNS, media - no longer reduces the grade. That is a decision, not a defect',
+                'MEASURED: one firewall moved from C/75 to A/91 on an unchanged configuration; the other stayed at F/38, its four genuinely internet-reachable administrative interfaces still critical while its VPN and interface-policy findings dropped to low. The aim was calibration, not leniency',
+            ],
+        ],
         [
             'version' => '3.74.0',
             'date' => '2026-09-20',

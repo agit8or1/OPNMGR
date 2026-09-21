@@ -177,5 +177,53 @@ check('the downward token retry carries the overrides forward',
 check('the payload is built once and encoded',
     str_contains($raw, 'CURLOPT_POSTFIELDS => json_encode($payload)'));
 
+// --- severity must track reachability, not tidiness --------------------------
+//
+// The prompt described the grade bands and left the severity of individual
+// findings entirely to the model, which rated hardening gaps as medium and high
+// and then graded down against its own inflation. A firewall whose worst real
+// problem was plaintext administration on a LAN-only GUI scored C/75; DNSSEC
+// disabled and a permissive WireGuard policy - neither reachable from the
+// internet - were both medium.
+//
+// Anchored to what an attacker can actually reach, the same configuration scores
+// A/91, while a firewall with four administrative interfaces genuinely published
+// to the internet stays at F. The point was never leniency.
+
+check('severity is defined by reachability',
+    str_contains($src, 'assign by what an attacker can reach, not by how tidy the setting is'));
+check('critical requires internet reachability AND administrative access',
+    str_contains($src, 'reachable from any internet source AND grants administrative control'));
+check('high is the authenticated or limited case',
+    str_contains($src, 'reachable from the internet but authenticated or limited in scope'));
+check('medium requires a position the attacker must already hold',
+    str_contains($src, 'exploitable only from a position an attacker must already hold'));
+check('low is named as where most preferences belong',
+    str_contains($src, 'This is where most configuration preferences belong'));
+
+foreach ([
+    'DNSSEC validation disabled'  => 'resolver-integrity hardening, not an exposure',
+    'permissive any-to-any policy on a VPN interface' => 'admitted by cryptographic key',
+    'web GUI on plain HTTP'       => 'NO internet-facing rule permitting it',
+] as $case => $reason) {
+    check("{$case} is calibrated as low", str_contains($src, $case),
+        'this was rated medium or high and drove the grade down');
+    check("...with its reason stated", str_contains($src, $reason),
+        'a rule with no reason is one the next model ignores');
+}
+
+check('the grade is derived from the findings raised',
+    str_contains($src, 'The grade must follow from the findings you actually raised'),
+    'grade and severity were two independent judgements that disagreed');
+check('a critical forces D or F', str_contains($src, 'any CRITICAL -> D or F'));
+check('only low and info is an A',
+    str_contains($src, 'only LOW and INFO -> A')
+    && str_contains($src, 'nothing but hardening preferences outstanding is an A, not a B'));
+check('the same issue is not counted twice',
+    str_contains($src, 'Do not grade down for the same issue twice'));
+check('intentional publishing does not reduce the grade',
+    str_contains($src, 'do not grade down for intentional publishing of non-administrative services'),
+    'a published Plex or mail server is a decision, not a defect');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

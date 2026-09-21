@@ -6,6 +6,30 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.74.1
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **Grading was overly aggressive because severity had no rubric.**
+
+  The prompt described the grade bands and left the severity of each finding to
+  the model, which rated hardening gaps as medium and high and then graded down
+  against its own inflation.
+
+  Severity is anchored to reachability now. DNSSEC disabled, a permissive VPN
+  interface policy, a plain-HTTP GUI with no internet-facing rule permitting it,
+  WAN ICMP and unreferenced certificates are all low - each with its reason
+  stated. The grade follows from the findings raised: any critical grades D or F,
+  only low and info grades A.
+
+  One firewall moved from C/75 to A/91 on an unchanged configuration. The other
+  stayed at F/38 - four administrative interfaces genuinely published to the
+  internet - while its VPN and interface-policy findings dropped to low. The aim
+  was calibration, not leniency.
+
+---
+
 ## Version 3.74.0
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

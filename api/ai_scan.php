@@ -691,6 +691,37 @@ function buildAnalysisPrompt($config_data, $firewall, $scan_type, $log_data = nu
     $prompt .= "A firewall with SSH/HTTP restricted to management IPs should receive A or B grade, NOT C or below\n";
     $prompt .= "Do NOT penalize for things on the forbidden list above\n\n";
 
+    // Severity had no rubric at all: the grade bands were described and the
+    // severity of individual findings was left to the model, which rated
+    // hardening gaps as medium and high and then graded down against its own
+    // inflation. Severity is anchored to reachability now - what an attacker on
+    // the internet can actually do with it - and the grade follows from the
+    // severities rather than being a separate judgement.
+    $prompt .= "**SEVERITY - assign by what an attacker can reach, not by how tidy the setting is**:\n";
+    $prompt .= "- CRITICAL: reachable from any internet source AND grants administrative control or unauthenticated access. "
+             . "Examples: the firewall's own web GUI open to any source; Proxmox, Webmin, IPMI or a database admin panel published to the internet without source restriction.\n";
+    $prompt .= "- HIGH: reachable from the internet but authenticated or limited in scope, or a credential weakness ON an internet-reachable service. "
+             . "Example: SSH permitting password authentication WHEN the rule table shows port 22 open to any source.\n";
+    $prompt .= "- MEDIUM: exploitable only from a position an attacker must already hold - the local network, or an authenticated VPN session - or a material weakening of defence in depth.\n";
+    $prompt .= "- LOW: a hardening or best-practice gap with no direct path from the internet. This is where most configuration preferences belong.\n";
+    $prompt .= "- INFO: an observation worth stating that needs no action.\n\n";
+
+    $prompt .= "**Calibration - these are LOW, not medium or high**:\n";
+    $prompt .= "- DNSSEC validation disabled (in Unbound, Dnsmasq or both). It is resolver-integrity hardening, not an exposure; a resolver bound to the LAN is not reachable from the internet.\n";
+    $prompt .= "- A permissive any-to-any policy on a VPN interface such as WireGuard or OpenVPN. Peers are admitted by cryptographic key, so the interface is not open to the internet - it is open to people you have already given a key. Say so and recommend narrowing it, but do not rate it medium or higher unless the VPN itself accepts unauthenticated connections.\n";
+    $prompt .= "- The web GUI on plain HTTP when the rule table shows NO internet-facing rule permitting it. Plaintext administration on a trusted LAN is worth fixing and is not an internet exposure.\n";
+    $prompt .= "- WAN responding to ICMP echo.\n";
+    $prompt .= "- Optional hardening not enabled: IDS/IPS, outbound lockdown, additional plugins.\n";
+    $prompt .= "- Certificates that are expiring or expired but not referenced by any running service.\n\n";
+
+    $prompt .= "**The grade must follow from the findings you actually raised**:\n";
+    $prompt .= "- any CRITICAL -> D or F\n";
+    $prompt .= "- no critical, one or more HIGH -> C\n";
+    $prompt .= "- no critical or high, some MEDIUM -> B\n";
+    $prompt .= "- only LOW and INFO -> A, and a firewall with nothing but hardening preferences outstanding is an A, not a B\n";
+    $prompt .= "Do not grade down for the same issue twice, and do not grade down for intentional publishing of non-administrative services "
+             . "(web, mail, DNS, media, game servers) that the operator clearly meant to expose.\n\n";
+
     $prompt .= "\n**SECURITY ENHANCEMENT RECOMMENDATIONS**:\n";
     $prompt .= "ALWAYS include these as optional recommendations for improving security (DO NOT reduce grade if not implemented):\n\n";
     $prompt .= "1. Secure Outbound Lockdown:\n";
