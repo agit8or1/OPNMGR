@@ -379,9 +379,14 @@ try {
             <td><a href="/firewall_details.php?id=<?php echo $fw['id'] ?>" class="dash-fw-name"><?php echo htmlspecialchars($fw['hostname'] ?: 'Unnamed') ?></a></td>
             <td class="dash-fw-ip"><?php echo htmlspecialchars(firewall_wan_address($fw) ?: '-') ?></td>
             <td><?php if ($fw['customer_name']): ?><span class="dash-fw-cust"><?php echo htmlspecialchars($fw['customer_name']) ?></span><?php else: ?>-<?php endif ?></td>
-            <td class="dash-fw-health-cell">
-              <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>
-              <span class="dash-fw-health-pct"><?php echo $health ?>%</span>
+            <td class="dash-fw-health-cell" onclick="event.stopPropagation()">
+              <?php // Links to its detail, as the scan grade beside it does: two
+                    // columns of the same kind should behave the same way. ?>
+              <a class="dash-fw-health-link" href="/firewall_health.php?firewall=<?php echo (int)$fw['id'] ?>"
+                 title="Health checks for <?php echo htmlspecialchars($fw['hostname'] ?: 'this firewall') ?>">
+                <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>
+                <span class="dash-fw-health-pct"><?php echo $health ?>%</span>
+              </a>
             </td>
             <td class="dash-fw-scan" onclick="event.stopPropagation()">
               <?php if (!empty($fw['scan_grade'])):

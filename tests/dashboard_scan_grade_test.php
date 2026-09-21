@@ -95,5 +95,22 @@ check('clicking the grade does not trigger the row navigation',
     str_contains($dash, 'onclick="event.stopPropagation()"'),
     'the row navigates to firewall details, which is not where the report is');
 
+// --- two columns of the same kind should behave the same way -----------------
+//
+// The scan grade linked to its report; the health figure beside it linked
+// nowhere, so one column invited a click and the other quietly did not.
+
+check('the health figure links to its detail',
+    str_contains($dash, 'class="dash-fw-health-link"')
+    && str_contains($dash, '/firewall_health.php?firewall=<?php echo (int)$fw[\'id\']'));
+check('it lands on that firewall rather than the fleet page',
+    str_contains($dash, 'firewall_health.php?firewall='),
+    'firewall_health.php reads ?firewall= to focus one device');
+check('clicking it does not also trigger the row navigation',
+    (bool) preg_match('/dash-fw-health-cell" onclick="event.stopPropagation\(\)"/', $dash),
+    'the row navigates to firewall details, which is not the health page');
+check('the link is styled to look like one on hover',
+    str_contains($css, '.dash-fw-health-link'));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

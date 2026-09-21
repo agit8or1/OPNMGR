@@ -91,6 +91,20 @@ try {
             // this file used to run a scan by itself; it defines functions now.
             require_once __DIR__ . '/../api/ai_scan.php';
 
+            // Re-read the toggle immediately before spending money and sending
+            // this firewall's configuration to a third party. The list was built
+            // at the top of the run, and with a 60 second pause between scans a
+            // fleet takes long enough that "automatic scanning is off" can become
+            // true while the run is still going. The cost of checking is one
+            // query; the cost of not checking is a scan the operator had just
+            // switched off.
+            $still = db()->prepare('SELECT auto_scan_enabled FROM firewall_ai_settings WHERE firewall_id = ?');
+            $still->execute([$firewall_id]);
+            if ((int) $still->fetchColumn() !== 1) {
+                log_message("SKIP: automatic scanning was switched off for $hostname during this run");
+                continue;
+            }
+
             log_message("Starting AI scan for $hostname...");
 
             // $fw is the firewall_ai_settings row; $firewall is the firewalls

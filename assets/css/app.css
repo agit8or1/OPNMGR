@@ -1752,3 +1752,15 @@ pre code {
 }
 [data-theme="dark"] .agent-upgrade { color: #6cb6ff; }
 [data-theme="dark"] .agent-held { color: #fbbf24; }
+
+/* The health figure links to its detail, as the scan grade beside it does.
+   Two columns of the same kind reading differently is the inconsistency. */
+.dash-fw-health-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+}
+.dash-fw-health-link:hover .dash-fw-health-pct { text-decoration: underline; }
+.dash-fw-health-link:hover .health-bar { filter: brightness(1.08); }

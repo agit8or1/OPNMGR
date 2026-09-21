@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Severity By What Is Reachable'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Both Columns Click'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.74.2',
+            'date' => '2026-09-20',
+            'type' => 'patch',
+            'title' => 'Both Columns Click',
+            'changes' => [
+                'CHANGED: The health figure in the fleet table links to that firewall\'s health detail, as the scan grade beside it already did. Two columns of the same kind, one inviting a click and the other quietly not, is the inconsistency',
+                'FIXED: The automatic scan scheduler re-reads auto_scan_enabled immediately before each scan rather than only when the run starts. A scan spends money and sends a configuration to a third party, and with a sixty second pause between firewalls a fleet run lasts long enough for the operator to switch scanning off while it is still going',
+                'VERIFIED: the 02:00 cron is the only automatic path to a scan. The widget and the firewall page both start one from a button, and a manual scan deliberately ignores the automatic toggle - switching scheduled scanning off must not take the scan button away',
+            ],
+        ],
         [
             'version' => '3.74.1',
             'date' => '2026-09-20',

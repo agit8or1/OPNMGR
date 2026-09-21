@@ -6,6 +6,28 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.74.2
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Changed
+
+- **The health figure links to its detail**, as the scan grade beside it already
+  did. Two columns of the same kind, one inviting a click and the other quietly
+  not, is the inconsistency.
+
+### Fixed
+
+- **The scan scheduler re-reads `auto_scan_enabled` before each scan**, not only
+  when the run starts. A scan spends money and sends a configuration to a third
+  party, and with a sixty second pause between firewalls a run lasts long enough
+  for scanning to be switched off while it is still going.
+
+  The 02:00 cron is the only automatic path to a scan; both UI paths start one
+  from a button, and a manual scan ignores the automatic toggle so switching
+  scheduled scanning off does not take the button away.
+
+---
+
 ## Version 3.74.1
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

@@ -114,5 +114,30 @@ check('deploy still removes files deleted from the repository',
     'without it production keeps serving code that no longer exists');
 check('deploy reports drift', str_contains($deploy, 'drift'));
 
+// --- a scan must run automatically only when that was asked for --------------
+//
+// A scan spends money and sends a firewall's configuration to a third party, so
+// "is automatic scanning on for this firewall" has to be true at the moment it
+// runs, not merely when the run started.
+
+check('the scheduler selects only firewalls with it enabled',
+    str_contains($sched, 'WHERE fas.auto_scan_enabled = 1'));
+check('it re-reads the toggle immediately before each scan',
+    (bool) preg_match('/SELECT auto_scan_enabled FROM firewall_ai_settings WHERE firewall_id = \?/', $sched),
+    'the list is built once and the run pauses 60 seconds between firewalls');
+check('a firewall switched off mid-run is skipped, not scanned',
+    str_contains($sched, 'automatic scanning was switched off for'));
+check('the skip is logged rather than silent',
+    (bool) preg_match('/SKIP:[\s\S]{0,120}continue;/', $sched));
+check('it also requires the firewall to be online',
+    str_contains($sched, "f.status = 'online'"),
+    'scanning an offline firewall fails at the SSH fetch and produces nothing useful');
+
+// The manual path must NOT be gated by the automatic toggle: switching
+// scheduled scanning off should not disable the button.
+check('a manual scan does not consult the automatic toggle',
+    !preg_match('/function opnmgr_run_ai_scan[\s\S]{0,2000}auto_scan_enabled/', $rawScan),
+    'turning off scheduled scanning must not take the scan button away');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
