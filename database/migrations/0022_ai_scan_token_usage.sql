@@ -11,7 +11,12 @@
 -- `total_tokens IS NOT NULL` so a scan that was never measured is reported as
 -- unmeasured rather than as free.
 
+-- IF NOT EXISTS because database/schema.sql already carries these columns and
+-- ships with an empty schema_migrations table: a fresh install loads the schema
+-- and then runs every migration, so one that is not idempotent fails the install
+-- with "Duplicate column name". Every other ALTER in this directory is written
+-- the same way; this one was not, and CI caught it.
 ALTER TABLE ai_scan_reports
-  ADD COLUMN prompt_tokens INT NULL AFTER scan_duration,
-  ADD COLUMN completion_tokens INT NULL AFTER prompt_tokens,
-  ADD COLUMN total_tokens INT NULL AFTER completion_tokens;
+  ADD COLUMN IF NOT EXISTS prompt_tokens INT NULL AFTER scan_duration,
+  ADD COLUMN IF NOT EXISTS completion_tokens INT NULL AFTER prompt_tokens,
+  ADD COLUMN IF NOT EXISTS total_tokens INT NULL AFTER completion_tokens;

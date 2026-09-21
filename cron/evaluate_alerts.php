@@ -201,6 +201,14 @@ foreach ($firewalls as $fw) {
                 'firewall_id' => $id, 'object_key' => $name,
                 'title'  => sprintf('Gateway %s is down on %s', $name, $host),
                 'detail' => sprintf('Status %s, loss %s%%', $gw['status'], $gw['loss_percent'] ?? '?'),
+                'metadata' => array_filter([
+                    'gateway'      => $name,
+                    'address'      => $gw['address'] ?? null,
+                    'monitor_ip'   => $gw['monitor'] ?? null,
+                    'interface'    => $gw['interface'] ?? null,
+                    'latency_ms'   => $gw['latency_ms'] ?? null,
+                    'loss_percent' => $gw['loss_percent'] ?? null,
+                ], static fn($v) => $v !== null && $v !== ''),
             ]);
             resolve('gateway.degraded', $id, $name, 'superseded by gateway down');
         } elseif (!$stale && $sev === 'warning') {
@@ -210,6 +218,17 @@ foreach ($firewalls as $fw) {
                 'detail' => sprintf('Latency %s ms, loss %s%% (thresholds %s ms / %s%%)',
                                     $gw['latency_ms'] ?? '?', $gw['loss_percent'] ?? '?',
                                     $thresholds['gw_latency'], $thresholds['gw_loss']),
+                // Only firewall.offline recorded any metadata, so every other
+                // incident reached the page with nothing to inspect: no address,
+                // no interface, nothing to act on but the title.
+                'metadata' => array_filter([
+                    'gateway'      => $name,
+                    'address'      => $gw['address'] ?? null,
+                    'monitor_ip'   => $gw['monitor'] ?? null,
+                    'interface'    => $gw['interface'] ?? null,
+                    'latency_ms'   => $gw['latency_ms'] ?? null,
+                    'loss_percent' => $gw['loss_percent'] ?? null,
+                ], static fn($v) => $v !== null && $v !== ''),
             ]);
             resolve('gateway.down', $id, $name, 'gateway is no longer down');
         } else {
@@ -232,6 +251,18 @@ foreach ($firewalls as $fw) {
                 'firewall_id' => $id, 'object_key' => $key,
                 'title'  => sprintf('%s tunnel %s is down on %s', ucfirst($t['vpn_type']), $t['name'], $host),
                 'detail' => sprintf('Status %s. Peer %s.', $t['status'], $t['peer'] ?: 'unknown'),
+                // The endpoint is the address involved, and the last handshake
+                // says when it was last working - both are what you want in
+                // front of you when the incident opens.
+                'metadata' => array_filter([
+                    'tunnel'           => $t['name'] ?? null,
+                    'vpn_type'         => $t['vpn_type'] ?? null,
+                    'peer'             => $t['peer'] ?? null,
+                    'endpoint'         => $t['endpoint'] ?? null,
+                    'status'           => $t['status'] ?? null,
+                    'latest_handshake' => $t['latest_handshake'] ?? null,
+                    'connected_since'  => $t['connected_since'] ?? null,
+                ], static fn($v) => $v !== null && $v !== ''),
             ]);
         } else {
             resolve('vpn.down', $id, $key, 'tunnel is up');
@@ -265,6 +296,11 @@ foreach ($firewalls as $fw) {
                 'firewall_id' => $id, 'object_key' => $svc['name'],
                 'title'  => sprintf('Service %s is stopped on %s', $svc['name'], $host),
                 'detail' => $svc['description'] ?: null,
+                'metadata' => array_filter([
+                    'service'     => $svc['name'] ?? null,
+                    'description' => $svc['description'] ?? null,
+                    'status'      => $svc['status'] ?? null,
+                ], static fn($v) => $v !== null && $v !== ''),
             ]);
         } else {
             resolve('service.stopped', $id, $svc['name'], 'service is running');

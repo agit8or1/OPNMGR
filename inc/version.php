@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ask The Tile What It Means'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Incident, Not Just Its History'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.76.0',
+            'date' => '2026-09-20',
+            'type' => 'minor',
+            'title' => 'The Incident, Not Just Its History',
+            'changes' => [
+                'ADDED: An incident opens to the incident itself - exact first seen, last seen and resolved times with how long it lasted, the object involved, the firewall with its WAN and LAN addresses, customer, occurrence and notification counts, acknowledgement, and the full detail text rather than 120 characters of it. The incident title is the link; "History" was a small button at the far right of a nine-column row',
+                'ADDED: Conditions now record what they saw. Only firewall.offline stored any metadata, so every other incident arrived with nothing to inspect: gateway incidents carry the gateway address, monitor IP and interface; VPN incidents the peer, endpoint and last handshake; service incidents the service and its status. Addresses sort to the top of the recorded detail, because that is what you reach for first',
+                'FIXED: CI was red on two jobs. Migration 0022 was written as a plain ALTER TABLE ADD COLUMN, and since database/schema.sql already carries those columns and ships with an empty schema_migrations table, a fresh install ran the migration against a schema that already had the change and failed with "Duplicate column name". Every other ALTER in the directory already used IF NOT EXISTS',
+                'ADDED: A test that fails on any unguarded ADD COLUMN, ADD INDEX, CREATE TABLE or DROP TABLE in a migration, so the next one cannot break an install the same way',
+                'FIXED: The new incident view built its address cells by concatenating escaped strings inside a ternary. tests/injection_guard_test.php rejects that shape - an escaped concatenation is one edit away from an unescaped one - and it was right to',
+            ],
+        ],
         [
             'version' => '3.75.0',
             'date' => '2026-09-20',

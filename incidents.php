@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/inc/firewall_policy.php';
 /**
  * Alert Incidents.
  *
@@ -42,10 +43,47 @@ $inMaint    = maintenance_firewalls_in_window();
 $detailId   = (int)($_GET['incident'] ?? 0);
 
 $timeline = [];
+$incident = null;
 if ($detailId > 0) {
     $stmt = db()->prepare('SELECT * FROM alert_incident_events WHERE incident_id = ? ORDER BY id');
     $stmt->execute([$detailId]);
     $timeline = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // The incident itself, not only its history. "History" showed a list of
+    // state changes and never the thing they happened to: no exact times, no
+    // object, no address, and a detail line truncated at 120 characters in the
+    // table with nowhere to read the rest.
+    $stmt = db()->prepare(
+        'SELECT i.*, f.hostname, f.wan_ip, f.wan_interface_stats, f.lan_ip,
+                f.agent_version, f.status AS firewall_status, c.name AS customer_name
+           FROM alert_incidents i
+           LEFT JOIN firewalls f ON f.id = i.firewall_id
+           LEFT JOIN customers c ON c.id = i.customer_id
+          WHERE i.id = ?'
+    );
+    $stmt->execute([$detailId]);
+    $incident = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** A timestamp with both the date and how long ago it was. */
+function inc_when(?string $ts): string
+{
+    if (!$ts) { return '—'; }
+    $t = strtotime($ts);
+    if (!$t) { return htmlspecialchars($ts); }
+    return htmlspecialchars(date('D j M Y, H:i:s', $t)) . ' <span class="text-muted">('
+         . htmlspecialchars(inc_age($ts)) . ' ago)</span>';
+}
+
+/** How long the incident lasted, when it is over. */
+function inc_duration(?string $from, ?string $to): string
+{
+    if (!$from || !$to) { return '—'; }
+    $secs = max(0, strtotime($to) - strtotime($from));
+    if ($secs < 60)    { return $secs . ' seconds'; }
+    if ($secs < 3600)  { return round($secs / 60) . ' minutes'; }
+    if ($secs < 86400) { return round($secs / 3600, 1) . ' hours'; }
+    return round($secs / 86400, 1) . ' days';
 }
 
 $customers = [];
@@ -176,9 +214,14 @@ include __DIR__ . '/inc/header.php';
                         <td><span class="badge bg-<?php echo sev_class($i['severity']); ?>">
                             <?php echo htmlspecialchars($i['severity']); ?></span></td>
                         <td class="small">
-                            <?php echo htmlspecialchars($i['title']); ?>
+                            <?php // The title is the way in: "History" was a small button at the
+                                  // far right of a nine-column row, and the thing most people
+                                  // click is the name of the thing. ?>
+                            <a href="?incident=<?php echo (int)$i['id']; ?>#incident-detail"
+                               class="incident-open"><?php echo htmlspecialchars($i['title']); ?></a>
                             <?php if ($i['detail']): ?>
-                                <br><span class="text-muted"><?php echo htmlspecialchars(substr($i['detail'], 0, 120)); ?></span>
+                                <br><span class="text-muted"><?php echo htmlspecialchars(substr($i['detail'], 0, 120)); ?><?php
+                                    echo strlen($i['detail']) > 120 ? '…' : ''; ?></span>
                             <?php endif; ?>
                         </td>
                         <td class="small">
@@ -235,26 +278,161 @@ include __DIR__ . '/inc/header.php';
         </div>
     </div>
 
-    <?php if ($timeline): ?>
-    <div class="card mt-3">
+    <?php if ($incident): ?>
+    <?php
+    $meta = json_decode((string) ($incident['metadata'] ?? ''), true);
+    if (!is_array($meta)) { $meta = []; }
+    // Addresses first: when something is wrong, the address involved is what you
+    // reach for. Only firewall.offline recorded any metadata before, so most
+    // incidents arrived with nothing to inspect.
+    $addressKeys = ['address', 'monitor_ip', 'endpoint', 'peer', 'source_ip', 'ip'];
+
+    // Hoisted rather than built inline. These are agent-supplied strings, and a
+    // concatenation that happens to be escaped today is one edit away from not
+    // being; tests/injection_guard_test.php rejects the shape for that reason,
+    // and it was right to - this block was written with the escaping buried in
+    // a ternary.
+    $objectKey = (string) ($incident['object_key'] ?? '');
+    $lanAddr   = (string) ($incident['lan_ip'] ?? '');
+    $wanAddr   = $incident['hostname'] ? (string) firewall_wan_address($incident) : '';
+    ?>
+    <div class="card mt-3" id="incident-detail">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong class="small">Incident #<?php echo $detailId; ?> history</strong>
+            <div>
+                <span class="badge bg-<?php echo sev_class($incident['severity']); ?> me-2">
+                    <?php echo htmlspecialchars($incident['severity']); ?></span>
+                <strong>Incident #<?php echo (int) $incident['id']; ?></strong>
+                <span class="text-muted ms-2"><?php echo htmlspecialchars($incident['title']); ?></span>
+            </div>
             <a class="btn btn-sm btn-outline-secondary" href="incidents.php">Close</a>
         </div>
         <div class="card-body">
-            <ul class="list-unstyled mb-0 small">
-                <?php foreach ($timeline as $e): ?>
-                    <li class="mb-1">
-                        <span class="text-muted" style="display:inline-block;width:150px">
-                            <?php echo htmlspecialchars($e['occurred_at']); ?></span>
-                        <span class="badge bg-secondary"><?php echo htmlspecialchars($e['event']); ?></span>
-                        <?php echo htmlspecialchars($e['detail'] ?? ''); ?>
-                        <?php if ($e['actor']): ?>
-                            <span class="text-muted">by <?php echo htmlspecialchars($e['actor']); ?></span>
+
+            <?php if (!empty($incident['detail'])): ?>
+                <p class="mb-3"><?php echo nl2br(htmlspecialchars($incident['detail'])); ?></p>
+            <?php endif; ?>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                        <tr><th style="width:38%">Condition</th>
+                            <td><code><?php echo htmlspecialchars($incident['alert_type']); ?></code></td></tr>
+                        <tr><th>Object</th>
+                            <td><?php if ($objectKey !== ''): ?><code><?php echo htmlspecialchars($objectKey); ?></code>
+                                <?php else: ?><span class="text-muted">the firewall itself</span><?php endif; ?></td></tr>
+                        <tr><th>Firewall</th>
+                            <td>
+                                <?php if ($incident['hostname']): ?>
+                                    <a href="firewall_details.php?id=<?php echo (int) $incident['firewall_id']; ?>">
+                                        <?php echo htmlspecialchars($incident['hostname']); ?></a>
+                                    <span class="text-muted">(<?php echo htmlspecialchars($incident['firewall_status'] ?? '?'); ?>)</span>
+                                <?php else: ?>
+                                    <span class="text-muted">no longer exists</span>
+                                <?php endif; ?>
+                            </td></tr>
+                        <tr><th>WAN address</th>
+                            <td><?php if ($wanAddr !== ''): ?><code><?php echo htmlspecialchars($wanAddr); ?></code>
+                                <?php else: ?><span class="text-muted">&mdash;</span><?php endif; ?></td></tr>
+                        <tr><th>LAN address</th>
+                            <td><?php if ($lanAddr !== ''): ?><code><?php echo htmlspecialchars($lanAddr); ?></code>
+                                <?php else: ?><span class="text-muted">&mdash;</span><?php endif; ?></td></tr>
+                        <tr><th>Customer</th>
+                            <td><?php echo htmlspecialchars($incident['customer_name'] ?: '—'); ?></td></tr>
+                        <tr><th>Status</th>
+                            <td><?php echo htmlspecialchars($incident['status']); ?>
+                                <?php if ((int) $incident['suppressed'] === 1): ?>
+                                    <span class="badge bg-secondary ms-1">notifications held</span>
+                                    <div class="small text-muted"><?php echo htmlspecialchars($incident['suppressed_reason'] ?? ''); ?></div>
+                                <?php endif; ?></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="col-md-6">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                        <tr><th style="width:38%">First seen</th><td><?php echo inc_when($incident['first_seen_at']); ?></td></tr>
+                        <tr><th>Last seen</th><td><?php echo inc_when($incident['last_seen_at']); ?></td></tr>
+                        <tr><th>Resolved</th>
+                            <td><?php echo $incident['resolved_at']
+                                    ? inc_when($incident['resolved_at'])
+                                    : '<span class="text-warning">still open</span>'; ?></td></tr>
+                        <tr><th>Lasted</th>
+                            <td><?php echo htmlspecialchars(inc_duration(
+                                    $incident['first_seen_at'],
+                                    $incident['resolved_at'] ?: $incident['last_seen_at'])); ?>
+                                <?php if (!$incident['resolved_at']): ?>
+                                    <span class="text-muted">so far</span>
+                                <?php endif; ?></td></tr>
+                        <tr><th>Seen</th>
+                            <td><?php echo (int) $incident['occurrence_count']; ?> time(s)
+                                <span class="text-muted">— each evaluation that found it still true</span></td></tr>
+                        <tr><th>Notified</th>
+                            <td><?php echo (int) $incident['notify_count']; ?> time(s)<?php
+                                if ($incident['last_notified_at']) {
+                                    echo ', last ' . inc_when($incident['last_notified_at']);
+                                } ?></td></tr>
+                        <?php if ($incident['acknowledged_at']): ?>
+                        <tr><th>Acknowledged</th>
+                            <td><?php echo inc_when($incident['acknowledged_at']); ?>
+                                <?php if ($incident['acknowledged_by']): ?>
+                                    <div class="small">by <?php echo htmlspecialchars($incident['acknowledged_by']); ?></div>
+                                <?php endif; ?>
+                                <?php if ($incident['acknowledged_note']): ?>
+                                    <div class="small text-muted"><?php echo htmlspecialchars($incident['acknowledged_note']); ?></div>
+                                <?php endif; ?></td></tr>
                         <?php endif; ?>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <?php if ($meta): ?>
+                <h6 class="mt-3 mb-2 small text-uppercase text-muted">What was recorded</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                    <?php
+                    uksort($meta, static function ($a, $b) use ($addressKeys) {
+                        $ai = in_array($a, $addressKeys, true) ? 0 : 1;
+                        $bi = in_array($b, $addressKeys, true) ? 0 : 1;
+                        return $ai === $bi ? strcmp($a, $b) : $ai - $bi;
+                    });
+                    ?>
+                    <?php foreach ($meta as $k => $v): ?>
+                        <tr>
+                            <th style="width:38%"><?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', (string) $k))); ?></th>
+                            <td><code><?php echo htmlspecialchars(is_scalar($v) ? (string) $v : json_encode($v)); ?></code>
+                                <?php if ((string) $k === 'seconds_since_checkin' && is_numeric($v)): ?>
+                                    <span class="text-muted">(<?php echo round($v / 60); ?> minutes)</span>
+                                <?php endif; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p class="small text-muted mt-3 mb-0">
+                    No structured detail was recorded for this incident. Conditions raised
+                    before v3.76.0 stored none except <code>firewall.offline</code>.
+                </p>
+            <?php endif; ?>
+
+            <?php if ($timeline): ?>
+                <h6 class="mt-3 mb-2 small text-uppercase text-muted">History</h6>
+                <ul class="list-unstyled mb-0 small">
+                    <?php foreach ($timeline as $e): ?>
+                        <li class="mb-1">
+                            <span class="text-muted" style="display:inline-block;width:170px">
+                                <?php echo htmlspecialchars($e['occurred_at']); ?></span>
+                            <span class="badge bg-secondary"><?php echo htmlspecialchars($e['event']); ?></span>
+                            <?php echo htmlspecialchars($e['detail'] ?? ''); ?>
+                            <?php if ($e['actor']): ?>
+                                <span class="text-muted">by <?php echo htmlspecialchars($e['actor']); ?></span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
         </div>
     </div>
     <?php endif; ?>

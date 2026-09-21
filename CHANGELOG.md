@@ -6,6 +6,32 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.76.0
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **Incidents open to the incident, not just its history.** Exact times with how
+  long it lasted, the object involved, the firewall and its addresses,
+  occurrence and notification counts, acknowledgement, and the full detail text.
+  The title is the link.
+
+- **Conditions record what they saw.** Only `firewall.offline` stored metadata,
+  so every other incident arrived with nothing to inspect. Gateway incidents now
+  carry the address, monitor IP and interface; VPN incidents the peer, endpoint
+  and last handshake; service incidents the service and status.
+
+### Fixed
+
+- **CI was red on two jobs.** Migration 0022 used a plain `ALTER TABLE ADD
+  COLUMN`. `database/schema.sql` already carries those columns and ships with an
+  empty `schema_migrations`, so a fresh install ran the migration against a
+  schema that already had the change: `Duplicate column name 'prompt_tokens'`.
+  A test now fails on any unguarded `ADD COLUMN`, `ADD INDEX`, `CREATE TABLE` or
+  `DROP TABLE` in a migration.
+
+---
+
 ## Version 3.75.0
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 
