@@ -1779,3 +1779,24 @@ pre code {
     border-radius: 6px;
     background: rgba(0,0,0,.14);
 }
+
+/* The health grade, shown the way the scan grade beside it is. Health already
+   computed a grade and the dashboard printed only the percentage, so two
+   columns of the same kind read as different sorts of thing. */
+.health-grade {
+    display: inline-block;
+    min-width: 1.6rem;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: .8125rem;
+    line-height: 1.5;
+    text-align: center;
+}
+.health-grade.good { background: rgba(34,197,94,.15);  color: #16a34a; }
+.health-grade.warn { background: rgba(245,158,11,.18); color: #b45309; }
+.health-grade.bad  { background: rgba(239,68,68,.15);  color: #dc2626; }
+[data-theme="dark"] .health-grade.good { color: #4ade80; }
+[data-theme="dark"] .health-grade.warn { color: #fbbf24; }
+[data-theme="dark"] .health-grade.bad  { color: #f87171; }

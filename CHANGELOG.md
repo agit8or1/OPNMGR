@@ -6,6 +6,23 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.76.1
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **Health had a grade and never showed it.** The fleet table printed a letter
+  grade for the scan and a bare percentage for health.
+  `calculateHealthReport()` has always computed a grade and a per-component
+  breakdown; the dashboard called `calculateHealthScore()`, which returns the
+  number and discards the rest.
+
+  The grade now sits beside the percentage, coloured by the same thresholds as
+  the bar, and hovering gives the breakdown instead of a label repeating the
+  column heading.
+
+---
+
 ## Version 3.76.0
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

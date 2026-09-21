@@ -62,7 +62,13 @@ if (db()) {
         $health_sum = 0;
 
         foreach ($firewalls as &$fw) {
-            $fw['health_score'] = calculateHealthScore($fw, $latest_major_version);
+            // The full report, not just the number. It already computes a grade
+            // and a breakdown; the dashboard showed the percentage alone, so
+            // Health and Scan - two columns of the same kind - said the same
+            // sort of thing in two different languages.
+            $fw['health_report'] = calculateHealthReport($fw, $latest_major_version);
+            $fw['health_score']  = $fw['health_report']['score'];
+            $fw['health_grade']  = $fw['health_report']['grade'];
             $health_sum += $fw['health_score'];
             $fw['live_status'] = 'offline';
             if (!empty($fw['agent_last_checkin'])) {
@@ -380,12 +386,22 @@ try {
             <td class="dash-fw-ip"><?php echo htmlspecialchars(firewall_wan_address($fw) ?: '-') ?></td>
             <td><?php if ($fw['customer_name']): ?><span class="dash-fw-cust"><?php echo htmlspecialchars($fw['customer_name']) ?></span><?php else: ?>-<?php endif ?></td>
             <td class="dash-fw-health-cell" onclick="event.stopPropagation()">
-              <?php // Links to its detail, as the scan grade beside it does: two
-                    // columns of the same kind should behave the same way. ?>
+              <?php
+              // Links to its detail and carries its grade, as the scan grade
+              // beside it does. The tooltip is the breakdown the health report
+              // already builds - which component lost the points.
+              $hGrade = (string) ($fw['health_grade'] ?? '');
+              $hTip   = function_exists('buildHealthTooltip') && !empty($fw['health_report'])
+                        ? buildHealthTooltip($fw['health_report'])
+                        : ('Health checks for ' . ($fw['hostname'] ?: 'this firewall'));
+              ?>
               <a class="dash-fw-health-link" href="/firewall_health.php?firewall=<?php echo (int)$fw['id'] ?>"
-                 title="Health checks for <?php echo htmlspecialchars($fw['hostname'] ?: 'this firewall') ?>">
+                 title="<?php echo htmlspecialchars($hTip) ?>">
                 <div class="health-bar"><div class="health-bar-fill <?php echo $healthClass ?>" style="width:<?php echo $health ?>%"></div></div>
                 <span class="dash-fw-health-pct"><?php echo $health ?>%</span>
+                <?php if ($hGrade !== ''): ?>
+                  <span class="health-grade <?php echo $healthClass ?>"><?php echo htmlspecialchars($hGrade) ?></span>
+                <?php endif ?>
               </a>
             </td>
             <td class="dash-fw-scan" onclick="event.stopPropagation()">

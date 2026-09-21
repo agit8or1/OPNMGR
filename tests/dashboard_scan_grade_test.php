@@ -112,5 +112,39 @@ check('clicking it does not also trigger the row navigation',
 check('the link is styled to look like one on hover',
     str_contains($css, '.dash-fw-health-link'));
 
+// --- health had a grade and never showed it ----------------------------------
+//
+// calculateHealthReport() computes a score, a grade and a per-component
+// breakdown. The dashboard called calculateHealthScore(), which throws the rest
+// away, so Health printed "100%" beside a Scan column printing "A" - two columns
+// of the same kind reading as different sorts of thing.
+
+check('the dashboard takes the whole health report',
+    str_contains($dash, "calculateHealthReport(\$fw, \$latest_major_version)"),
+    'calculateHealthScore() returns only the number and discards the grade');
+check('the grade is carried onto the row',
+    str_contains($dash, "\$fw['health_grade']"));
+check('it is rendered beside the percentage',
+    str_contains($dash, 'class="health-grade'),
+    'the scan column shows a letter; this one showed only a percentage');
+check('the grade is escaped', str_contains($dash, "htmlspecialchars(\$hGrade)"));
+check('its colour follows the same thresholds as the bar',
+    (bool) preg_match('/class="health-grade <\?php echo \$healthClass/', $dash),
+    'a green bar beside an amber grade would be two verdicts on one number');
+check('an empty grade renders nothing rather than an empty badge',
+    str_contains($dash, "\$hGrade !== ''"));
+
+check('the health breakdown is the tooltip',
+    str_contains($dash, 'buildHealthTooltip($fw[\'health_report\'])'),
+    'the scan grade explains itself on hover; this one said only "Health checks for ..."');
+check('a missing report falls back rather than fataling',
+    str_contains($dash, "function_exists('buildHealthTooltip') && !empty(\$fw['health_report'])"));
+
+foreach (['good', 'warn', 'bad'] as $cls) {
+    check("the {$cls} health grade is styled", str_contains($css, ".health-grade.{$cls}"));
+}
+check('the health grade is legible in dark mode',
+    str_contains($css, '[data-theme="dark"] .health-grade.bad'));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);

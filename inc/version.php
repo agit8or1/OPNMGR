@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Incident, Not Just Its History'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Has A Grade Too'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.76.1',
+            'date' => '2026-09-20',
+            'type' => 'patch',
+            'title' => 'Health Has A Grade Too',
+            'changes' => [
+                'FIXED: The fleet table showed a letter grade for the AI scan and a bare percentage for health, so two columns of the same kind read as different sorts of thing. calculateHealthReport() has always computed a grade and a per-component breakdown; the dashboard called calculateHealthScore(), which returns the number and throws the rest away',
+                'ADDED: The health grade sits beside its percentage, coloured by the same thresholds as the bar so one number never carries two verdicts, and hovering gives the breakdown the health report already builds - which component lost the points - rather than a label repeating the column heading',
+            ],
+        ],
         [
             'version' => '3.76.0',
             'date' => '2026-09-20',
