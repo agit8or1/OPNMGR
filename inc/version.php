@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Both Columns Click'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Ask The Tile What It Means'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,19 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.75.0',
+            'date' => '2026-09-20',
+            'type' => 'minor',
+            'title' => 'Ask The Tile What It Means',
+            'changes' => [
+                'ADDED: The Log Analysis Statistics tiles open the records their figures are made of. "30 blocked attempts" over thirty days had no route to which scan, which log, or when; each tile now lists its contributing rows, linked to the report each came from',
+                'ADDED: A tile reading zero explains what was examined rather than opening an empty table. No threats found says how many lines across how many files were read and that nothing was flagged - an empty table reads as "not checked"',
+                'FIXED: The Total Analyses panel initially listed one row per log file beneath a tile counting scans, showing six under a two. It groups by report now, so the figure and its detail agree. A panel that disagrees with its own headline is worse than none: it invites doubt about whichever number was checked second',
+                'CHANGED: The blocked and failed-authentication figures state that they come from the log excerpt each scan read, not from the firewall\'s own counters',
+                'CHANGED: The tiles are controls - keyboard reachable, focus-visible, with their open state exposed - and only one panel opens at a time, since four stacked tables would be the same wall of numbers further down the page',
+            ],
+        ],
         [
             'version' => '3.74.2',
             'date' => '2026-09-20',

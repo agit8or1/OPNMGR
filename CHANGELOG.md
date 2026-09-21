@@ -6,6 +6,26 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.75.0
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **The Log Analysis Statistics tiles open the records behind them.**
+
+  "30 blocked attempts" over thirty days offered no route to which scan, which
+  log, or when. Each tile now lists its contributing rows, linked to the report
+  each came from, and a tile reading zero says what was examined instead of
+  opening an empty table.
+
+### Fixed
+
+- **A panel that disagreed with its own headline.** Total Analyses first listed
+  one row per log file beneath a tile counting scans - six under a two. It groups
+  by report now, so the figure and its detail agree.
+
+---
+
 ## Version 3.74.2
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

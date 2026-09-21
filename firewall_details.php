@@ -84,6 +84,7 @@ if (!$firewall) {
 }
 
 // Get log analysis statistics for this firewall
+$log_analysis_rows = [];
 $log_analysis_stats = [
     'total_analyses' => 0,
     'total_threats' => 0,
@@ -106,8 +107,45 @@ try {
     $stats_stmt = db()->prepare($stats_query);
     $stats_stmt->execute([$id]);
     $log_analysis_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC) ?: $log_analysis_stats;
+    // The rows the totals are made of. The tiles showed four numbers with no way
+    // to ask what was in them - "12 blocked attempts" over thirty days, and no
+    // route to which scan, which log, or what was blocked. Fifteen rows on this
+    // installation, so they are fetched with the totals rather than behind an
+    // endpoint that would have to be built, guarded and kept in step.
+    $detail_stmt = db()->prepare(
+        "SELECT lar.id, lar.report_id, lar.log_type, lar.lines_analyzed,
+                lar.active_threats, lar.suspicious_ips, lar.blocked_attempts,
+                lar.failed_auth_attempts, lar.anomaly_score, lar.threat_level,
+                asr.created_at, asr.overall_grade
+           FROM log_analysis_results lar
+           JOIN ai_scan_reports asr ON asr.id = lar.report_id
+          WHERE asr.firewall_id = ? AND asr.scan_type = 'config_with_logs'
+            AND asr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+          ORDER BY asr.created_at DESC, lar.log_type"
+    );
+    $detail_stmt->execute([$id]);
+    $log_analysis_rows = $detail_stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
     error_log("Error fetching log analysis stats: " . $e->getMessage());
+}
+
+// Flatten the JSON columns once, here, rather than in the markup.
+$log_threat_items = [];
+$log_ip_items = [];
+foreach (($log_analysis_rows ?? []) as $r) {
+    foreach (['active_threats' => &$log_threat_items, 'suspicious_ips' => &$log_ip_items] as $col => &$bucket) {
+        $decoded = json_decode((string) ($r[$col] ?? ''), true);
+        if (!is_array($decoded)) { continue; }
+        foreach ($decoded as $item) {
+            $bucket[] = [
+                'value'     => is_scalar($item) ? (string) $item : json_encode($item),
+                'log_type'  => $r['log_type'],
+                'report_id' => (int) $r['report_id'],
+                'when'      => $r['created_at'],
+            ];
+        }
+    }
+    unset($bucket);
 }
 
 // Show success message after redirect
@@ -1194,43 +1232,206 @@ function connectViaOnDemandTunnel(firewallId) {
                                 </div>
 
                                 <?php if ($log_analysis_stats['total_analyses'] > 0): ?>
+                                    <?php
+                                    // Each tile opens the rows it is made of, so a total can be
+                                    // checked rather than taken on trust. The numbers came from
+                                    // SUM() over these same rows; showing them is the only way
+                                    // "12 blocked attempts" answers "which twelve".
+                                    $la_tiles = [
+                                        'analyses' => ['label' => 'Total Analyses',   'value' => (int)($log_analysis_stats['total_analyses'] ?? 0),   'border' => 'primary',   'text' => 'primary'],
+                                        'threats'  => ['label' => 'Active Threats',   'value' => (int)($log_analysis_stats['total_threats'] ?? 0),    'border' => 'danger',    'text' => 'danger'],
+                                        'blocks'   => ['label' => 'Blocked Attempts', 'value' => (int)($log_analysis_stats['total_blocks'] ?? 0),     'border' => 'warning',   'text' => 'warning'],
+                                        'auth'     => ['label' => 'Failed Auth',      'value' => (int)($log_analysis_stats['total_failed_auth'] ?? 0),'border' => 'secondary', 'text' => 'secondary'],
+                                    ];
+                                    ?>
                                     <div class="row">
+                                        <?php foreach ($la_tiles as $key => $t): ?>
                                         <div class="col-md-3 mb-3">
-                                            <div class="card border-primary">
+                                            <div class="card border-<?= $t['border'] ?> la-tile" role="button" tabindex="0"
+                                                 data-la-panel="la-panel-<?= $key ?>"
+                                                 aria-expanded="false" aria-controls="la-panel-<?= $key ?>"
+                                                 title="Show the records behind this number">
                                                 <div class="card-body text-center p-3">
-                                                    <h6 class="text-muted mb-2" style="font-size: 0.9rem;">Total Analyses</h6>
-                                                    <h3 class="text-primary mb-0"><?php echo number_format($log_analysis_stats['total_analyses'] ?? 0); ?></h3>
+                                                    <h6 class="text-muted mb-2" style="font-size: 0.9rem;"><?= htmlspecialchars($t['label']) ?></h6>
+                                                    <h3 class="text-<?= $t['text'] ?> mb-0"><?= number_format($t['value']) ?></h3>
+                                                    <small class="text-muted la-tile-hint"><i class="fas fa-chevron-down me-1"></i>details</small>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-3 mb-3">
-                                            <div class="card border-danger">
-                                                <div class="card-body text-center p-3">
-                                                    <h6 class="text-muted mb-2" style="font-size: 0.9rem;">Active Threats</h6>
-                                                    <h3 class="text-danger mb-0"><?php echo number_format($log_analysis_stats['total_threats'] ?? 0); ?></h3>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3 mb-3">
-                                            <div class="card border-warning">
-                                                <div class="card-body text-center p-3">
-                                                    <h6 class="text-muted mb-2" style="font-size: 0.9rem;">Blocked Attempts</h6>
-                                                    <h3 class="text-warning mb-0"><?php echo number_format($log_analysis_stats['total_blocks'] ?? 0); ?></h3>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3 mb-3">
-                                            <div class="card border-secondary">
-                                                <div class="card-body text-center p-3">
-                                                    <h6 class="text-muted mb-2" style="font-size: 0.9rem;">Failed Auth</h6>
-                                                    <h3 class="text-secondary mb-0"><?php echo number_format($log_analysis_stats['total_failed_auth'] ?? 0); ?></h3>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <?php endforeach ?>
                                     </div>
+
+                                    <?php
+                                    $la_when = static fn(?string $d): string => $d ? date('M j, H:i', strtotime($d)) : '-';
+                                    ?>
+
+                                    <!-- Total Analyses -->
+                                    <?php
+                                    // Grouped by report, because the tile counts
+                                    // COUNT(DISTINCT asr.id) - scans, not log files. Listing one
+                                    // row per log file made the panel show six against a tile
+                                    // reading two, which is worse than no detail at all: it
+                                    // invites the reader to doubt whichever number they checked
+                                    // second.
+                                    $la_by_report = [];
+                                    foreach ($log_analysis_rows as $r) {
+                                        $rid = (int) $r['report_id'];
+                                        if (!isset($la_by_report[$rid])) {
+                                            $la_by_report[$rid] = [
+                                                'when' => $r['created_at'], 'grade' => $r['overall_grade'],
+                                                'logs' => [], 'lines' => 0, 'levels' => [],
+                                            ];
+                                        }
+                                        $la_by_report[$rid]['logs'][] = $r['log_type'];
+                                        $la_by_report[$rid]['lines'] += (int) $r['lines_analyzed'];
+                                        if ($r['threat_level']) { $la_by_report[$rid]['levels'][] = $r['threat_level']; }
+                                    }
+                                    ?>
+                                    <div class="la-panel" id="la-panel-analyses" hidden>
+                                      <div class="table-responsive">
+                                        <table class="table table-sm table-dark mb-0">
+                                          <thead><tr><th>Scanned</th><th>Logs read</th><th class="text-end">Lines</th><th>Threat level</th><th>Grade</th><th>Report</th></tr></thead>
+                                          <tbody>
+                                          <?php foreach ($la_by_report as $rid => $g): ?>
+                                            <tr>
+                                              <td><?= htmlspecialchars($la_when($g['when'])) ?></td>
+                                              <td><code><?= htmlspecialchars(implode(', ', $g['logs'])) ?></code></td>
+                                              <td class="text-end"><?= number_format($g['lines']) ?></td>
+                                              <td><?= htmlspecialchars($g['levels'] ? implode('/', array_unique($g['levels'])) : '-') ?></td>
+                                              <td><?= htmlspecialchars($g['grade'] ?: '-') ?></td>
+                                              <td><a href="/ai_reports.php?report_id=<?= (int)$rid ?>">#<?= (int)$rid ?></a></td>
+                                            </tr>
+                                          <?php endforeach ?>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <small class="text-muted d-block mt-2">
+                                        One row per scan. A scan reading three log files appears once here,
+                                        and three times in the per-log figures above.
+                                      </small>
+                                    </div>
+
+                                    <!-- Active Threats -->
+                                    <div class="la-panel" id="la-panel-threats" hidden>
+                                      <?php if ($log_threat_items): ?>
+                                        <ul class="list-group list-group-flush">
+                                          <?php foreach ($log_threat_items as $it): ?>
+                                            <li class="list-group-item bg-transparent">
+                                              <code><?= htmlspecialchars($it['value']) ?></code>
+                                              <small class="text-muted ms-2">
+                                                <?= htmlspecialchars($it['log_type']) ?> log,
+                                                <?= htmlspecialchars($la_when($it['when'])) ?>,
+                                                <a href="/ai_reports.php?report_id=<?= (int)$it['report_id'] ?>">report #<?= (int)$it['report_id'] ?></a>
+                                              </small>
+                                            </li>
+                                          <?php endforeach ?>
+                                        </ul>
+                                      <?php else: ?>
+                                        <div class="alert alert-success mb-0">
+                                          <i class="fas fa-check-circle me-2"></i>
+                                          No active threats were identified in any log sample in this window.
+                                          The logs were read &mdash; <?= number_format(array_sum(array_column($log_analysis_rows, 'lines_analyzed'))) ?>
+                                          lines across <?= count($log_analysis_rows) ?> file(s) &mdash; and nothing was flagged.
+                                        </div>
+                                      <?php endif ?>
+                                    </div>
+
+                                    <!-- Blocked Attempts -->
+                                    <div class="la-panel" id="la-panel-blocks" hidden>
+                                      <div class="table-responsive">
+                                        <table class="table table-sm table-dark mb-0">
+                                          <thead><tr><th>Scanned</th><th>Log</th><th class="text-end">Blocked</th><th>Report</th></tr></thead>
+                                          <tbody>
+                                          <?php foreach ($log_analysis_rows as $r): ?>
+                                            <?php if ((int)$r['blocked_attempts'] === 0) { continue; } ?>
+                                            <tr>
+                                              <td><?= htmlspecialchars($la_when($r['created_at'])) ?></td>
+                                              <td><code><?= htmlspecialchars($r['log_type']) ?></code></td>
+                                              <td class="text-end"><?= number_format((int)$r['blocked_attempts']) ?></td>
+                                              <td><a href="/ai_reports.php?report_id=<?= (int)$r['report_id'] ?>">#<?= (int)$r['report_id'] ?></a></td>
+                                            </tr>
+                                          <?php endforeach ?>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <small class="text-muted d-block mt-2">
+                                        Counted from the log sample each scan read, not from the firewall's full
+                                        counters &mdash; these are what appeared in the lines sent for analysis.
+                                      </small>
+                                    </div>
+
+                                    <!-- Failed Auth -->
+                                    <div class="la-panel" id="la-panel-auth" hidden>
+                                      <?php $authRows = array_filter($log_analysis_rows, fn($r) => (int)$r['failed_auth_attempts'] > 0); ?>
+                                      <?php if ($authRows): ?>
+                                        <div class="table-responsive">
+                                          <table class="table table-sm table-dark mb-0">
+                                            <thead><tr><th>Scanned</th><th>Log</th><th class="text-end">Failed</th><th>Report</th></tr></thead>
+                                            <tbody>
+                                            <?php foreach ($authRows as $r): ?>
+                                              <tr>
+                                                <td><?= htmlspecialchars($la_when($r['created_at'])) ?></td>
+                                                <td><code><?= htmlspecialchars($r['log_type']) ?></code></td>
+                                                <td class="text-end"><?= number_format((int)$r['failed_auth_attempts']) ?></td>
+                                                <td><a href="/ai_reports.php?report_id=<?= (int)$r['report_id'] ?>">#<?= (int)$r['report_id'] ?></a></td>
+                                              </tr>
+                                            <?php endforeach ?>
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      <?php else: ?>
+                                        <div class="alert alert-success mb-0">
+                                          <i class="fas fa-check-circle me-2"></i>No failed authentication attempts appeared in any log sample in this window.
+                                        </div>
+                                      <?php endif ?>
+                                      <?php if ($log_ip_items): ?>
+                                        <div class="mt-2">
+                                          <strong class="small">Suspicious addresses seen</strong>
+                                          <ul class="list-group list-group-flush">
+                                            <?php foreach ($log_ip_items as $it): ?>
+                                              <li class="list-group-item bg-transparent">
+                                                <code><?= htmlspecialchars($it['value']) ?></code>
+                                                <small class="text-muted ms-2"><?= htmlspecialchars($it['log_type']) ?> log, <?= htmlspecialchars($la_when($it['when'])) ?></small>
+                                              </li>
+                                            <?php endforeach ?>
+                                          </ul>
+                                        </div>
+                                      <?php endif ?>
+                                    </div>
+
                                     <div class="alert alert-dark border-secondary mb-0 mt-2">
                                         <small class="text-muted"><i class="fas fa-info-circle me-2"></i>Statistics based on AI scans performed in the last 30 days. Run AI security analysis to update these metrics.</small>
                                     </div>
+
+                                    <script>
+                                    // One panel open at a time: four stacked tables is not "details",
+                                    // it is the same wall of numbers further down the page. Keyboard
+                                    // reachable because the tiles are controls now, not decoration.
+                                    (function () {
+                                      const tiles = document.querySelectorAll('.la-tile');
+                                      const close = () => {
+                                        document.querySelectorAll('.la-panel').forEach(p => p.hidden = true);
+                                        tiles.forEach(t => { t.classList.remove('open'); t.setAttribute('aria-expanded', 'false'); });
+                                      };
+                                      const toggle = (tile) => {
+                                        const panel = document.getElementById(tile.dataset.laPanel);
+                                        if (!panel) { return; }
+                                        const wasOpen = !panel.hidden;
+                                        close();
+                                        if (!wasOpen) {
+                                          panel.hidden = false;
+                                          tile.classList.add('open');
+                                          tile.setAttribute('aria-expanded', 'true');
+                                        }
+                                      };
+                                      tiles.forEach(tile => {
+                                        tile.addEventListener('click', () => toggle(tile));
+                                        tile.addEventListener('keydown', e => {
+                                          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(tile); }
+                                        });
+                                      });
+                                    })();
+                                    </script>
                                 <?php else: ?>
                                     <div class="alert alert-info mb-0">
                                         <i class="fas fa-info-circle me-2"></i>No log analysis data available yet. Run an AI security scan to generate log analysis statistics.
