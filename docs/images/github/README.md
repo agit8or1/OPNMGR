@@ -19,7 +19,7 @@ that can silently fail to catch a hostname.
 
 | File | Content |
 |---|---|
-| `<feature>-light.png`, `<feature>-dark.png` | 28 captures, 1440×1000 at deviceScaleFactor 2 |
+| `<feature>-light.png`, `<feature>-dark.png` | 32 captures, 1440×1000 at deviceScaleFactor 2 |
 | `walkthrough-poster.png` | Poster frame for the walkthrough video |
 | `captures.json` | Route, theme, tab and viewport for every capture |
 

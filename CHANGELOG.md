@@ -6,6 +6,33 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.77.0
+**Released**: September 20, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **Log Analysis Statistics multiplied every total by the number of logs read.**
+
+  `api/ai_scan.php` writes one `log_analysis_results` row per log file and fills
+  each with the same report-level figures, so a scan reporting 5 blocked attempts
+  stored 5 three times. Two such scans showed **30** against a true **10**.
+
+  Totals collapse each report to one row before adding, and the panels group by
+  scan - showing which logs were read, how many lines, the threat level and
+  anomaly score beside the figure.
+
+### Added
+
+- **Sample AI reports in the demo fixture**, and four documentation captures: a
+  firewall that scans badly, one that scans well, the log analysis panel and the
+  provider settings. None could be photographed from a real installation - a
+  report is a list of a firewall's weaknesses beside its addresses.
+
+- All 32 screenshots regenerated, so they show the scan and health grades, the
+  pending agent version, the alert policy tab and the incident detail view.
+
+---
+
 ## Version 3.76.1
 **Released**: September 20, 2026 | **Agent**: v1.7.0
 

@@ -740,6 +740,167 @@ foreach ($fleet as $n => $f) {
 }
 echo "  update campaign    1 running, rings seeded in terminal states\n";
 
+// Firewall id, customer, site and hostname for a fleet index. Defined here
+// because the AI scan seeding below is now the first consumer; the incident
+// seeding further down uses the same closure.
+$fwMeta = static function (int $idx) use ($ids, $fleet, $customerIds, $siteIds) {
+    $f = $fleet[$idx];
+    return [$ids[$idx], $customerIds[$f[1]], $siteIds[$f[1] . '/' . $f[2]], $f[0]];
+};
+
+// ---------------------------------------------------------------------------
+// AI security scans.
+//
+// The fixture seeded no scan data at all, so the AI report screens could not be
+// photographed from the demo environment - and they are not the sort of thing to
+// photograph from a real fleet, since a report is a list of a firewall's actual
+// weaknesses next to its actual addresses.
+//
+// Findings below are written against the documentation addresses this fixture
+// already uses. Severities follow the same rule the live prompt states: critical
+// means reachable from the internet and administrative, low means a hardening
+// gap with no path in.
+// ---------------------------------------------------------------------------
+
+$insReport = $db->prepare(
+    'INSERT INTO ai_scan_reports
+        (firewall_id, config_snapshot_id, scan_type, provider, model, overall_grade,
+         security_score, risk_level, summary, recommendations, concerns, improvements,
+         full_report, scan_duration, prompt_tokens, completion_tokens, total_tokens, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+);
+$insFinding = $db->prepare(
+    'INSERT INTO ai_scan_findings
+        (report_id, source, category, severity, title, description, recommendation, affected_rules)
+     VALUES (?,?,?,?,?,?,?,?)'
+);
+$insLogAnalysis = $db->prepare(
+    'INSERT INTO log_analysis_results
+        (report_id, log_type, lines_analyzed, active_threats, suspicious_ips,
+         blocked_attempts, failed_auth_attempts, anomaly_score, threat_level)
+     VALUES (?,?,?,?,?,?,?,?,?)'
+);
+
+// [fw index, grade, score, risk, hours ago, scan type, summary, [findings], [logs]]
+$scans = [
+    [3, 'D', 62, 'high', 2.5, 'config_with_logs',
+     'The firewall is reachable and fully patched, and its rule set is mostly sound: SSH is restricted to two management addresses, bogon and private-range blocking are enabled on WAN, and outbound NAT is unremarkable. Two administrative interfaces are published to the internet without source restriction, which is what drives the grade. Ordinary service publishing - web and mail for the site - is intentional and is not treated as a concern.',
+     [
+        ['critical', 'management_exposure', 'Web GUI reachable from any internet source',
+         'An enabled WAN rule permits any source to the firewall itself on 443, and the GUI listens on all interfaces. Anyone who can reach the address can reach the login page.',
+         'Restrict the rule to your management prefixes, or move administration behind the VPN.',
+         "wan | pass TCP any -> (self):443 | HTTPS Allow\nsystem | webgui protocol=https port=443"],
+        ['critical', 'management_exposure', 'Hypervisor management interface published to the internet',
+         'Port 8006 is forwarded from the WAN address to an internal host with no source restriction.',
+         'Restrict the forward to known addresses, or publish it through the VPN instead.',
+         'wan | pass TCP any -> 10.22.0.40:8006 | pve host'],
+        ['high', 'remote_access', 'SSH password authentication enabled',
+         'The daemon permits password authentication. SSH is restricted to two management addresses, so this is not internet-facing, but a stolen password would be sufficient on its own from either of them.',
+         'Set PasswordAuthentication to no and rely on keys.',
+         'system | sshd passwordauth=1 permitrootlogin=1'],
+        ['medium', 'access_control', 'Single-source WAN exception reaches any destination',
+         'One WAN rule permits a specific source address to any internal destination on any port.',
+         'Narrow the destination to the hosts that address actually needs.',
+         'wan | pass any 203.0.113.77 -> any | vendor access'],
+        ['low', 'dns', 'DNSSEC validation disabled',
+         'Neither resolver validates DNSSEC. The resolver is bound to the LAN and is not reachable from the internet, so this is a hardening gap rather than an exposure.',
+         'Enable DNSSEC validation in the resolver.',
+         'unbound | dnssec=0'],
+        ['low', 'vpn_access_control', 'VPN interface policy permits any-to-any',
+         'The WireGuard interface passes all traffic from connected peers. Peers are admitted by key, so this is open to people who already hold one rather than to the internet.',
+         'Narrow the interface policy to the networks peers actually need.',
+         'wireguard | pass any any -> any'],
+     ],
+     [['filter', 412, 18, 0, 'low'], ['system', 96, 0, 0, 'low'], ['resolver', 240, 0, 0, 'low']],
+    ],
+    [0, 'A', 94, 'low', 6.0, 'config_only',
+     'A tight configuration. Administration is reachable only from the management prefixes, the GUI is HTTPS with a current certificate, DNSSEC validation is on, and the single published service is an intentional web listener. What remains is preference rather than exposure.',
+     [
+        ['low', 'service_hardening', 'WAN responds to ICMP echo from any source',
+         'The firewall answers pings from the internet. This reveals that the address is live and nothing more.',
+         'Leave it if you use it for monitoring; otherwise restrict it to your monitoring hosts.',
+         'wan | pass ICMP any -> (self) | Allow ping'],
+        ['low', 'monitoring', 'Intrusion detection is not enabled',
+         'Suricata is installed but not started. This is optional hardening and does not affect the grade.',
+         'Enable it if you want signature-based detection on this circuit.',
+         'service | suricata status=stopped'],
+        ['info', 'access_control', 'SSH restricted to management addresses',
+         'Port 22 is reachable only from two known prefixes, which is what the rest of this report assumes.',
+         'No action needed.',
+         'wan | pass TCP 192.0.2.0/24 -> (self):22 | management'],
+     ],
+     [],
+    ],
+    [8, 'C', 71, 'medium', 30.0, 'config_only',
+     'This firewall has not checked in for some time and the configuration read is the last one collected. The rule set publishes two services intentionally; the concerns are an expired certificate still bound to the web GUI and an administrative interface reachable from a broad source range rather than from named hosts.',
+     [
+        ['high', 'certificates', 'Web GUI is using an expired certificate',
+         'The certificate bound to the GUI expired eleven days ago. Administrators are being trained to click through the warning.',
+         'Renew and rebind the certificate.',
+         'system | webgui ssl-certref=webgui-8 expired'],
+        ['medium', 'management_exposure', 'Administration reachable from a broad source range',
+         'The management rule permits a /16 rather than the specific hosts that need it.',
+         'Narrow the source to the addresses actually used for administration.',
+         'wan | pass TCP 203.0.113.0/16 -> (self):443 | admin'],
+        ['low', 'dns', 'DNSSEC validation disabled', 'Resolver hardening, not an exposure.',
+         'Enable DNSSEC validation.', 'unbound | dnssec=0'],
+     ],
+     [],
+    ],
+];
+
+$scanCount = 0;
+$findingCount = 0;
+foreach ($scans as $scan) {
+    [$idx, $grade, $score, $risk, $ageH, $type, $summary, $findings, $logs] = $scan;
+    [$fid, , , ] = $fwMeta($idx);
+
+    $recs = [];
+    foreach ($findings as $f) {
+        if ($f[0] === 'info') { continue; }
+        $recs[] = $f[2] . ' - ' . $f[4];
+    }
+    // Titles, not category slugs: "Key Concerns" is read by a person, and
+    // "management_exposure" twice over says less than the two sentences it
+    // stands for.
+    $concerns = [];
+    foreach ($findings as $f) {
+        if (in_array($f[0], ['critical', 'high'], true)) {
+            $concerns[] = strtoupper($f[0]) . ': ' . $f[2];
+        }
+    }
+
+    $promptTokens = 38000 + ($idx * 1700);
+    $completion   = 1800 + ($idx * 90);
+
+    $insReport->execute([
+        $fid, null, $type, 'openai', 'gpt-5.5', $grade, $score, $risk,
+        $summary,
+        implode("\n", $recs),
+        $concerns ? implode("\n", $concerns) : 'No critical or high severity concerns were raised.',
+        'Optional hardening is listed in the findings below and does not affect the grade.',
+        $summary,
+        14 + $idx,
+        $promptTokens, $completion, $promptTokens + $completion,
+        $ts('-' . $ageH . ' hours'),
+    ]);
+    $reportId = (int) $db->lastInsertId();
+    $scanCount++;
+
+    foreach ($findings as $f) {
+        $insFinding->execute([$reportId, 'config', $f[1], $f[0], $f[2], $f[3], $f[4], $f[5]]);
+        $findingCount++;
+    }
+    foreach ($logs as $l) {
+        [$logType, $lines, $blocked, $failedAuth, $level] = $l;
+        $insLogAnalysis->execute([
+            $reportId, $logType, $lines, json_encode([]), json_encode([]),
+            $blocked, $failedAuth, $level === 'low' ? 0.12 : 0.55, $level,
+        ]);
+    }
+}
+echo "  ai scans           {$scanCount} reports, {$findingCount} findings\n";
+
 // ---------------------------------------------------------------------------
 // Incidents.
 // ---------------------------------------------------------------------------
@@ -758,10 +919,6 @@ $insEvent = $db->prepare(
      VALUES (?,?,?,?,?)'
 );
 
-$fwMeta = static function (int $idx) use ($ids, $fleet, $customerIds, $siteIds) {
-    $f = $fleet[$idx];
-    return [$ids[$idx], $customerIds[$f[1]], $siteIds[$f[1] . '/' . $f[2]], $f[0]];
-};
 
 $incidents = [
     // [fw index, type, object, severity, status, title, detail, age hours, count]

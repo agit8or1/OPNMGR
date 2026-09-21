@@ -76,6 +76,15 @@ const TARGETS = [
   { file: 'agent-diagnostics',   url: '/diagnostics.php',                    theme: 'light' },
 
   // --- Configuration and change control -----------------------------------
+  // AI security analysis. The fixture seeds three reports so the set can show a
+  // firewall that scans badly, one that scans well, and the settings page that
+  // chooses the model - none of which could be photographed from a real fleet,
+  // since a report is a list of a firewall's actual weaknesses beside its actual
+  // addresses.
+  { file: 'ai-report',           url: '/ai_reports.php?report_id=1',         theme: 'dark'  },
+  { file: 'ai-report-clean',     url: '/ai_reports.php?report_id=2',         theme: 'light' },
+  { file: 'ai-log-analysis',     url: '/firewall_details.php?id=4',          theme: 'dark', tab: 'AI Analysis' },
+  { file: 'ai-settings',         url: '/ai_settings.php',                    theme: 'light' },
   { file: 'config-drift',        url: '/config_drift.php',                   theme: 'light' },
   { file: 'config-diff',         url: '/config_drift.php?firewall=4',        theme: 'dark',
     scrollTo: 'DIFFERENCES FROM BASELINE' },

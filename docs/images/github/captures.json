@@ -1,10 +1,258 @@
 [
   {
+    "name": "fleet-dashboard-dark",
+    "url": "/dashboard.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 596768
+  },
+  {
+    "name": "fleet-dashboard-light",
+    "url": "/dashboard.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 570954
+  },
+  {
+    "name": "fleet-firewalls-light",
+    "url": "/firewalls.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 558916
+  },
+  {
+    "name": "customers-sites-dark",
+    "url": "/customers.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 462093
+  },
+  {
+    "name": "firewall-statistics-dark",
+    "url": "/firewall_details.php?id=4",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 485973
+  },
+  {
+    "name": "firewall-health-light",
+    "url": "/firewall_health.php?firewall=4",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 391306
+  },
+  {
+    "name": "health-overview-dark",
+    "url": "/firewall_health.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 535594
+  },
+  {
+    "name": "incidents-light",
+    "url": "/incidents.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 444489
+  },
+  {
+    "name": "alert-history-dark",
+    "url": "/alert_history.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 442248
+  },
+  {
+    "name": "audit-log-light",
+    "url": "/audit_log.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 615724
+  },
+  {
+    "name": "manager-health-dark",
+    "url": "/health_monitor.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 578201
+  },
+  {
+    "name": "agent-diagnostics-light",
+    "url": "/diagnostics.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 378579
+  },
+  {
+    "name": "ai-report-dark",
+    "url": "/ai_reports.php?report_id=1",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 550077
+  },
+  {
+    "name": "ai-report-clean-light",
+    "url": "/ai_reports.php?report_id=2",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 462783
+  },
+  {
+    "name": "ai-log-analysis-dark",
+    "url": "/firewall_details.php?id=4",
+    "theme": "dark",
+    "tab": "AI Analysis",
+    "viewport": "1440x1000@2x",
+    "bytes": 381665
+  },
+  {
+    "name": "ai-settings-light",
+    "url": "/ai_settings.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 449170
+  },
+  {
+    "name": "config-drift-light",
+    "url": "/config_drift.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 445077
+  },
+  {
+    "name": "config-diff-dark",
+    "url": "/config_drift.php?firewall=4",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 460076
+  },
+  {
+    "name": "config-search-light",
+    "url": "/config_search.php?q=check%3Assh_open_to_world",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 290496
+  },
+  {
+    "name": "backup-history-dark",
+    "url": "/firewall_details.php?id=4",
+    "theme": "dark",
+    "tab": "Backups",
+    "viewport": "1440x1000@2x",
+    "bytes": 496392
+  },
+  {
+    "name": "fleet-updates-dark",
+    "url": "/fleet_updates.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 505031
+  },
+  {
+    "name": "bulk-operations-light",
+    "url": "/bulk_operations.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 415097
+  },
+  {
+    "name": "maintenance-windows-dark",
+    "url": "/maintenance.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 365301
+  },
+  {
+    "name": "fleet-search-light",
+    "url": "/search.php?q=tag%3Acritical-site",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 403888
+  },
+  {
+    "name": "enroll-firewall-light",
+    "url": "/add_firewall_page.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 503355
+  },
+  {
     "name": "settings-dark",
     "url": "/settings.php",
     "theme": "dark",
     "tab": null,
     "viewport": "1440x1000@2x",
-    "bytes": 316279
+    "bytes": 454150
+  },
+  {
+    "name": "users-roles-light",
+    "url": "/users.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 377260
+  },
+  {
+    "name": "tags-dark",
+    "url": "/manage_tags_ui.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 295728
+  },
+  {
+    "name": "approved-commands-light",
+    "url": "/approved_commands.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 360138
+  },
+  {
+    "name": "alerting-dark",
+    "url": "/alerts.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 526595
+  },
+  {
+    "name": "system-backup-light",
+    "url": "/system_backup.php",
+    "theme": "light",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 454552
+  },
+  {
+    "name": "about-dark",
+    "url": "/about.php",
+    "theme": "dark",
+    "tab": null,
+    "viewport": "1440x1000@2x",
+    "bytes": 492597
   }
 ]

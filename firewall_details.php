@@ -94,15 +94,35 @@ $log_analysis_stats = [
 ];
 
 try {
+    // Counted once per scan, not once per log file.
+    //
+    // api/ai_scan.php writes one log_analysis_results row per log it read, and
+    // fills each with the SAME report-level figures - $analysis['blocked_attempts']
+    // is the model's count for the whole scan, written three times when three
+    // logs were read. Summing the rows therefore multiplied every total by the
+    // number of logs: a scan reporting 5 blocked attempts showed 15, and two
+    // such scans showed 30.
+    //
+    // The inner query collapses each report to one row before the outer one adds
+    // them up, which also makes the figure agree with the detail panel below.
     $stats_query = "SELECT
-        COUNT(DISTINCT asr.id) as total_analyses,
-        SUM(lar.active_threats IS NOT NULL AND JSON_LENGTH(lar.active_threats) > 0) as total_threats,
-        SUM(lar.blocked_attempts) as total_blocks,
-        SUM(lar.failed_auth_attempts) as total_failed_auth,
-        AVG(lar.anomaly_score) as avg_anomaly_score
-    FROM ai_scan_reports asr
-    LEFT JOIN log_analysis_results lar ON asr.id = lar.report_id
-    WHERE asr.firewall_id = ? AND asr.scan_type = 'config_with_logs' AND asr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+        COUNT(*) as total_analyses,
+        SUM(per_report.threats) as total_threats,
+        SUM(per_report.blocked) as total_blocks,
+        SUM(per_report.failed_auth) as total_failed_auth,
+        AVG(per_report.anomaly) as avg_anomaly_score
+    FROM (
+        SELECT asr.id,
+               MAX(lar.active_threats IS NOT NULL AND JSON_LENGTH(lar.active_threats) > 0) AS threats,
+               MAX(COALESCE(lar.blocked_attempts, 0))     AS blocked,
+               MAX(COALESCE(lar.failed_auth_attempts, 0)) AS failed_auth,
+               MAX(COALESCE(lar.anomaly_score, 0))        AS anomaly
+          FROM ai_scan_reports asr
+          LEFT JOIN log_analysis_results lar ON asr.id = lar.report_id
+         WHERE asr.firewall_id = ? AND asr.scan_type = 'config_with_logs'
+           AND asr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+         GROUP BY asr.id
+    ) per_report";
 
     $stats_stmt = db()->prepare($stats_query);
     $stats_stmt->execute([$id]);
@@ -1280,11 +1300,18 @@ function connectViaOnDemandTunnel(firewallId) {
                                             $la_by_report[$rid] = [
                                                 'when' => $r['created_at'], 'grade' => $r['overall_grade'],
                                                 'logs' => [], 'lines' => 0, 'levels' => [],
+                                                'blocked' => 0, 'failed_auth' => 0, 'anomaly' => 0.0,
                                             ];
                                         }
                                         $la_by_report[$rid]['logs'][] = $r['log_type'];
                                         $la_by_report[$rid]['lines'] += (int) $r['lines_analyzed'];
                                         if ($r['threat_level']) { $la_by_report[$rid]['levels'][] = $r['threat_level']; }
+                                        // max, not sum: the same scan-level figure is written to
+                                        // every log row, so adding them multiplies by the number
+                                        // of logs read.
+                                        $la_by_report[$rid]['blocked']     = max($la_by_report[$rid]['blocked'], (int) $r['blocked_attempts']);
+                                        $la_by_report[$rid]['failed_auth'] = max($la_by_report[$rid]['failed_auth'], (int) $r['failed_auth_attempts']);
+                                        $la_by_report[$rid]['anomaly']     = max($la_by_report[$rid]['anomaly'], (float) $r['anomaly_score']);
                                     }
                                     ?>
                                     <div class="la-panel" id="la-panel-analyses" hidden>
@@ -1340,40 +1367,49 @@ function connectViaOnDemandTunnel(firewallId) {
                                     <div class="la-panel" id="la-panel-blocks" hidden>
                                       <div class="table-responsive">
                                         <table class="table table-sm table-dark mb-0">
-                                          <thead><tr><th>Scanned</th><th>Log</th><th class="text-end">Blocked</th><th>Report</th></tr></thead>
+                                          <thead><tr><th>Scanned</th><th class="text-end">Blocked</th><th>Logs read</th>
+                                            <th class="text-end">Lines</th><th>Threat level</th><th class="text-end">Anomaly</th><th>Report</th></tr></thead>
                                           <tbody>
-                                          <?php foreach ($log_analysis_rows as $r): ?>
-                                            <?php if ((int)$r['blocked_attempts'] === 0) { continue; } ?>
+                                          <?php foreach ($la_by_report as $rid => $g): ?>
+                                            <?php if ($g['blocked'] === 0) { continue; } ?>
                                             <tr>
-                                              <td><?= htmlspecialchars($la_when($r['created_at'])) ?></td>
-                                              <td><code><?= htmlspecialchars($r['log_type']) ?></code></td>
-                                              <td class="text-end"><?= number_format((int)$r['blocked_attempts']) ?></td>
-                                              <td><a href="/ai_reports.php?report_id=<?= (int)$r['report_id'] ?>">#<?= (int)$r['report_id'] ?></a></td>
+                                              <td><?= htmlspecialchars($la_when($g['when'])) ?></td>
+                                              <td class="text-end"><?= number_format($g['blocked']) ?></td>
+                                              <td><code><?= htmlspecialchars(implode(', ', $g['logs'])) ?></code></td>
+                                              <td class="text-end"><?= number_format($g['lines']) ?></td>
+                                              <td><?= htmlspecialchars($g['levels'] ? implode('/', array_unique($g['levels'])) : '-') ?></td>
+                                              <td class="text-end"><?= htmlspecialchars((string) round($g['anomaly'], 2)) ?></td>
+                                              <td><a href="/ai_reports.php?report_id=<?= (int)$rid ?>">#<?= (int)$rid ?></a></td>
                                             </tr>
                                           <?php endforeach ?>
                                           </tbody>
                                         </table>
                                       </div>
                                       <small class="text-muted d-block mt-2">
-                                        Counted from the log sample each scan read, not from the firewall's full
-                                        counters &mdash; these are what appeared in the lines sent for analysis.
+                                        One row per scan, because the figure is the model's count for that scan as
+                                        a whole &mdash; it is stored against each log file it read, not measured
+                                        per log. Counted from the lines sent for analysis, not from the firewall's
+                                        own counters.
                                       </small>
                                     </div>
 
                                     <!-- Failed Auth -->
                                     <div class="la-panel" id="la-panel-auth" hidden>
-                                      <?php $authRows = array_filter($log_analysis_rows, fn($r) => (int)$r['failed_auth_attempts'] > 0); ?>
+                                      <?php $authRows = array_filter($la_by_report, fn($g) => $g['failed_auth'] > 0); ?>
                                       <?php if ($authRows): ?>
                                         <div class="table-responsive">
                                           <table class="table table-sm table-dark mb-0">
-                                            <thead><tr><th>Scanned</th><th>Log</th><th class="text-end">Failed</th><th>Report</th></tr></thead>
+                                            <thead><tr><th>Scanned</th><th class="text-end">Failed</th><th>Logs read</th>
+                                              <th class="text-end">Lines</th><th>Threat level</th><th>Report</th></tr></thead>
                                             <tbody>
-                                            <?php foreach ($authRows as $r): ?>
+                                            <?php foreach ($authRows as $rid => $g): ?>
                                               <tr>
-                                                <td><?= htmlspecialchars($la_when($r['created_at'])) ?></td>
-                                                <td><code><?= htmlspecialchars($r['log_type']) ?></code></td>
-                                                <td class="text-end"><?= number_format((int)$r['failed_auth_attempts']) ?></td>
-                                                <td><a href="/ai_reports.php?report_id=<?= (int)$r['report_id'] ?>">#<?= (int)$r['report_id'] ?></a></td>
+                                                <td><?= htmlspecialchars($la_when($g['when'])) ?></td>
+                                                <td class="text-end"><?= number_format($g['failed_auth']) ?></td>
+                                                <td><code><?= htmlspecialchars(implode(', ', $g['logs'])) ?></code></td>
+                                                <td class="text-end"><?= number_format($g['lines']) ?></td>
+                                                <td><?= htmlspecialchars($g['levels'] ? implode('/', array_unique($g['levels'])) : '-') ?></td>
+                                                <td><a href="/ai_reports.php?report_id=<?= (int)$rid ?>">#<?= (int)$rid ?></a></td>
                                               </tr>
                                             <?php endforeach ?>
                                             </tbody>

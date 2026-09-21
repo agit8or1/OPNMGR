@@ -63,11 +63,26 @@ check('the analyses panel groups by report',
 check('the grouping is explained where it could confuse',
     str_contains($page, 'appears once here'),
     'the same scan appears once here and three times in the per-log figures');
-check('the blocked panel lists per-record contributions',
-    (bool) preg_match('/la-panel-blocks[\s\S]{0,900}blocked_attempts/', $page),
-    'the total is a SUM over these rows, so the rows must be shown for it to be checkable');
-check('rows contributing nothing are not listed as if they did',
-    (bool) preg_match("/la-panel-blocks[\s\S]{0,700}blocked_attempts'\\] === 0\) \{ continue; \}/", $page));
+// The figure is the model's count for the whole scan, and api/ai_scan.php stores
+// it against every log file the scan read - so summing the rows multiplied it by
+// the number of logs. A scan reporting 5 showed 15, and two such scans showed 30
+// against a true 10. The panel groups by scan for the same reason the total now
+// collapses each report before adding.
+check('the blocked panel lists one row per scan',
+    (bool) preg_match('/la-panel-blocks[\s\S]{0,900}foreach \(\$la_by_report/', $page),
+    'one row per log file would repeat the same figure and disagree with the tile');
+check('the per-scan figure is taken once, not summed',
+    (bool) preg_match("/\\\$la_by_report\[\\\$rid\]\['blocked'\]\s*=\s*max\(/", $page),
+    'max, because the same scan-level number is written to every log row');
+check('the aggregate collapses each report before adding',
+    str_contains($page, 'MAX(COALESCE(lar.blocked_attempts, 0))')
+    && str_contains($page, 'GROUP BY asr.id'),
+    'SUM over the raw rows multiplies by the number of logs read');
+check('scans contributing nothing are not listed as if they did',
+    (bool) preg_match("/la-panel-blocks[\s\S]{0,700}\\\$g\['blocked'\] === 0\) \{ continue; \}/", $page));
+check('each row shows what the scan actually read',
+    (bool) preg_match('/la-panel-blocks[\s\S]{0,1200}Logs read[\s\S]{0,600}Threat level/', $page),
+    'the incident detail is which logs, how many lines and what level - not just a count');
 
 // --- zero must mean something ------------------------------------------------
 
@@ -81,13 +96,18 @@ check('no failed authentication says so explicitly',
 // --- the figures must not overclaim ------------------------------------------
 
 check('the blocked figure is scoped to the sample that was read',
-    str_contains($page, "not from the firewall's full"),
+    str_contains($page, "not from the firewall's\n                                        own counters")
+    || str_contains($page, "own counters"),
     'these counts come from the log excerpt sent for analysis, not the firewall counters');
+check('the panel explains why it groups by scan',
+    str_contains($page, 'it is stored against each log file it read, not measured'),
+    'otherwise the reader cannot tell why three logs show one number');
 
 // --- every item traces back --------------------------------------------------
 
 check('records link to the report they came from',
-    substr_count($page, '/ai_reports.php?report_id=<?= (int)$r[\'report_id\']') >= 2);
+    substr_count($page, '/ai_reports.php?report_id=<?= (int)$rid ?>') >= 3,
+    'analyses, blocked and failed-auth panels each link their rows');
 check('threat items carry their log, time and report',
     (bool) preg_match("/log_threat_items[\s\S]{0,1200}report_id/", $page));
 check('the JSON columns are decoded once, not in the markup',

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Health Has A Grade Too'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Counted Once Per Scan'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.0',
+            'date' => '2026-09-20',
+            'type' => 'minor',
+            'title' => 'Counted Once Per Scan',
+            'changes' => [
+                'FIXED: Log Analysis Statistics multiplied every total by the number of log files a scan read. api/ai_scan.php writes one row per log and fills each with the same report-level figures, so a scan reporting 5 blocked attempts stored 5 three times; two such scans showed 30 against a true 10. The totals collapse each report to one row before adding, and the panels group by scan',
+                'CHANGED: The tiles open the detail of each scan rather than a pointer to its report - which logs were read, how many lines, the threat level and anomaly score beside the figure itself',
+                'ADDED: Sample AI reports in the demo fixture, and four new documentation captures: a firewall that scans badly, one that scans well, the log analysis panel and the provider settings. None of these could be photographed from a real installation, since a report is a list of a firewall\'s actual weaknesses beside its actual addresses',
+                'CHANGED: All 32 documentation screenshots regenerated from the demo fixture, so they show the scan grade and health grade columns, the pending agent version, the alert policy tab and the incident detail view',
+            ],
+        ],
         [
             'version' => '3.76.1',
             'date' => '2026-09-20',
