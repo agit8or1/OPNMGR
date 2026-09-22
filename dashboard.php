@@ -202,7 +202,14 @@ $healthColor = $avg_health >= 80 ? 'var(--success)' : ($avg_health >= 50 ? 'var(
 .dash-fw-ip   { color: var(--text-muted); font-size: 0.8rem; font-family: monospace; }
 .dash-fw-cust { font-size: 0.7rem; padding: 1px 7px; background: var(--sidebar-active); border-radius: 3px; color: var(--accent); }
 .dash-fw-health-cell { min-width: 120px; }
-.dash-fw-health-cell .health-bar { width: 60px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+/* The grade badge was added beside the bar and the percentage without taking
+   anything back, so the cell's content outgrew its 120px and widened the whole
+   column. The bar gives up the width the badge needs, and the spacing is the
+   flex gap alone - the bar's margin and the badge's margin were both still
+   there, doubling every gap. */
+.dash-fw-health-cell .health-bar { flex: 0 0 48px; width: 48px; margin-right: 0; }
+.dash-fw-health-cell .dash-fw-health-link { gap: 6px; }
+.dash-fw-health-cell .health-grade { margin-left: 0; min-width: 0; padding: 0 4px; font-size: 0.75rem; }
 .dash-fw-health-pct { font-weight: 600; font-size: 0.8rem; }
 .dash-fw-table .badge { font-size: 0.6rem; padding: 2px 6px; }
 

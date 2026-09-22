@@ -2,7 +2,24 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: September 18, 2026
+**Last Updated**: September 21, 2026
+
+---
+
+## Version 3.77.1
+**Released**: September 21, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **The health grade widened the dashboard's Health column.** 3.76.1 put the
+  letter grade beside the bar and the percentage without taking any width back,
+  and the bar's right margin and the badge's left margin were both still applied
+  on top of the flex gap - so every space in the cell was doubled and the
+  content outgrew the 120px the column had always been given.
+
+  The bar gives up the width the badge needs, and the spacing is the flex gap
+  alone. The cell fits its own column again and the columns beside it are back
+  where they were.
 
 ---
 

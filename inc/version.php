@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-20'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Counted Once Per Scan'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-21'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Grade Pays Its Own Width'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,15 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.1',
+            'date' => '2026-09-21',
+            'type' => 'patch',
+            'title' => 'The Grade Pays Its Own Width',
+            'changes' => [
+                'FIXED: The health grade added in 3.76.1 widened the dashboard Health column and squeezed every column beside it. The badge was placed next to the bar and the percentage without taking any width back, and the bar\'s right margin and the badge\'s left margin were both still there on top of the flex gap. The bar gives up the width the badge needs and the spacing is the gap alone, so the cell fits the 120px it always had',
+            ],
+        ],
         [
             'version' => '3.77.0',
             'date' => '2026-09-20',

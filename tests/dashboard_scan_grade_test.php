@@ -146,5 +146,27 @@ foreach (['good', 'warn', 'bad'] as $cls) {
 check('the health grade is legible in dark mode',
     str_contains($css, '[data-theme="dark"] .health-grade.bad'));
 
+// --- the grade pays its own width --------------------------------------------
+//
+// The badge was added beside the bar and the percentage without taking any
+// width back, and the bar's own right margin and the badge's own left margin
+// were both still applied on top of the flex gap - so the cell outgrew the
+// 120px the column had always been given and squeezed every column beside it.
+
+check('the health bar gives up width for the badge',
+    (bool) preg_match('/\.dash-fw-health-cell \.health-bar \{[^}]*flex: 0 0 48px/', $dash),
+    'a 60px bar plus the percentage plus the badge does not fit 120px');
+check('the bar no longer adds a margin of its own',
+    (bool) preg_match('/\.dash-fw-health-cell \.health-bar \{[^}]*margin-right: 0/', $dash),
+    'margin-right plus the flex gap spaced the cell twice');
+check('the badge no longer adds a margin of its own',
+    (bool) preg_match('/\.dash-fw-health-cell \.health-grade \{[^}]*margin-left: 0/', $dash),
+    'the shared .health-grade rule carries margin-left for non-flex callers');
+check('the badge does not claim a minimum width in the cell',
+    (bool) preg_match('/\.dash-fw-health-cell \.health-grade \{[^}]*min-width: 0/', $dash));
+check('the column keeps the width it always had',
+    str_contains($dash, '.dash-fw-health-cell { min-width: 120px; }'),
+    'widening the column is the regression, not the fix');
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
