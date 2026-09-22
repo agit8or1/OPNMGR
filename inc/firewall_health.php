@@ -204,6 +204,43 @@ if (!function_exists('health_ingest_gateways')) {
     }
 }
 
+if (!function_exists('health_wireguard_status')) {
+    /**
+     * What a WireGuard peer's last handshake actually says about it.
+     *
+     * WireGuard is connectionless. A peer handshakes when it has traffic to
+     * send and rekeys about every two minutes while it does; an idle laptop or
+     * a phone with its screen off sends nothing and handshakes not at all. The
+     * agent calls anything past 180 seconds "down", so every idle peer raised a
+     * vpn.down incident that the next packet resolved minutes later - noise
+     * that looked exactly like a tunnel that had genuinely failed.
+     *
+     * Three states instead of two: up (handshaking now), idle (quiet, but
+     * within the window a working peer can be quiet for) and down (past it, or
+     * never connected at all). Only the last is a fault.
+     *
+     * @param string|null $handshake Last handshake as stored ('Y-m-d H:i:s'), or null.
+     */
+    function health_wireguard_status(?string $handshake): string {
+        if ($handshake === null || $handshake === '' || str_starts_with($handshake, '0000')) {
+            return 'down';
+        }
+
+        $ts = strtotime($handshake);
+        if ($ts === false) {
+            return 'down';
+        }
+
+        // A handshake in the future is a clock difference, not a fault.
+        $age = max(0, time() - $ts);
+        if ($age <= 180) {
+            return 'up';
+        }
+
+        return $age <= health_thresholds()['wg_idle'] ? 'idle' : 'down';
+    }
+}
+
 if (!function_exists('health_ingest_vpn')) {
     /**
      * Replace a firewall's VPN tunnel state, recording transitions.
@@ -233,6 +270,15 @@ if (!function_exists('health_ingest_vpn')) {
             }
 
             $status = strtolower((string)(health_clean_string($t['status'] ?? null, 32) ?? 'unknown'));
+            $handshake = health_parse_timestamp($t['latest_handshake'] ?? null);
+
+            // Decided here rather than on the firewall, so every agent already
+            // in the field - all of which send the 180-second verdict - gets
+            // the same answer, and the alert evaluator and the health page read
+            // one definition instead of each carrying their own.
+            if ($type === 'wireguard') {
+                $status = health_wireguard_status($handshake);
+            }
             $key    = $type . '|' . $name;
 
             if (array_key_exists($key, $existing) && $existing[$key] !== $status) {
@@ -258,7 +304,7 @@ if (!function_exists('health_ingest_vpn')) {
                 health_clean_string($t['endpoint'] ?? null, 255),
                 $status,
                 array_key_exists('enabled', $t) ? (!empty($t['enabled']) ? 1 : 0) : 1,
-                health_parse_timestamp($t['latest_handshake'] ?? null),
+                $handshake,
                 health_parse_timestamp($t['connected_since'] ?? null),
                 isset($t['rx_bytes']) && is_numeric($t['rx_bytes']) ? max(0, (int)$t['rx_bytes']) : null,
                 isset($t['tx_bytes']) && is_numeric($t['tx_bytes']) ? max(0, (int)$t['tx_bytes']) : null,
@@ -499,6 +545,9 @@ if (!function_exists('health_thresholds')) {
             'cert_warn_days_medium'       => 30,
             'health_gateway_loss_warn'    => 5,
             'health_gateway_latency_warn' => 150,
+            // How long a WireGuard peer may go without a handshake before it
+            // counts as down rather than idle. See health_wireguard_status().
+            'health_wireguard_idle_minutes' => 15,
         ];
 
         try {
@@ -519,6 +568,7 @@ if (!function_exists('health_thresholds')) {
             'cert_medium'   => (int)$defaults['cert_warn_days_medium'],
             'gw_loss'       => (float)$defaults['health_gateway_loss_warn'],
             'gw_latency'    => (float)$defaults['health_gateway_latency_warn'],
+            'wg_idle'       => max(180, (int)$defaults['health_wireguard_idle_minutes'] * 60),
         ];
         return $cache;
     }
@@ -622,7 +672,8 @@ if (!function_exists('health_fleet_summary')) {
             $summary['gateways_warn'] = (int)$stmt->fetchColumn();
 
             $summary['vpn_down'] = (int)db()->query(
-                "SELECT COUNT(*) FROM firewall_vpn_tunnels WHERE enabled = 1 AND LOWER(status) NOT IN ('up','connected')"
+                "SELECT COUNT(*) FROM firewall_vpn_tunnels
+                  WHERE enabled = 1 AND LOWER(status) NOT IN ('up','connected','idle')"
             )->fetchColumn();
 
             $summary['services_stopped'] = (int)db()->query(

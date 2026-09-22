@@ -244,13 +244,24 @@ foreach ($firewalls as $fw) {
     foreach ($vpns->fetchAll(PDO::FETCH_ASSOC) as $t) {
         $key = $t['vpn_type'] . '/' . $t['name'];
         $seenTunnels[] = $key;
-        $up  = in_array(strtolower((string)$t['status']), ['up', 'connected'], true);
+        // idle is a WireGuard peer that has simply had nothing to send. It is
+        // not a fault, and treating it as one raised an incident for every
+        // quiet phone and laptop, which the next packet resolved minutes later.
+        // health_wireguard_status() is where that line is drawn, at ingest.
+        $up  = in_array(strtolower((string)$t['status']), ['up', 'connected', 'idle'], true);
 
         if (!$stale && !$up) {
             raise('vpn.down', [
                 'firewall_id' => $id, 'object_key' => $key,
                 'title'  => sprintf('%s tunnel %s is down on %s', ucfirst($t['vpn_type']), $t['name'], $host),
-                'detail' => sprintf('Status %s. Peer %s.', $t['status'], $t['peer'] ?: 'unknown'),
+                'detail' => sprintf(
+                    'Status %s. Peer %s.%s',
+                    $t['status'],
+                    $t['peer'] ?: 'unknown',
+                    $t['latest_handshake']
+                        ? sprintf(' Last handshake %s.', $t['latest_handshake'])
+                        : ' No handshake has ever been recorded.'
+                ),
                 // The endpoint is the address involved, and the last handshake
                 // says when it was last working - both are what you want in
                 // front of you when the incident opens.

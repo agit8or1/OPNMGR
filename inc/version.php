@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-21'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'The Grade Pays Its Own Width'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Quiet Peer Is Not A Down One'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.2',
+            'date' => '2026-09-21',
+            'type' => 'patch',
+            'title' => 'A Quiet Peer Is Not A Down One',
+            'changes' => [
+                'FIXED: Every idle WireGuard peer raised a vpn.down incident that resolved minutes later. WireGuard is connectionless - a peer handshakes when it has traffic to send - and the agent called anything past 180 seconds down, so a phone with its screen off looked exactly like a tunnel that had failed',
+                'ADDED: A third tunnel state, idle: quiet, but within the window a working peer can be quiet for (health_wireguard_idle_minutes, default 15). Only down is a fault. The verdict is reached on ingest, so every agent already in the field gets it without an upgrade',
+                'CHANGED: The health page shows an idle peer in amber rather than as a failure, and the VPN Down counts on the dashboard and the fleet health page no longer include it',
+                'CHANGED: A vpn.down incident records when the tunnel last handshook, or says that it never has',
+            ],
+        ],
         [
             'version' => '3.77.1',
             'date' => '2026-09-21',

@@ -6,6 +6,40 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.77.2
+**Released**: September 21, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **Every idle WireGuard peer raised a VPN-down alert.** WireGuard is
+  connectionless: a peer handshakes when it has traffic to send and rekeys
+  about every two minutes while it does, so a phone with its screen off stops
+  handshaking without anything being wrong. The agent called anything past 180
+  seconds `down`, so those peers opened a `vpn.down` incident that the next
+  packet resolved - noise indistinguishable from a tunnel that had genuinely
+  failed.
+
+  A peer now has three states: **up** (handshaking), **idle** (quiet, but
+  within the window a working peer can be quiet for) and **down** (past it, or
+  never connected). Only `down` is a fault. The window is
+  `health_wireguard_idle_minutes`, 15 by default.
+
+  The verdict is reached when the check-in is stored, not on the firewall, so
+  every agent already in the field gets it without an upgrade, and the alert
+  evaluator and the health page read one definition instead of each carrying
+  their own.
+
+### Changed
+
+- The health page shows an idle peer in amber rather than as a failure, and the
+  VPN Down counts on the dashboard and the fleet health page no longer include
+  idle peers.
+
+- A `vpn.down` incident records when the tunnel last handshook, or says that it
+  never has.
+
+---
+
 ## Version 3.77.1
 **Released**: September 21, 2026 | **Agent**: v1.7.0
 

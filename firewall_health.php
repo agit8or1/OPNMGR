@@ -33,7 +33,7 @@ try {
                (SELECT COUNT(*) FROM firewall_gateways g WHERE g.firewall_id = f.id) AS gw_total,
                (SELECT COUNT(*) FROM firewall_vpn_tunnels v
                  WHERE v.firewall_id = f.id AND v.enabled = 1
-                   AND LOWER(v.status) NOT IN ('up','connected')) AS vpn_down,
+                   AND LOWER(v.status) NOT IN ('up','connected','idle')) AS vpn_down,
                (SELECT COUNT(*) FROM firewall_vpn_tunnels v WHERE v.firewall_id = f.id) AS vpn_total,
                (SELECT COUNT(*) FROM firewall_services sv
                  WHERE sv.firewall_id = f.id AND sv.enabled = 1 AND sv.running = 0) AS svc_stopped,
@@ -370,7 +370,17 @@ include __DIR__ . '/inc/header.php';
                             <td class="small text-muted">
                                 <?php echo htmlspecialchars($v['endpoint'] ?: $v['peer'] ?: '—'); ?>
                             </td>
-                            <td><span class="badge bg-<?php echo in_array(strtolower((string)$v['status']), ['up','connected'], true) ? 'success' : 'danger'; ?>">
+                            <?php
+                            // idle is a WireGuard peer that is quiet, not one
+                            // that has failed - amber, and not counted as down.
+                            $vState = strtolower((string)$v['status']);
+                            $vClass = in_array($vState, ['up', 'connected'], true) ? 'success'
+                                    : ($vState === 'idle' ? 'warning text-dark' : 'danger');
+                            ?>
+                            <td><span class="badge bg-<?php echo $vClass; ?>"
+                                      title="<?php echo $vState === 'idle'
+                                          ? 'No handshake recently, but within the window a working peer can be quiet for'
+                                          : ''; ?>">
                                 <?php echo htmlspecialchars($v['status']); ?></span></td>
                             <td class="small text-muted"><?php echo htmlspecialchars(h_age($v['latest_handshake'])); ?></td>
                             <td class="small"><?php echo h_bytes($v['rx_bytes'] === null ? null : (int)$v['rx_bytes']); ?></td>
