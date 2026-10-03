@@ -144,31 +144,25 @@ function isLoggedIn() {
         return false;
     }
 
-    // Deactivating an account has to end the sessions it already has, or
-    // "disable this user" means "disable them at their next login", which is
-    // not what an operator reaching for it needs. Re-checked on a short
-    // interval rather than every request: one query a minute per active
-    // session, bounding both the cost and how long a disabled account keeps
-    // working.
-    $activeChecked = $_SESSION['active_checked_at'] ?? 0;
-    if (($now - $activeChecked) > 60) {
+    // Resolve account status AND role once per request. A role demotion must
+    // affect existing sessions, not only the user's next login.
+    static $verifiedUserId = null;
+    if ($verifiedUserId !== $_SESSION['user_id']) {
         try {
-            $stmt = db()->prepare('SELECT is_active FROM users WHERE id = ?');
+            $stmt = db()->prepare('SELECT is_active, role FROM users WHERE id = ?');
             $stmt->execute([$_SESSION['user_id']]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            // A deleted account ends the session too.
-            if ($row === false || (array_key_exists('is_active', $row) && (int) $row['is_active'] === 0)) {
-                error_log('SECURITY: session for deactivated or removed user_id='
-                    . $_SESSION['user_id'] . ' - session destroyed');
+            if ($row === false || (int) ($row['is_active'] ?? 0) !== 1) {
                 destroySession();
                 return false;
             }
-            $_SESSION['active_checked_at'] = $now;
+            $_SESSION['role'] = $row['role'];
+            $verifiedUserId = $_SESSION['user_id'];
         } catch (Throwable $e) {
-            // A database blip must not log everyone out; the check retries on
-            // the next request.
+            // Keep the cookie so a transient outage can recover, but do not
+            // authorize this request using stale privileges.
             error_log('OPNMGR: could not verify account status: ' . $e->getMessage());
+            return false;
         }
     }
 
