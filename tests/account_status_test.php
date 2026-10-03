@@ -56,9 +56,9 @@ check('isLoggedIn() re-checks account status',
     preg_match('/function isLoggedIn\b.*?is_active/s', $auth) === 1,
     'otherwise disabling a user only takes effect at their next login');
 
-check('the re-check is rate limited rather than per request',
-    strpos($auth, 'active_checked_at') !== false,
-    'one query per request per session is a real cost');
+check('account state is checked once per request',
+    strpos($auth, 'static $verifiedUserId') !== false,
+    'repeated permission checks share a query, but a later request must see demotions');
 
 check('a deleted account also ends the session',
     preg_match('/\$row === false/', $auth) === 1);
@@ -95,6 +95,15 @@ check('the user listing selects is_active',
 check('the user listing selects last_login',
     preg_match('/SELECT[^"]*last_login[^"]*FROM users/i', $users) === 1,
     'an account that has never signed in is worth seeing');
+
+// Exercise the actual session helper as well as the source-level contracts.
+foreach (['demoted', 'active', 'disabled', 'missing', 'outage'] as $scenario) {
+    $output = [];
+    $code = 0;
+    exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/account_authorization_test.php')
+        . ' ' . escapeshellarg($scenario) . ' 2>&1', $output, $code);
+    check('live session authorization: ' . $scenario, $code === 0, implode("\n", $output));
+}
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
