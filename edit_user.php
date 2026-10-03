@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
-requireLogin();
+require_permission('user.manage');
 
 $msg = '';
 $id = intval($_GET['id'] ?? 0);
