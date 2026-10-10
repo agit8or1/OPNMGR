@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Scanned By Someone Else'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Somewhere To Write To'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.4',
+            'date' => '2026-10-10',
+            'type' => 'patch',
+            'title' => 'Somewhere To Write To',
+            'changes' => [
+                'ADDED: SECURITY.md names a security contact email for reporters who cannot use GitHub Private Vulnerability Reporting, and for automated scanners',
+                'FIXED: SECURITY.md said security fixes were supported for 3.12.x; it now points at VERSION so it cannot go stale',
+            ],
+        ],
         [
             'version' => '3.77.3',
             'date' => '2026-10-10',

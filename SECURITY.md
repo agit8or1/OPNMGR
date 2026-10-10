@@ -4,12 +4,14 @@
 
 Please report security issues through
 [GitHub Private Vulnerability Reporting](https://github.com/agit8or1/OPNMGR/security/advisories/new)
-rather than opening a public issue.
+rather than opening a public issue. If you cannot use GitHub, email
+[agit8or@gmail.com](mailto:agit8or@gmail.com) instead; this is also the address automated
+scanners report to.
 
 Include the affected version, what an attacker gains, and the smallest set of steps that
 reproduces it. You will get an acknowledgement within a few days.
 
-Supported for security fixes: the current minor release (3.12.x).
+Supported for security fixes: the current minor release (see [VERSION](VERSION)).
 
 ---
 

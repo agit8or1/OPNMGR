@@ -6,6 +6,19 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.77.4
+**Released**: October 10, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **A security contact email in SECURITY.md.** GitHub Private Vulnerability
+  Reporting remains the preferred route; the email is for reporters who cannot
+  use it, and is the address automated scanners report to.
+- **SECURITY.md no longer names 3.12.x as the supported release.** It now
+  points at `VERSION`, so it cannot fall behind again.
+
+---
+
 ## Version 3.77.3
 **Released**: October 10, 2026 | **Agent**: v1.7.0
 
