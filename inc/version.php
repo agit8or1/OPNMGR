@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Inherit From What'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Rolled Back, Not Put Back'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,15 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.6',
+            'date' => '2026-10-10',
+            'type' => 'patch',
+            'title' => 'Rolled Back, Not Put Back',
+            'changes' => [
+                'FIXED: The alert policy test suite deleted every alert policy and re-inserted a saved copy at the end, so any run that stopped early left the table empty and an operator\'s mutes silently vanished. It now runs inside one transaction that is always rolled back, which other connections never see and which MySQL discards if the process dies',
+            ],
+        ],
         [
             'version' => '3.77.5',
             'date' => '2026-10-10',

@@ -30,10 +30,22 @@ function check(string $what, bool $ok, string $detail = ''): void
 
 $root = dirname(__DIR__);
 
-// The suite writes to the live database, so record what is there and put it
-// back. A test that does not hand the installation back as it found it is a
-// defect in the installation.
-$before = db()->query('SELECT * FROM alert_policies')->fetchAll(PDO::FETCH_ASSOC);
+// The suite runs against the live database, so everything it does happens
+// inside one transaction that is always rolled back - never committed.
+//
+// It used to delete every row and re-insert a saved copy at the end. Any run
+// that stopped before the end (a failed check that threw, a fatal, Ctrl-C), or
+// an older copy of this file without the restore, left the table empty: an
+// operator's mutes on fw51 vanished that way and the warnings they had
+// silenced started mailing again. Worse, mid-run the table holds a *global*
+// service.stopped mute, which the evaluator could have committed-read.
+// A rollback cannot be skipped: if this process dies, MySQL discards the
+// transaction on disconnect, and other connections never see it at all.
+$before = (int) db()->query('SELECT COUNT(*) FROM alert_policies')->fetchColumn();
+db()->beginTransaction();
+register_shutdown_function(static function (): void {
+    if (db()->inTransaction()) { db()->rollBack(); }
+});
 db()->query('DELETE FROM alert_policies');
 alert_policy_flush_cache();
 
@@ -130,15 +142,12 @@ check('a write is visible immediately',
 
 // --- restore ------------------------------------------------------------------
 
-db()->query('DELETE FROM alert_policies');
-foreach ($before as $row) {
-    alert_policy_set($row['alert_type'], (int) $row['firewall_id'], $row['object_key'],
-                     (int) $row['enabled'] === 1, $row['threshold'], $row['note']);
-}
+db()->rollBack();
 alert_policy_flush_cache();
-$after = db()->query('SELECT COUNT(*) FROM alert_policies')->fetchColumn();
-check('the installation is left as it was found', (int) $after === count($before),
-    sprintf('had %d row(s), now %d', count($before), (int) $after));
+$after = (int) db()->query('SELECT COUNT(*) FROM alert_policies')->fetchColumn();
+check('the installation is left as it was found', $after === $before,
+    sprintf('had %d row(s), now %d', $before, $after));
+
 
 // --- enforcement lives at the one chokepoint ---------------------------------
 

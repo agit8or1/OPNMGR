@@ -6,6 +6,24 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.77.6
+**Released**: October 10, 2026 | **Agent**: v1.7.0
+
+### Fixed
+
+- **The alert policy tests could wipe an installation's mutes.**
+  `tests/alert_policy_test.php` runs against the live database. It deleted
+  every row in `alert_policies` and re-inserted a saved copy at the end, so a
+  run that stopped early - a failing check, a fatal, Ctrl-C - left the table
+  empty, and warnings an operator had muted started mailing again. Mid-run the
+  table also held a *global* mute that the alert evaluator could read.
+
+  The suite now runs inside one transaction that is always rolled back. Other
+  connections never see its writes, and if the process dies MySQL discards the
+  transaction on disconnect.
+
+---
+
 ## Version 3.77.5
 **Released**: October 10, 2026 | **Agent**: v1.7.0
 
