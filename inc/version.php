@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-09-21'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Quiet Peer Is Not A Down One'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-10'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Scanned By Someone Else'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.3',
+            'date' => '2026-10-10',
+            'type' => 'patch',
+            'title' => 'Scanned By Someone Else',
+            'changes' => [
+                'ADDED: .oss-scanner/Dockerfile builds an offline image for Anthropic\'s OSS Scanner that mirrors a production install - PHP 8.3 behind nginx with the hardening snippet, MariaDB with the schema and every migration - with opnmgr-start and opnmgr-test helpers',
+                'ADDED: .oss-scanner/threat_model.md states where untrusted input enters, which components matter, what is out of scope and how severity is rated. Neither file is used by the application',
+            ],
+        ],
         [
             'version' => '3.77.2',
             'date' => '2026-09-21',

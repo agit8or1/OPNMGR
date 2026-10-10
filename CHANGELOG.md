@@ -2,7 +2,23 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: September 21, 2026
+**Last Updated**: October 10, 2026
+
+---
+
+## Version 3.77.3
+**Released**: October 10, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **Build and threat model for Anthropic's OSS Scanner.** `.oss-scanner/Dockerfile`
+  builds an offline image that mirrors a production install - PHP 8.3 behind
+  nginx with `deploy/nginx-opnmgr-hardening.conf`, MariaDB with
+  `database/schema.sql` and every migration applied - and provides
+  `opnmgr-start` and `opnmgr-test` (the suites CI runs).
+  `.oss-scanner/threat_model.md` states where untrusted input enters, which
+  components matter, what is out of scope and how severity is rated. Neither
+  file is used by the application; credentials in the image exist only there.
 
 ---
 
