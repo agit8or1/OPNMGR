@@ -4149,7 +4149,7 @@ initializeSSHKeys();
                                       </td>
                                       <td>
                                         <select name="policy[<?= htmlspecialchars($type) ?>][state]" class="form-select form-select-sm">
-                                          <option value="inherit" <?= $st['set'] ? '' : 'selected' ?>>Inherit<?= $st['set'] ? '' : ' (' . htmlspecialchars($st['from']) . ')' ?></option>
+                                          <option value="inherit" <?= $st['set'] ? '' : 'selected' ?>>Inherit<?= $st['set'] ? '' : ' (' . ($st['enabled'] ? 'alerting' : 'muted') . ', ' . htmlspecialchars($st['from']) . ')' ?></option>
                                           <option value="on"  <?= ($st['set'] && $st['enabled']) ? 'selected' : '' ?>>Alert</option>
                                           <option value="off" <?= ($st['set'] && !$st['enabled']) ? 'selected' : '' ?>>Muted</option>
                                         </select>

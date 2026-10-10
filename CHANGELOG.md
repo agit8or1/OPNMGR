@@ -6,6 +6,19 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.77.5
+**Released**: October 10, 2026 | **Agent**: v1.7.0
+
+### Changed
+
+- **Inherit now says what it inherits.** On a firewall's alert policy, a
+  condition left on *Inherit* showed only where its setting came from
+  ("Inherit (all firewalls)"), not whether that setting alerts. With every
+  condition muted globally by default, the two looked identical. It now reads
+  e.g. "Inherit (muted, all firewalls)".
+
+---
+
 ## Version 3.77.4
 **Released**: October 10, 2026 | **Agent**: v1.7.0
 

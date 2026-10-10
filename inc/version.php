@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Somewhere To Write To'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Inherit From What'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,15 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.77.5',
+            'date' => '2026-10-10',
+            'type' => 'patch',
+            'title' => 'Inherit From What',
+            'changes' => [
+                'CHANGED: An alert condition left on Inherit on the firewall page now says what it inherits - alerting or muted - as well as where from, so a globally muted condition no longer reads like one that alerts',
+            ],
+        ],
         [
             'version' => '3.77.4',
             'date' => '2026-10-10',
