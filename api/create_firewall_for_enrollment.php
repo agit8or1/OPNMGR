@@ -63,8 +63,8 @@ try {
 
         // Update customer_group if provided
         if ($customer_group) {
-            $stmt = db()->prepare('UPDATE firewalls SET customer_group = ? WHERE id = ?');
-            $stmt->execute([$customer_group, $firewall_id]);
+            $stmt = db()->prepare('UPDATE firewalls SET customer_group = ?, customer_name = ? WHERE id = ?');
+            $stmt->execute([$customer_group, $customer_group, $firewall_id]);
         }
 
         // Invalidate any old unused tokens for this firewall
@@ -73,11 +73,12 @@ try {
     } else {
         // Create new firewall with pending status
         $stmt = db()->prepare('
-            INSERT INTO firewalls (hostname, customer_group, ip_address, status)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO firewalls (hostname, customer_group, customer_name, ip_address, status)
+            VALUES (?, ?, ?, ?, ?)
         ');
         $stmt->execute([
             $hostname,
+            $customer_group ?: null,
             $customer_group ?: null,
             '0.0.0.0',  // Will be updated on enrollment
             'pending'

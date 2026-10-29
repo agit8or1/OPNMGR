@@ -55,6 +55,12 @@ if (!$firewall) {
     exit;
 }
 
+if (opnmgr_server_url() === '') {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Server URL is not configured (Settings > Manager FQDN)']);
+    exit;
+}
+
 try {
     // Generate a unique token
     $token = bin2hex(random_bytes(32)); // 64 character hex string
@@ -69,9 +75,10 @@ try {
     ');
     $stmt->execute([$token, $firewall_id, $expires_at]);
 
-    // Get server URL from configuration or use detected URL
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $server_url = $protocol . '://' . $_SERVER['HTTP_HOST'];
+    // The configured server identity, not the Host header: a key generated
+    // while browsing by IP or through a proxy would otherwise send the agent
+    // to an address it cannot use. The request host is only the last fallback.
+    $server_url = opnmgr_server_url();
 
     // Create the enrollment key (base64 encoded JSON) with all settings
     $enrollment_data = [

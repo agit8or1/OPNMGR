@@ -6,6 +6,42 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.78.0
+**Released**: October 29, 2026 | **Agent**: v1.7.0
+
+### Added
+
+- **Add a firewall without running the enrollment script.** Enrolling with the
+  agent plugin needs an enrollment key, and a key belongs to a firewall record -
+  but the only thing that created one was the legacy enrollment script, which
+  fails on current installs and leaves the record behind as a side effect
+  ([#12](https://github.com/agit8or1/OPNMGR/issues/12)). Add Firewall now has a
+  form for the agent plugin: give the firewall a name and optionally a customer,
+  and it creates a pending record and shows the key, the plugin install command
+  and where to paste it. The firewall shows as pending until the agent enrolls.
+  The endpoint for this, `api/create_firewall_for_enrollment.php`, already
+  existed; nothing in the UI called it.
+
+### Changed
+
+- The legacy enrollment script moved below the agent plugin method and is
+  labelled as legacy. It no longer opens with a banner saying it has been
+  tested and works.
+
+### Fixed
+
+- **Enrollment keys pointed agents at whatever host the browser used.**
+  `api/enrollment_key.php` built the server URL from the request's Host header,
+  so a key generated while browsing by IP address, `localhost` or through a
+  proxy sent the agent to an address it could not reach. It now uses the
+  configured server identity (`opnmgr_server_url()`), the same source as every
+  other URL handed to agents, and refuses if none is configured.
+- A customer given when creating a firewall for enrollment was saved only to
+  `customer_group`, which the firewall list shows as a tag. It is saved as the
+  customer name too.
+
+---
+
 ## Version 3.77.6
 **Released**: October 10, 2026 | **Agent**: v1.7.0
 

@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Rolled Back, Not Put Back'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-29'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Firewall Before Its Agent'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -43,6 +43,18 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.78.0',
+            'date' => '2026-10-29',
+            'type' => 'minor',
+            'title' => 'A Firewall Before Its Agent',
+            'changes' => [
+                'ADDED: Add Firewall can create a firewall on its own and hand back an enrollment key for the agent plugin. The only way to get a firewall record to generate a key for was to run the legacy enrollment script, which fails on current installs (issue #12)',
+                'CHANGED: The legacy enrollment script is labelled as such, below the agent plugin method, and no longer claims to be tested and working',
+                'FIXED: Enrollment keys embedded the Host header of the browser request as the server URL, so a key generated while browsing by IP address or through a proxy sent the agent somewhere it could not use. They now carry the configured server URL',
+                'FIXED: A firewall created for enrollment with a customer showed it in the Tags column only; the customer name is set too, so it appears and is searchable as the customer',
+            ],
+        ],
         [
             'version' => '3.77.6',
             'date' => '2026-10-10',

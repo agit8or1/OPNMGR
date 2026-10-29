@@ -15,6 +15,12 @@ $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : '
 $enrollment_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/enroll_firewall.php?action=download&token=' . $enrollment_token;
 $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_enroll.sh "' . $enrollment_url . '" && chmod +x /tmp/opnsense_enroll.sh && bash /tmp/opnsense_enroll.sh';
 
+$server_url = opnmgr_server_url();
+$agent_install_command = 'fetch -o - ' . $server_url . '/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=' . $server_url . ' sh';
+
+// Suggestions for the customer field of the agent enrollment form.
+$customer_names = db()->query('SELECT name FROM customers ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
+
 ?>
 <div class="container-fluid">
     <div class="row">
@@ -28,15 +34,61 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
 
             <div class="row">
                 <div class="col-lg-8">
-                    <div class="card card">
+                    <div class="card card mb-4">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>One-Click OPNsense Enrollment</h5>
+                            <h5 class="mb-0"><i class="fas fa-key me-2"></i>Enroll with the OPNManager Agent Plugin (Recommended)</h5>
                         </div>
                         <div class="card-body">
-                            <div class="alert alert-success">
-                                <h6><i class="fas fa-check-circle me-2"></i>✅ Enrollment System Working!</h6>
-                                <p class="mb-0">The automated enrollment script has been tested and is working perfectly on OPNsense firewalls.</p>
+                            <p>Create the firewall here, then paste the enrollment key into the agent plugin. Nothing has to be run over SSH.</p>
+                            <form id="agentEnrollForm" class="row g-2 mb-3" onsubmit="createAgentEnrollment(event)">
+                                <div class="col-md-5">
+                                    <label class="form-label" for="enrollHostname">Firewall name</label>
+                                    <input type="text" class="form-control" id="enrollHostname" maxlength="255" required placeholder="e.g. branch-office-fw">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="enrollCustomer">Customer (optional)</label>
+                                    <input type="text" class="form-control" id="enrollCustomer" maxlength="128" list="enrollCustomerList">
+                                    <datalist id="enrollCustomerList">
+                                        <?php foreach ($customer_names as $name): ?>
+                                        <option value="<?php echo htmlspecialchars($name); ?>">
+                                        <?php endforeach; ?>
+                                    </datalist>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100" id="agentEnrollBtn">
+                                        <i class="fas fa-plus me-1"></i>Create &amp; Get Key
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div id="agentEnrollResult" class="d-none">
+                                <label class="form-label" for="agentEnrollKey">Enrollment key for <strong id="agentEnrollName"></strong>:</label>
+                                <div class="input-group mb-2">
+                                    <input type="text" id="agentEnrollKey" class="form-control font-monospace" readonly>
+                                    <button class="btn btn-primary" type="button" onclick="copyAgentEnrollKey(this)">
+                                        <i class="fas fa-copy me-1"></i>Copy
+                                    </button>
+                                </div>
+                                <p class="small text-muted mb-2">Expires <span id="agentEnrollExpires"></span>. It can be used once; a new key can be generated from the firewall's details page.</p>
+                                <ol class="mb-0">
+                                    <li>Install the agent plugin from a shell on the firewall:
+                                        <code class="d-block p-2 my-1 border rounded"><?php echo htmlspecialchars($agent_install_command); ?></code>
+                                    </li>
+                                    <li>On OPNsense, go to <strong>Services &rarr; OPNManager Agent</strong>.</li>
+                                    <li>Paste the key into <strong>Quick Enrollment</strong> and click <strong>Enroll</strong>.</li>
+                                </ol>
+                                <p class="mt-2 mb-0"><a id="agentEnrollLink" href="#">Open the firewall's page</a> &mdash; it shows as pending until the agent enrolls.</p>
                             </div>
+                            <div id="agentEnrollError" class="alert alert-danger d-none mt-2 mb-0"></div>
+                        </div>
+                    </div>
+
+                    <div class="card card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-terminal me-2"></i>Legacy Enrollment Script</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">The older method: run a script on the firewall over SSH. Use the agent plugin above unless you need this.</p>
 
                             <div class="accordion" id="installationAccordion">
                                 <div class="accordion-item">
@@ -156,6 +208,60 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
 </div>
 
 <script>
+const csrfToken = '<?php echo csrf_token(); ?>';
+
+async function postJson(url, body) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+        body: JSON.stringify(Object.assign({csrf: csrfToken}, body))
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || ('HTTP ' + response.status));
+    }
+    return data;
+}
+
+async function createAgentEnrollment(event) {
+    event.preventDefault();
+    const btn = document.getElementById('agentEnrollBtn');
+    const errorBox = document.getElementById('agentEnrollError');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Creating...';
+    errorBox.classList.add('d-none');
+
+    try {
+        const created = await postJson('api/create_firewall_for_enrollment.php', {
+            hostname: document.getElementById('enrollHostname').value.trim(),
+            customer_group: document.getElementById('enrollCustomer').value.trim()
+        });
+        const key = await postJson('api/enrollment_key.php', {firewall_id: created.firewall_id});
+
+        document.getElementById('agentEnrollName').textContent = created.hostname;
+        document.getElementById('agentEnrollKey').value = key.enrollment_key;
+        document.getElementById('agentEnrollExpires').textContent = new Date(key.expires_at.replace(' ', 'T')).toLocaleString();
+        document.getElementById('agentEnrollLink').href = '/firewall_details.php?id=' + encodeURIComponent(created.firewall_id);
+        document.getElementById('agentEnrollResult').classList.remove('d-none');
+    } catch (e) {
+        errorBox.textContent = 'Could not create the enrollment: ' + e.message;
+        errorBox.classList.remove('d-none');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+function copyAgentEnrollKey(btn) {
+    const input = document.getElementById('agentEnrollKey');
+    input.select();
+    navigator.clipboard.writeText(input.value).catch(() => document.execCommand('copy'));
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+    setTimeout(() => { btn.innerHTML = originalHtml; }, 2000);
+}
+
 function copyWgetCommand() {
     const input = document.getElementById('wgetCommand');
     input.select();
