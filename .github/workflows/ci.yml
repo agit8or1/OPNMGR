@@ -35,7 +35,9 @@ jobs:
             -print0 | xargs -0 -n1 -P4 php -l
 
   dependencies:
-    name: Dependency audit (Composer + npm)
+    # The name is a required status check in the "Require CI on main" ruleset;
+    # the job now audits npm as well, but renaming it would block every merge.
+    name: Composer validate and audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
