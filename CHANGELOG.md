@@ -6,6 +6,22 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.79.1
+**Released**: November 6, 2026 | **Agent**: v1.8.0 (held)
+
+### Changed
+
+- **Automatic agent resets stay off until enabled.** The hourly
+  `scripts/auto_reset_stale_agents.php` run crashed before it could reset
+  anything until 3.79.0 fixed its scope bug - so that fix, on its own, would
+  have switched on automatic kill-and-reinstall of any agent silent for two
+  hours, including SSH to the firewall. The cron run now reports stale agents
+  and marks long-silent ones offline as before, and resets only when
+  `auto_reset_stale_agents_enabled` is `1` (migration 0031, default `0`).
+  Resets an operator requests from `admin/reset_agent.php` are unaffected.
+
+---
+
 ## Version 3.79.0
 **Released**: November 6, 2026 | **Agent**: v1.8.0 (held) · pfSense agent v1.0.0
 
