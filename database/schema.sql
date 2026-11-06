@@ -1762,7 +1762,7 @@ CREATE TABLE IF NOT EXISTS `report_ai_summaries` (
 CREATE TABLE IF NOT EXISTS `report_deliveries` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `report_id` bigint(20) NOT NULL,
-  `recipient_email` varchar(255) NOT NULL,
+  `recipient_address` varchar(255) NOT NULL,
   `status` enum('queued','sent','failed') NOT NULL DEFAULT 'queued',
   `attempts` tinyint(4) NOT NULL DEFAULT 0,
   `next_attempt_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1771,7 +1771,7 @@ CREATE TABLE IF NOT EXISTS `report_deliveries` (
   `sent_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_delivery` (`report_id`,`recipient_email`),
+  UNIQUE KEY `uniq_delivery` (`report_id`,`recipient_address`),
   KEY `idx_status` (`status`,`next_attempt_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

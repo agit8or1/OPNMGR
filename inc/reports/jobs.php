@@ -394,7 +394,7 @@ if (!function_exists('report_deliveries_queue')) {
         $n = 0;
         foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $email) {
             if (!report_recipient_valid($email)) { continue; }
-            $i = db()->prepare('INSERT IGNORE INTO report_deliveries (report_id, recipient_email, next_attempt_at) VALUES (?,?,FROM_UNIXTIME(?))');
+            $i = db()->prepare('INSERT IGNORE INTO report_deliveries (report_id, recipient_address, next_attempt_at) VALUES (?,?,FROM_UNIXTIME(?))');
             $i->execute([$reportId, $email, $now ?? time()]);
             $n += $i->rowCount();
         }
@@ -426,7 +426,7 @@ if (!function_exists('report_delivery_run')) {
             try {
                 $r = db()->prepare('SELECT id, customer_id, title, timezone, period_start, period_end FROM reports WHERE id = ?'); $r->execute([$d['report_id']]); $rep = $r->fetch(PDO::FETCH_ASSOC);
                 if (!$rep) { throw new RuntimeException('Report no longer exists'); }
-                if (!report_recipient_valid($d['recipient_email'])) { throw new RuntimeException('Recipient address is invalid'); }
+                if (!report_recipient_valid($d['recipient_address'])) { throw new RuntimeException('Recipient address is invalid'); }
                 $sh = report_share_create((int)$rep['id'], 168, 'delivery', $now);
                 if (!$sh['ok']) { throw new RuntimeException($sh['error']); }
                 db()->prepare('UPDATE report_deliveries SET share_id = ? WHERE id = ?')->execute([$sh['share_id'], $d['id']]);
@@ -435,7 +435,7 @@ if (!function_exists('report_delivery_run')) {
                 $subject = 'Network service report: ' . preg_replace('/[^\p{L}\p{N} .,:()\/_-]/u', '', mb_substr((string)$rep['title'], 0, 100));
                 $body = '<p>A new service report is ready.</p><p>' . report_h($rep['title']) . '</p><p><a href="' . report_h($link) . '">Open the report</a></p>'
                       . '<p>This link expires ' . report_h(report_fmt_ts($sh['expires_at'], $rep['timezone'])) . '. Do not forward it.</p>';
-                $m = report_mail_send($d['recipient_email'], $subject, $body);
+                $m = report_mail_send($d['recipient_address'], $subject, $body);
                 if (empty($m['success'])) { throw new RuntimeException((string)($m['error'] ?? 'Mail transport failed')); }
                 db()->prepare("UPDATE report_deliveries SET status='sent', attempts=attempts+1, sent_at=FROM_UNIXTIME(?), last_error=NULL WHERE id=?")->execute([$now, $d['id']]);
                 report_audit('report.deliver', ['object_type' => 'report', 'object_id' => $rep['id'], 'customer_id' => $rep['customer_id'] !== null ? (int)$rep['customer_id'] : null, 'message' => 'Delivered report link by email']);

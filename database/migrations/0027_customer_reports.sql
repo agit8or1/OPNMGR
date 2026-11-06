@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS report_shares (
 CREATE TABLE IF NOT EXISTS report_deliveries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     report_id BIGINT NOT NULL,
-    recipient_email VARCHAR(255) NOT NULL,
+    recipient_address VARCHAR(255) NOT NULL,
     status ENUM('queued','sent','failed') NOT NULL DEFAULT 'queued',
     attempts TINYINT NOT NULL DEFAULT 0,
     next_attempt_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS report_deliveries (
     share_id BIGINT NULL,
     sent_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_delivery (report_id, recipient_email),
+    UNIQUE KEY uniq_delivery (report_id, recipient_address),
     KEY idx_status (status, next_attempt_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

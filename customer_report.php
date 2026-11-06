@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $snap = json_decode($rep['snapshot_json'], true) ?: [];
 $shares = db()->prepare('SELECT id, expires_at, revoked_at, created_by, last_accessed_at, access_count FROM report_shares WHERE report_id = ? ORDER BY id DESC'); $shares->execute([$rep['id']]); $shares = $shares->fetchAll(PDO::FETCH_ASSOC);
-$dels = db()->prepare('SELECT recipient_email, status, attempts, last_error, sent_at FROM report_deliveries WHERE report_id = ?'); $dels->execute([$rep['id']]); $dels = $dels->fetchAll(PDO::FETCH_ASSOC);
+$dels = db()->prepare('SELECT recipient_address, status, attempts, last_error, sent_at FROM report_deliveries WHERE report_id = ?'); $dels->execute([$rep['id']]); $dels = $dels->fetchAll(PDO::FETCH_ASSOC);
 $id = (int)$rep['id']; $csrf = csrf_token();
 include __DIR__ . '/inc/header.php';
 ?>
@@ -63,7 +63,7 @@ include __DIR__ . '/inc/header.php';
       <td><?php if ($live): ?><form method="post"><input type="hidden" name="csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="share_id" value="<?= (int)$s['id'] ?>"><button name="action" value="revoke_share" class="btn btn-sm btn-outline-danger">Revoke</button></form><?php endif; ?></td></tr>
     <?php endforeach; ?></table>
     <?php if ($dels): ?><h6>Deliveries</h6><table class="table table-sm"><tr><th>Recipient</th><th>Status</th><th>Attempts</th><th>Error</th></tr>
-      <?php foreach ($dels as $d): ?><tr><td><?= $e($d['recipient_email']) ?></td><td><?= $e($d['status']) ?></td><td><?= (int)$d['attempts'] ?></td><td><?= $e($d['last_error']) ?></td></tr><?php endforeach; ?></table><?php endif; ?>
+      <?php foreach ($dels as $d): ?><tr><td><?= $e($d['recipient_address']) ?></td><td><?= $e($d['status']) ?></td><td><?= (int)$d['attempts'] ?></td><td><?= $e($d['last_error']) ?></td></tr><?php endforeach; ?></table><?php endif; ?>
   </div></div>
   <?php endif; ?>
 </div>
