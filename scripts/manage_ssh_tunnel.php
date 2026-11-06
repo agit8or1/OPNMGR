@@ -43,6 +43,18 @@ function is_tunnel_active($port) {
 
 function start_tunnel($firewall, $duration_minutes = 30) {
     $firewall_id = $firewall['id'];
+
+    // The tunnel opens SSH through a pf rule installed by an OPNsense syshook.
+    // Every tunnel entry point (UI, async starter, API) comes through here, so
+    // this is where a platform without that mechanism is refused - with the
+    // reason, instead of a tunnel that waits for a rule that never appears.
+    require_once __DIR__ . '/../inc/platform/platform.php';
+    $platform_fw = platform_firewall((int)$firewall_id);
+    $tunnel_allowed = $platform_fw ? platform_capability_allows($platform_fw, 'remote.tunnel')
+                                   : ['allowed' => false, 'reason' => 'Firewall not found'];
+    if (!$tunnel_allowed['allowed']) {
+        return ['success' => false, 'error' => 'Remote tunnel not available: ' . $tunnel_allowed['reason']];
+    }
     $hostname = $firewall['hostname'];
     $ip = $firewall['wan_ip'] ?: ($firewall['ip_address'] ?: $firewall['hostname']);
     

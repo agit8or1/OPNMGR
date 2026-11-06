@@ -75,6 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 db()->prepare('UPDATE users SET is_active = ? WHERE id = ?')
                     ->execute([$makeActive, $userId]);
+                if (!$makeActive) {
+                    auth_revoke_sessions((int) $userId, 'account deactivated');
+                }
 
                 if (function_exists('audit_log')) {
                     audit_log($makeActive ? 'user.activate' : 'user.deactivate', [
@@ -88,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $message = '<div class="alert alert-success">'
                          . htmlspecialchars($targetUser['username'])
-                         . ($makeActive ? ' activated.' : ' deactivated. Any open session ends within a minute.')
+                         . ($makeActive ? ' activated.' : ' deactivated. Its open sessions have ended.')
                          . '</div>';
             }
         }
@@ -105,6 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
                 $stmt = db()->prepare("UPDATE users SET password = ? WHERE id = ?");
                 $stmt->execute([$hashedPassword, $_SESSION['user_id']]);
+                // Every other session of this account ends; this one continues.
+                auth_revoke_sessions((int) $_SESSION['user_id'], 'password changed', true);
                 $message = '<div class="alert alert-success">Password changed successfully!</div>';
             } catch (PDOException $e) {
                 error_log("users.php error: " . $e->getMessage());
@@ -128,9 +133,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                     $stmt = db()->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ?, password = ? WHERE id = ?");
                     $stmt->execute([$firstName, $lastName, $username, $email, $role, $hashedPassword, $userId]);
+                    // A reset password must not leave the old sessions alive.
+                    auth_revoke_sessions((int) $userId, 'password reset by an administrator', true);
                 } else {
                     $stmt = db()->prepare("UPDATE users SET first_name = ?, last_name = ?, username = ?, email = ?, role = ? WHERE id = ?");
                     $stmt->execute([$firstName, $lastName, $username, $email, $role, $userId]);
+                }
+                // A role change needs no revocation: every request re-reads the
+                // role (auth_sync_session), so it applies on the next request.
+                if (function_exists('audit_log')) {
+                    audit_log('user.update', [
+                        'object_type' => 'user', 'object_id' => (string) $userId,
+                        'message' => 'Updated ' . $username . ' (role ' . $role . ')'
+                                   . (!empty($password) ? ', password reset' : ''),
+                    ]);
                 }
                 $message = '<div class="alert alert-success">User updated successfully!</div>';
             } catch (PDOException $e) {

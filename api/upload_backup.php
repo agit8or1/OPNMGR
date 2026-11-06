@@ -56,7 +56,12 @@ if (($uploaded['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
 }
 
 // Reject anything that is not a plausible OPNsense config before it is stored.
-$validation = validate_backup_upload($uploaded['tmp_name'], (int)$uploaded['size']);
+// The firewall's own platform decides which root is acceptable; an unverified
+// platform accepts either and the stored root then feeds detection.
+require_once __DIR__ . '/../inc/platform/platform.php';
+$platform_fw = platform_firewall($firewall_id);
+$expected_root = $platform_fw ? platform_adapter($platform_fw)->configRoot() : null;
+$validation = validate_backup_upload($uploaded['tmp_name'], (int)$uploaded['size'], $expected_root);
 if (!$validation['ok']) {
     record_backup_failure($firewall_id, $validation['reason'], $backup_id);
     audit_log_agent('backup.upload.rejected', $firewall_id, [

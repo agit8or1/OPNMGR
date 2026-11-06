@@ -92,6 +92,24 @@ if (!function_exists('opnmgr_permission_matrix')) {
             'alert.acknowledge'     => $operators,
             'maintenance.manage'    => $operators,
 
+            // --- mixed fleet, templates, VPN, reports, integrations (3.79) -----
+            'platform.view'         => $all,
+            'platform.validate'     => $adminOnly,  // record a lab validation
+            'template.view'         => $all,
+            'template.manage'       => $operators,  // drafts, assignments, variables
+            'template.publish'      => $operators,
+            'template.exception'    => $operators,
+            'template.approve'      => $adminOnly,  // approve a concrete plan
+            'template.apply'        => $adminOnly,  // write to firewalls
+            'vpn.view'              => $all,
+            'vpn.diagnose'          => $operators,  // run bounded probes
+            'vpn.manage'            => $operators,  // pairing / corrections
+            'report.generate'       => $operators,
+            'report.manage'         => $operators,  // schedules, recipients
+            'report.deliver'        => $adminOnly,  // enable delivery / share links
+            'integration.view'      => $operators,
+            'integration.replay'    => $operators,
+
             'bulk.operate'          => $operators,  // bulk safe operations
             'bulk.privileged'       => $adminOnly,  // bulk high-risk operations
 
@@ -117,6 +135,10 @@ if (!function_exists('current_role')) {
      */
     function current_role(): ?string {
         if (!isset($_SESSION['user_id'])) {
+            return null;
+        }
+        // The role as the database has it now, not as it was at login.
+        if (function_exists('auth_sync_session') && !auth_sync_session()) {
             return null;
         }
         $role = $_SESSION['role'] ?? '';

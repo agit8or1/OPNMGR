@@ -11,6 +11,20 @@
 
 define('TEST_ROOT', dirname(__DIR__));
 
+// Tests write fixtures. They run against a disposable database made with
+// tests/lib/make_test_db.sh, never the live one, unless someone explicitly
+// opts in. Before 3.79 `DB_NAME=x` was silently overridden by .env (see
+// inc/env.php), so this checks the value PHP will actually use.
+(function () {
+    $name = getenv('DB_NAME');
+    if (($name === false || strpos($name, 'opnsense_fw_test') !== 0) && getenv('OPNMGR_TEST_ALLOW_LIVE') !== '1') {
+        fwrite(STDERR, "Refusing to run: DB_NAME must name a test database (opnsense_fw_test*).\n"
+            . "  tests/lib/make_test_db.sh && DB_NAME=opnsense_fw_test php " . ($_SERVER['argv'][0] ?? 'tests/x_test.php') . "\n"
+            . "  (OPNMGR_TEST_ALLOW_LIVE=1 overrides, for the live-safe legacy suites only.)\n");
+        exit(2);
+    }
+})();
+
 class T {
     public static int $pass = 0;
     public static int $fail = 0;
@@ -92,6 +106,7 @@ function call_endpoint(string $script, array $opt = []): array {
         'post'    => $post,
         'body'    => $body,
         'files'   => $files,
+        'session' => $opt['session'] ?? null,
     ];
 
     $runner = TEST_ROOT . '/tests/runner.php';

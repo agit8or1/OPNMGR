@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
 requireLogin();
+// This page changes roles. It used to require only a login, so any signed-in
+// account - read-only included - could POST a role change for any user,
+// itself among them.
+require_permission('user.manage');
 
 $msg = '';
 $id = intval($_GET['id'] ?? 0);

@@ -214,9 +214,14 @@ if ($probe) {
         if (!$all && !in_array($row['state'], ['AT RISK', 'UNKNOWN'], true)) {
             continue;
         }
+        $perFw = build_structured_command('agent_install_verify', [], platform_firewall((int)$row['id']));
+        if (!$perFw['ok']) {
+            fwrite(STDERR, sprintf("cannot probe %s: %s\n", $row['hostname'], $perFw['error']));
+            continue;
+        }
         $res = queue_firewall_command(
             $row['id'],
-            $built['command'],
+            $perFw['command'],
             'Verify agent installation (plugin hook and rc.d script)',
             ['action' => 'agent_install_verify', 'parameters' => [],
              'is_raw' => false, 'risk' => $built['risk']]

@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.7.0"
+AGENT_VERSION="1.8.0"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 # Update transcripts get their own file. The installer's output used to be
@@ -161,6 +161,42 @@ get_health_json() {
         \{*\}) echo "$out" ;;
         *)      echo "{}" ;;
     esac
+}
+
+# Platform probe (agent 1.8.0).
+#
+# Tells the manager what this box is and what it can do, from evidence on the
+# box rather than from what the agent assumes about itself: the manager treats
+# a platform it cannot verify as read-only, and never infers the product from
+# FreeBSD alone. Booleans only, plus version strings and package names - no
+# configuration content.
+json_bool() { if eval "$1" >/dev/null 2>&1; then printf true; else printf false; fi; }
+
+get_platform_json() {
+    local pver bver cver pkgs
+    pver=$(opnsense-version 2>/dev/null | awk '{print $2}' | head -1)
+    bver=$(freebsd-version -u 2>/dev/null)
+    cver=$(get_config "/opnsense/version")
+    # Relevant packages only, as a JSON string list.
+    pkgs=$(pkg query '%n-%v' 2>/dev/null \
+        | grep -E '^(opnsense|os-|wireguard|strongswan|openvpn|frr|haproxy)' \
+        | head -60 | sed 's/["\\]//g; s/.*/"&"/' | paste -sd, -)
+
+    printf '{"family":"opnsense","agent_flavor":"opnsense-plugin","product_version":"%s","base_version":"%s","config_version":"%s",' \
+        "$pver" "$bver" "$cver"
+    printf '"markers":{"opnsense_version_bin":%s,"pfsense_globals":%s},' \
+        "$(json_bool 'command -v opnsense-version')" \
+        "$(json_bool 'grep -q xml_rootobj.*pfsense /etc/inc/globals.inc')"
+    printf '"packages":[%s],' "$pkgs"
+    printf '"probes":{"configctl":%s,"python3":%s,"php":%s,"wg":%s,"swanctl":%s,"openssl":%s,"daemon":%s,"opnsense_config_api":%s}}' \
+        "$(json_bool 'test -x /usr/local/sbin/configctl')" \
+        "$(json_bool 'test -x /usr/local/bin/python3')" \
+        "$(json_bool 'test -x /usr/local/bin/php')" \
+        "$(json_bool 'command -v wg')" \
+        "$(json_bool 'command -v swanctl')" \
+        "$(json_bool 'command -v openssl')" \
+        "$(json_bool 'test -x /usr/sbin/daemon')" \
+        "$(json_bool 'grep -q "function restoreBackup" /usr/local/opnsense/mvc/app/library/OPNsense/Core/Config.php')"
 }
 
 # Read configuration from OPNsense config.xml using xmllint
@@ -1254,6 +1290,12 @@ post_to_manager() {
             PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//')
             PAYLOAD="${PAYLOAD},\"health\":$HEALTH_JSON}"
         fi
+
+        # Platform probe (agent 1.8.0+)
+        PLATFORM_JSON=$(get_platform_json)
+        case "$PLATFORM_JSON" in
+            \{*\}) PAYLOAD=$(echo "$PAYLOAD" | sed 's/}$//'); PAYLOAD="${PAYLOAD},\"platform\":$PLATFORM_JSON}" ;;
+        esac
 
         # Perform check-in
         # The path is what the signature covers, not the full URL - the server

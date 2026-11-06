@@ -17,9 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+require_once __DIR__ . '/../inc/agent_auth.php';
+$authz = agent_reset_request_authorized($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+if (!$authz['ok']) {
+    http_response_code($authz['status']);
+    echo json_encode(['success' => false, 'message' => $authz['error']]);
     exit;
 }
 

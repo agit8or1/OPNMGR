@@ -1,0 +1,54 @@
+/* VPN topology. Colours come from Bootstrap's theme variables so the page
+   follows the dark/light switch; nothing here hardcodes a colour. */
+.vpn-st-up       { --vpn-c: var(--bs-success); }
+.vpn-st-degraded { --vpn-c: var(--bs-warning); }
+.vpn-st-idle     { --vpn-c: var(--bs-info); }
+.vpn-st-down     { --vpn-c: var(--bs-danger); }
+.vpn-st-stale    { --vpn-c: var(--bs-orange, var(--bs-warning)); }
+.vpn-st-unknown,
+.vpn-st-disabled { --vpn-c: var(--bs-secondary); }
+
+.vpn-badge { background: var(--vpn-c, var(--bs-secondary)); color: var(--bs-body-bg); font-weight: 500; }
+.vpn-st-stale.vpn-badge { background: transparent; color: var(--vpn-c); border: 1px dashed var(--vpn-c); }
+.vpn-st-unknown.vpn-badge { background: transparent; color: var(--bs-secondary-color); border: 1px solid var(--bs-secondary); }
+.vpn-rel-observed { background: var(--bs-body-color); color: var(--bs-body-bg); }
+.vpn-rel-inferred { background: transparent; color: var(--bs-body-color); border: 1px dashed var(--bs-body-color); }
+.vpn-rel-manual   { background: transparent; color: var(--bs-primary); border: 2px solid var(--bs-primary); }
+.vpn-rel-unpaired { background: transparent; color: var(--bs-secondary-color); border: 1px dotted var(--bs-secondary); }
+.vpn-sevb-critical { background: var(--bs-danger); color: var(--bs-body-bg); }
+.vpn-sevb-warning  { background: var(--bs-warning); color: var(--bs-body-bg); }
+.vpn-sevb-info     { background: var(--bs-info); color: var(--bs-body-bg); }
+.vpn-basis-observed, .vpn-basis-configured { background: var(--bs-body-color); color: var(--bs-body-bg); }
+.vpn-basis-inferred { background: transparent; color: var(--bs-body-color); border: 1px dashed var(--bs-body-color); }
+.vpn-finding { border-left: 4px solid var(--bs-secondary); }
+.vpn-sev-critical { border-left-color: var(--bs-danger); }
+.vpn-sev-warning  { border-left-color: var(--bs-warning); }
+.vpn-sev-info     { border-left-color: var(--bs-info); }
+
+.vpn-tile { cursor: pointer; border: 1px solid var(--bs-border-color); border-left: 4px solid var(--vpn-c); border-radius: .375rem;
+            padding: .35rem .75rem; min-width: 5.5rem; background: var(--bs-body-bg); }
+.vpn-tile-n { font-size: 1.4rem; line-height: 1.1; color: var(--vpn-c); }
+.vpn-tile-l { font-size: .75rem; color: var(--bs-secondary-color); }
+
+.vpn-svg { width: 100%; height: auto; min-height: 420px; background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: .375rem; touch-action: none; }
+.vpn-edge { stroke: var(--vpn-c, var(--bs-secondary)); stroke-width: 3; cursor: pointer; fill: none; }
+.vpn-edge:hover, .vpn-edge.sel { stroke-width: 5; }
+/* Relationship: observed = solid, inferred = dashed, manual = heavy dash-dot. */
+.vpn-edge.vpn-rel-observed { stroke-dasharray: none; }
+.vpn-edge.vpn-rel-inferred { stroke-dasharray: 8 6; }
+.vpn-edge.vpn-rel-manual   { stroke-dasharray: 14 4 2 4; stroke-width: 4; }
+.vpn-edge.vpn-st-stale     { opacity: .6; }
+.vpn-edge.vpn-st-unknown, .vpn-edge.vpn-st-disabled { opacity: .55; }
+.vpn-edge-count { fill: var(--bs-body-color); font-size: 11px; text-anchor: middle; pointer-events: none; }
+.vpn-node { cursor: grab; }
+.vpn-node rect, .vpn-node ellipse { fill: var(--bs-tertiary-bg); stroke: var(--bs-border-color); stroke-width: 1.5; }
+.vpn-node:focus rect, .vpn-node:hover rect, .vpn-node:hover ellipse { stroke: var(--bs-primary); }
+.vpn-node-external ellipse  { stroke-dasharray: 4 3; }
+.vpn-node-ambiguous ellipse { stroke: var(--bs-warning); stroke-dasharray: 2 3; }
+.vpn-node-unknown ellipse   { stroke-dasharray: 1 4; }
+.vpn-node-remote_access ellipse { stroke: var(--bs-info); }
+.vpn-node-label { fill: var(--bs-body-color); font-size: 11px; text-anchor: middle; pointer-events: none; user-select: none; }
+.vpn-legend span { margin-right: 1rem; white-space: nowrap; }
+.vpn-legend svg { vertical-align: middle; }
+#vpn-detail { max-height: 78vh; overflow: auto; }
+#vpn-detail dd { word-break: break-word; }

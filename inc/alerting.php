@@ -96,6 +96,25 @@ if (!function_exists('alert_incident_event')) {
     }
 }
 
+
+if (!function_exists('alert_emit_integration_event')) {
+    /**
+     * Hand an incident transition to the integrations outbox (3.79.0).
+     *
+     * Transitions only - never called for a repeat sighting - so a condition
+     * that persists produces no further events. Best effort: integrations must
+     * never be able to break detection, so every failure is swallowed.
+     */
+    function alert_emit_integration_event(string $eventType, int $incidentId, array $extra = []): void {
+        try {
+            require_once __DIR__ . '/integrations/events.php';
+            integration_emit($eventType, ['incident_id' => $incidentId] + $extra);
+        } catch (Throwable $e) {
+            error_log('OPNMGR: integration emit failed: ' . $e->getMessage());
+        }
+    }
+}
+
 if (!function_exists('alert_raise')) {
     /**
      * Assert that a condition is currently true.
@@ -153,6 +172,12 @@ if (!function_exists('alert_raise')) {
                       WHERE id = ?'
                 )->execute([$detail, $meta, $severity, (int)$existing['id']]);
 
+                // Integrations: only an actual severity change is an event.
+                if ($existing['severity'] !== $severity) {
+                    alert_emit_integration_event('incident.severity_changed', (int)$existing['id'],
+                        ['previous_severity' => $existing['severity'], 'severity' => $severity]);
+                }
+
                 return (int)$existing['id'];
             }
 
@@ -168,6 +193,20 @@ if (!function_exists('alert_raise')) {
 
             $incidentId = (int)db()->lastInsertId();
             alert_incident_event($incidentId, 'opened', $title);
+
+            // Integrations: a recurrence of a recently resolved condition is
+            // "reopened" (carrying the earlier incident id) so ticket
+            // connectors can apply their reopen-or-new-ticket policy.
+            try {
+                $prev = db()->prepare('SELECT id FROM alert_incidents WHERE dedupe_source = ? AND status = "resolved" AND id <> ?
+                                        AND resolved_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE) ORDER BY id DESC LIMIT 1');
+                $prev->execute([$key, $incidentId, max(1, (int)alert_setting('integrations_reopen_window_minutes', 1440))]);
+                $prevId = $prev->fetchColumn();
+                alert_emit_integration_event($prevId ? 'incident.reopened' : 'incident.opened', $incidentId,
+                    ['dedupe_key' => "incident:{$incidentId}:opened"] + ($prevId ? ['recurrence_of' => (int)$prevId] : []));
+            } catch (Throwable $e) {
+                error_log('OPNMGR: integration recurrence check failed: ' . $e->getMessage());
+            }
 
             audit_log('alert.opened', [
                 'actor_type'  => 'system',
@@ -217,6 +256,8 @@ if (!function_exists('alert_resolve')) {
             )->execute([(int)$incident['id']]);
 
             alert_incident_event((int)$incident['id'], 'resolved', $reason);
+            alert_emit_integration_event('incident.resolved', (int)$incident['id'],
+                ['dedupe_key' => "incident:{$incident['id']}:resolved", 'details' => ['reason' => $reason]]);
 
             audit_log('alert.resolved', [
                 'actor_type'  => 'system',
@@ -257,6 +298,8 @@ if (!function_exists('alert_acknowledge')) {
         }
 
         alert_incident_event($incidentId, 'acknowledged', $note ?: null, $_SESSION['username'] ?? null);
+        alert_emit_integration_event('incident.acknowledged', $incidentId,
+            ['dedupe_key' => "incident:{$incidentId}:acknowledged", 'details' => ['acknowledged_by' => $_SESSION['username'] ?? 'system']]);
 
         audit_log('alert.acknowledged', [
             'object_type' => 'incident',

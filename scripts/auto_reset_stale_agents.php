@@ -45,7 +45,7 @@ $SSH_TIMEOUT = 10;
 $options = getopt('', ['threshold:', 'dry-run', 'force-firewall-id:', 'verbose']);
 $DRY_RUN = isset($options['dry-run']);
 $VERBOSE = isset($options['verbose']) || $DRY_RUN;
-$FORCE_FIREWALL_ID = $options['force-firewall-id'] ?? null;
+$FORCE_FIREWALL_ID = isset($options['force-firewall-id']) ? (int)$options['force-firewall-id'] : null;
 
 if (isset($options['threshold'])) {
     $STALE_THRESHOLD_HOURS = (int)$options['threshold'];
@@ -114,7 +114,7 @@ function mark_as_offline($firewall_id) {
 /**
  * Queue emergency reset command for firewall
  */
-function queue_emergency_reset($firewall_id) {
+function queue_emergency_reset($firewall_id, string $reinstall_host) {
     // Generate emergency reset command
     $reset_command = 'killall -9 tunnel_agent opnsense_agent 2>/dev/null; ' .
                      'ps aux | grep -i agent | grep -v grep | awk \'{print $2}\' | xargs kill -9 2>/dev/null; ' .
@@ -152,7 +152,7 @@ function queue_emergency_reset($firewall_id) {
 /**
  * Attempt to reset agent via SSH
  */
-function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeout) {
+function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeout, string $reinstall_host) {
     global $DRY_RUN;
 
     if ($DRY_RUN) {
@@ -172,14 +172,24 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
     foreach ($targets as $target) {
         log_message('INFO', "Attempting SSH connection to $target...", $firewall_id);
 
-        // Build SSH command
-        $ssh_opts = "-i '$ssh_key_path' -o BatchMode=yes -o ConnectTimeout=$timeout -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts";
+        // The hostname and WAN address come from what the agent reported, so
+        // they are validated as a host/IP and every argument is escaped; the
+        // previous version interpolated them into the shell line verbatim.
+        if (!filter_var($target, FILTER_VALIDATE_IP)
+            && !preg_match('/^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$/D', (string)$target)) {
+            log_message('WARNING', "Skipping SSH target that is not a valid host or IP", $firewall_id);
+            continue;
+        }
 
         // Download and execute reinstall script
         $reset_script = buildAgentReinstallCommand($reinstall_host, (int)$firewall_id)
                       . ' > /tmp/agent_reinstall.log 2>&1 &';
 
-        $ssh_command = "ssh $ssh_opts root@$target '$reset_script' 2>&1";
+        $ssh_command = 'ssh -i ' . escapeshellarg((string)$ssh_key_path)
+            . ' -o BatchMode=yes -o ConnectTimeout=' . (int)$timeout
+            . ' -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts '
+            . escapeshellarg('root@' . $target) . ' ' . escapeshellarg($reset_script) . ' 2>&1';
+        $output = [];
 
         exec($ssh_command, $output, $return_code);
 
@@ -199,7 +209,7 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
  */
 function main() {
     global $STALE_THRESHOLD_HOURS, $OFFLINE_THRESHOLD_HOURS,
-           $SSH_KEY_PATH, $SSH_TIMEOUT, $DRY_RUN, $FORCE_FIREWALL_ID;
+           $SSH_KEY_PATH, $SSH_TIMEOUT, $DRY_RUN, $FORCE_FIREWALL_ID, $reinstall_host;
 
     log_message('INFO', "=== Starting Stale Agent Auto-Reset Script ===");
     log_message('INFO', "Threshold: $STALE_THRESHOLD_HOURS hours | Dry Run: " . ($DRY_RUN ? 'YES' : 'NO'));
@@ -235,7 +245,7 @@ function main() {
 
         // Queue emergency reset command (for when agent comes back online)
         if (!$DRY_RUN) {
-            if (queue_emergency_reset($firewall_id)) {
+            if (queue_emergency_reset($firewall_id, $reinstall_host)) {
                 log_message('INFO', "Queued emergency reset command for firewall $firewall_id", $firewall_id);
             }
         } else {
@@ -244,7 +254,7 @@ function main() {
 
         // Attempt SSH reset if we have connection info
         if (file_exists($SSH_KEY_PATH) && ($hostname || $wan_ip)) {
-            $ssh_success = ssh_reset_agent($hostname, $wan_ip, $firewall_id, $SSH_KEY_PATH, $SSH_TIMEOUT);
+            $ssh_success = ssh_reset_agent($hostname, $wan_ip, $firewall_id, $SSH_KEY_PATH, $SSH_TIMEOUT, $reinstall_host);
 
             if ($ssh_success) {
                 log_message('INFO', "SSH reset successful for $hostname", $firewall_id);

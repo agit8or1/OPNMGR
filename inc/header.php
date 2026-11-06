@@ -220,6 +220,36 @@ function isActive($page) {
         <span class="sidebar-label">Config Drift</span>
       </a>
       <?php endif; ?>
+      <?php if (function_exists('can') && can('platform.view')): ?>
+      <a class="sidebar-item <?php echo isActive(['platform_compatibility.php','firewall_capabilities.php']) ?>" href="/platform_compatibility.php">
+        <span class="sidebar-icon"><i class="fas fa-puzzle-piece"></i></span>
+        <span class="sidebar-label">Compatibility</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('template.view')): ?>
+      <a class="sidebar-item <?php echo isActive(['policy_templates.php','policy_template.php','policy_deploy.php','policy_compliance.php']) ?>" href="/policy_templates.php">
+        <span class="sidebar-icon"><i class="fas fa-clone"></i></span>
+        <span class="sidebar-label">Policy Templates</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('vpn.view')): ?>
+      <a class="sidebar-item <?php echo isActive(['vpn_topology.php','vpn_diagnostics.php']) ?>" href="/vpn_topology.php">
+        <span class="sidebar-icon"><i class="fas fa-diagram-project"></i></span>
+        <span class="sidebar-label">VPN Topology</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('report.view')): ?>
+      <a class="sidebar-item <?php echo isActive(['customer_reports.php','customer_report.php']) ?>" href="/customer_reports.php">
+        <span class="sidebar-icon"><i class="fas fa-file-contract"></i></span>
+        <span class="sidebar-label">Customer Reports</span>
+      </a>
+      <?php endif; ?>
+      <?php if (function_exists('can') && can('integration.view')): ?>
+      <a class="sidebar-item <?php echo isActive(['integrations.php','integration_routes.php','integration_deliveries.php','integration_tickets.php']) ?>" href="/integrations.php">
+        <span class="sidebar-icon"><i class="fas fa-plug"></i></span>
+        <span class="sidebar-label">Integrations</span>
+      </a>
+      <?php endif; ?>
       <?php if (function_exists('can') && can('audit.view')): ?>
       <a class="sidebar-item <?php echo isActive('audit_log.php') ?>" href="/audit_log.php">
         <span class="sidebar-icon"><i class="fas fa-clipboard-list"></i></span>

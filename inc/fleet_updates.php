@@ -435,7 +435,7 @@ if (!function_exists('campaign_dispatch')) {
 
             // Dispatch.
             $action = $campaign['operation'] === 'check' ? 'check_updates' : 'install_updates';
-            $built  = build_structured_command($action, []);
+            $built  = build_structured_command($action, [], platform_firewall((int)$fid));
             if (!$built['ok']) {
                 campaign_set_status($t['id'], 'failed', $built['error']);
                 continue;

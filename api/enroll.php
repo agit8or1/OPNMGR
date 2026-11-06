@@ -31,18 +31,27 @@ if (empty($token) || empty($hostname)) {
     exit;
 }
 
+require_once __DIR__ . '/../inc/enrollment_script.php';
+
+if (!enrollment_token_format_ok($token)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Invalid or expired token']);
+    exit;
+}
+
 try {
-    // Verify token is valid
-    $stmt = db()->prepare("SELECT * FROM enrollment_tokens WHERE token = ? AND expires_at > NOW()");
-    $stmt->execute([$token]);
-    $tokenData = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$tokenData) {
+    // Claim the token before doing anything with it. The conditional UPDATE is
+    // the single-use guarantee: it also refuses a token another path already
+    // marked used (this endpoint used to check only the expiry, and deleted
+    // the row after the work, so two concurrent runs could both enroll).
+    db()->beginTransaction();
+    if (!enrollment_token_claim($token, trim((string)($data['hardware_id'] ?? '')) ?: null)) {
+        db()->rollBack();
         http_response_code(404);
         echo json_encode(['success' => false, 'message' => 'Invalid or expired token']);
         exit;
     }
-    
+
     // Check if firewall already exists
     $stmt = db()->prepare("SELECT id FROM firewalls WHERE hostname = ?");
     $stmt->execute([$hostname]);
@@ -76,10 +85,10 @@ try {
         $stmt->execute([$firewall_id, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version]);
     }
     
-    // Mark token as used by deleting it
-    $stmt = db()->prepare("DELETE FROM enrollment_tokens WHERE token = ?");
-    $stmt->execute([$token]);
-    
+    // The token was claimed above; committing keeps the claim. A failure
+    // before this point rolls back and leaves the token usable.
+    db()->commit();
+
     echo json_encode([
         'success' => true, 
         'message' => 'Enrollment successful',
@@ -87,6 +96,9 @@ try {
     ]);
     
 } catch (Exception $e) {
+    if (db()->inTransaction()) {
+        db()->rollBack();
+    }
     error_log("Enrollment error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Internal server error']);

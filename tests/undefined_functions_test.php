@@ -45,6 +45,9 @@ foreach ($tracked as $rel) {
     $path = $root . '/' . $rel;
     if (!is_file($path)) { continue; }
     if (strpos($rel, 'vendor/') === 0) { continue; }
+    // agent/pfsense runs on the firewall against pfSense's own includes
+    // (gwlb.inc, service-utils.inc ...), which the manager does not have.
+    if (strpos($rel, 'agent/pfsense/') === 0) { continue; }
 
     $src = (string) file_get_contents($path);
     $t   = @token_get_all($src);

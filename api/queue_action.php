@@ -72,7 +72,7 @@ if ($firewall_id <= 0 || $action === '') {
     exit;
 }
 
-$built = build_structured_command($action, $parameters);
+$built = build_structured_command($action, $parameters, platform_firewall($firewall_id));
 if (!$built['ok']) {
     audit_log('command.action', [
         'success'     => false,

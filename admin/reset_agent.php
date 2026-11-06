@@ -5,21 +5,31 @@
  * Web interface for manually triggering agent resets for stale firewalls
  */
 
-// Session and authentication
-session_start();
+// Session, authentication and CSRF come from the standard bootstrap; this
+// page used to start its own session and check only that someone was logged
+// in, so any account - read-only included - could POST a reset and run the
+// reset CLI, with no CSRF token either.
+require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../inc/db.php';
-require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/logging.php';
+require_once __DIR__ . '/../inc/agent_auth.php';
 
-// Require authentication
 requireLogin();
+// Viewing the list needs the same role as acting on it.
+requireAdmin();
 
 $success_message = '';
 $error_message = '';
 $reset_output = '';
 
 // Handle reset request
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['firewall_id'])) {
+$authz = ($_SERVER['REQUEST_METHOD'] === 'POST')
+    ? agent_reset_request_authorized($_POST['csrf'] ?? '')
+    : ['ok' => false, 'status' => 200, 'error' => ''];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$authz['ok']) {
+    http_response_code($authz['status']);
+    $error_message = $authz['error'];
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['firewall_id'])) {
     $firewall_id = (int)$_POST['firewall_id'];
     $user_id = $_SESSION['user_id'] ?? null;
 
@@ -33,7 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['firewall_id'])) {
         log_info('admin', "Manual agent reset triggered for firewall $firewall_id by user $user_id", $user_id, $firewall_id);
 
         // Run the auto-reset script for this specific firewall
-        $command = "/usr/bin/php /var/www/opnsense/scripts/auto_reset_stale_agents.php --force-firewall-id=$firewall_id --verbose 2>&1";
+        // The CLI binary, not PHP_BINARY: under php-fpm that is the FPM daemon.
+        $php_cli = is_executable('/usr/bin/php') ? '/usr/bin/php' : PHP_BINARY;
+        $command = escapeshellarg($php_cli) . ' ' . escapeshellarg(dirname(__DIR__) . '/scripts/auto_reset_stale_agents.php')
+                 . ' --force-firewall-id=' . (int)$firewall_id . ' --verbose 2>&1';
         $output = [];
         exec($command, $output, $return_code);
 
@@ -162,7 +175,8 @@ $firewalls = $stmt->fetchAll();
                                     <td><?= htmlspecialchars($fw['agent_version'] ?: 'Unknown') ?></td>
                                     <td>
                                         <form method="POST" style="display: inline;" onsubmit="return confirm('Reset agent for <?= htmlspecialchars($fw['hostname']) ?>?');">
-                                            <input type="hidden" name="firewall_id" value="<?= $fw['id'] ?>">
+                                            <input type="hidden" name="firewall_id" value="<?= (int)$fw['id'] ?>">
+                                            <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                                             <button type="submit" class="btn btn-sm btn-warning">
                                                 <i class="fas fa-redo"></i> Reset
                                             </button>

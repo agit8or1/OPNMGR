@@ -69,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     try {
                         $stmt = db()->prepare('UPDATE users SET password = ? WHERE id = ?');
                         $stmt->execute([$new_hash, $user_data['id']]);
+                        auth_revoke_sessions((int) $user_data['id'], 'password changed', true);
                         $message = 'Password changed successfully!';
                         $message_type = 'success';
                     } catch (Exception $e) {

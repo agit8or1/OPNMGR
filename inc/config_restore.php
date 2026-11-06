@@ -21,6 +21,7 @@ require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/backup_storage.php';
 require_once __DIR__ . '/config_drift.php';
 require_once __DIR__ . '/agent_commands.php';
+require_once __DIR__ . '/platform/platform.php';
 
 if (!function_exists('restore_setting')) {
     /** Read a restore setting with a fallback. */
@@ -78,9 +79,21 @@ if (!function_exists('restore_validate')) {
             return $fail('The backup file could not be read');
         }
 
-        $validation = validate_backup_upload($path, (int)($row['file_size'] ?: strlen($xml)));
+        // Platform: the target must be a verified platform whose restore is
+        // allowed, and the backup must be that platform's configuration. An
+        // OPNsense config is never installed on pfSense or the reverse - not
+        // even if the backup row says it belongs to this firewall, because a
+        // firewall can be rebuilt on the other product under the same record.
+        $fw = platform_firewall((int)$row['fw_id']);
+        $adapter = platform_adapter($fw ?? []);
+        $allow = platform_capability_allows($fw ?? ['id' => 0], 'config.restore');
+        if (!$allow['allowed']) {
+            return $fail('Restore is not available for this firewall: ' . $allow['reason']);
+        }
+
+        $validation = validate_backup_upload($path, (int)($row['file_size'] ?: strlen($xml)), $adapter->configRoot());
         if (!$validation['ok']) {
-            return $fail('The backup is not a usable configuration: ' . $validation['reason']);
+            return $fail('The backup is not a usable ' . $adapter->label() . ' configuration: ' . $validation['reason']);
         }
 
         return ['ok' => true, 'error' => '', 'backup' => $row,
@@ -209,8 +222,14 @@ if (!function_exists('build_restore_command')) {
      * that requires an operator's browser session - so it could not have worked
      * even if the URL had been well-formed.
      */
-    function build_restore_command(int $restoreId, int $firewallId, string $token): string {
+    function build_restore_command(int $restoreId, int $firewallId, string $token,
+                                   ?OpnmgrPlatformAdapter $adapter = null): string {
         $url = opnmgr_server_url() . '/api/download_restore_config.php';
+        $adapter = $adapter ?? platform_adapter(platform_firewall($firewallId) ?? []);
+        $root = $adapter->configRoot() ?? 'opnsense';
+        $install = $adapter->installConfigShell('TMP', 'OPNManager restore #' . $restoreId)
+            ?? "echo 'ERROR: restore is not implemented for this platform'; exit 5\n";
+        $label = $adapter->label();
 
         return <<<SH
 #!/bin/sh
@@ -244,9 +263,10 @@ curl -sS -f -o "\$TMP" \\
   --data-urlencode "token={$token}" \\
   {$url} || { echo "ERROR: could not fetch configuration"; exit 1; }
 
-# Refuse to apply anything that is not a well-formed OPNsense config.
-if ! grep -q "<opnsense>" "\$TMP"; then
-    echo "ERROR: fetched file is not an OPNsense configuration"
+# Refuse to apply anything that is not this platform's configuration. The
+# manager already checked; this is the firewall checking for itself.
+if ! head -c 4096 "\$TMP" | grep -q "<{$root}>"; then
+    echo "ERROR: fetched file is not a {$label} configuration"
     rm -f "\$TMP"
     exit 1
 fi
@@ -261,7 +281,9 @@ echo "Applying configuration..."
 # `if ! cmd; then RC=\$?` does not work: inside the test, \$? is the negated
 # status - 1 for any failure - so a restore that failed with 3 reported 1.
 set +e
-/usr/local/sbin/configctl firmware restore "\$TMP"
+(
+{$install}
+)
 RC=\$?
 set -e
 

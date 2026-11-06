@@ -130,14 +130,20 @@ if (is_file($enroll)) {
         strpos($body, '__MGMT_SERVER_IP__') !== false);
 }
 
-// And the endpoint that serves it substitutes both.
-$serve = $root . '/api/get_enroll_script.php';
+// And the renderer every installer endpoint uses substitutes both. (Since
+// 3.79 the endpoints delegate to inc/enrollment_script.php; the behaviour is
+// exercised in tests/enrollment_script_test.php.)
+$serve = $root . '/inc/enrollment_script.php';
 if (is_file($serve)) {
     $body = (string) file_get_contents($serve);
-    check('get_enroll_script.php substitutes the SSH key',
-        strpos($body, '__SERVER_SSH_KEY__') !== false);
-    check('get_enroll_script.php substitutes the manager IP',
-        strpos($body, '__MGMT_SERVER_IP__') !== false);
+    check('the installer renderer substitutes the SSH key',
+        strpos($body, "'SERVER_SSH_KEY'   => [\$sshKey, '__SERVER_SSH_KEY__']") !== false);
+    check('the installer renderer substitutes the manager IP',
+        strpos($body, "'MGMT_SERVER_IP'   => [\$mgmtIp, '__MGMT_SERVER_IP__']") !== false);
+}
+foreach (['api/get_enroll_script.php', 'api/get_enroll_script_http.php', 'api/get_enrollment_script.php'] as $ep) {
+    check("{$ep} delegates to the validated renderer",
+        strpos((string) @file_get_contents($root . '/' . $ep), 'enrollment_serve_installer()') !== false);
 }
 
 // ---------------------------------------------------------------------------

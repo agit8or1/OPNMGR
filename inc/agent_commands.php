@@ -23,6 +23,7 @@
  */
 
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/platform/platform.php';
 
 if (!function_exists('agent_service_allowlist')) {
     /**
@@ -213,6 +214,24 @@ if (!function_exists('agent_command_catalog')) {
                     };
                 },
             ],
+            'vpn_probe' => [
+                'label'    => 'VPN bounded probe',
+                'category' => 'network',
+                'risk'     => 'LOW',
+                // One bounded probe, sourced from an address inside the tunnel's
+                // protected network. Built by OpnmgrBaseAdapter::vpnProbeShell()
+                // so the catalogue and both platform adapters share one shape.
+                // A probe from the firewall is not client traffic: it does not
+                // traverse the LAN rule set a client's packets would.
+                'params'   => [
+                    'method' => ['type' => 'enum', 'values' => ['icmp','tcp','udp','traceroute'], 'required' => true],
+                    'target' => ['type' => 'ip', 'required' => true],
+                    'source' => ['type' => 'ip', 'required' => false],
+                    'port'   => ['type' => 'int', 'min' => 1, 'max' => 65535, 'required' => false],
+                    'size'   => ['type' => 'int', 'min' => 0, 'max' => 1472, 'required' => false],
+                ],
+                'build'    => fn(array $p) => OpnmgrBaseAdapter::vpnProbeShell($p),
+            ],
             'vpn_restart' => [
                 'label'    => 'Restart VPN',
                 'category' => 'network',
@@ -335,7 +354,11 @@ if (!function_exists('validate_action_params')) {
                     break;
 
                 case 'service':
-                    if (!in_array($value, agent_service_allowlist(), true)) {
+                    // Union of the per-platform lists; platform_action_verdict()
+                    // then checks the name against the target's own list.
+                    $known = array_merge(agent_service_allowlist(),
+                        (new OpnmgrPfsenseAdapter())->serviceAllowlist());
+                    if (!in_array($value, $known, true)) {
                         return ['ok' => false, 'error' => "Service '{$value}' is not in the allowed list", 'params' => []];
                     }
                     break;
@@ -347,6 +370,15 @@ if (!function_exists('validate_action_params')) {
                             'error'  => "Parameter '{$name}' must be one of: " . implode(', ', $rule['values']),
                             'params' => [],
                         ];
+                    }
+                    break;
+
+                case 'ip':
+                    // A literal address only: probes must never resolve names,
+                    // and a hostname would let the target change under us.
+                    $value = trim((string)$value);
+                    if (filter_var($value, FILTER_VALIDATE_IP) === false) {
+                        return ['ok' => false, 'error' => "Parameter '{$name}' must be an IP address", 'params' => []];
                     }
                     break;
 
@@ -378,7 +410,7 @@ if (!function_exists('build_structured_command')) {
      *
      * @return array{ok:bool, error:string, command:string, risk:string, label:string, params:array}
      */
-    function build_structured_command(string $action, array $params): array {
+    function build_structured_command(string $action, array $params, ?array $firewall = null): array {
         $validated = validate_action_params($action, $params);
         if (!$validated['ok']) {
             return ['ok' => false, 'error' => $validated['error'], 'command' => '',
@@ -387,10 +419,25 @@ if (!function_exists('build_structured_command')) {
 
         $entry = agent_command_catalog()[$action];
 
+        // With a target firewall the shell comes from its platform adapter, and
+        // an action the platform cannot take is refused with the reason. The
+        // two-argument form is the OPNsense build, kept for existing callers;
+        // queue_firewall_command() still gates whatever it is handed.
+        if ($firewall !== null) {
+            $verdict = platform_action_verdict($firewall, $action, $validated['params']);
+            if (!$verdict['ok']) {
+                return ['ok' => false, 'error' => $verdict['error'], 'command' => '',
+                        'risk' => $entry['risk'], 'label' => $entry['label'], 'params' => []];
+            }
+            $command = $verdict['command'];
+        } else {
+            $command = ($entry['build'])($validated['params']);
+        }
+
         return [
             'ok'      => true,
             'error'   => '',
-            'command' => ($entry['build'])($validated['params']),
+            'command' => $command,
             'risk'    => $entry['risk'],
             'label'   => $entry['label'],
             'params'  => $validated['params'],
@@ -421,7 +468,7 @@ if (!function_exists('queue_firewall_command')) {
             return ['ok' => false, 'error' => 'Empty command', 'command_id' => 0, 'hostname' => ''];
         }
 
-        $stmt = db()->prepare('SELECT id, hostname FROM firewalls WHERE id = ?');
+        $stmt = db()->prepare('SELECT * FROM firewalls WHERE id = ?');
         $stmt->execute([$firewallId]);
         $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -433,6 +480,25 @@ if (!function_exists('queue_firewall_command')) {
                 'message'     => 'Attempt to queue a command against a firewall that does not exist',
             ]);
             return ['ok' => false, 'error' => 'Firewall not found', 'command_id' => 0, 'hostname' => ''];
+        }
+
+        // Platform gate. The same check runs again at delivery (agent_checkin),
+        // which also catches rows inserted by endpoints that bypass this
+        // function; refusing here gives the operator the reason immediately.
+        $verdict = platform_delivery_verdict($firewall, [
+            'command' => $command, 'action' => $action, 'is_raw' => $isRaw ? 1 : 0,
+        ]);
+        if (!$verdict['deliver']) {
+            $reason = preg_replace('/^Not delivered: /', '', $verdict['reason']);
+            audit_log('command.queue', [
+                'success'     => false,
+                'object_type' => 'firewall',
+                'object_id'   => (string)$firewallId,
+                'firewall_id' => $firewallId,
+                'message'     => 'Refused by platform gate: ' . substr($reason, 0, 400),
+                'metadata'    => ['action' => $action, 'is_raw' => $isRaw],
+            ]);
+            return ['ok' => false, 'error' => $reason, 'command_id' => 0, 'hostname' => $firewall['hostname']];
         }
 
         $params = isset($opts['parameters']) && is_array($opts['parameters'])

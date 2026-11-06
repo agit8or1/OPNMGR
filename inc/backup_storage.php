@@ -90,7 +90,14 @@ if (!function_exists('validate_backup_upload')) {
      * @param int    $size    Reported size in bytes
      * @return array{ok:bool, reason:string, root:string|null}
      */
-    function validate_backup_upload(string $tmpPath, int $size): array {
+    /**
+     * @param ?string $expectedRoot 'opnsense' or 'pfsense' for a firewall of a
+     *                              known platform; null accepts either, for a
+     *                              firewall whose platform is not yet verified.
+     *                              A backup is never accepted as the other
+     *                              product's configuration.
+     */
+    function validate_backup_upload(string $tmpPath, int $size, ?string $expectedRoot = 'opnsense'): array {
         if (!is_file($tmpPath) || !is_readable($tmpPath)) {
             return ['ok' => false, 'reason' => 'file unreadable', 'root' => null];
         }
@@ -147,10 +154,12 @@ if (!function_exists('validate_backup_upload')) {
             return ['ok' => false, 'reason' => 'no XML root element found', 'root' => null];
         }
 
-        if (strtolower($rootName) !== 'opnsense') {
+        $accepted = $expectedRoot === null ? ['opnsense', 'pfsense'] : [$expectedRoot];
+        if (!in_array(strtolower($rootName), $accepted, true)) {
             return [
                 'ok'     => false,
-                'reason' => 'root element is <' . substr($rootName, 0, 32) . '>, expected <opnsense>',
+                'reason' => 'root element is <' . substr($rootName, 0, 32) . '>, expected <'
+                            . implode('> or <', $accepted) . '>',
                 'root'   => $rootName,
             ];
         }
