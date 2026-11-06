@@ -97,7 +97,7 @@ try {
     // record anywhere, the agent ran it with nohup and never reported a result,
     // and the UI had nothing to show. The update worked; there was simply no
     // evidence of it, which is indistinguishable from failure.
-    $built = build_structured_command('install_updates', []);
+    $built = build_structured_command('install_updates', [], platform_firewall((int)$firewall_id));
     if (!$built['ok']) {
         echo json_encode(['success' => false, 'message' => $built['error']]);
         exit;

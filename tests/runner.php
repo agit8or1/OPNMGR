@@ -18,6 +18,15 @@ $_POST   = $job['post'] ?? [];
 $_FILES  = $job['files'] ?? [];
 $_REQUEST = array_merge($_GET, $_POST);
 
+// Optional signed-in user. The session is started here, before the endpoint's
+// bootstrap, which then finds it active and leaves it alone.
+if (!empty($job['session']) && is_array($job['session'])) {
+    session_save_path(sys_get_temp_dir());
+    session_id('opnmgrtest' . bin2hex(random_bytes(12)));
+    @session_start();
+    $_SESSION = $job['session'];
+}
+
 // php://input is not writable from CLI, so provide the raw body through a
 // stream wrapper that endpoints reach via file_get_contents('php://input').
 if (!empty($job['body'])) {

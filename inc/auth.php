@@ -144,32 +144,14 @@ function isLoggedIn() {
         return false;
     }
 
-    // Deactivating an account has to end the sessions it already has, or
-    // "disable this user" means "disable them at their next login", which is
-    // not what an operator reaching for it needs. Re-checked on a short
-    // interval rather than every request: one query a minute per active
-    // session, bounding both the cost and how long a disabled account keeps
-    // working.
-    $activeChecked = $_SESSION['active_checked_at'] ?? 0;
-    if (($now - $activeChecked) > 60) {
-        try {
-            $stmt = db()->prepare('SELECT is_active FROM users WHERE id = ?');
-            $stmt->execute([$_SESSION['user_id']]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            // A deleted account ends the session too.
-            if ($row === false || (array_key_exists('is_active', $row) && (int) $row['is_active'] === 0)) {
-                error_log('SECURITY: session for deactivated or removed user_id='
-                    . $_SESSION['user_id'] . ' - session destroyed');
-                destroySession();
-                return false;
-            }
-            $_SESSION['active_checked_at'] = $now;
-        } catch (Throwable $e) {
-            // A database blip must not log everyone out; the check retries on
-            // the next request.
-            error_log('OPNMGR: could not verify account status: ' . $e->getMessage());
-        }
+    // The account is re-read on every request: deactivation, deletion, a
+    // revoked session version and a changed role all take effect on the very
+    // next request. This used to run once a minute and refresh nothing but
+    // is_active, so a demoted administrator kept the role cached in
+    // $_SESSION until they logged out, and a password reset left every
+    // existing session working.
+    if (!auth_sync_session()) {
+        return false;
     }
 
     // Periodically roll the session id so a long-lived session does not keep
@@ -185,7 +167,104 @@ function isLoggedIn() {
 }
 
 function isAdmin() {
+    // A caller that checks isAdmin() without requireLogin() must still see the
+    // role as it is now, not as it was at login.
+    if (isset($_SESSION['user_id']) && !auth_sync_session()) {
+        return false;
+    }
     return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+}
+
+/**
+ * Re-validate the signed-in account against the database, once per request.
+ *
+ * Ends the session when the account is gone, disabled, or its
+ * session_version has moved past the one this session was issued under, and
+ * refreshes $_SESSION['role'] from the database so demotion and permission
+ * removal apply immediately.
+ *
+ * A database error does not log everyone out (the previous behaviour, kept),
+ * but it also grants nothing new: the cached role is only ever replaced by a
+ * value read from the database.
+ *
+ * @since 3.79.0
+ */
+function auth_sync_session(bool $reset = false): bool {
+    static $synced = null;   // user_id this request already validated
+    if ($reset) {
+        $synced = null;
+        return true;
+    }
+    if (!isset($_SESSION['user_id'])) {
+        return false;
+    }
+    $uid = (int) $_SESSION['user_id'];
+    if ($synced === $uid) {
+        return true;
+    }
+
+    try {
+        try {
+            $stmt = db()->prepare('SELECT is_active, role, session_version FROM users WHERE id = ?');
+            $stmt->execute([$uid]);
+        } catch (PDOException $e) {
+            // Before migration 0030: no session_version column yet.
+            $stmt = db()->prepare('SELECT is_active, role, 0 AS session_version FROM users WHERE id = ?');
+            $stmt->execute([$uid]);
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row === false || (array_key_exists('is_active', $row) && (int) $row['is_active'] === 0)) {
+            error_log('SECURITY: session for deactivated or removed user_id=' . $uid . ' - session destroyed');
+            destroySession();
+            return false;
+        }
+        if ((int) $row['session_version'] !== (int) ($_SESSION['session_version'] ?? 0)) {
+            error_log('SECURITY: session for user_id=' . $uid . ' was revoked (session version changed) - session destroyed');
+            destroySession();
+            return false;
+        }
+        if (($_SESSION['role'] ?? null) !== $row['role']) {
+            error_log(sprintf('OPNMGR: role for user_id=%d changed %s -> %s; session updated',
+                $uid, $_SESSION['role'] ?? 'none', $row['role']));
+            $_SESSION['role'] = $row['role'];
+        }
+        $_SESSION['active_checked_at'] = time();
+        $synced = $uid;
+        return true;
+    } catch (Throwable $e) {
+        error_log('OPNMGR: could not verify account status: ' . $e->getMessage());
+        return true;
+    }
+}
+
+/**
+ * End every existing session of an account.
+ *
+ * Call after a password change or reset, a two-factor change, deactivation,
+ * or anything else that should force the account to authenticate again.
+ * With $keepCurrent the caller's own session (when it is that account's) is
+ * moved to the new version, so changing your own password does not log you
+ * out of the page you did it from - but does log out everywhere else.
+ *
+ * @since 3.79.0
+ */
+function auth_revoke_sessions(int $userId, string $reason, bool $keepCurrent = false): void {
+    db()->prepare('UPDATE users SET session_version = session_version + 1 WHERE id = ?')->execute([$userId]);
+    if ($keepCurrent && (int) ($_SESSION['user_id'] ?? 0) === $userId) {
+        $stmt = db()->prepare('SELECT session_version FROM users WHERE id = ?');
+        $stmt->execute([$userId]);
+        $_SESSION['session_version'] = (int) $stmt->fetchColumn();
+        session_regenerate_id(true);
+    }
+    auth_sync_session(true);
+    if (function_exists('audit_log')) {
+        audit_log('auth.sessions.revoked', [
+            'object_type' => 'user',
+            'object_id'   => (string) $userId,
+            'message'     => 'Existing sessions revoked: ' . $reason,
+        ]);
+    }
 }
 
 /**
@@ -337,6 +416,7 @@ function login($username, $password) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['role'] = $user['role'];
+        $_SESSION['session_version'] = (int) ($user['session_version'] ?? 0);
         $_SESSION['login_time'] = time();
         $_SESSION['created_at'] = time();
         $_SESSION['last_activity'] = time();

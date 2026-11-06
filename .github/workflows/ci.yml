@@ -34,8 +34,8 @@ jobs:
             -not -path './.archive/*' \
             -print0 | xargs -0 -n1 -P4 php -l
 
-  composer:
-    name: Composer validate and audit
+  dependencies:
+    name: Dependency audit (Composer + npm)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -45,11 +45,22 @@ jobs:
           php-version: '8.3'
           coverage: none
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Validate composer.json
         run: composer validate --no-check-publish
 
+      # Blocking. Exit 1 = advisories (listed with the parent-package fix),
+      # exit 2 = a scanner could not run - which is reported as such, never as
+      # a clean result. This replaced `composer audit || true`, which turned
+      # both findings and scanner failures into a pass.
       - name: Audit dependencies for known vulnerabilities
-        run: composer audit --no-interaction || true
+        run: php scripts/ci/dependency_audit.php
+
+      - name: Audit classifier suite
+        run: php tests/dependency_audit_test.php
 
   shellcheck:
     name: ShellCheck
@@ -73,13 +84,16 @@ jobs:
   security-tests:
     name: Security regression tests
     runs-on: ubuntu-latest
+    # tests/bootstrap.php refuses any database not named opnsense_fw_test*.
+    env:
+      DB_NAME: opnsense_fw_test
 
     services:
       mariadb:
         image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: ci-root
-          MARIADB_DATABASE: opnsense_fw
+          MARIADB_DATABASE: opnsense_fw_test
         ports: ['3306:3306']
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
@@ -104,7 +118,7 @@ jobs:
         run: |
           cat > .env <<EOF
           DB_HOST=127.0.0.1
-          DB_NAME=opnsense_fw
+          DB_NAME=opnsense_fw_test
           DB_USER=root
           DB_PASS=ci-root
           APP_ENV=testing
@@ -113,7 +127,9 @@ jobs:
           php scripts/sign_release.php --generate-key
 
       - name: Load schema (clean install path)
-        run: mysql -h 127.0.0.1 -u root -pci-root opnsense_fw < database/schema.sql
+        run: |
+          sed -e 's/`opnsense_fw`/`opnsense_fw_test`/g' database/schema.sql \
+            | mysql -h 127.0.0.1 -u root -pci-root
 
       - name: Run migrations (must be a no-op on a fresh schema)
         run: |
@@ -267,6 +283,26 @@ jobs:
       - name: Agent request signing suite
         run: php tests/agent_request_signing_test.php
 
+      # 3.79: mixed-fleet platform layer and the security fixes in the same
+      # release.
+      - name: Platform detection, capabilities and dispatch suite
+        run: php tests/platform_test.php
+
+      - name: Platform handling through the check-in endpoint
+        run: php tests/platform_checkin_test.php
+
+      - name: pfSense agent suite
+        run: php tests/pfsense_agent_test.php
+
+      - name: Enrollment installer suite
+        run: php tests/enrollment_script_test.php
+
+      - name: Session revocation suite
+        run: php tests/session_revocation_test.php
+
+      - name: Agent reset authorisation suite
+        run: php tests/agent_reset_authz_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
@@ -309,13 +345,15 @@ jobs:
   upgrade-path:
     name: Upgrade from the previous schema
     runs-on: ubuntu-latest
+    env:
+      DB_NAME: opnsense_fw_test
 
     services:
       mariadb:
         image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: ci-root
-          MARIADB_DATABASE: opnsense_fw
+          MARIADB_DATABASE: opnsense_fw_test
         ports: ['3306:3306']
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
@@ -336,13 +374,14 @@ jobs:
         run: |
           git show origin/main:database/schema.sql > /tmp/old-schema.sql 2>/dev/null \
             || git show HEAD~1:database/schema.sql > /tmp/old-schema.sql
-          mysql -h 127.0.0.1 -u root -pci-root opnsense_fw < /tmp/old-schema.sql
+          sed -e 's/`opnsense_fw`/`opnsense_fw_test`/g' /tmp/old-schema.sql \
+            | mysql -h 127.0.0.1 -u root -pci-root
 
       - name: Configure environment
         run: |
           cat > .env <<EOF
           DB_HOST=127.0.0.1
-          DB_NAME=opnsense_fw
+          DB_NAME=opnsense_fw_test
           DB_USER=root
           DB_PASS=ci-root
           EOF

@@ -6,6 +6,8 @@ require_once __DIR__ . '/inc/command_results.php';
 require_once __DIR__ . '/inc/agent_commands.php';
 require_once __DIR__ . '/inc/reboot_state.php';
 require_once __DIR__ . '/inc/firewall_health.php';
+require_once __DIR__ . '/inc/backup_storage.php';
+require_once __DIR__ . '/inc/platform/platform.php';
 
 // Endpoint for firewall agent check-ins
 header('Content-Type: application/json');
@@ -298,6 +300,25 @@ try {
         log_info('agent', "Agent checkin: firewall_id=$firewall_id, type=$agent_type, version=$agent_version, wan_ip=$wan_ip", null, $firewall_id);
     }
 
+    // Platform detection (3.79.0). Runs on every check-in so the platform is
+    // re-verified before any queued command below is released, and so a
+    // firewall that stops reporting goes stale instead of staying trusted.
+    // Never allowed to fail a check-in; on error the previous values stand.
+    try {
+        $agent_platform = is_array($input['platform'] ?? null) ? $input['platform'] : [];
+        $detected = platform_detect([
+            'agent_platform' => $agent_platform,
+            'agent_version'  => $agent_version,
+            'version_string' => is_string($opnsense_version) ? $opnsense_version : '',
+            // Only consulted when the agent sent no explicit platform block:
+            // reading the latest backup's root costs a file read per check-in.
+            'config_root'    => $agent_platform ? null : platform_config_root_of_latest_backup($firewall_id),
+        ]);
+        platform_record_detection($firewall_id, $detected, $agent_platform);
+    } catch (Throwable $e) {
+        error_log('Platform detection failed for firewall ' . $firewall_id . ': ' . $e->getMessage());
+    }
+
     // OPNsense health telemetry (Agent v1.6.0+): gateways, VPN tunnels, CARP,
     // services and certificates. Absent for older agents, which simply do not
     // populate those views rather than being treated as "everything is down".
@@ -508,7 +529,21 @@ try {
     $update_info = $stmt->fetch();
     
     $opnsense_update_requested = false;
-    if ($update_info && $update_info['update_requested']) {
+    $platform_row = platform_firewall($firewall_id) ?? $firewall;
+    $firmware_allowed = platform_capability_allows($platform_row, 'firmware.install');
+    if ($update_info && $update_info['update_requested'] && !$firmware_allowed['allowed']) {
+        // The request flag predates platform awareness: a firmware request on a
+        // platform where installation is not implemented is closed out with
+        // the reason instead of sending `opnsense-update` to a pfSense box.
+        db()->prepare(
+            "UPDATE firewalls SET update_requested = 0, last_update_result = 'unsupported',
+                    last_update_error = ?, last_update_attempt_at = NOW() WHERE id = ?"
+        )->execute([substr($firmware_allowed['reason'], 0, 255), $firewall_id]);
+        audit_log_agent('update.refused', $firewall_id, [
+            'success' => false,
+            'message' => 'Firmware update not delivered: ' . substr($firmware_allowed['reason'], 0, 400),
+        ]);
+    } elseif ($update_info && $update_info['update_requested']) {
         $opnsense_update_requested = true;
         
         // Clear the request flag so it is delivered once, and mark the firewall
@@ -666,6 +701,14 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
     // Use centralized version constant from inc/agent_version.php
     require_once __DIR__ . '/inc/agent_version.php';
     $latest_agent_version = LATEST_AGENT_VERSION;
+
+    // pfSense runs a separate agent with its own version line and installer;
+    // offering it the OPNsense plugin would install an MVC plugin on a product
+    // that has no MVC framework.
+    $fw_row = platform_firewall((int)$firewall_id);
+    if ($fw_row && ($fw_row['agent_flavor'] ?? '') === 'pfsense-agent') {
+        return checkPfsenseAgentUpdate($current_agent_version, $fw_row);
+    }
     
     // Clean version strings for comparison
     $current_clean = preg_replace('/[^0-9.]/', '', $current_agent_version);
@@ -774,9 +817,9 @@ function checkQueuedCommands($firewall_id) {
         }
         
         // Get pending commands
-        $stmt = db()->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
+        $stmt = db()->prepare('SELECT id, command, description, action, is_raw FROM firewall_commands WHERE firewall_id = ? AND status = "pending" ORDER BY created_at ASC LIMIT 5');
         $stmt->execute([$firewall_id]);
-        $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $commands = platform_filter_deliverable($firewall_id, $stmt->fetchAll(PDO::FETCH_ASSOC));
         
         if (!empty($commands)) {
             // Mark commands as sent
@@ -812,9 +855,9 @@ function checkQueuedCommandsForUpdateAgent($firewall_id) {
         }
         
         // Get pending commands marked for update agent
-        $stmt = db()->prepare('SELECT id, command, description FROM firewall_commands WHERE firewall_id = ? AND status = "pending" AND is_update_command = 1 ORDER BY created_at ASC LIMIT 5');
+        $stmt = db()->prepare('SELECT id, command, description, action, is_raw FROM firewall_commands WHERE firewall_id = ? AND status = "pending" AND is_update_command = 1 ORDER BY created_at ASC LIMIT 5');
         $stmt->execute([$firewall_id]);
-        $commands = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $commands = platform_filter_deliverable($firewall_id, $stmt->fetchAll(PDO::FETCH_ASSOC));
         
         if (!empty($commands)) {
             // Mark commands as sent
@@ -896,4 +939,71 @@ function processWANInterfaceStats($firewall_id, $wan_interface_stats_json) {
         error_log("Failed to process WAN interface stats for firewall $firewall_id: " . $e->getMessage());
     }
 }
-?>
+
+/**
+ * Drop, and close out, queued commands this firewall's platform must not run.
+ *
+ * This is the gate every command passes, including the ones legacy endpoints
+ * insert into firewall_commands directly with OPNsense shell text in them. A
+ * refused command is marked failed with the reason, not left pending, so the
+ * operator sees why and it is never retried onto the wrong product.
+ *
+ * @return array The deliverable commands, as id/command/description rows
+ */
+function platform_filter_deliverable(int $firewall_id, array $commands): array {
+    if (!$commands) {
+        return [];
+    }
+    $fw = platform_firewall($firewall_id);
+    $out = [];
+    foreach ($commands as $cmd) {
+        $verdict = $fw ? platform_delivery_verdict($fw, $cmd) : ['deliver' => false, 'reason' => 'Firewall not found'];
+        if ($verdict['deliver']) {
+            $out[] = ['id' => $cmd['id'], 'command' => $cmd['command'], 'description' => $cmd['description']];
+            continue;
+        }
+        db()->prepare(
+            "UPDATE firewall_commands SET status = 'failed', completed_at = NOW(), result = ?
+              WHERE id = ? AND status = 'pending'"
+        )->execute([$verdict['reason'], $cmd['id']]);
+        audit_log_agent('command.refused', $firewall_id, [
+            'success'     => false,
+            'object_type' => 'command',
+            'object_id'   => (string)$cmd['id'],
+            'message'     => substr($verdict['reason'], 0, 500),
+            'metadata'    => ['action' => $cmd['action'] ?? null, 'platform' => $fw['platform_family'] ?? null],
+        ]);
+    }
+    return $out;
+}
+
+/**
+ * Agent update offer for the pfSense agent.
+ *
+ * Gated on the agent.update capability, which is untested on pfSense until a
+ * lab validation is recorded, so by default only designated lab firewalls are
+ * offered an update.
+ */
+function checkPfsenseAgentUpdate(string $current, array $fw): array {
+    $latest = PFSENSE_AGENT_VERSION;
+    $clean = preg_replace('/[^0-9.]/', '', $current);
+    if (!version_compare($clean, $latest, '<')) {
+        return ['update_available' => false, 'latest_version' => $latest];
+    }
+    $allow = platform_capability_allows($fw, 'agent.update');
+    $base = opnmgr_server_url();
+    if (!$allow['allowed'] || $base === '') {
+        return ['update_available' => false, 'update_held' => true,
+                'rollout_stage' => $allow['allowed'] ? 'unconfigured' : 'capability-gated',
+                'latest_version' => $latest];
+    }
+    $installer = $base . '/downloads/pfsense/install_opnmgr_agent_pfsense.sh';
+    $cmd = 'fetch -o - ' . escapeshellarg($installer) . ' | env OPNMGR_BASE_URL=' . escapeshellarg($base) . ' sh';
+    return [
+        'update_available'         => true,
+        'latest_version'           => $latest,
+        'update_command'           => $cmd . ' > /tmp/opnmgr_agent_update.log 2>&1 &',
+        'manual_reinstall_command' => $cmd,
+    ];
+}
+

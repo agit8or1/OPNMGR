@@ -545,3 +545,30 @@ if (!function_exists('buildAgentReinstallCommand')) {
         );
     }
 }
+
+if (!function_exists('agent_reset_request_authorized')) {
+    /**
+     * Authorization for an operator-initiated agent reset.
+     *
+     * One policy for every way of asking: the supported API
+     * (api/reset_agent.php) and the legacy page (admin/reset_agent.php), which
+     * used to require only a login and no CSRF token before running the reset
+     * CLI. An administrator holding agent.restart, with a valid CSRF token.
+     * Checked before any command is queued or subprocess started.
+     *
+     * @return array{ok:bool, status:int, error:string}
+     * @since 3.79.0
+     */
+    function agent_reset_request_authorized(?string $csrfToken): array {
+        if (!function_exists('isLoggedIn') || !isLoggedIn()) {
+            return ['ok' => false, 'status' => 401, 'error' => 'Authentication required'];
+        }
+        if (!isAdmin() || !function_exists('can') || !can('agent.restart')) {
+            return ['ok' => false, 'status' => 403, 'error' => 'Administrator access required to reset an agent'];
+        }
+        if (!function_exists('csrf_verify') || !csrf_verify((string)$csrfToken)) {
+            return ['ok' => false, 'status' => 403, 'error' => 'Invalid CSRF token'];
+        }
+        return ['ok' => true, 'status' => 200, 'error' => ''];
+    }
+}

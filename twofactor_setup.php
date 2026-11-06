@@ -254,10 +254,13 @@ function enable2FA($userId, $secret) {
     // Stored encrypted, not hashed: TOTP verification needs the secret back.
     $stmt = db()->prepare("UPDATE users SET totp_secret = ? WHERE id = ?");
     $stmt->execute([opnmgr_encrypt($secret), $userId]);
+    // Sessions that never passed the new second factor end; this one goes on.
+    auth_revoke_sessions((int) $userId, 'two-factor authentication enabled', true);
 }
 
 function disable2FA($userId) {
     $stmt = db()->prepare("UPDATE users SET totp_secret = NULL WHERE id = ?");
     $stmt->execute([$userId]);
+    auth_revoke_sessions((int) $userId, 'two-factor authentication disabled', true);
 }
 ?>

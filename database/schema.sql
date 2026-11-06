@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.72.1.
+-- Generated from the reference installation for OPNManager v3.79.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -220,6 +220,7 @@ CREATE TABLE IF NOT EXISTS `alert_incidents` (
   `last_notified_at` timestamp NULL DEFAULT NULL,
   `suppressed` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 when notification was withheld, e.g. during maintenance',
   `suppressed_reason` varchar(128) DEFAULT NULL,
+  `owner` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_active_dedupe` (`dedupe_key`),
   KEY `idx_status` (`status`),
@@ -1153,6 +1154,18 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `last_update_error` varchar(255) DEFAULT NULL,
   `last_update_attempt_at` timestamp NULL DEFAULT NULL,
   `agent_rollout_pilot` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Receives agent releases at rollout stage pilot',
+  `platform_family` varchar(16) DEFAULT NULL COMMENT 'opnsense | pfsense | NULL (unknown)',
+  `platform_edition` varchar(16) DEFAULT NULL COMMENT 'community | plus | business | unknown (pfSense); NULL for OPNsense',
+  `platform_os_version` varchar(64) DEFAULT NULL COMMENT 'Product version as the platform reports it, e.g. 26.7.8 or 2.8.1-RELEASE',
+  `platform_base_version` varchar(64) DEFAULT NULL COMMENT 'FreeBSD release. Recorded, never used on its own to identify the product',
+  `platform_config_version` varchar(16) DEFAULT NULL COMMENT 'config.xml <version> schema revision',
+  `platform_packages` text DEFAULT NULL COMMENT 'JSON list of relevant installed packages',
+  `platform_probe` text DEFAULT NULL COMMENT 'JSON tool/mechanism probe results from the agent',
+  `platform_detection_source` varchar(64) DEFAULT NULL,
+  `platform_detection_confidence` varchar(8) DEFAULT NULL COMMENT 'high | medium | low',
+  `platform_detection_conflict` varchar(255) DEFAULT NULL COMMENT 'Set when evidence sources disagree; forces read-only',
+  `platform_verified_at` timestamp NULL DEFAULT NULL,
+  `agent_flavor` varchar(32) DEFAULT NULL COMMENT 'opnsense-plugin | pfsense-agent',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),
@@ -1162,7 +1175,8 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   KEY `idx_site_id` (`site_id`),
   KEY `idx_carp_state` (`carp_state`),
   KEY `idx_ha_peer` (`ha_peer_firewall_id`),
-  KEY `idx_update_ring` (`update_ring`)
+  KEY `idx_update_ring` (`update_ring`),
+  KEY `idx_platform_family` (`platform_family`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1191,6 +1205,221 @@ CREATE TABLE IF NOT EXISTS `global_settings` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `setting_key` (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_deliveries` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `event_row_id` bigint(20) NOT NULL,
+  `event_id` char(36) NOT NULL,
+  `event_type` varchar(64) NOT NULL,
+  `destination_id` int(11) NOT NULL,
+  `route_id` int(11) DEFAULT NULL,
+  `idempotency_key` char(64) NOT NULL,
+  `action` varchar(24) NOT NULL DEFAULT 'notify',
+  `status` enum('pending','leased','sending','retry','succeeded','dead','needs_reconciliation','suppressed','cancelled') NOT NULL DEFAULT 'pending',
+  `suppress_reason` varchar(128) DEFAULT NULL,
+  `attempts` int(11) NOT NULL DEFAULT 0,
+  `rate_limit_hits` int(11) NOT NULL DEFAULT 0,
+  `max_attempts` int(11) NOT NULL DEFAULT 6,
+  `next_attempt_at` datetime NOT NULL,
+  `lease_until` datetime DEFAULT NULL,
+  `lease_token` char(32) DEFAULT NULL,
+  `last_http_status` int(11) DEFAULT NULL,
+  `last_error` varchar(500) DEFAULT NULL COMMENT 'Redacted',
+  `resolved_ip` varchar(45) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `firewall_id` int(11) DEFAULT NULL,
+  `incident_id` bigint(20) DEFAULT NULL,
+  `severity` varchar(16) DEFAULT NULL,
+  `is_test` tinyint(1) NOT NULL DEFAULT 0,
+  `replay_count` int(11) NOT NULL DEFAULT 0,
+  `replay_of` bigint(20) DEFAULT NULL,
+  `delivered_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_idem` (`destination_id`,`idempotency_key`),
+  KEY `idx_due` (`status`,`next_attempt_at`),
+  KEY `idx_dest_status` (`destination_id`,`status`),
+  KEY `idx_incident_dest` (`incident_id`,`destination_id`),
+  KEY `idx_customer` (`customer_id`),
+  KEY `idx_event` (`event_row_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_delivery_attempts` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `delivery_id` bigint(20) NOT NULL,
+  `attempt_no` int(11) NOT NULL,
+  `started_at` datetime NOT NULL,
+  `duration_ms` int(11) DEFAULT NULL,
+  `outcome` varchar(24) NOT NULL,
+  `http_status` int(11) DEFAULT NULL,
+  `resolved_ip` varchar(45) DEFAULT NULL,
+  `error` varchar(500) DEFAULT NULL COMMENT 'Redacted',
+  PRIMARY KEY (`id`),
+  KEY `idx_delivery` (`delivery_id`,`attempt_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_destinations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `type` enum('email','webhook','slack','teams','ticket_webhook') NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `customer_id` int(11) DEFAULT NULL COMMENT 'NULL = global; scoped staff see only their customers',
+  `config_json` text DEFAULT NULL COMMENT 'Non-secret settings (JSON)',
+  `secrets_enc` text DEFAULT NULL COMMENT 'Secrets (JSON) encrypted with opnmgr_encrypt: url, signing/auth/inbound secrets',
+  `allow_internal` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Permit private/loopback targets (internal helpdesks)',
+  `ip_change_policy` enum('warn','block') NOT NULL DEFAULT 'warn',
+  `concurrency_limit` int(11) NOT NULL DEFAULT 2,
+  `max_attempts` int(11) NOT NULL DEFAULT 6,
+  `timeout_seconds` int(11) NOT NULL DEFAULT 10,
+  `on_resolve` enum('resolve','comment','none') NOT NULL DEFAULT 'resolve',
+  `on_recurrence` enum('reopen','new_ticket') NOT NULL DEFAULT 'new_ticket',
+  `reopen_window_minutes` int(11) NOT NULL DEFAULT 1440,
+  `on_external_close` enum('note','reopen_ticket') NOT NULL DEFAULT 'note',
+  `inbound_ack_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `inbound_comment_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `inbound_assign_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `last_ip` varchar(45) DEFAULT NULL,
+  `last_ip_changed_at` datetime DEFAULT NULL,
+  `ip_change_pending` tinyint(1) NOT NULL DEFAULT 0,
+  `paused_until` datetime DEFAULT NULL COMMENT 'Set from Retry-After on a 429',
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_name` (`name`),
+  KEY `idx_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_escalations` (
+  `route_id` int(11) NOT NULL,
+  `incident_id` bigint(20) NOT NULL,
+  `fired_at` datetime NOT NULL,
+  PRIMARY KEY (`route_id`,`incident_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_events` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `event_id` char(36) NOT NULL,
+  `event_type` varchar(64) NOT NULL,
+  `event_version` int(11) NOT NULL DEFAULT 1,
+  `dedupe_key` varchar(191) DEFAULT NULL,
+  `occurred_at` datetime NOT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `firewall_id` int(11) DEFAULT NULL,
+  `incident_id` bigint(20) DEFAULT NULL,
+  `severity` varchar(16) DEFAULT NULL,
+  `origin_kind` varchar(16) NOT NULL DEFAULT 'local',
+  `origin_destination_id` int(11) DEFAULT NULL COMMENT 'Destination that caused this event (inbound sync); never delivered back to it',
+  `forced_route_id` int(11) DEFAULT NULL COMMENT 'Escalation events go only to their route',
+  `correlation_id` varchar(64) DEFAULT NULL,
+  `envelope_json` mediumtext NOT NULL,
+  `status` enum('pending','routed','failed') NOT NULL DEFAULT 'pending',
+  `routed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_event_id` (`event_id`),
+  UNIQUE KEY `uniq_dedupe` (`dedupe_key`),
+  KEY `idx_status` (`status`,`id`),
+  KEY `idx_incident` (`incident_id`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_inbound_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `destination_id` int(11) DEFAULT NULL,
+  `received_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `remote_ip` varchar(45) DEFAULT NULL,
+  `result` varchar(32) NOT NULL,
+  `action` varchar(32) DEFAULT NULL,
+  `external_id` varchar(191) DEFAULT NULL,
+  `incident_id` bigint(20) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `detail` varchar(300) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_dest` (`destination_id`,`received_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_inbound_nonces` (
+  `destination_id` int(11) NOT NULL,
+  `nonce_hash` char(64) NOT NULL,
+  `seen_at` datetime NOT NULL,
+  PRIMARY KEY (`destination_id`,`nonce_hash`),
+  KEY `idx_seen` (`seen_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_routes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `destination_id` int(11) NOT NULL,
+  `event_types` varchar(255) NOT NULL DEFAULT '' COMMENT 'csv; empty = all',
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `severities` varchar(64) NOT NULL DEFAULT '' COMMENT 'csv; empty = all',
+  `incident_types` varchar(500) NOT NULL DEFAULT '' COMMENT 'csv of alert types; empty = all',
+  `tag_ids` varchar(255) NOT NULL DEFAULT '' COMMENT 'csv; any-of; empty = all',
+  `schedule_json` text DEFAULT NULL COMMENT '{"timezone","days":[1-7],"start":"HH:MM","end":"HH:MM"}',
+  `schedule_outside` enum('skip','defer') NOT NULL DEFAULT 'skip',
+  `escalate_after_minutes` int(11) DEFAULT NULL COMMENT 'Set = escalation route: fires only if still unacknowledged after N minutes',
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_destination` (`destination_id`),
+  KEY `idx_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `integration_ticket_links` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `destination_id` int(11) NOT NULL,
+  `incident_id` bigint(20) NOT NULL,
+  `active_key` varchar(40) DEFAULT NULL COMMENT 'dest:incident while the link is live; NULL once closed (UNIQUE)',
+  `link_state` enum('creating','active','needs_reconciliation','closed','abandoned') NOT NULL DEFAULT 'creating',
+  `outcome_unknown` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'A create was attempted and its result is unknown',
+  `create_idempotency_key` char(64) DEFAULT NULL,
+  `create_attempted_at` datetime DEFAULT NULL,
+  `external_id` varchar(191) DEFAULT NULL,
+  `external_url` varchar(500) DEFAULT NULL,
+  `ticket_state` enum('unknown','open','acknowledged','closed') NOT NULL DEFAULT 'unknown',
+  `incident_state` varchar(16) DEFAULT NULL COMMENT 'Observed local incident state at last sync',
+  `closed_while_incident_active` tinyint(1) NOT NULL DEFAULT 0,
+  `external_assignee` varchar(128) DEFAULT NULL,
+  `reopened_from_link_id` bigint(20) DEFAULT NULL,
+  `last_auto_reopen_at` datetime DEFAULT NULL,
+  `last_synced_at` datetime DEFAULT NULL,
+  `last_inbound_at` datetime DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL,
+  `site_id` int(11) DEFAULT NULL,
+  `firewall_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_active` (`active_key`),
+  KEY `idx_incident` (`incident_id`),
+  KEY `idx_external` (`destination_id`,`external_id`),
+  KEY `idx_customer` (`customer_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1296,6 +1525,22 @@ CREATE TABLE IF NOT EXISTS `maintenance_windows` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `platform_validations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `platform_family` varchar(16) NOT NULL,
+  `platform_edition` varchar(16) NOT NULL DEFAULT '',
+  `version_prefix` varchar(32) NOT NULL COMMENT 'Matched as a prefix of platform_os_version, e.g. 26.7',
+  `capability` varchar(64) NOT NULL,
+  `agent_version` varchar(32) DEFAULT NULL,
+  `validated_at` datetime NOT NULL,
+  `evidence` varchar(512) NOT NULL COMMENT 'What was run, on which device, with what result',
+  `recorded_by` varchar(64) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_validation` (`platform_family`,`platform_edition`,`version_prefix`,`capability`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `platform_versions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `version` varchar(20) NOT NULL,
@@ -1306,6 +1551,345 @@ CREATE TABLE IF NOT EXISTS `platform_versions` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `version` (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_assignments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `revision_id` int(11) NOT NULL COMMENT 'Pinned published revision',
+  `scope_type` enum('global','customer','site','firewall') NOT NULL,
+  `scope_id` int(11) DEFAULT NULL COMMENT 'NULL for global',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_scope` (`scope_type`,`scope_id`),
+  KEY `idx_template` (`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_deployment_targets` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `deployment_id` int(11) NOT NULL,
+  `firewall_id` int(11) NOT NULL,
+  `order_index` int(11) NOT NULL DEFAULT 0 COMMENT 'Ring order, then hostname',
+  `ring` varchar(16) DEFAULT NULL,
+  `ha_role` enum('standalone','primary','secondary_verify') NOT NULL DEFAULT 'standalone',
+  `status` enum('planned','blocked','stale','approved','pre_backup','applying','verifying','confirming','succeeded','failed','rolled_back','held','skipped','cancelled') NOT NULL DEFAULT 'planned',
+  `approvable` tinyint(1) NOT NULL DEFAULT 0,
+  `base_backup_id` int(11) DEFAULT NULL,
+  `base_fingerprint` char(64) DEFAULT NULL COMMENT 'sha256 of the raw base config bytes',
+  `plan_hash` char(64) DEFAULT NULL,
+  `artifact_sha256` char(64) DEFAULT NULL COMMENT 'sha256 of the rendered full config; the file itself is re-rendered on fetch, never stored',
+  `plan_json` mediumtext DEFAULT NULL COMMENT 'Sanitized semantic plan (no secrets)',
+  `change_count` int(11) NOT NULL DEFAULT 0,
+  `blockers` text DEFAULT NULL COMMENT 'JSON list of reasons the plan cannot be approved',
+  `approval_hash` char(64) DEFAULT NULL,
+  `approved_plan_hash` char(64) DEFAULT NULL,
+  `approved_fingerprint` char(64) DEFAULT NULL,
+  `approved_by` varchar(64) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `pre_backup_id` int(11) DEFAULT NULL,
+  `verify_backup_id` int(11) DEFAULT NULL,
+  `apply_command_id` int(11) DEFAULT NULL,
+  `confirm_command_id` int(11) DEFAULT NULL,
+  `rollback_command_id` int(11) DEFAULT NULL,
+  `fetch_token` char(64) DEFAULT NULL,
+  `token_used_at` datetime DEFAULT NULL,
+  `checkin_before` datetime DEFAULT NULL,
+  `applied_at` datetime DEFAULT NULL,
+  `recovery_deadline` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `detail` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_fetch_token` (`fetch_token`),
+  KEY `idx_deployment` (`deployment_id`),
+  KEY `idx_firewall` (`firewall_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_deployments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `revision_id` int(11) NOT NULL,
+  `status` enum('planned','approved','running','completed','stopped','cancelled') NOT NULL DEFAULT 'planned',
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `approved_by` varchar(64) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `detail` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_exceptions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `template_id` int(11) NOT NULL,
+  `object_key` varchar(64) NOT NULL COMMENT 'Component key, or * for the whole template',
+  `reason` varchar(512) NOT NULL,
+  `owner` varchar(128) NOT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `revoked_at` datetime DEFAULT NULL,
+  `revoked_by` varchar(64) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_fw_tpl` (`firewall_id`,`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_firewall_locks` (
+  `firewall_id` int(11) NOT NULL,
+  `target_id` int(11) NOT NULL,
+  `acquired_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  PRIMARY KEY (`firewall_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='One in-flight policy deployment per firewall';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_firewall_state` (
+  `firewall_id` int(11) NOT NULL,
+  `template_id` int(11) NOT NULL,
+  `desired_revision_id` int(11) DEFAULT NULL,
+  `last_applied_revision_id` int(11) DEFAULT NULL,
+  `last_applied_at` datetime DEFAULT NULL,
+  `last_deployment_id` int(11) DEFAULT NULL,
+  `compliance` enum('compliant','drifted','pending','exception','conflict','invalid','unknown') NOT NULL DEFAULT 'unknown',
+  `evaluated_backup_id` int(11) DEFAULT NULL,
+  `out_of_band_changes` int(11) NOT NULL DEFAULT 0,
+  `detail` text DEFAULT NULL COMMENT 'JSON summary, no secrets',
+  `last_evaluated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`firewall_id`,`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_object_mappings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `firewall_id` int(11) NOT NULL,
+  `template_id` int(11) NOT NULL,
+  `object_key` varchar(64) NOT NULL,
+  `target_ref` varchar(128) NOT NULL COMMENT 'Existing alias name, rule uuid or pfSense tracker to adopt',
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_mapping` (`firewall_id`,`template_id`,`object_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_template_revisions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `template_id` int(11) NOT NULL,
+  `revision` int(11) NOT NULL,
+  `status` enum('draft','published','retired') NOT NULL DEFAULT 'draft',
+  `content` mediumtext NOT NULL COMMENT 'JSON: {variables:[...], components:[...]}',
+  `content_hash` char(64) NOT NULL COMMENT 'sha256 of canonical content; frozen at publish',
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `published_by` varchar(64) DEFAULT NULL,
+  `published_at` timestamp NULL DEFAULT NULL,
+  `retired_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_template_revision` (`template_id`,`revision`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_templates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL,
+  `description` text DEFAULT NULL,
+  `is_retired` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `policy_variable_values` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `scope_type` enum('global','customer','site','firewall') NOT NULL,
+  `scope_id` int(11) NOT NULL DEFAULT 0 COMMENT '0 for global',
+  `template_id` int(11) NOT NULL DEFAULT 0 COMMENT '0 = applies to every template',
+  `name` varchar(64) NOT NULL,
+  `value` text NOT NULL COMMENT 'JSON-encoded value',
+  `updated_by` varchar(64) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_value` (`scope_type`,`scope_id`,`template_id`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_ai_summaries` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `input_hash` char(64) NOT NULL COMMENT 'sha256 of provider, model, prompt version and the exact facts sent',
+  `provider` varchar(50) NOT NULL,
+  `model` varchar(100) DEFAULT NULL,
+  `status` enum('ok','discarded','failed') NOT NULL,
+  `narrative` text DEFAULT NULL,
+  `detail` varchar(255) DEFAULT NULL,
+  `prompt_tokens` int(11) DEFAULT NULL,
+  `completion_tokens` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_hash` (`input_hash`,`status`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_deliveries` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `report_id` bigint(20) NOT NULL,
+  `recipient_email` varchar(255) NOT NULL,
+  `status` enum('queued','sent','failed') NOT NULL DEFAULT 'queued',
+  `attempts` tinyint(4) NOT NULL DEFAULT 0,
+  `next_attempt_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_error` varchar(255) DEFAULT NULL,
+  `share_id` bigint(20) DEFAULT NULL,
+  `sent_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_delivery` (`report_id`,`recipient_email`),
+  KEY `idx_status` (`status`,`next_attempt_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_jobs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `dedupe_key` char(64) DEFAULT NULL COMMENT 'sha256 of type/scope/period/sections/options; NULL once failed so a retry can be requested',
+  `dedupe_source` char(64) NOT NULL,
+  `report_type` enum('firewall','site','customer','fleet') NOT NULL,
+  `scope_id` int(11) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL COMMENT 'Owning customer; NULL for fleet reports',
+  `params` text NOT NULL COMMENT 'JSON: period, timezone, sections, options',
+  `status` enum('queued','running','succeeded','failed','cancelled') NOT NULL DEFAULT 'queued',
+  `attempts` tinyint(4) NOT NULL DEFAULT 0,
+  `max_attempts` tinyint(4) NOT NULL DEFAULT 3,
+  `next_attempt_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_error` varchar(512) DEFAULT NULL,
+  `report_id` bigint(20) DEFAULT NULL,
+  `schedule_id` int(11) DEFAULT NULL,
+  `requested_by` varchar(64) DEFAULT NULL,
+  `requested_by_user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `started_at` timestamp NULL DEFAULT NULL,
+  `finished_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_dedupe` (`dedupe_key`),
+  KEY `idx_status` (`status`,`next_attempt_at`),
+  KEY `idx_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_recipients` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL DEFAULT 0 COMMENT '0 = internal recipients for fleet reports',
+  `email` varchar(255) NOT NULL,
+  `name` varchar(128) DEFAULT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_recipient` (`customer_id`,`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_schedules` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL,
+  `report_type` enum('firewall','site','customer','fleet') NOT NULL,
+  `scope_id` int(11) DEFAULT NULL COMMENT 'firewall_id, site_id or customer_id per type; NULL for fleet',
+  `customer_id` int(11) DEFAULT NULL COMMENT 'Owning customer, denormalised for scoping; NULL for fleet',
+  `cadence` enum('weekly','monthly') NOT NULL,
+  `run_day` tinyint(4) NOT NULL DEFAULT 1 COMMENT 'weekly: 1=Mon..7=Sun; monthly: 1..28',
+  `run_hour` tinyint(4) NOT NULL DEFAULT 6 COMMENT 'Local hour in the scope timezone',
+  `sections` text DEFAULT NULL COMMENT 'JSON list of section keys',
+  `include_ai` tinyint(1) NOT NULL DEFAULT 0,
+  `deliver` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Email recipients when ready (also needs the global switch)',
+  `enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Off until an administrator enables it',
+  `next_run_at` timestamp NULL DEFAULT NULL,
+  `last_run_at` timestamp NULL DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_due` (`enabled`,`next_run_at`),
+  KEY `idx_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `report_shares` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `report_id` bigint(20) NOT NULL,
+  `token_hash` char(64) NOT NULL COMMENT 'sha256 of the token; the token itself is never stored',
+  `expires_at` timestamp NOT NULL,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `revoked_by` varchar(64) DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_accessed_at` timestamp NULL DEFAULT NULL,
+  `access_count` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_token` (`token_hash`),
+  KEY `idx_report` (`report_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `reports` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `job_id` bigint(20) DEFAULT NULL,
+  `schedule_id` int(11) DEFAULT NULL,
+  `report_type` enum('firewall','site','customer','fleet') NOT NULL,
+  `scope_id` int(11) DEFAULT NULL,
+  `customer_id` int(11) DEFAULT NULL COMMENT 'Owning customer; NULL means fleet-wide (unrestricted staff only)',
+  `title` varchar(255) NOT NULL,
+  `timezone` varchar(64) NOT NULL,
+  `period_start` int(10) unsigned NOT NULL COMMENT 'Unix seconds, inclusive',
+  `period_end` int(10) unsigned NOT NULL COMMENT 'Unix seconds, exclusive',
+  `sections` text NOT NULL,
+  `generated_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `generated_by` varchar(64) DEFAULT NULL,
+  `html_path` varchar(512) NOT NULL,
+  `html_sha256` char(64) NOT NULL,
+  `csv_path` varchar(512) DEFAULT NULL,
+  `csv_sha256` char(64) DEFAULT NULL,
+  `pdf_path` varchar(512) DEFAULT NULL,
+  `pdf_sha256` char(64) DEFAULT NULL,
+  `pdf_status` enum('ok','unavailable','failed','not_requested') NOT NULL DEFAULT 'not_requested',
+  `pdf_error` varchar(255) DEFAULT NULL,
+  `snapshot_json` longtext NOT NULL COMMENT 'Metric snapshot and provenance used to build the report',
+  `snapshot_sha256` char(64) NOT NULL,
+  `ai_status` enum('none','ok','failed','discarded') NOT NULL DEFAULT 'none',
+  PRIMARY KEY (`id`),
+  KEY `idx_customer` (`customer_id`,`generated_at`),
+  KEY `idx_generated` (`generated_at`),
+  KEY `idx_job` (`job_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1617,6 +2201,16 @@ CREATE TABLE IF NOT EXISTS `updater_commands` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `user_customer_scopes` (
+  `user_id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`user_id`,`customer_id`),
+  KEY `idx_customer` (`customer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE IF NOT EXISTS `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(64) NOT NULL,
@@ -1635,6 +2229,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `mfa_enforced_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
+  `session_version` int(11) NOT NULL DEFAULT 0 COMMENT 'Bumped to revoke every existing session for this account',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   KEY `idx_role` (`role`),
@@ -1660,6 +2255,91 @@ SET character_set_client = utf8mb4;
   1 AS `tx_errors`,
   1 AS `last_updated` */;
 SET character_set_client = @saved_cs_client;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `vpn_activity` (
+  `firewall_id` int(11) NOT NULL,
+  `vpn_type` varchar(16) NOT NULL,
+  `name` varchar(128) NOT NULL,
+  `last_rx` bigint(20) DEFAULT NULL,
+  `last_tx` bigint(20) DEFAULT NULL,
+  `first_seen_at` datetime NOT NULL,
+  `last_change_at` datetime DEFAULT NULL COMMENT 'Counters last observed to increase; NULL if never seen to move',
+  `observed_at` datetime NOT NULL,
+  PRIMARY KEY (`firewall_id`,`vpn_type`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `vpn_config_cache` (
+  `firewall_id` int(11) NOT NULL,
+  `backup_id` int(11) DEFAULT NULL,
+  `fingerprint` char(64) DEFAULT NULL COMMENT 'sha256 of the config file the slice was built from',
+  `config_time` datetime DEFAULT NULL COMMENT 'When that backup was taken',
+  `collected_at` datetime NOT NULL,
+  `slice` mediumtext NOT NULL COMMENT 'JSON: vpn, interfaces, routes, gateways, nat, filter_rules; no secrets',
+  PRIMARY KEY (`firewall_id`),
+  KEY `idx_backup` (`backup_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `vpn_diagnostic_runs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `run_group` char(32) NOT NULL COMMENT 'Legs of one coordinated check share this',
+  `leg` varchar(16) NOT NULL DEFAULT 'source' COMMENT 'source | peer',
+  `firewall_id` int(11) NOT NULL,
+  `tunnel_key` varchar(191) DEFAULT NULL,
+  `method` varchar(12) NOT NULL,
+  `target` varchar(64) NOT NULL,
+  `port` int(11) DEFAULT NULL,
+  `source_address` varchar(64) DEFAULT NULL COMMENT 'Address the probe was bound to (-S / -s)',
+  `source_interface` varchar(64) DEFAULT NULL,
+  `source_reason` varchar(255) DEFAULT NULL,
+  `command_id` int(11) DEFAULT NULL,
+  `status` varchar(16) NOT NULL DEFAULT 'queued' COMMENT 'queued | completed | failed | refused | expired',
+  `outcome` varchar(16) DEFAULT NULL COMMENT 'reachable | unreachable | inconclusive',
+  `summary` varchar(500) DEFAULT NULL,
+  `result_excerpt` text DEFAULT NULL,
+  `incident_id` bigint(20) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `username` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `completed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_group` (`run_group`),
+  KEY `idx_fw_time` (`firewall_id`,`created_at`),
+  KEY `idx_user_time` (`user_id`,`created_at`),
+  KEY `idx_command` (`command_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `vpn_layout_prefs` (
+  `user_id` int(11) NOT NULL,
+  `view_key` varchar(32) NOT NULL DEFAULT 'topology',
+  `prefs` text NOT NULL COMMENT 'JSON: node positions, filters, view mode',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`,`view_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `vpn_peer_pairings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `kind` enum('pair','unpair','classify') NOT NULL,
+  `endpoint_a` varchar(191) NOT NULL COMMENT 'Endpoint key; for pair/unpair the lexically smaller of the two',
+  `endpoint_b` varchar(191) NOT NULL DEFAULT '' COMMENT 'Other endpoint key; empty for classify',
+  `classification` varchar(24) DEFAULT NULL COMMENT 'classify only: site_to_site | remote_access | external | unknown',
+  `note` varchar(255) DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_pairing` (`kind`,`endpoint_a`,`endpoint_b`),
+  KEY `idx_a` (`endpoint_a`),
+  KEY `idx_b` (`endpoint_b`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!50001 DROP VIEW IF EXISTS `v_firewall_wan_status`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;

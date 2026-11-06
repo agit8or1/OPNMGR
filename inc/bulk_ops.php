@@ -228,12 +228,15 @@ if (!function_exists('bulk_execute')) {
                     $detail = $r['detail'] ?? null;
                     $commandId = $r['command_id'] ?? null;
                 } elseif ($builtCommand !== null) {
-                    $q = queue_firewall_command(
+                    // Parameters were validated once above; the shell itself
+                    // is per firewall, because the fleet can mix platforms.
+                    $perFw = build_structured_command($entry['action'], $params, platform_firewall((int)$fid));
+                    $q = $perFw['ok'] ? queue_firewall_command(
                         $fid,
-                        $builtCommand['command'],
+                        $perFw['command'],
                         sprintf('Bulk #%d: %s', $bulkId, $builtCommand['label']),
                         ['is_raw' => false, 'action' => $entry['action'], 'risk' => $builtCommand['risk']]
-                    );
+                    ) : ['ok' => false, 'error' => $perFw['error']];
                     if ($q['ok']) {
                         $commandId = $q['command_id'];
                     } else {

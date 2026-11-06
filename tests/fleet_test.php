@@ -48,6 +48,10 @@ function mkfw(string $name, array $extra = []): int {
         'hardware_id' => hash('md5', $name . random_bytes(6)),
         'status' => 'online', 'customer_id' => $custId,
         'updates_available' => 1, 'alerts_enabled' => 1,
+        // A verified OPNsense box: since 3.79 an unverified platform is
+        // read-only and campaigns/bulk operations correctly skip it.
+        'platform_family' => 'opnsense', 'platform_os_version' => '26.7.8',
+        'platform_detection_confidence' => 'high', 'platform_verified_at' => date('Y-m-d H:i:s'),
     ], $extra);
     $ph = implode(',', array_fill(0, count($cols), '?'));
     db()->prepare('INSERT INTO firewalls (' . implode(',', array_keys($cols)) . ") VALUES ({$ph})")

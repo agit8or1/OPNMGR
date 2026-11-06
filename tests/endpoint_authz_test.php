@@ -41,7 +41,9 @@ $session = '/\b(requireLogin|requireAdmin|require_permission|isLoggedIn)\b'
 // with an expiry, rather than by a session - that is the point of enrolment.
 $agent   = '/\b(authenticateAgentRequest|agent_verify_signature|verify_agent'
          . '|agent_authenticate|validate_agent)\b'
-         . '|FROM\s+enrollment_tokens/i';
+         . '|FROM\s+enrollment_tokens'
+         // 3.79: the single-use claim lives in inc/enrollment_script.php.
+         . '|enrollment_token_claim|enrollment_token_state/i';
 $touches = '/\b(INSERT\s+INTO|UPDATE\s+\w|DELETE\s+FROM|db\(\)->(?:query|prepare)|queue_firewall_command|queue_command)\b/i';
 
 $unguarded = [];
@@ -109,7 +111,8 @@ if ($dl !== '') {
 exec('cd ' . escapeshellarg($root) . ' && git ls-files --cached --others --exclude-standard "api/*.php" "*.php" 2>/dev/null', $all, $st);
 
 $writes  = '/\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|queue_firewall_command|queue_command)\b/i';
-$csrfRe  = '/\b(csrf_verify|check_csrf|verify_csrf)\b/';
+// agent_reset_request_authorized() (inc/agent_auth.php) calls csrf_verify().
+$csrfRe  = '/\b(csrf_verify|check_csrf|verify_csrf|agent_reset_request_authorized)\b/';
 $machine = '/\b(authenticateAgentRequest|agent_verify_signature|validate_agent)\b|FROM\s+enrollment_tokens/i';
 $browser = '/\b(requireLogin|requireAdmin|require_permission|isLoggedIn)\b'
          . '|\$_SESSION\s*\[\s*[\'"]user_id[\'"]\s*\]/';

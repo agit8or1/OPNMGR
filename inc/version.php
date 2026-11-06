@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-10-29'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Firewall Before Its Agent'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'More Than One Kind Of Firewall'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,8 +20,11 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Firewall Befor
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.7.0'); }
-if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-09-18'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.0'); }
+if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-11-06'); }
+// The pfSense agent (agent/pfsense/) is a separate package with its own
+// version line: it shares the check-in protocol, not the OPNsense plugin.
+if (!defined('PFSENSE_AGENT_VERSION')) { define('PFSENSE_AGENT_VERSION', '1.0.0'); }
 if (!defined('AGENT_MIN_VERSION')) { define('AGENT_MIN_VERSION', '1.3.0'); } // Minimum supported agent version
 
 // First agent release that collects OPNsense health telemetry (gateways, VPN,
@@ -43,6 +46,27 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.79.0',
+            'date' => '2026-11-06',
+            'type' => 'minor',
+            'title' => 'More Than One Kind Of Firewall',
+            'changes' => [
+                'ADDED: Mixed OPNsense / pfSense CE / pfSense Plus fleets: evidence-based platform detection, capability states, platform adapters, a delivery gate on every queued command, and Compatibility / Capabilities pages. pfSense operations are implemented but untested on live devices; writes run only on designated lab firewalls',
+                'ADDED: pfSense agent 1.0.0 (separate package) and OPNsense agent 1.8.0 with a platform probe, published held behind the rollout gate',
+                'ADDED: Policy templates with assignment precedence, variables, exceptions, fingerprint-bound approval, staged deployment, a local recovery timer and compliance. Preview-only except on lab firewalls',
+                'ADDED: VPN topology and guided, rate-limited diagnostics',
+                'ADDED: Customer reports (HTML/PDF/CSV) with explicit metric definitions; schedules and delivery off by default',
+                'ADDED: Ticketing and notification integrations: outbox, email, signed webhooks, Slack, Teams Workflows, generic ticketing webhook',
+                'SECURITY: Enrollment installer endpoints validated nothing and pasted the token into a root shell script; all four now share one validated renderer, and tokens are claimed atomically',
+                'SECURITY: Role and session state are re-read on every request; password, 2FA and deactivation changes revoke existing sessions (users.session_version)',
+                'SECURITY: edit_user.php let any signed-in user change roles; it now requires user.manage',
+                'SECURITY: The legacy agent reset page now requires an administrator with agent.restart and a valid CSRF token; the reset CLI scope bug that made every reset throw is fixed',
+                'SECURITY: Puppeteer 25.16.0 clears the tooling npm advisories; the CI dependency audit is blocking and tells findings from scanner failure',
+                'FIXED: Configuration restore used a configctl action that does not exist in OPNsense; it now uses the platform-native locked restore and never crosses platforms',
+                'FIXED: DB_NAME in the environment was overridden by .env, so test runs could reach the live database; tests now refuse a non-test database',
+            ],
+        ],
         [
             'version' => '3.78.0',
             'date' => '2026-10-29',

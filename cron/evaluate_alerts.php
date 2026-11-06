@@ -35,6 +35,7 @@ require_once __DIR__ . '/../inc/firewall_health.php';
 require_once __DIR__ . '/../inc/alerts.php';
 require_once __DIR__ . '/../inc/config_restore.php';
 require_once __DIR__ . '/../inc/alert_policy.php';
+require_once __DIR__ . '/../inc/integrations/events.php'; // integration_legacy_email_owner()
 
 $dryRun  = in_array('--dry-run', $argv, true);
 $verbose = in_array('--verbose', $argv, true) || $dryRun;
@@ -151,7 +152,7 @@ $minAgent   = (string)alert_setting('alert_agent_min_version', '1.5.0');
 
 $firewalls = db()->query(
     'SELECT id, hostname, status, last_checkin, alerts_enabled, offline_alert_threshold,
-            agent_version, agent_auth_failures, carp_enabled, carp_state,
+            agent_version, agent_flavor, agent_auth_failures, carp_enabled, carp_state,
             last_backup_status, last_backup_error,
             TIMESTAMPDIFF(SECOND, last_checkin, NOW()) AS seconds_since_checkin
        FROM firewalls'
@@ -484,7 +485,11 @@ foreach ($firewalls as $fw) {
     }
 
     // --- agent version ------------------------------------------------------
-    if (!empty($fw['agent_version']) && version_compare($fw['agent_version'], $minAgent, '<')) {
+    // The minimum is an OPNsense plugin version. The pfSense agent has its own
+    // version line (PFSENSE_AGENT_VERSION), so comparing it here would raise a
+    // permanent false "outdated" for every pfSense firewall.
+    if (!empty($fw['agent_version']) && ($fw['agent_flavor'] ?? '') !== 'pfsense-agent'
+        && version_compare($fw['agent_version'], $minAgent, '<')) {
         raise('agent.outdated', [
             'firewall_id' => $id,
             'title'  => sprintf('%s is running agent %s (minimum %s)', $host, $fw['agent_version'], $minAgent),
@@ -645,6 +650,13 @@ foreach ($open as $incident) {
             alert_mark_suppressed((int)$incident['id'], 'maintenance window active');
             $suppressed++;
         }
+        continue;
+    }
+
+    // Integrations (3.79.0): once an operator has moved incident email into an
+    // integration destination, the legacy mailer stands down so recipients do
+    // not receive both. Default owner is 'legacy', i.e. no change.
+    if (function_exists('integration_legacy_email_owner') && integration_legacy_email_owner() === 'integrations') {
         continue;
     }
 

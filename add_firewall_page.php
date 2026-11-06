@@ -17,6 +17,7 @@ $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_e
 
 $server_url = opnmgr_server_url();
 $agent_install_command = 'fetch -o - ' . $server_url . '/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=' . $server_url . ' sh';
+$pfsense_install_prefix = 'fetch -o - ' . $server_url . '/downloads/pfsense/install_opnmgr_agent_pfsense.sh | env OPNMGR_BASE_URL=' . $server_url;
 
 // Suggestions for the customer field of the agent enrollment form.
 $customer_names = db()->query('SELECT name FROM customers ORDER BY name')->fetchAll(PDO::FETCH_COLUMN);
@@ -70,6 +71,12 @@ $customer_names = db()->query('SELECT name FROM customers ORDER BY name')->fetch
                                     </button>
                                 </div>
                                 <p class="small text-muted mb-2">Expires <span id="agentEnrollExpires"></span>. It can be used once; a new key can be generated from the firewall's details page.</p>
+                                <ul class="nav nav-tabs small mb-2" role="tablist">
+                                    <li class="nav-item"><button type="button" class="nav-link active" data-bs-toggle="tab" data-bs-target="#enrollOpn">OPNsense</button></li>
+                                    <li class="nav-item"><button type="button" class="nav-link" data-bs-toggle="tab" data-bs-target="#enrollPf">pfSense CE / Plus</button></li>
+                                </ul>
+                                <div class="tab-content">
+                                <div class="tab-pane fade show active" id="enrollOpn">
                                 <ol class="mb-0">
                                     <li>Install the agent plugin from a shell on the firewall:
                                         <code class="d-block p-2 my-1 border rounded"><?php echo htmlspecialchars($agent_install_command); ?></code>
@@ -77,6 +84,16 @@ $customer_names = db()->query('SELECT name FROM customers ORDER BY name')->fetch
                                     <li>On OPNsense, go to <strong>Services &rarr; OPNManager Agent</strong>.</li>
                                     <li>Paste the key into <strong>Quick Enrollment</strong> and click <strong>Enroll</strong>.</li>
                                 </ol>
+                                </div>
+                                <div class="tab-pane fade" id="enrollPf">
+                                <p class="small mb-1">pfSense uses a separate agent (no OPNsense plugin, configd or Python). Run as root from
+                                    <strong>Diagnostics &rarr; Command Prompt</strong> or an SSH shell (option 8):</p>
+                                <code class="d-block p-2 my-1 border rounded" id="pfsenseInstallCmd"></code>
+                                <p class="small text-muted mb-0">The firewall is read-only in OPNManager until its agent has reported the platform.
+                                    pfSense operations are implemented but not yet live-validated; see
+                                    <a href="/platform_compatibility.php">Compatibility</a>.</p>
+                                </div>
+                                </div>
                                 <p class="mt-2 mb-0"><a id="agentEnrollLink" href="#">Open the firewall's page</a> &mdash; it shows as pending until the agent enrolls.</p>
                             </div>
                             <div id="agentEnrollError" class="alert alert-danger d-none mt-2 mb-0"></div>
@@ -241,6 +258,8 @@ async function createAgentEnrollment(event) {
 
         document.getElementById('agentEnrollName').textContent = created.hostname;
         document.getElementById('agentEnrollKey').value = key.enrollment_key;
+        document.getElementById('pfsenseInstallCmd').textContent = <?php echo json_encode($pfsense_install_prefix); ?>
+            + " OPNMGR_ENROLL_KEY='" + key.enrollment_key.replace(/[^A-Za-z0-9+\/=]/g, '') + "' sh";
         document.getElementById('agentEnrollExpires').textContent = new Date(key.expires_at.replace(' ', 'T')).toLocaleString();
         document.getElementById('agentEnrollLink').href = '/firewall_details.php?id=' + encodeURIComponent(created.firewall_id);
         document.getElementById('agentEnrollResult').classList.remove('d-none');

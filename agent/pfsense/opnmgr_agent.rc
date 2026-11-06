@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# /usr/local/etc/rc.d/opnmgr_agent.sh - OPNManager agent for pfSense.
+#
+# pfSense runs /usr/local/etc/rc.d/*.sh with "start" at boot. The agent runs
+# under daemon(8) -r, which restarts it if it exits, so a crash does not leave
+# the firewall silent until someone reaches the console.
+
+AGENT=/usr/local/opnmgr/opnmgr_agent.sh
+PIDFILE=/var/run/opnmgr_agent.pid      # supervisor
+CHILDPID=/var/run/opnmgr_agent.child.pid
+
+case "$1" in
+    start)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+            echo "opnmgr_agent already running"; exit 0
+        fi
+        /usr/sbin/daemon -r -R 15 -P "$PIDFILE" -p "$CHILDPID" -T opnmgr_agent /bin/sh "$AGENT"
+        echo "opnmgr_agent started"
+        ;;
+    stop)
+        [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
+        [ -f "$CHILDPID" ] && kill "$(cat "$CHILDPID")" 2>/dev/null
+        rm -f "$PIDFILE" "$CHILDPID"
+        echo "opnmgr_agent stopped"
+        ;;
+    restart)
+        "$0" stop; sleep 1; "$0" start
+        ;;
+    status)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+            echo "opnmgr_agent is running as pid $(cat "$CHILDPID" 2>/dev/null) (supervisor $(cat "$PIDFILE"))"
+        else
+            echo "opnmgr_agent is not running"; exit 1
+        fi
+        ;;
+    *) echo "usage: $0 start|stop|restart|status"; exit 2 ;;
+esac

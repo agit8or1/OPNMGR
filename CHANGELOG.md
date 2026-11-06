@@ -2,7 +2,109 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: October 10, 2026
+**Last Updated**: November 6, 2026
+
+---
+
+## Version 3.79.0
+**Released**: November 6, 2026 | **Agent**: v1.8.0 (held) · pfSense agent v1.0.0
+
+Mixed OPNsense / pfSense CE / pfSense Plus fleets, shared policy templates, VPN
+topology and diagnostics, customer reports, ticketing and notification
+integrations — plus four security fixes.
+
+> **Validation.** OPNsense paths run against two production OPNsense 26.7
+> firewalls. **No pfSense device was available**: every pfSense operation is
+> implemented and fixture/stub-tested, and shows as *untested* in the product
+> (write operations only on designated lab devices) until a lab validation is
+> recorded. See `docs/PLATFORMS.md`.
+
+### Security
+
+- **Enrollment installers executed shell from the token.** Four endpoints
+  (`api/get_enroll_script.php`, `api/get_enroll_script_http.php`,
+  `api/get_enrollment_script.php`, `enroll_firewall.php?action=download`)
+  pasted any non-empty token between double quotes in a root shell script, so
+  `$(...)` in a crafted URL ran on a firewall when an operator executed that
+  installer (requesting the URL alone ran nothing on the manager). Two also
+  took the manager URL from the Host header. All four now serve one renderer
+  (`inc/enrollment_script.php`): 64-hex tokens only, a live unexpired unused
+  record required, configured manager URL, every value validated and
+  single-quoted. `api/enroll.php` and `enroll_firewall.php` claim the token
+  atomically (previously `api/enroll.php` ignored `used`, and both claimed
+  after the work, so concurrent runs could both enroll).
+- **Privileges outlived account changes.** Authorization trusted the role cached
+  at login and the periodic check read only `is_active`. Every request now
+  re-reads the account; `users.session_version` (migration 0030) revokes all
+  existing sessions on password change/reset, 2FA change and deactivation.
+  A demoted administrator loses access on the next request.
+- **`edit_user.php` changed roles for any signed-in user.** It required only a
+  login, so a read-only account could promote itself (reproduced in a test
+  database). It now requires `user.manage`.
+- **Legacy agent reset.** `admin/reset_agent.php` ran the reset CLI for any
+  signed-in user with no CSRF token. It now shares the supported API's policy
+  (administrator, `agent.restart`, valid CSRF) via
+  `agent_reset_request_authorized()`, checked before any subprocess. The CLI
+  could not complete a reset at all: `$reinstall_host` was out of scope in two
+  functions, so the typed command builder threw a TypeError. Fixed, and the
+  SSH target/command are now validated and escaped.
+- **Tooling dependencies.** Puppeteer 24 → 25.16.0 clears every npm advisory
+  (basic-ftp, extract-zip, ip-address, js-yaml, zod, ws and their parents).
+  CI's dependency audit is blocking and distinguishes findings (exit 1) from a
+  scanner that did not run (exit 2); it was `composer audit || true`.
+- **Tests could write to production.** `DB_NAME=x php ...` was overridden by
+  `.env` (PHP's default `variables_order` leaves `$_ENV` empty). The process
+  environment now wins, `tests/lib/make_test_db.sh` asserts the database it
+  reached, and `tests/bootstrap.php` refuses any database not named
+  `opnsense_fw_test*`.
+
+### Added
+
+- **Mixed fleets** (`inc/platform/`, `docs/PLATFORMS.md`): evidence-based
+  platform detection (never from FreeBSD alone) with source, confidence and
+  conflict; capability states supported / untested / unavailable / unsupported
+  / stale; platform adapters for commands, config install and backups; a
+  delivery gate on every queued command so legacy endpoints cannot send
+  `configctl` to pfSense; Compatibility and per-firewall Capabilities pages;
+  lab-device designation and recorded validations.
+- **pfSense agent** (`agent/pfsense/`): separate package (shell + pfSense PHP
+  includes, `daemon(8)` supervision), same check-in protocol, credential
+  adoption and HMAC signing as the OPNsense agent; never edits `config.xml`.
+- **OPNsense agent 1.8.0**: sends a platform probe. Published held behind the
+  rollout gate.
+- **Policy templates** (`docs/POLICY_TEMPLATES.md`): versioned templates,
+  global/customer/site/firewall assignment with conflict detection, typed
+  variables, exceptions, semantic per-device plans, approval bound to plan and
+  config fingerprint, staged deployment with a locally enforced recovery timer,
+  read-back verification, compliance and drift. Preview everywhere; writes
+  only on designated lab firewalls.
+- **VPN topology** (`docs/VPN_TOPOLOGY.md`): WireGuard/IPsec/OpenVPN model,
+  multi-identifier peer matching (shared public IPs never merge), map + table,
+  role-aware idle/stale/down states, diagnostics with evidence and confidence,
+  bounded rate-limited probes.
+- **Customer reports** (`docs/CUSTOMER_REPORTS.md`): per-firewall/site/
+  customer/fleet, HTML/PDF/CSV, explicit metric definitions, monitoring gaps
+  separated from outages, DST-safe periods, immutable stored reports, optional
+  labelled AI summary. Schedules and delivery ship disabled.
+- **Integrations** (`docs/INTEGRATIONS.md`): transactional outbox, email,
+  signed webhooks, Slack, Teams **Workflows** webhooks (O365 connectors were
+  retired May 2026), generic ticketing webhook; routing, retries, dead letter,
+  replay, one ticket per incident, inbound sync, SSRF protection.
+- Staff customer scopes (`user_customer_scopes`, migration 0029).
+
+### Fixed
+
+- **Configuration restore could never have worked.** It ran
+  `configctl firmware restore`, an action that does not exist in OPNsense core.
+  Restore now uses `Config::restoreBackup()` (OPNsense) or `config_restore()`
+  (pfSense), and both manager and firewall refuse the other product's XML.
+- Backups from a pfSense firewall were rejected (only `<opnsense>` accepted).
+- A pfSense agent 1.0.0 would have raised a permanent "agent outdated" incident.
+
+### Upgrading
+
+Run `php scripts/migrate.php` (0024–0030). New cron jobs are listed in each
+module's doc; none are required for existing behaviour.
 
 ---
 

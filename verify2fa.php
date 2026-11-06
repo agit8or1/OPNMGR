@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = 'Session expired. Please try again.';
     } else {
     $code = trim($_POST['code'] ?? '');
-    $stmt = db()->prepare('SELECT id, username, role, totp_secret FROM users WHERE id = :id');
+    $stmt = db()->prepare('SELECT * FROM users WHERE id = :id');
     $stmt->execute([':id' => $pending_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['user_id']          = $user['id'];
         $_SESSION['username']         = $user['username'];
         $_SESSION['role']             = $user['role'];
+        $_SESSION['session_version']  = (int) ($user['session_version'] ?? 0);
         $_SESSION['login_time']       = time();
         $_SESSION['created_at']       = time();
         $_SESSION['last_activity']    = time();

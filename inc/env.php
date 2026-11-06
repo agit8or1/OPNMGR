@@ -36,8 +36,12 @@ if (!function_exists('load_env')) {
                     $value = substr($value, 1, -1);
                 }
 
-                // Only set if not already set in environment
-                if (!isset($_ENV[$key])) {
+                // Only set if not already set in environment. getenv() is
+                // checked too: with PHP's default variables_order (GPCS) the
+                // real process environment is NOT copied into $_ENV, so
+                // `DB_NAME=x php script.php` used to be silently overridden by
+                // .env - which pointed every "test database" run at production.
+                if (!isset($_ENV[$key]) && getenv($key) === false) {
                     $_ENV[$key] = $value;
                     putenv("$key=$value");
                 }

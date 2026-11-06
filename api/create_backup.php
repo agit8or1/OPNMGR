@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../inc/backup_storage.php';
+require_once __DIR__ . '/../inc/agent_commands.php';
 
 requireLogin();
 
@@ -70,15 +71,20 @@ try {
     // server URL rather than a hardcoded hostname.
     $backup_command = build_backup_upload_command($firewall_id, (int)$backup_id, $backup_filename);
     
-    $stmt = db()->prepare("
-        INSERT INTO firewall_commands (firewall_id, command, description, status, created_at) 
-        VALUES (?, ?, 'Create manual configuration backup', 'pending', NOW())
-    ");
-    $stmt->execute([$firewall_id, $backup_command]);
-    
-    // Get the command ID for tracking
-    $command_id = db()->lastInsertId();
-    
+    // Through the sanctioned queue path, so the platform gate applies and the
+    // queueing is audited like every other command.
+    $queued = queue_firewall_command(
+        $firewall_id, $backup_command, 'Create manual configuration backup',
+        ['is_raw' => false, 'action' => 'retrieve_config', 'risk' => 'MEDIUM']
+    );
+    if (!$queued['ok']) {
+        db()->prepare('DELETE FROM backups WHERE id = ? AND backup_file = ?')->execute([$backup_id, $backup_filename]);
+        http_response_code(409);
+        echo json_encode(['error' => $queued['error']]);
+        exit;
+    }
+    $command_id = $queued['command_id'];
+
     // Log the backup request
     $stmt = db()->prepare("
         INSERT INTO system_logs (firewall_id, category, message, level, timestamp) 
