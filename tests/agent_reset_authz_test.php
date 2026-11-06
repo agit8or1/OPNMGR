@@ -96,6 +96,28 @@ T::ok(is_string($queued) && str_contains($queued, 'https://127.0.0.1/reinstall_a
 T::ok(str_contains($text, 'Cannot attempt SSH reset') || str_contains($text, 'Skipping SSH target'), 'and no SSH was attempted in the test');
 
 // ===========================================================================
+T::group('The hourly cron path does not reset unless enabled');
+db()->exec("DELETE FROM firewall_commands WHERE firewall_id = $fwId");
+db()->exec("DELETE FROM settings WHERE `name` = 'auto_reset_stale_agents_enabled'");
+$cron = function () {
+    $out = []; $rc = 0;
+    exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(TEST_ROOT . '/scripts/auto_reset_stale_agents.php') . ' --verbose 2>&1', $out, $rc);
+    return [$rc, implode("\n", $out)];
+};
+[$rc, $text] = $cron();
+T::eq(0, $rc, 'the unforced (cron) run exits 0');
+T::ok(str_contains($text, 'Stale agent detected: __reset_test__'), 'it still reports the stale agent');
+T::ok(str_contains($text, 'Automatic reset is disabled'), 'and says automatic reset is disabled');
+T::eq(0, $cmdCount(), 'with no setting, nothing is queued for the firewall');
+db()->exec("INSERT INTO settings (`name`,`value`) VALUES ('auto_reset_stale_agents_enabled','0')");
+$cron();
+T::eq(0, $cmdCount(), 'with the setting at 0, nothing is queued');
+db()->exec("UPDATE settings SET `value` = '1' WHERE `name` = 'auto_reset_stale_agents_enabled'");
+$cron();
+T::eq(1, $cmdCount(), 'with the setting at 1, the cron run queues a reset');
+db()->exec("DELETE FROM settings WHERE `name` = 'auto_reset_stale_agents_enabled'");
+
+// ===========================================================================
 T::group('Admin with a valid token can run it');
 db()->exec("DELETE FROM firewall_commands WHERE firewall_id = $fwId");
 $r = call_endpoint('admin/reset_agent.php', ['method' => 'POST', 'session' => session_as('admin'),

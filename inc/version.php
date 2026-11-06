@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'More Than One Kind Of Firewall'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fixed Is Not The Same As On'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -46,6 +46,15 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.79.1',
+            'date' => '2026-11-06',
+            'type' => 'patch',
+            'title' => 'Fixed Is Not The Same As On',
+            'changes' => [
+                'CHANGED: The hourly stale-agent cron no longer resets agents on its own unless auto_reset_stale_agents_enabled is set to 1 (migration 0031). Before 3.79.0 it crashed before resetting anything, so fixing that bug would otherwise have switched on automatic kill-and-reinstall with SSH to firewalls. Operator-requested resets are unaffected',
+            ],
+        ],
         [
             'version' => '3.79.0',
             'date' => '2026-11-06',

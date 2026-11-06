@@ -205,6 +205,19 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
 }
 
 /**
+ * Whether the hourly run may reset agents on its own. Off unless set to 1.
+ */
+function auto_reset_enabled(): bool {
+    try {
+        $s = db()->prepare("SELECT `value` FROM settings WHERE `name` = 'auto_reset_stale_agents_enabled'");
+        $s->execute();
+        return (string)$s->fetchColumn() === '1';
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+/**
  * Main execution
  */
 function main() {
@@ -241,6 +254,18 @@ function main() {
             } else {
                 log_message('INFO', "DRY RUN: Would mark firewall $firewall_id as offline", $firewall_id);
             }
+        }
+
+        // Resetting is destructive (kills and reinstalls the agent, and may
+        // SSH to the firewall), and until 3.79 this script crashed before it
+        // ever got here, so automatic resets had never actually run. The
+        // hourly cron therefore only reports unless an administrator turns
+        // auto_reset_stale_agents_enabled on. A reset an operator asked for
+        // (--force-firewall-id, from admin/reset_agent.php) always proceeds.
+        if (!$FORCE_FIREWALL_ID && !auto_reset_enabled()) {
+            log_message('INFO', "Automatic reset is disabled (auto_reset_stale_agents_enabled=0); not resetting $hostname", $firewall_id);
+            echo "\n";
+            continue;
         }
 
         // Queue emergency reset command (for when agent comes back online)
