@@ -6,6 +6,42 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.79.2
+**Released**: November 6, 2026 | **Agent**: v1.8.1
+
+### Fixed
+
+- **Bandwidth tests could not show a 10 Gbps circuit.** The agent ran 4 TCP
+  streams for 8 seconds against one distant public iperf3 server. Each stream
+  is bounded by its window and the round-trip time, so the datacenter firewall
+  plateaued at ~1.63 Gbps run after run on a 10 Gbps link. Its own CPU was not
+  the limit (iperf3 3.22, 40 cores). Agent 1.8.1 takes the server list, stream
+  count (default 16, 1–128) and duration (default 10 s) from the manager,
+  omits the first 2 s of ramp-up, and reports receiver-side throughput for
+  both directions, plus streams, iperf3 version and CPU use on each end.
+- **Failed measurements were stored as speeds.** A failed upload leg was saved
+  as 0 Mbps (about a third of runs), latency was hardcoded to 0, and a test
+  started from the bandwidth-test button left a row "running" forever. Missing
+  values are now NULL ("not measured"), failed tests are stored as failed,
+  and migration 0032 corrects the historical zeros.
+- The speedtest chart shifted already-local timestamps back five hours.
+- `firewall_edit.php` saved changes for any signed-in user; saving now
+  requires `firewall.manage`.
+
+### Added
+
+- Per-firewall iperf3 server(s), stream count and provisioned link speed on
+  Edit Firewall. Results show as a share of the circuit and state what they
+  measured: the path to that server, not only the circuit. For a 10 Gbps
+  link, point it at a nearby iperf3 server that can itself sustain 10 Gbps.
+
+### Changed
+
+- Agent auto-update is on (`agent_rollout_auto_promote = 1`): a newly
+  published agent is promoted to the fleet automatically.
+
+---
+
 ## Version 3.79.1
 **Released**: November 6, 2026 | **Agent**: v1.8.0 (held)
 

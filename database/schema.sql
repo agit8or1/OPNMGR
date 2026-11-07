@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.79.0.
+-- Generated from the reference installation for OPNManager v3.79.2.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -404,6 +404,11 @@ CREATE TABLE IF NOT EXISTS `bandwidth_tests` (
   `error_message` text DEFAULT NULL,
   `test_duration` int(11) DEFAULT NULL COMMENT 'Test duration in seconds',
   `tested_at` timestamp NULL DEFAULT current_timestamp(),
+  `streams` smallint(6) DEFAULT NULL,
+  `iperf_version` varchar(16) DEFAULT NULL,
+  `local_cpu_percent` tinyint(3) unsigned DEFAULT NULL,
+  `remote_cpu_percent` tinyint(3) unsigned DEFAULT NULL,
+  `command_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_firewall_tested` (`firewall_id`,`tested_at`),
   CONSTRAINT `bandwidth_tests_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
@@ -1166,6 +1171,10 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `platform_detection_conflict` varchar(255) DEFAULT NULL COMMENT 'Set when evidence sources disagree; forces read-only',
   `platform_verified_at` timestamp NULL DEFAULT NULL,
   `agent_flavor` varchar(32) DEFAULT NULL COMMENT 'opnsense-plugin | pfsense-agent',
+  `speedtest_server` varchar(255) DEFAULT NULL COMMENT 'Comma-separated iperf3 host[:port] list for this firewall; NULL = global setting',
+  `speedtest_streams` smallint(6) DEFAULT NULL COMMENT 'Parallel streams for this firewall; NULL = global setting',
+  `wan_link_down_mbps` int(11) DEFAULT NULL COMMENT 'Provisioned downstream, for showing results as a share of the circuit',
+  `wan_link_up_mbps` int(11) DEFAULT NULL COMMENT 'Provisioned upstream',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),

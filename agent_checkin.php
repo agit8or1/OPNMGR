@@ -8,6 +8,7 @@ require_once __DIR__ . '/inc/reboot_state.php';
 require_once __DIR__ . '/inc/firewall_health.php';
 require_once __DIR__ . '/inc/backup_storage.php';
 require_once __DIR__ . '/inc/platform/platform.php';
+require_once __DIR__ . '/inc/speedtest.php';
 
 // Endpoint for firewall agent check-ins
 header('Content-Type: application/json');
@@ -70,18 +71,13 @@ if ($command_id > 0 && !empty($command_status)) {
             // belonging to this firewall rather than re-querying by id alone.
             $cmd_info = $accepted['command'];
 
-            if ($cmd_info && ($cmd_info['command'] === 'run_speedtest' || $cmd_info['command_type'] === 'speedtest')) {
+            if ($cmd_info && (speedtest_is_command($cmd_info['command'] ?? '') || ($cmd_info['command_type'] ?? '') === 'speedtest')) {
+                // A failed leg is stored as "not measured", never 0 Mbps, and
+                // a failed test is recorded as failed instead of dropped.
                 $speedtest_data = json_decode($command_result, true);
-                if ($speedtest_data && isset($speedtest_data['download_mbps']) && !isset($speedtest_data['error'])) {
-                    $bw_stmt = db()->prepare("INSERT INTO bandwidth_tests (firewall_id, test_type, test_status, download_speed, upload_speed, latency, test_server, tested_at) VALUES (?, 'manual', 'completed', ?, ?, ?, ?, NOW())");
-                    $bw_stmt->execute([
-                        $cmd_info['firewall_id'],
-                        (float)($speedtest_data['download_mbps'] ?? 0),
-                        (float)($speedtest_data['upload_mbps'] ?? 0),
-                        (float)($speedtest_data['ping_ms'] ?? 0),
-                        $speedtest_data['server'] ?? 'agent-iperf3'
-                    ]);
-                    error_log("Speedtest results saved for firewall {$cmd_info['firewall_id']}: down={$speedtest_data['download_mbps']} up={$speedtest_data['upload_mbps']}");
+                if (is_array($speedtest_data)) {
+                    $bw_id = speedtest_ingest((int)$cmd_info['firewall_id'], $speedtest_data, $cmd_info);
+                    error_log("Speedtest result stored for firewall {$cmd_info['firewall_id']} (bandwidth_tests #{$bw_id})");
                 }
             }
         }

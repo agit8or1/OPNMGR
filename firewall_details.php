@@ -628,6 +628,7 @@ include __DIR__ . '/inc/header.php';
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <div id="speedtestNote" class="text-muted mt-2" style="font-size: 0.65rem;"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -2990,6 +2991,35 @@ function calculateStats(dataArray) {
 }
 
 // Fetch and update system stats charts
+// A value of null means that leg was not measured (failed or never run):
+// show a dash, not "null Mbps" or a fake 0. With a provisioned link speed
+// set on the firewall, each figure also shows its share of the circuit.
+function renderSpeedtestStats(data) {
+    const link = data.link || {};
+    const fmt = (v, cap) => {
+        if (v === null || v === undefined) return '—';
+        const pct = cap ? ' (' + Math.round(v / cap * 100) + '%)' : '';
+        return (v >= 1000 ? (v / 1000).toFixed(2) + ' Gbps' : Math.round(v) + ' Mbps') + pct;
+    };
+    const set = (id, v, cap) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v, cap); };
+    set('downloadAvg', data.stats.download.avg, link.down_mbps);
+    set('downloadPeak', data.stats.download.peak, link.down_mbps);
+    set('downloadLow', data.stats.download.low, link.down_mbps);
+    set('uploadAvg', data.stats.upload.avg, link.up_mbps);
+    set('uploadPeak', data.stats.upload.peak, link.up_mbps);
+    set('uploadLow', data.stats.upload.low, link.up_mbps);
+    const note = document.getElementById('speedtestNote');
+    if (note) {
+        const last = (data.meta || []).slice(-1)[0] || {};
+        let t = data.note || '';
+        if (last.server) t += ' Last: ' + last.server.replace(/^WAN-/, '') + (last.streams ? ', ' + last.streams + ' streams' : '') + '.';
+        if (last.local_cpu !== null && last.local_cpu !== undefined && last.local_cpu >= 90) t += ' Firewall CPU was ' + last.local_cpu + '% — result may be CPU-limited.';
+        if (data.failed_tests) t += ' ' + data.failed_tests + ' failed test(s) in this period are excluded.';
+        if (!link.down_mbps) t += ' Set the provisioned link speed on the firewall to see results as a share of the circuit.';
+        note.textContent = t;
+    }
+}
+
 function updateSystemCharts() {
     const hours = document.getElementById('timeFrameSelect')?.value || 24;
     const firewallId = <?php echo $firewall['id']; ?>;
@@ -3178,12 +3208,7 @@ function updateSystemCharts() {
 
                 // Update stats
                 if (data.stats) {
-                    document.getElementById('downloadAvg').textContent = data.stats.download.avg + ' Mbps';
-                    document.getElementById('downloadPeak').textContent = data.stats.download.peak + ' Mbps';
-                    document.getElementById('downloadLow').textContent = data.stats.download.low + ' Mbps';
-                    document.getElementById('uploadAvg').textContent = data.stats.upload.avg + ' Mbps';
-                    document.getElementById('uploadPeak').textContent = data.stats.upload.peak + ' Mbps';
-                    document.getElementById('uploadLow').textContent = data.stats.upload.low + ' Mbps';
+                    renderSpeedtestStats(data);
                 }
             } else if (!data.success) {
                 console.error('SpeedTest API error:', data.error);
@@ -3247,12 +3272,7 @@ function updateSpeedtestChart() {
 
                 // Update stats
                 if (data.stats) {
-                    document.getElementById('downloadAvg').textContent = data.stats.download.avg + ' Mbps';
-                    document.getElementById('downloadPeak').textContent = data.stats.download.peak + ' Mbps';
-                    document.getElementById('downloadLow').textContent = data.stats.download.low + ' Mbps';
-                    document.getElementById('uploadAvg').textContent = data.stats.upload.avg + ' Mbps';
-                    document.getElementById('uploadPeak').textContent = data.stats.upload.peak + ' Mbps';
-                    document.getElementById('uploadLow').textContent = data.stats.upload.low + ' Mbps';
+                    renderSpeedtestStats(data);
                 }
             } else if (!data.success) {
                 console.error('SpeedTest API error:', data.error);

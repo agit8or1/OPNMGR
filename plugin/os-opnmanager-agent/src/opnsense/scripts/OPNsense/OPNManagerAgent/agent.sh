@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.8.0"
+AGENT_VERSION="1.8.1"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 # Update transcripts get their own file. The installer's output used to be
@@ -451,69 +451,92 @@ EOF
 # Run iperf3 bandwidth test to public server (WAN test)
 # Tries multiple servers with retry logic for reliability
 run_iperf3_test() {
-    log_message "Running iperf3 WAN bandwidth test..."
+    # Arguments (agent 1.8.1), all validated here because they arrive in a
+    # queued command:
+    #   $1 servers  comma-separated host[:port] list, tried in order
+    #   $2 streams  parallel TCP streams (1-128)
+    #   $3 duration seconds measured (5-60), after a 2 s omitted ramp-up
+    #
+    # The old test ran 4 streams for 8 s against one distant public server.
+    # Each TCP stream is bounded by window/RTT, so it plateaued near 1.6 Gbps
+    # on a 10 Gbps link no matter what the link could do; and a failed upload
+    # leg was reported as 0 Mbps, latency was hardcoded to 0.
+    local servers="${1:-iperf.he.net,bouygues.iperf.fr,speedtest.wtnet.de,iperf.par2.as49434.net}"
+    local streams="${2:-16}"
+    local duration="${3:-10}"
+    case "$streams" in ''|*[!0-9]*) streams=16 ;; esac
+    case "$duration" in ''|*[!0-9]*) duration=10 ;; esac
+    [ "$streams" -lt 1 ] && streams=1;   [ "$streams" -gt 128 ] && streams=128
+    [ "$duration" -lt 5 ] && duration=5; [ "$duration" -gt 60 ] && duration=60
+    local tmo=$((duration + 20))
 
-    # Check if iperf3 is installed
+    log_message "Running iperf3 WAN bandwidth test (${streams} streams, ${duration}s)..."
+
     if ! command -v iperf3 >/dev/null 2>&1; then
         log_message "iperf3 not installed, attempting to install..."
-        if command -v pkg >/dev/null 2>&1; then
-            pkg install -y iperf3 >/dev/null 2>&1
-        fi
+        command -v pkg >/dev/null 2>&1 && pkg install -y iperf3 >/dev/null 2>&1
     fi
-
     if ! command -v iperf3 >/dev/null 2>&1; then
-        log_message "iperf3 not available"
         echo '{"error":"iperf3 not available"}'
         return 1
     fi
+    local iperf_version=$(iperf3 --version 2>/dev/null | head -1 | awk '{print $2}' | tr -cd '0-9.')
 
-    # List of public iperf3 servers to try (in order of preference)
-    local servers="iperf.he.net bouygues.iperf.fr speedtest.wtnet.de iperf.par2.as49434.net"
+    # Receiver-side throughput for both directions (sum_received), which is
+    # what actually crossed the link; plus CPU use on both ends so a result
+    # limited by a CPU rather than the path can be flagged.
+    local parse='import json,sys
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print("x x x"); sys.exit()
+e=d.get("end",{}); r=e.get("sum_received",{}).get("bits_per_second")
+c=e.get("cpu_utilization_percent",{})
+print("%s %s %s" % (int(r/1e6) if r else "x", int(c.get("host_total",0)) if c else "x", int(c.get("remote_total",0)) if c else "x"))'
 
-    for iperf_server in $servers; do
-        log_message "Trying iperf3 server: $iperf_server"
+    local entry host port
+    for entry in $(echo "$servers" | tr ',' ' '); do
+        host="${entry%%:*}"; port="5201"
+        [ "$entry" != "$host" ] && port="${entry##*:}"
+        # Hostnames/IPv4 only; anything else is not passed to iperf3 at all.
+        if ! echo "$host" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$'; then continue; fi
+        case "$port" in ''|*[!0-9]*) continue ;; esac
 
-        # Test download (reverse mode) with 4 parallel streams
-        local download_result=$(timeout 30 iperf3 -c "$iperf_server" -R -P 4 -t 8 -J 2>&1)
-        local download_exit=$?
-
-        # Check if server was busy
-        if echo "$download_result" | grep -q "server is busy"; then
-            log_message "Server $iperf_server is busy, trying next..."
-            sleep 1
-            continue
+        log_message "Trying iperf3 server: $host:$port"
+        local dl_json=$(timeout $tmo iperf3 -c "$host" -p "$port" -R -P "$streams" -t "$duration" -O 2 -J --connect-timeout 3000 2>&1)
+        if echo "$dl_json" | grep -q "server is busy"; then
+            log_message "Server $host is busy, trying next..."; sleep 1; continue
         fi
-
-        local download=0
-        if [ $download_exit -eq 0 ] && [ -n "$download_result" ]; then
-            download=$(echo "$download_result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('end',{}).get('sum_received',{}).get('bits_per_second',0)/1000000))" 2>/dev/null)
-        fi
-
-        if [ -z "$download" ] || [ "$download" -le 0 ] 2>/dev/null; then
-            log_message "Download test failed on $iperf_server, trying next..."
-            continue
+        set -- $(echo "$dl_json" | /usr/local/bin/python3 -c "$parse" 2>/dev/null)
+        local download="${1:-x}" dl_cpu="${2:-x}" dl_rcpu="${3:-x}"
+        if [ "$download" = "x" ] || [ "$download" -le 0 ] 2>/dev/null; then
+            log_message "Download test failed on $host, trying next..."; continue
         fi
 
         sleep 2
+        local ul_json=$(timeout $tmo iperf3 -c "$host" -p "$port" -P "$streams" -t "$duration" -O 2 -J --connect-timeout 3000 2>&1)
+        set -- $(echo "$ul_json" | /usr/local/bin/python3 -c "$parse" 2>/dev/null)
+        local upload="${1:-x}" ul_cpu="${2:-x}"
 
-        # Test upload (normal mode) with 4 parallel streams
-        local upload_result=$(timeout 30 iperf3 -c "$iperf_server" -P 4 -t 8 -J 2>&1)
-        local upload_exit=$?
+        local ping_ms=$(ping -c 3 -t 5 "$host" 2>/dev/null | awk -F'/' '/round-trip/ {print $5}')
+        case "$ping_ms" in ''|*[!0-9.]*) ping_ms="null" ;; esac
 
-        local upload=0
-        if [ $upload_exit -eq 0 ] && [ -n "$upload_result" ]; then
-            upload=$(echo "$upload_result" | /usr/local/bin/python3 -c "import json,sys; data=json.load(sys.stdin); print(int(data.get('end',{}).get('sum_sent',{}).get('bits_per_second',0)/1000000))" 2>/dev/null)
+        # null, never 0, for a leg that did not produce a measurement.
+        local up_json="null" up_err="null"
+        if [ "$upload" != "x" ] && [ "$upload" -gt 0 ] 2>/dev/null; then
+            up_json="$upload"
+        else
+            up_err='"upload leg did not complete"'
         fi
+        local cpu_json="null"; [ "$dl_cpu" != "x" ] && cpu_json="$dl_cpu"
+        [ "$ul_cpu" != "x" ] && [ "$cpu_json" != "null" ] && [ "$ul_cpu" -gt "$cpu_json" ] 2>/dev/null && cpu_json="$ul_cpu"
+        local rcpu_json="null"; [ "$dl_rcpu" != "x" ] && rcpu_json="$dl_rcpu"
 
-        [ -z "$upload" ] && upload=0
-
-        if [ "$download" -gt 0 ]; then
-            log_message "iperf3 test complete: Down=${download}Mbps, Up=${upload}Mbps (to $iperf_server)"
-            cat <<EOF
-{"download_mbps":$download,"upload_mbps":$upload,"ping_ms":0,"server":"WAN-$iperf_server","timestamp":"$(date '+%Y-%m-%d %H:%M:%S')","test_type":"iperf3"}
-EOF
-            return 0
-        fi
+        log_message "iperf3 test complete: Down=${download}Mbps, Up=${up_json}Mbps (to $host:$port, ${streams} streams)"
+        printf '{"download_mbps":%s,"upload_mbps":%s,"ping_ms":%s,"server":"WAN-%s","server_port":%s,"streams":%s,"duration_s":%s,"iperf_version":"%s","local_cpu_percent":%s,"remote_cpu_percent":%s,"upload_error":%s,"timestamp":"%s","test_type":"iperf3"}\n' \
+            "$download" "$up_json" "$ping_ms" "$host" "$port" "$streams" "$duration" "$iperf_version" \
+            "$cpu_json" "$rcpu_json" "$up_err" "$(date '+%Y-%m-%d %H:%M:%S')"
+        return 0
     done
 
     log_message "All iperf3 servers failed or busy"
@@ -521,24 +544,27 @@ EOF
     return 1
 }
 
-# Run speedtest (only when requested by server) - uses iperf3 for accurate WAN bandwidth
-# Tests to public iperf3 servers that can handle multiple connections
+# Run speedtest (only when requested by server). Optional key=value
+# arguments from the manager: servers=, streams=, duration=.
 run_speedtest() {
     log_message "Running bandwidth test..."
-
-    # Use iperf3 for WAN bandwidth test to public server
-    local iperf_result=$(run_iperf3_test)
-
+    local servers="" streams="" duration="" kv
+    for kv in "$@"; do
+        case "$kv" in
+            servers=*)  servers="${kv#servers=}" ;;
+            streams=*)  streams="${kv#streams=}" ;;
+            duration=*) duration="${kv#duration=}" ;;
+        esac
+    done
+    local iperf_result=$(run_iperf3_test "$servers" "$streams" "$duration")
     if echo "$iperf_result" | grep -q '"download_mbps"'; then
-        # iperf3 succeeded
         echo "$iperf_result"
         return 0
-    else
-        # iperf3 failed
-        log_message "Bandwidth test failed"
-        echo '{"error":"Bandwidth test failed - all iperf3 servers unavailable"}'
-        return 1
     fi
+    log_message "Bandwidth test failed"
+    echo "$iperf_result" | grep -q '"error"' && echo "$iperf_result" \
+        || echo '{"error":"Bandwidth test failed - all iperf3 servers unavailable"}'
+    return 1
 }
 
 # Detect WAN interfaces from config.xml
@@ -945,9 +971,10 @@ except:
 
                 # Use a subshell with timeout to prevent agent crashes
                 (
-                    if [ "$cmd_data" = "run_speedtest" ]; then
+                    if [ "$cmd_data" = "run_speedtest" ] || [ "${cmd_data#run_speedtest }" != "$cmd_data" ]; then
                         log_message "Running speedtest as requested"
-                        result=$(run_speedtest 2>&1)
+                        # shellcheck disable=SC2086 - word splitting the key=value list is intended
+                        result=$(set -f; run_speedtest ${cmd_data#run_speedtest} 2>&1)
                         echo "$result" > /tmp/cmd_${cmd_id}_result.txt
 
                         # Send speedtest results to server

@@ -305,6 +305,9 @@ jobs:
       - name: Agent reset authorisation suite
         run: php tests/agent_reset_authz_test.php
 
+      - name: Bandwidth test suite
+        run: php tests/speedtest_test.php
+
       - name: Release manifest signs and verifies
         run: |
           # downloads/ is gitignored (release artifacts are large binaries and
