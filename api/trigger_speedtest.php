@@ -59,7 +59,7 @@ try {
     }
 
     // Check if there's already a pending/sent speedtest command (prevent spam)
-    $existing = db()->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND command = 'run_speedtest' AND status IN ('pending', 'sent') AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+    $existing = db()->prepare("SELECT id FROM firewall_commands WHERE firewall_id = ? AND (command = 'run_speedtest' OR command LIKE 'run_speedtest %') AND status IN ('pending', 'sent') AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
     $existing->execute([$firewall_id]);
     if ($existing->fetch()) {
         echo json_encode(['success' => false, 'error' => 'Speedtest already queued, please wait for it to complete']);
@@ -67,8 +67,13 @@ try {
     }
 
     // Queue the speedtest command for the agent
-    $stmt = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, command_type, status) VALUES (?, 'run_speedtest', 'On-demand bandwidth test via iperf3', 'speedtest', 'pending')");
-    $stmt->execute([$firewall_id]);
+    // Parameters (servers, streams, duration) come from inc/speedtest.php and
+    // reach only agents that understand them.
+    require_once __DIR__ . '/../inc/speedtest.php';
+    require_once __DIR__ . '/../inc/platform/platform.php';
+    $stmt = db()->prepare("INSERT INTO firewall_commands (firewall_id, command, description, command_type, status, queued_by_user_id, queued_by_username) VALUES (?, ?, 'On-demand bandwidth test via iperf3', 'speedtest', 'pending', ?, ?)");
+    $stmt->execute([$firewall_id, speedtest_command_for(platform_firewall((int)$firewall_id) ?? []),
+                    $_SESSION['user_id'] ?? null, $_SESSION['username'] ?? null]);
 
     echo json_encode([
         'success' => true,

@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fixed Is Not The Same As On'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Plateau Is Not A Link'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Fixed Is Not The
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.0'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.1'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-11-06'); }
 // The pfSense agent (agent/pfsense/) is a separate package with its own
 // version line: it shares the check-in protocol, not the OPNsense plugin.
@@ -46,6 +46,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.79.2',
+            'date' => '2026-11-06',
+            'type' => 'patch',
+            'title' => 'A Plateau Is Not A Link',
+            'changes' => [
+                'FIXED: Bandwidth tests plateaued near 1.6 Gbps on a 10 Gbps circuit: 4 streams for 8 s against one distant public server, so each stream hit its TCP window/RTT limit. Agent 1.8.1 takes servers, streams (default 16) and duration from the manager, omits the ramp-up, and measures both directions at the receiver',
+                'FIXED: A failed upload leg was stored as 0 Mbps and latency was hardcoded to 0; both are now stored as not measured, and past 0 values are corrected (migration 0032). Failed tests are recorded as failed instead of dropped',
+                'FIXED: The speedtest chart shifted already-local timestamps back five hours',
+                'ADDED: Per-firewall iperf3 server, streams and provisioned link speed (Edit Firewall); results show as a share of the circuit and say what they measured',
+                'FIXED: firewall_edit.php saved changes for any signed-in user; saving now requires firewall.manage',
+                'CHANGED: Agent auto-update is on: new agent releases are promoted to the fleet when published',
+            ],
+        ],
         [
             'version' => '3.79.1',
             'date' => '2026-11-06',

@@ -29,20 +29,25 @@ if ($firewall_id <= 0) {
 }
 
 try {
-    // Get iperf3 bandwidth test results with timezone conversion
+    // tested_at is a TIMESTAMP returned in the server's named time zone
+    // (America/New_York, see /etc/mysql/conf.d/timezone.cnf), so it is
+    // already local. The previous CONVERT_TZ('+00:00','-05:00') shifted
+    // already-local values back five hours, and by the wrong amount in DST.
     $stmt = db()->prepare("
         SELECT
-            CONVERT_TZ(tested_at, '+00:00', '-05:00') as tested_at_local,
-            DATE_FORMAT(CONVERT_TZ(tested_at, '+00:00', '-05:00'), '%Y-%m-%d %H:%i') as test_label,
+            DATE_FORMAT(tested_at, '%Y-%m-%d %H:%i') as test_label,
             AVG(download_speed) as avg_download,
             AVG(upload_speed) as avg_upload,
             AVG(latency) as avg_ping,
+            MAX(streams) as streams,
+            MAX(test_server) as test_server,
+            MAX(local_cpu_percent) as local_cpu,
             COUNT(*) as test_count
         FROM bandwidth_tests
         WHERE firewall_id = :firewall_id
         AND test_status = 'completed'
         AND tested_at >= DATE_SUB(NOW(), INTERVAL :hours HOUR)
-        GROUP BY DATE_FORMAT(CONVERT_TZ(tested_at, '+00:00', '-05:00'), '%Y-%m-%d %H:%i')
+        GROUP BY DATE_FORMAT(tested_at, '%Y-%m-%d %H:%i')
         ORDER BY test_label ASC
     ");
 
@@ -53,41 +58,36 @@ try {
 
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // NULL means the leg was not measured. It stays null (a gap in the
+    // chart) and is excluded from the statistics: it used to become 0 Mbps,
+    // which dragged every average and "low" down with failed tests.
     $labels = [];
     $download_data = [];
     $upload_data = [];
-
+    $meta = [];
     foreach ($results as $row) {
         $labels[] = $row['test_label'];
-        $download_data[] = round($row['avg_download'], 2);
-        $upload_data[] = round($row['avg_upload'], 2);
+        $download_data[] = $row['avg_download'] === null ? null : round((float)$row['avg_download'], 2);
+        $upload_data[] = $row['avg_upload'] === null ? null : round((float)$row['avg_upload'], 2);
+        $meta[] = ['streams' => $row['streams'] !== null ? (int)$row['streams'] : null,
+                   'server' => $row['test_server'], 'local_cpu' => $row['local_cpu'] !== null ? (int)$row['local_cpu'] : null];
     }
 
-    // Calculate statistics
-    $stats = [
-        'download' => [
-            'avg' => 0,
-            'peak' => 0,
-            'low' => 0
-        ],
-        'upload' => [
-            'avg' => 0,
-            'peak' => 0,
-            'low' => 0
-        ]
-    ];
+    $summ = function (array $vals): array {
+        $vals = array_values(array_filter($vals, fn($v) => $v !== null));
+        if (!$vals) {
+            return ['avg' => null, 'peak' => null, 'low' => null, 'measured' => 0];
+        }
+        return ['avg' => round(array_sum($vals) / count($vals), 2), 'peak' => round(max($vals), 2),
+                'low' => round(min($vals), 2), 'measured' => count($vals)];
+    };
+    $stats = ['download' => $summ($download_data), 'upload' => $summ($upload_data)];
 
-    if (!empty($download_data)) {
-        $stats['download']['avg'] = round(array_sum($download_data) / count($download_data), 2);
-        $stats['download']['peak'] = round(max($download_data), 2);
-        $stats['download']['low'] = round(min($download_data), 2);
-    }
-
-    if (!empty($upload_data)) {
-        $stats['upload']['avg'] = round(array_sum($upload_data) / count($upload_data), 2);
-        $stats['upload']['peak'] = round(max($upload_data), 2);
-        $stats['upload']['low'] = round(min($upload_data), 2);
-    }
+    $fw = db()->prepare('SELECT wan_link_down_mbps, wan_link_up_mbps FROM firewalls WHERE id = ?');
+    $fw->execute([$firewall_id]);
+    $link = $fw->fetch(PDO::FETCH_ASSOC) ?: [];
+    $failed = db()->prepare("SELECT COUNT(*) FROM bandwidth_tests WHERE firewall_id = ? AND test_status = 'failed' AND tested_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)");
+    $failed->execute([$firewall_id, $hours]);
 
     http_response_code(200);
     echo json_encode([
@@ -96,7 +96,12 @@ try {
         'download' => $download_data,
         'upload' => $upload_data,
         'count' => count($labels),
-        'stats' => $stats
+        'stats' => $stats,
+        'meta' => $meta,
+        'failed_tests' => (int)$failed->fetchColumn(),
+        'link' => ['down_mbps' => isset($link['wan_link_down_mbps']) ? (int)$link['wan_link_down_mbps'] ?: null : null,
+                   'up_mbps' => isset($link['wan_link_up_mbps']) ? (int)$link['wan_link_up_mbps'] ?: null : null],
+        'note' => 'Measured from the firewall to the listed iperf3 server: bounded by that server and path, not only the circuit.'
     ]);
     
 } catch (PDOException $e) {

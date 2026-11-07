@@ -93,10 +93,12 @@ try {
             (firewall_id, command_type, command, description, status, created_at)
             VALUES (?, ?, ?, ?, ?, NOW())
         ');
+        require_once __DIR__ . '/../inc/speedtest.php';
+        require_once __DIR__ . '/../inc/platform/platform.php';
         $insert_stmt->execute([
             $fw_id,
             'speedtest',
-            'run_speedtest',
+            speedtest_command_for(platform_firewall((int)$fw_id) ?? []),
             'Automatic scheduled speedtest (every ' . $interval . 'h) - ' . date('Y-m-d H:i:s'),
             'pending'
         ]);

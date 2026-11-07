@@ -70,12 +70,17 @@ try {
 
     // Queue command for agent to run built-in speedtest (uses iperf3)
     $stmt = db()->prepare("
-        INSERT INTO firewall_commands (firewall_id, command, description, command_type, status)
-        VALUES (?, 'run_speedtest', ?, 'shell', 'pending')
+        INSERT INTO firewall_commands (firewall_id, command, description, command_type, status, queued_by_user_id, queued_by_username)
+        VALUES (?, ?, ?, 'speedtest', 'pending', ?, ?)
     ");
+    require_once __DIR__ . '/../inc/speedtest.php';
+    require_once __DIR__ . '/../inc/platform/platform.php';
     $stmt->execute([
         $firewall_id,
-        'Bandwidth test via iperf3 (ID: ' . $test_id . ')'
+        speedtest_command_for(platform_firewall((int)$firewall_id) ?? []),
+        'Bandwidth test via iperf3 (ID: ' . $test_id . ')',
+        $_SESSION['user_id'] ?? null,
+        $_SESSION['username'] ?? null,
     ]);
     
     echo json_encode([

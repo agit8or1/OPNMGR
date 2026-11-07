@@ -53,7 +53,11 @@ $current_tag_ids = array_column($current_tags, 'id');
 $current_tag_names = array_column($current_tags, 'name');
 
 // Handle form submission
+// Saving changes a firewall's name, customer, tags and test parameters, which
+// is firewall.manage; it used to need only a login, so a read-only account
+// could save it. Viewing stays open to every role, as before.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_permission('firewall.manage');
     // Was a hand-rolled !== against the session value. csrf_verify() compares
     // with hash_equals() instead, and is the one implementation the rest of the
     // application uses - a second copy is a second thing to get wrong.
@@ -66,10 +70,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $customer_id = (int)($_POST['customer_id'] ?? 0);
     $site_id     = (int)($_POST['site_id'] ?? 0);
     $tags_array = $_POST['tags'] ?? [];
+
+    // Bandwidth test parameters (3.79.2). Empty means "use the global setting".
+    require_once __DIR__ . '/inc/speedtest.php';
+    $st_server = trim((string)($_POST['speedtest_server'] ?? ''));
+    $st_streams = trim((string)($_POST['speedtest_streams'] ?? ''));
+    $link_down = trim((string)($_POST['wan_link_down_mbps'] ?? ''));
+    $link_up = trim((string)($_POST['wan_link_up_mbps'] ?? ''));
+    $st_servers_ok = $st_server === '' || count(array_filter(explode(',', $st_server), fn($e) => !speedtest_valid_server(trim($e)))) === 0;
     $tags_list = is_array($tags_array) ? array_filter(array_map('trim', $tags_array)) : array_filter(array_map('trim', explode(',', $tags_array)));
 
     if (empty($hostname)) {
         $error = 'Firewall hostname is required';
+    } elseif (!$st_servers_ok || strlen($st_server) > 255) {
+        $error = 'Speedtest server must be host or host:port, comma separated';
+    } elseif ($st_streams !== '' && (!ctype_digit($st_streams) || (int)$st_streams < 1 || (int)$st_streams > 128)) {
+        $error = 'Speedtest streams must be between 1 and 128';
+    } elseif (($link_down !== '' && (!ctype_digit($link_down) || (int)$link_down > 400000))
+           || ($link_up !== '' && (!ctype_digit($link_up) || (int)$link_up > 400000))) {
+        $error = 'Provisioned link speed must be a whole number of Mbps';
     } else {
         try {
             // Update firewall basic info (no tag_names column exists)
@@ -79,6 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE id = ?
             ");
             $stmt->execute([$hostname, $notes, $firewall_id]);
+
+            db()->prepare('UPDATE firewalls SET speedtest_server = ?, speedtest_streams = ?,
+                                  wan_link_down_mbps = ?, wan_link_up_mbps = ? WHERE id = ?')
+                ->execute([$st_server !== '' ? $st_server : null, $st_streams !== '' ? (int)$st_streams : null,
+                           $link_down !== '' ? (int)$link_down : null, $link_up !== '' ? (int)$link_up : null,
+                           $firewall_id]);
 
             // Customer/site assignment goes through the service layer, which
             // writes customer_id/site_id, keeps the legacy customer_name and
@@ -210,6 +235,24 @@ include __DIR__ . '/inc/header.php';
                             <label for="notes" class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Notes</label>
                             <textarea class="form-control" id="notes" name="notes" rows="3"
                                       style="background-color: rgba(255,255,255,0.15)!important; border-color: rgba(138,180,248,0.5)!important; color: #fff!important; font-weight: 500;"><?php echo htmlspecialchars($firewall['notes'] ?? ''); ?></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" style="display: block!important; visibility: visible!important; opacity: 1!important; color: #fff!important; font-weight: 500!important; font-size: 1rem!important; margin-bottom: 0.5rem!important;">Bandwidth test</label>
+                            <div class="row g-2">
+                                <div class="col-md-6"><input class="form-control" name="speedtest_server" maxlength="255"
+                                    placeholder="iperf3 server(s): host[:port], comma separated (blank = default)"
+                                    value="<?php echo htmlspecialchars($firewall['speedtest_server'] ?? ''); ?>"></div>
+                                <div class="col-md-2"><input class="form-control" name="speedtest_streams" inputmode="numeric"
+                                    placeholder="streams" value="<?php echo htmlspecialchars((string)($firewall['speedtest_streams'] ?? '')); ?>"></div>
+                                <div class="col-md-2"><input class="form-control" name="wan_link_down_mbps" inputmode="numeric"
+                                    placeholder="down Mbps" value="<?php echo htmlspecialchars((string)($firewall['wan_link_down_mbps'] ?? '')); ?>"></div>
+                                <div class="col-md-2"><input class="form-control" name="wan_link_up_mbps" inputmode="numeric"
+                                    placeholder="up Mbps" value="<?php echo htmlspecialchars((string)($firewall['wan_link_up_mbps'] ?? '')); ?>"></div>
+                            </div>
+                            <small class="text-muted">A test measures the path to that server, not only the circuit. For a 10 Gbps
+                                link use a nearby iperf3 server that can itself sustain 10 Gbps, and 16–32 streams.
+                                Down/up Mbps is the provisioned speed, used to show results as a share of the circuit.</small>
                         </div>
 
                         <div class="mb-3">
