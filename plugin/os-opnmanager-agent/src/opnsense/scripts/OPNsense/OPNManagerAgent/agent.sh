@@ -25,7 +25,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # OPNManager Agent - Centralized firewall management agent for OPNsense
-AGENT_VERSION="1.8.1"
+AGENT_VERSION="1.8.2"
 CONFIG_FILE="/conf/config.xml"
 LOG_FILE="/var/log/opnmanager_agent.log"
 # Update transcripts get their own file. The installer's output used to be
@@ -544,18 +544,108 @@ print("%s %s %s" % (int(r/1e6) if r else "x", int(c.get("host_total",0)) if c el
     return 1
 }
 
+# Ookla Speedtest CLI engine (agent 1.8.2). Opt-in only: the manager sends
+# engine=ookla solely for firewalls an administrator enabled after recording
+# acceptance of Ookla's terms, which license the CLI for personal,
+# non-commercial use. The binary is Ookla's own FreeBSD package, fetched from
+# Ookla, checksum-pinned, and unpacked to /usr/local/opnmgr/bin - never
+# installed through pkg, so OPNsense's package database is untouched.
+OOKLA_PKG_URL="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-freebsd13-x86_64.pkg"
+OOKLA_PKG_SHA256="${OPNMGR_OOKLA_PKG_SHA256:-23b20119066df5b08c4f3a8920334ccaab0783780f9b2494629394d1ef33e6f8}"
+OOKLA_BIN_SHA256="${OPNMGR_OOKLA_BIN_SHA256:-a3a65ac2a40ab28061af3fa803afabe8f3a3d58bf3fc58041c2c1be84dd43997}"
+OOKLA_BIN="${OPNMGR_OOKLA_BIN:-/usr/local/opnmgr/bin/speedtest}"
+
+sha256_of() { sha256 -q "$1" 2>/dev/null || sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+
+ensure_ookla() {
+    if [ -x "$OOKLA_BIN" ] && [ "$(sha256_of "$OOKLA_BIN")" = "$OOKLA_BIN_SHA256" ]; then
+        return 0
+    fi
+    log_message "Fetching Ookla Speedtest CLI (checksum-pinned)"
+    local tmp=$(mktemp -d /tmp/opnmgr-ookla.XXXXXX) || return 1
+    if ! fetch -q -o "$tmp/ookla.pkg" "$OOKLA_PKG_URL" 2>/dev/null \
+        && ! curl -sSf -o "$tmp/ookla.pkg" "$OOKLA_PKG_URL" 2>/dev/null; then
+        rm -rf "$tmp"; echo "download failed"; return 1
+    fi
+    if [ "$(sha256_of "$tmp/ookla.pkg")" != "$OOKLA_PKG_SHA256" ]; then
+        rm -rf "$tmp"; echo "package checksum mismatch"; return 1
+    fi
+    # The package is a tar archive; take only the binary out of it.
+    tar -xf "$tmp/ookla.pkg" -C "$tmp" /usr/local/bin/speedtest 2>/dev/null \
+        || tar -xf "$tmp/ookla.pkg" -C "$tmp" usr/local/bin/speedtest 2>/dev/null
+    if [ "$(sha256_of "$tmp/usr/local/bin/speedtest")" != "$OOKLA_BIN_SHA256" ]; then
+        rm -rf "$tmp"; echo "binary checksum mismatch"; return 1
+    fi
+    mkdir -p "$(dirname "$OOKLA_BIN")" && install -m 0755 "$tmp/usr/local/bin/speedtest" "$OOKLA_BIN"
+    rm -rf "$tmp"
+    [ -x "$OOKLA_BIN" ]
+}
+
+run_ookla_test() {
+    local server_id="$1"
+    case "$server_id" in *[!0-9]*) server_id="" ;; esac
+    local why
+    why=$(ensure_ookla) || { printf '{"error":"Ookla CLI unavailable: %s","engine":"ookla"}\n' "${why:-install failed}"; return 1; }
+
+    # HOME is where the CLI records licence acceptance; keep it out of /root.
+    local home=/var/db/opnmgr-ookla
+    mkdir -p "$home" && chmod 700 "$home"
+    local out
+    out=$(HOME="$home" timeout 150 "$OOKLA_BIN" --accept-license --accept-gdpr -f json -p no \
+          ${server_id:+-s "$server_id"} 2>&1)
+
+    # Ookla JSON reports bandwidth in bytes per second.
+    printf '%s' "$out" | /usr/local/bin/python3 -c '
+import json, sys
+raw = sys.stdin.read()
+d = None
+for line in raw.splitlines():
+    line = line.strip()
+    if line.startswith("{"):
+        try:
+            j = json.loads(line)
+        except Exception:
+            continue
+        if j.get("type") == "result" or "download" in j:
+            d = j
+if d is None:
+    msg = raw.strip().splitlines()[-1] if raw.strip() else "no output"
+    print(json.dumps({"error": "Ookla test failed: " + msg[:200], "engine": "ookla"})); sys.exit(1)
+def mbps(leg):
+    b = (d.get(leg) or {}).get("bandwidth")
+    return int(b * 8 / 1e6) if isinstance(b, (int, float)) and b > 0 else None
+srv = d.get("server") or {}
+r = {"download_mbps": mbps("download"), "upload_mbps": mbps("upload"),
+     "ping_ms": (d.get("ping") or {}).get("latency"), "jitter_ms": (d.get("ping") or {}).get("jitter"),
+     "packet_loss": d.get("packetLoss"), "engine": "ookla",
+     "server": "OOKLA-%s (%s) #%s" % (srv.get("name", "?"), srv.get("location", "?"), srv.get("id", "?")),
+     "result_url": (d.get("result") or {}).get("url"), "test_type": "ookla"}
+if r["download_mbps"] is None:
+    r = {"error": "Ookla test returned no download measurement", "engine": "ookla"}
+elif r["upload_mbps"] is None:
+    r["upload_error"] = "upload leg did not complete"
+print(json.dumps(r))
+'
+}
+
 # Run speedtest (only when requested by server). Optional key=value
 # arguments from the manager: servers=, streams=, duration=.
 run_speedtest() {
     log_message "Running bandwidth test..."
-    local servers="" streams="" duration="" kv
+    local servers="" streams="" duration="" engine="iperf3" ookla_server="" kv
     for kv in "$@"; do
         case "$kv" in
-            servers=*)  servers="${kv#servers=}" ;;
-            streams=*)  streams="${kv#streams=}" ;;
-            duration=*) duration="${kv#duration=}" ;;
+            servers=*)      servers="${kv#servers=}" ;;
+            streams=*)      streams="${kv#streams=}" ;;
+            duration=*)     duration="${kv#duration=}" ;;
+            engine=ookla)   engine="ookla" ;;
+            ookla_server=*) ookla_server="${kv#ookla_server=}" ;;
         esac
     done
+    if [ "$engine" = "ookla" ]; then
+        run_ookla_test "$ookla_server"
+        return $?
+    fi
     local iperf_result=$(run_iperf3_test "$servers" "$streams" "$duration")
     if echo "$iperf_result" | grep -q '"download_mbps"'; then
         echo "$iperf_result"

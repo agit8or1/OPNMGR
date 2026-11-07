@@ -6,6 +6,33 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.80.0
+**Released**: November 6, 2026 | **Agent**: v1.8.2
+
+### Added
+
+- **Optional Ookla Speedtest CLI engine.** Ookla's server network includes
+  multi-gigabit servers, which public iperf3 servers mostly are not. It is
+  off by default and enabled per firewall (Edit Firewall → Bandwidth test).
+  Before any firewall can use it, an administrator must record acceptance of
+  Ookla's [EULA](https://www.speedtest.net/about/eula),
+  [Terms](https://www.speedtest.net/about/terms) and
+  [Privacy Policy](https://www.speedtest.net/about/privacy). Ookla licenses
+  the CLI for personal, non-commercial use, so confirm your use is permitted
+  or covered by an agreement with Ookla. Acceptance is audited and can be
+  withdrawn, which stops Ookla tests.
+- Agent 1.8.2 runs `engine=ookla` tests. On first use it fetches Ookla's own
+  FreeBSD package (`ookla-speedtest-1.2.0-freebsd13-x86_64.pkg`, which is not
+  in OPNsense's repository), verifies pinned SHA-256 checksums of the package
+  and of the binary inside it, and unpacks only the binary to
+  `/usr/local/opnmgr/bin/speedtest`. `pkg` is not used, so OPNsense's package
+  database is not touched. The binary needs only FreeBSD base libraries.
+- Ookla results record the Ookla server, jitter, packet loss and the
+  speedtest.net result link (only speedtest.net result URLs are stored).
+- The Ookla engine has not yet run on a live firewall; iperf3 stays the default.
+
+---
+
 ## Version 3.79.3
 **Released**: November 6, 2026 | **Agent**: v1.8.1
 

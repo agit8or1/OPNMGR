@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Six Hundred Percent'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Someone Else\'s Servers'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -20,7 +20,7 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Six Hundred Perc
 // source bump here tells every agent to fetch a package that does not exist.
 // inc/agent_version.php aliases LATEST_AGENT_VERSION to it; do not redefine it there.
 // scripts/check_versions.php enforces this against the released artifact.
-if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.1'); }
+if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.2'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-11-06'); }
 // The pfSense agent (agent/pfsense/) is a separate package with its own
 // version line: it shares the check-in protocol, not the OPNsense plugin.
@@ -46,6 +46,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.80.0',
+            'date' => '2026-11-06',
+            'type' => 'minor',
+            'title' => 'Someone Else\'s Servers',
+            'changes' => [
+                'ADDED: Optional Ookla Speedtest CLI engine for bandwidth tests (agent 1.8.2). Off by default and enabled per firewall on Edit Firewall; an administrator must first record acceptance of Ookla\'s EULA, Terms and Privacy Policy, which license the CLI for personal, non-commercial use',
+                'ADDED: The agent fetches Ookla\'s own FreeBSD package only on enabled firewalls, verifies pinned checksums of the package and the binary, and unpacks the binary to /usr/local/opnmgr/bin without using pkg. iperf3 remains the default engine',
+                'ADDED: Ookla results record server, jitter, packet loss and the speedtest.net result link',
+            ],
+        ],
         [
             'version' => '3.79.3',
             'date' => '2026-11-06',

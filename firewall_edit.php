@@ -78,6 +78,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $link_down = trim((string)($_POST['wan_link_down_mbps'] ?? ''));
     $link_up = trim((string)($_POST['wan_link_up_mbps'] ?? ''));
     $st_servers_ok = $st_server === '' || count(array_filter(explode(',', $st_server), fn($e) => !speedtest_valid_server(trim($e)))) === 0;
+    $st_engine = ($_POST['speedtest_engine'] ?? 'iperf3') === 'ookla' ? 'ookla' : 'iperf3';
+    $st_ookla_server = trim((string)($_POST['speedtest_ookla_server_id'] ?? ''));
+    // Recording acceptance of Ookla's terms is an administrator decision for
+    // the whole installation, made with the licence text in front of them.
+    if (!empty($_POST['ookla_accept_terms']) && can('settings.manage') && speedtest_ookla_terms() === null) {
+        speedtest_ookla_accept_terms(true);
+    }
     $tags_list = is_array($tags_array) ? array_filter(array_map('trim', $tags_array)) : array_filter(array_map('trim', explode(',', $tags_array)));
 
     if (empty($hostname)) {
@@ -89,6 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (($link_down !== '' && (!ctype_digit($link_down) || (int)$link_down > 400000))
            || ($link_up !== '' && (!ctype_digit($link_up) || (int)$link_up > 400000))) {
         $error = 'Provisioned link speed must be a whole number of Mbps';
+    } elseif ($st_ookla_server !== '' && (!ctype_digit($st_ookla_server) || (int)$st_ookla_server > 9999999)) {
+        $error = 'Ookla server id must be a number';
+    } elseif ($st_engine === 'ookla' && speedtest_ookla_terms() === null) {
+        $error = "Ookla tests need an administrator to accept Ookla's terms first";
     } else {
         try {
             // Update firewall basic info (no tag_names column exists)
@@ -100,9 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$hostname, $notes, $firewall_id]);
 
             db()->prepare('UPDATE firewalls SET speedtest_server = ?, speedtest_streams = ?,
-                                  wan_link_down_mbps = ?, wan_link_up_mbps = ? WHERE id = ?')
+                                  wan_link_down_mbps = ?, wan_link_up_mbps = ?,
+                                  speedtest_engine = ?, speedtest_ookla_server_id = ? WHERE id = ?')
                 ->execute([$st_server !== '' ? $st_server : null, $st_streams !== '' ? (int)$st_streams : null,
                            $link_down !== '' ? (int)$link_down : null, $link_up !== '' ? (int)$link_up : null,
+                           $st_engine === 'ookla' ? 'ookla' : null, $st_ookla_server !== '' ? (int)$st_ookla_server : null,
                            $firewall_id]);
 
             // Customer/site assignment goes through the service layer, which
@@ -250,6 +263,32 @@ include __DIR__ . '/inc/header.php';
                                 <div class="col-md-2"><input class="form-control" name="wan_link_up_mbps" inputmode="numeric"
                                     placeholder="up Mbps" value="<?php echo htmlspecialchars((string)($firewall['wan_link_up_mbps'] ?? '')); ?>"></div>
                             </div>
+                            <?php require_once __DIR__ . '/inc/speedtest.php'; $ookla_terms = speedtest_ookla_terms(); ?>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-4">
+                                    <select class="form-select" name="speedtest_engine">
+                                        <option value="iperf3" <?php echo ($firewall['speedtest_engine'] ?? '') !== 'ookla' ? 'selected' : ''; ?>>Engine: iperf3 (default)</option>
+                                        <option value="ookla" <?php echo ($firewall['speedtest_engine'] ?? '') === 'ookla' ? 'selected' : ''; ?> <?php echo $ookla_terms ? '' : 'disabled'; ?>>Engine: Ookla Speedtest CLI<?php echo $ookla_terms ? '' : ' (terms not accepted)'; ?></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3"><input class="form-control" name="speedtest_ookla_server_id" inputmode="numeric"
+                                    placeholder="Ookla server id (blank = nearest)" value="<?php echo htmlspecialchars((string)($firewall['speedtest_ookla_server_id'] ?? '')); ?>"></div>
+                                <div class="col-md-5 small text-muted">
+                                    <?php if ($ookla_terms): ?>
+                                        Ookla terms accepted <?php echo htmlspecialchars($ookla_terms['at']); ?> by <?php echo htmlspecialchars($ookla_terms['by']); ?>.
+                                    <?php elseif (can('settings.manage')): ?>
+                                        <label><input type="checkbox" name="ookla_accept_terms" value="1">
+                                        I accept Ookla's <a href="https://www.speedtest.net/about/eula" target="_blank" rel="noopener">EULA</a>,
+                                        <a href="https://www.speedtest.net/about/terms" target="_blank" rel="noopener">Terms</a> and
+                                        <a href="https://www.speedtest.net/about/privacy" target="_blank" rel="noopener">Privacy Policy</a> for this installation,
+                                        and confirm our use is permitted (Ookla licenses the CLI for personal, non-commercial use).</label>
+                                    <?php else: ?>
+                                        An administrator must accept Ookla's terms before the Ookla engine can be used.
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <small class="text-muted">The Ookla engine downloads Ookla's own FreeBSD binary (checksum-pinned) onto this firewall only.
+                                Ookla picks a nearby server from its network, which includes multi-gigabit servers.</small><br>
                             <small class="text-muted">A test measures the path to that server, not only the circuit. For a 10 Gbps
                                 link use a nearby iperf3 server that can itself sustain 10 Gbps, and 16–32 streams.
                                 Down/up Mbps is the provisioned speed, used to show results as a share of the circuit.</small>
