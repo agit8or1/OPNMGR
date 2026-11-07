@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.79.2.
+-- Generated from the reference installation for OPNManager v3.79.3.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -406,8 +406,8 @@ CREATE TABLE IF NOT EXISTS `bandwidth_tests` (
   `tested_at` timestamp NULL DEFAULT current_timestamp(),
   `streams` smallint(6) DEFAULT NULL,
   `iperf_version` varchar(16) DEFAULT NULL,
-  `local_cpu_percent` tinyint(3) unsigned DEFAULT NULL,
-  `remote_cpu_percent` tinyint(3) unsigned DEFAULT NULL,
+  `local_cpu_percent` smallint(5) unsigned DEFAULT NULL COMMENT 'iperf3 host_total: summed across threads, can exceed 100',
+  `remote_cpu_percent` smallint(5) unsigned DEFAULT NULL COMMENT 'iperf3 remote_total: summed across threads, can exceed 100',
   `command_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_firewall_tested` (`firewall_id`,`tested_at`),

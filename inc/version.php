@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'A Plateau Is Not A Link'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Six Hundred Percent'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -46,6 +46,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.79.3',
+            'date' => '2026-11-06',
+            'type' => 'patch',
+            'title' => 'Six Hundred Percent',
+            'changes' => [
+                'FIXED: A 32-stream bandwidth test was measured and then lost: iperf3 sums CPU across threads (625% on the datacenter firewall), which overflowed a TINYINT column, so the insert failed. The columns are SMALLINT, values are clamped, and a storage error no longer fails the command result (migration 0033)',
+                'FIXED: "CPU-limited" is judged per stream, not on iperf3\'s summed CPU figure',
+            ],
+        ],
         [
             'version' => '3.79.2',
             'date' => '2026-11-06',

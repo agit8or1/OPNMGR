@@ -135,6 +135,12 @@ $id = speedtest_ingest((int)$fw['id'], ['download_mbps' => 8000, 'upload_mbps' =
 T::eq($runId, $id, "the 'running' row is completed instead of a second row being added");
 T::eq('completed', db()->query("SELECT test_status FROM bandwidth_tests WHERE id = $runId")->fetchColumn(), 'and it is no longer running');
 
+$id = speedtest_ingest((int)$fw['id'], ['download_mbps' => 4980, 'upload_mbps' => null, 'streams' => 32, 'duration_s' => 10,
+    'local_cpu_percent' => 625, 'remote_cpu_percent' => 30], ['id' => 4, 'description' => 'On-demand bandwidth test via iperf3']);
+T::eq('625', (string)db()->query("SELECT local_cpu_percent FROM bandwidth_tests WHERE id = " . (int)$id)->fetchColumn(),
+      'a multi-thread CPU figure above 255 is stored (it overflowed TINYINT and lost the result)');
+db()->exec('DELETE FROM bandwidth_tests WHERE id = ' . (int)$id);
+
 // ===========================================================================
 T::group('Results API');
 
