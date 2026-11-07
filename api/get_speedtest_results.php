@@ -69,8 +69,11 @@ try {
         $labels[] = $row['test_label'];
         $download_data[] = $row['avg_download'] === null ? null : round((float)$row['avg_download'], 2);
         $upload_data[] = $row['avg_upload'] === null ? null : round((float)$row['avg_upload'], 2);
+        // iperf3's CPU figure is summed across its threads (one per stream
+        // since 3.16), so CPU-bound means near 100% per stream, not overall.
+        $perStream = ($row['local_cpu'] !== null && $row['streams']) ? (int)round($row['local_cpu'] / $row['streams']) : null;
         $meta[] = ['streams' => $row['streams'] !== null ? (int)$row['streams'] : null,
-                   'server' => $row['test_server'], 'local_cpu' => $row['local_cpu'] !== null ? (int)$row['local_cpu'] : null];
+                   'server' => $row['test_server'], 'local_cpu_per_stream' => $perStream];
     }
 
     $summ = function (array $vals): array {

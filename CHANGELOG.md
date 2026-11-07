@@ -6,6 +6,23 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.79.3
+**Released**: November 6, 2026 | **Agent**: v1.8.1
+
+### Fixed
+
+- **A bandwidth test was measured and then lost.** The first 32-stream test on
+  the datacenter firewall measured 4,980 Mbps down, three times the old
+  ceiling, and was not stored. iperf3 reports CPU summed across its threads
+  (625% there), which overflowed a `TINYINT UNSIGNED` column and failed the
+  insert. Migration 0033 widens the columns, values are clamped to the
+  column, and an error storing a result is logged without failing the
+  command (the raw result is always kept in `firewall_commands.result`).
+- "May be CPU-limited" is now judged per stream (iperf3 runs one thread per
+  stream), not on the summed figure.
+
+---
+
 ## Version 3.79.2
 **Released**: November 6, 2026 | **Agent**: v1.8.1
 

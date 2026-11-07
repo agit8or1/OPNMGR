@@ -126,11 +126,13 @@ if (!function_exists('speedtest_ingest')) {
             'upload_speed'       => $failed ? null : speedtest_num($data['upload_mbps'] ?? null, 400000),
             'latency'            => speedtest_num($data['ping_ms'] ?? null, 10000),
             'test_server'        => isset($data['server']) ? substr((string)$data['server'], 0, 255) : null,
-            'test_duration'      => isset($data['duration_s']) && is_numeric($data['duration_s']) ? (int)$data['duration_s'] : null,
-            'streams'            => isset($data['streams']) && is_numeric($data['streams']) ? (int)$data['streams'] : null,
+            'test_duration'      => isset($data['duration_s']) && is_numeric($data['duration_s']) ? max(0, min(3600, (int)$data['duration_s'])) : null,
+            'streams'            => isset($data['streams']) && is_numeric($data['streams']) ? max(1, min(128, (int)$data['streams'])) : null,
             'iperf_version'      => isset($data['iperf_version']) ? substr(preg_replace('/[^0-9.]/', '', (string)$data['iperf_version']), 0, 16) : null,
-            'local_cpu_percent'  => isset($data['local_cpu_percent']) && is_numeric($data['local_cpu_percent']) ? (int)$data['local_cpu_percent'] : null,
-            'remote_cpu_percent' => isset($data['remote_cpu_percent']) && is_numeric($data['remote_cpu_percent']) ? (int)$data['remote_cpu_percent'] : null,
+            // Summed across threads by iperf3 (625 on a 32-stream run), so
+            // only clamped to the column, never to 100.
+            'local_cpu_percent'  => isset($data['local_cpu_percent']) && is_numeric($data['local_cpu_percent']) ? max(0, min(65535, (int)$data['local_cpu_percent'])) : null,
+            'remote_cpu_percent' => isset($data['remote_cpu_percent']) && is_numeric($data['remote_cpu_percent']) ? max(0, min(65535, (int)$data['remote_cpu_percent'])) : null,
             'error_message'      => $err,
             'command_id'         => isset($commandRow['id']) ? (int)$commandRow['id'] : null,
         ];

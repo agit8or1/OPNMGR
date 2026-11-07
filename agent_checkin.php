@@ -76,8 +76,14 @@ if ($command_id > 0 && !empty($command_status)) {
                 // a failed test is recorded as failed instead of dropped.
                 $speedtest_data = json_decode($command_result, true);
                 if (is_array($speedtest_data)) {
-                    $bw_id = speedtest_ingest((int)$cmd_info['firewall_id'], $speedtest_data, $cmd_info);
-                    error_log("Speedtest result stored for firewall {$cmd_info['firewall_id']} (bandwidth_tests #{$bw_id})");
+                    // Storing the measurement must never fail the command
+                    // result: the raw JSON stays in firewall_commands.result.
+                    try {
+                        $bw_id = speedtest_ingest((int)$cmd_info['firewall_id'], $speedtest_data, $cmd_info);
+                        error_log("Speedtest result stored for firewall {$cmd_info['firewall_id']} (bandwidth_tests #{$bw_id})");
+                    } catch (Throwable $e) {
+                        error_log("Speedtest result NOT stored for firewall {$cmd_info['firewall_id']} (command {$cmd_info['id']}): " . $e->getMessage());
+                    }
                 }
             }
         }
