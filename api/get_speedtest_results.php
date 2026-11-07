@@ -42,6 +42,8 @@ try {
             MAX(streams) as streams,
             MAX(test_server) as test_server,
             MAX(local_cpu_percent) as local_cpu,
+            MAX(engine) as engine,
+            MAX(result_url) as result_url,
             COUNT(*) as test_count
         FROM bandwidth_tests
         WHERE firewall_id = :firewall_id
@@ -73,7 +75,8 @@ try {
         // since 3.16), so CPU-bound means near 100% per stream, not overall.
         $perStream = ($row['local_cpu'] !== null && $row['streams']) ? (int)round($row['local_cpu'] / $row['streams']) : null;
         $meta[] = ['streams' => $row['streams'] !== null ? (int)$row['streams'] : null,
-                   'server' => $row['test_server'], 'local_cpu_per_stream' => $perStream];
+                   'server' => $row['test_server'], 'local_cpu_per_stream' => $perStream,
+                   'engine' => $row['engine'] ?: 'iperf3', 'result_url' => $row['result_url']];
     }
 
     $summ = function (array $vals): array {

@@ -86,6 +86,54 @@ T::ok(!str_contains($log, 'touch') && !str_contains($log, ';id') && str_contains
 T::ok(isset($j['error']) && !isset($j['download_mbps']), 'all servers failing is an error, not a 0 Mbps result');
 
 // ===========================================================================
+T::group('Agent: Ookla engine (stub binary, synthetic package)');
+
+$ofns = shell_exec(sprintf("sed -n '/^OOKLA_PKG_URL=/,/^OOKLA_BIN=/p;/^sha256_of()/p;/^ensure_ookla()/,/^}/p;/^run_ookla_test()/,/^}/p' %s", escapeshellarg($agent)));
+$ofns = str_replace('/usr/local/bin/python3', 'python3', (string)$ofns);
+$ofns = str_replace('home=/var/db/opnmgr-ookla', 'home=' . $tmp . '/ookla-home', $ofns);
+file_put_contents("$tmp/ookla.sh", "log_message() { :; }\n" . $fns . "\n" . $ofns);
+
+// A stand-in for Ookla's binary: prints a result in Ookla's JSON shape.
+$okBin = "#!/bin/sh\necho \"\$*\" > $tmp/ookla.args\n"
+    . "printf '%s\\n' '{\"type\":\"result\",\"ping\":{\"jitter\":0.4,\"latency\":1.9},\"download\":{\"bandwidth\":1162500000},"
+    . "\"upload\":{\"bandwidth\":1150000000},\"packetLoss\":0,\"server\":{\"id\":12345,\"name\":\"Example DC\",\"location\":\"Somewhere\"},"
+    . "\"result\":{\"url\":\"https://www.speedtest.net/result/c/0000-test\"}}'\n";
+@mkdir("$tmp/pkgroot/usr/local/bin", 0700, true);
+file_put_contents("$tmp/pkgroot/usr/local/bin/speedtest", $okBin);
+chmod("$tmp/pkgroot/usr/local/bin/speedtest", 0755);
+exec('tar -C ' . escapeshellarg("$tmp/pkgroot") . ' -cJf ' . escapeshellarg("$tmp/fake.pkg") . ' usr/local/bin/speedtest');
+$binSha = hash_file('sha256', "$tmp/pkgroot/usr/local/bin/speedtest");
+$pkgSha = hash_file('sha256', "$tmp/fake.pkg");
+// fetch stub: "downloads" the synthetic package to wherever -o says.
+file_put_contents("$tmp/bin/fetch", "#!/bin/sh\nwhile [ \$# -gt 0 ]; do [ \"\$1\" = \"-o\" ] && { shift; cp " . escapeshellarg("$tmp/fake.pkg") . " \"\$1\"; }; shift; done\n");
+chmod("$tmp/bin/fetch", 0700);
+
+$runOokla = function (string $args, string $pkgShaEnv, string $binShaEnv) use ($tmp): array {
+    @unlink("$tmp/opt/speedtest");
+    file_put_contents("$tmp/runo.sh", ". $tmp/ookla.sh\nset -f\nARGS=" . escapeshellarg($args) . "\nrun_speedtest \$ARGS\n");
+    $out = (string)shell_exec('PATH=' . escapeshellarg("$tmp/bin") . ':/usr/bin:/bin OPNMGR_OOKLA_BIN=' . escapeshellarg("$tmp/opt/speedtest")
+        . ' OPNMGR_OOKLA_PKG_SHA256=' . $pkgShaEnv . ' OPNMGR_OOKLA_BIN_SHA256=' . $binShaEnv
+        . ' sh ' . escapeshellarg("$tmp/runo.sh") . ' 2>/dev/null');
+    return [json_decode(trim((string)preg_replace('/^.*\n(?=\{)/s', '', trim($out))), true), $out];
+};
+
+[$j, $raw] = $runOokla('engine=ookla ookla_server=12345', $pkgSha, $binSha);
+T::ok(is_array($j) && ($j['engine'] ?? '') === 'ookla', 'the Ookla engine runs: ' . substr($raw, 0, 160));
+T::eq(9300, $j['download_mbps'] ?? null, 'download converted from bytes/s (1,162,500,000 B/s = 9,300 Mbps)');
+T::eq(9200, $j['upload_mbps'] ?? null, 'upload converted from bytes/s');
+T::eq(1.9, $j['ping_ms'] ?? null, 'latency from Ookla');
+T::ok(str_contains((string)($j['server'] ?? ''), '#12345'), 'the Ookla server is identified');
+T::ok(str_contains((string)@file_get_contents("$tmp/ookla.args"), '--accept-license')
+      && str_contains((string)@file_get_contents("$tmp/ookla.args"), '-s 12345'), 'licence flags and server id reach the CLI');
+T::ok(is_file("$tmp/opt/speedtest"), 'the binary is installed from the package after both checksums match');
+
+[$j] = $runOokla('engine=ookla', str_repeat('0', 64), $binSha);
+T::ok(isset($j['error']) && str_contains($j['error'], 'package checksum'), 'a package with the wrong checksum is refused');
+T::ok(!is_file("$tmp/opt/speedtest"), 'and nothing is installed');
+[$j] = $runOokla('engine=ookla', $pkgSha, str_repeat('0', 64));
+T::ok(isset($j['error']) && str_contains($j['error'], 'binary checksum'), 'a binary with the wrong checksum is refused');
+
+// ===========================================================================
 T::group('Manager: command text, gated by agent version');
 
 $mk = function (array $cols) use (&$made): array {
@@ -110,10 +158,29 @@ T::eq(10000, $cfg['link_down'], 'provisioned link speed is part of the config');
 T::ok(platform_delivery_verdict(array_merge($dc, ['platform_family' => 'opnsense', 'platform_verified_at' => date('Y-m-d H:i:s')]),
       ['command' => $cmd, 'action' => null, 'is_raw' => 1])['deliver'], 'the command passes the platform delivery gate on OPNsense');
 
+db()->exec("UPDATE settings SET `value` = '' WHERE `name` IN ('speedtest_ookla_terms_accepted_at','speedtest_ookla_terms_accepted_by')");
+$ok182 = $mk(['agent_version' => '1.8.2', 'speedtest_engine' => 'ookla', 'speedtest_ookla_server_id' => 777]);
+T::ok(str_contains(speedtest_command_for($ok182), 'streams='), 'Ookla is not used before the terms are accepted (iperf3 instead)');
+speedtest_ookla_accept_terms(true);
+T::eq('run_speedtest engine=ookla ookla_server=777', speedtest_command_for($ok182), 'after acceptance, an enabled 1.8.2 agent runs Ookla');
+$ok181 = $mk(['agent_version' => '1.8.1', 'speedtest_engine' => 'ookla']);
+T::ok(!str_contains(speedtest_command_for($ok181), 'engine=ookla'), 'an agent without the engine keeps iperf3');
+T::ok(!str_contains(speedtest_command_for($mk(['agent_version' => '1.8.2'])), 'engine=ookla'), 'a firewall not enabled for Ookla keeps iperf3');
+speedtest_ookla_accept_terms(false);
+T::ok(!str_contains(speedtest_command_for($ok182), 'engine=ookla'), 'withdrawing acceptance stops Ookla tests');
+
 // ===========================================================================
 T::group('Manager: storing results honestly');
 
 $fw = $mk([]);
+$oid = speedtest_ingest((int)$fw['id'], ['download_mbps' => 9300, 'upload_mbps' => 9200, 'engine' => 'ookla', 'jitter_ms' => 0.4,
+    'packet_loss' => 0, 'result_url' => 'https://www.speedtest.net/result/c/0000-test', 'server' => 'OOKLA-x'], ['id' => 9, 'description' => 'On-demand']);
+$orow = db()->query("SELECT * FROM bandwidth_tests WHERE id = $oid")->fetch(PDO::FETCH_ASSOC);
+T::ok($orow['engine'] === 'ookla' && $orow['result_url'] === 'https://www.speedtest.net/result/c/0000-test', 'Ookla engine and result link stored');
+$oid2 = speedtest_ingest((int)$fw['id'], ['download_mbps' => 1, 'engine' => 'ookla', 'result_url' => 'https://evil.example/x'], ['id' => 10]);
+T::eq(null, db()->query("SELECT result_url FROM bandwidth_tests WHERE id = $oid2")->fetchColumn(), 'only speedtest.net result links are kept');
+db()->exec("DELETE FROM bandwidth_tests WHERE id IN ($oid, $oid2)");
+
 $nullId = $id = speedtest_ingest((int)$fw['id'], ['download_mbps' => 9400, 'upload_mbps' => null, 'upload_error' => 'upload leg did not complete',
     'ping_ms' => 2.3, 'server' => 'WAN-iperf.dc.example.net', 'streams' => 32, 'duration_s' => 15, 'iperf_version' => '3.22',
     'local_cpu_percent' => 41], ['id' => 1, 'description' => 'Automatic scheduled speedtest (every 4h)']);

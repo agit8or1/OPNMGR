@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.79.3.
+-- Generated from the reference installation for OPNManager v3.80.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -409,6 +409,10 @@ CREATE TABLE IF NOT EXISTS `bandwidth_tests` (
   `local_cpu_percent` smallint(5) unsigned DEFAULT NULL COMMENT 'iperf3 host_total: summed across threads, can exceed 100',
   `remote_cpu_percent` smallint(5) unsigned DEFAULT NULL COMMENT 'iperf3 remote_total: summed across threads, can exceed 100',
   `command_id` int(11) DEFAULT NULL,
+  `engine` varchar(16) DEFAULT NULL,
+  `jitter_ms` decimal(8,2) DEFAULT NULL,
+  `packet_loss` decimal(6,2) DEFAULT NULL,
+  `result_url` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_firewall_tested` (`firewall_id`,`tested_at`),
   CONSTRAINT `bandwidth_tests_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
@@ -1175,6 +1179,8 @@ CREATE TABLE IF NOT EXISTS `firewalls` (
   `speedtest_streams` smallint(6) DEFAULT NULL COMMENT 'Parallel streams for this firewall; NULL = global setting',
   `wan_link_down_mbps` int(11) DEFAULT NULL COMMENT 'Provisioned downstream, for showing results as a share of the circuit',
   `wan_link_up_mbps` int(11) DEFAULT NULL COMMENT 'Provisioned upstream',
+  `speedtest_engine` varchar(16) DEFAULT NULL COMMENT 'iperf3 (default, NULL) or ookla',
+  `speedtest_ookla_server_id` int(11) DEFAULT NULL COMMENT 'Ookla server id; NULL lets the CLI pick the nearest',
   PRIMARY KEY (`id`),
   UNIQUE KEY `hardware_id` (`hardware_id`),
   UNIQUE KEY `uuid` (`uuid`),

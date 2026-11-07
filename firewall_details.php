@@ -3012,7 +3012,7 @@ function renderSpeedtestStats(data) {
     if (note) {
         const last = (data.meta || []).slice(-1)[0] || {};
         let t = data.note || '';
-        if (last.server) t += ' Last: ' + last.server.replace(/^WAN-/, '') + (last.streams ? ', ' + last.streams + ' streams' : '') + '.';
+        if (last.server) t += ' Last: ' + (last.engine === 'ookla' ? 'Ookla ' : '') + last.server.replace(/^(WAN|OOKLA)-/, '') + (last.streams ? ', ' + last.streams + ' streams' : '') + '.';
         if (last.local_cpu_per_stream !== null && last.local_cpu_per_stream !== undefined && last.local_cpu_per_stream >= 85) t += ' iperf3 used ~' + last.local_cpu_per_stream + '% CPU per stream on the firewall — the result may be CPU-limited.';
         if (data.failed_tests) t += ' ' + data.failed_tests + ' failed test(s) in this period are excluded.';
         if (!link.down_mbps) t += ' Set the provisioned link speed on the firewall to see results as a share of the circuit.';
