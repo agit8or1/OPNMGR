@@ -4,7 +4,7 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 
 require_once __DIR__ . '/../inc/logging.php';
 header('Content-Type: application/json');
-requireLogin();
+require_permission('tunnel.close'); // role check, not just login (3.80.1)
 
 $input = json_decode(file_get_contents('php://input'), true);
 

@@ -10,6 +10,11 @@ requireLogin();
 
 $action = $_GET['action'] ?? '';
 
+// Destructive actions are admin-only; the read actions stay open to all roles.
+if (in_array($action, ['cleanup_old_requests', 'clear_completed_requests'], true)) {
+    require_permission('system.maintenance');
+}
+
 switch ($action) {
     case 'cleanup_old_requests':
         cleanupOldRequests();

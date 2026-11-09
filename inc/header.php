@@ -370,6 +370,7 @@ function isActive($page) {
 if (function_exists('can') && can('settings.manage')) {
     require_once __DIR__ . '/notification_health.php';
     require_once __DIR__ . '/agent_signing_status.php';
+    require_once __DIR__ . '/crypto.php';
     try {
         $opnmgr_delivery_banner = notification_health_banner();
         if ($opnmgr_delivery_banner !== '') {
@@ -383,6 +384,19 @@ if (function_exists('can') && can('settings.manage')) {
         $opnmgr_signing_banner = agent_signing_banner();
         if ($opnmgr_signing_banner !== '') {
             echo '<div class="container-fluid pt-3">' . $opnmgr_signing_banner . '</div>';
+        }
+
+        // Without a master key every agent key, SSH key, TOTP secret and
+        // SMTP/AI credential is written to the database in plaintext, and the
+        // only trace used to be one error_log line (3.80.1).
+        if (function_exists('opnmgr_master_key') && (opnmgr_master_key() === null || !extension_loaded('sodium'))) {
+            echo '<div class="container-fluid pt-3"><div class="alert alert-danger mb-0">'
+               . '<i class="fas fa-key me-2"></i><strong>Secrets are stored unencrypted.</strong> '
+               . 'OPNMGR_MASTER_KEY is not set'
+               . (extension_loaded('sodium') ? '' : ' (and the PHP sodium extension is missing)')
+               . ', so firewall API keys, SSH keys, TOTP secrets and mail/AI credentials are in the database as plaintext. '
+               . 'On the server run <code>php scripts/generate_master_key.php</code>, back up <code>.env</code>, '
+               . 'then <code>php scripts/encrypt_secrets.php</code>.</div></div>';
         }
     } catch (Throwable $e) {
         // A warning banner must never be able to take the page down.

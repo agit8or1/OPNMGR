@@ -565,9 +565,15 @@ if (!function_exists('raw_commands_enabled')) {
             $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
             $stmt->execute(['raw_command_enabled']);
             $v = $stmt->fetchColumn();
-            return $v === false || (string)$v === '1';
+            // No row means off (3.80.1). Installs from schema.sql seed no
+            // settings, so the old `$v === false` default gave every fresh
+            // install root shell on the fleet. Upgraded installs keep the row
+            // their migration wrote. Toggle under Settings > Security policy.
+            return $v !== false && (string)$v === '1';
         } catch (Throwable $e) {
-            return true; // fail open on a settings read error, not closed
+            // Fail closed: a settings read error must not grant root shell.
+            error_log('OPNMGR: could not read raw_command_enabled, refusing raw commands: ' . $e->getMessage());
+            return false;
         }
     }
 }

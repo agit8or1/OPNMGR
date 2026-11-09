@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-06'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Someone Else\'s Servers'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-09'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Signed In Is Not Allowed'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -46,6 +46,25 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.80.1',
+            'date' => '2026-11-09',
+            'type' => 'patch',
+            'title' => 'Signed In Is Not Allowed',
+            'changes' => [
+                'SECURITY: api/run_diagnostic.php put the remote command inside a double-quoted local shell string, so `$(...)` in a ping/traceroute/dns target ran on the manager itself as www-data - which can read every firewall\'s SSH key. Any signed-in user, readonly included. The command is now passed to ssh as one escaped argument, every parameter is validated, and the endpoint requires command.diagnostic',
+                'SECURITY: api/network_diagnostic.php interpolated `target` into a root shell script on the firewall, guarded only by FILTER_VALIDATE_DOMAIN, which accepts quotes, `;` and `$(...)`. Any signed-in user could run commands as root on any firewall. It now goes through the structured catalogue (strict host check, escaping, platform gate, audit) and requires command.diagnostic',
+                'SECURITY: add_user.php required only a login, so a readonly account could create an administrator. It now requires user.manage',
+                'SECURITY: api/queue_action.php checked only HIGH/CRITICAL risk; readonly users could queue service start/restart and agent restart. Every action now requires the capability risk_to_capability() maps its risk to - readonly can queue nothing',
+                'SECURITY: api/trigger_update.php let any signed-in user start a firmware upgrade and logged it only to the app log. It requires update.install and writes an audit entry',
+                'SECURITY: 20 further pages and endpoints that changed state checked a login but no role (certbot, ACME, fail2ban, branding, package builder, backups, command cancel, tunnel close, wake, bandwidth tests, GeoIP blocks, firewall edits, AI scan settings, request-queue cleanup, docs rebuild). Each now requires the capability in the permission matrix',
+                'SECURITY: raw_commands_enabled() failed open on a settings read error; it now fails closed',
+                'SECURITY: An unbound firewall could be claimed by any check-in that guessed its (sequential) id, which was then handed the api_key and signing secret. The first claim now needs an enrolment token redeemed for that firewall within agent_claim_window_hours (default 24; 0 restores trust-on-first-use), and unadopted credentials are re-sent only within the same window',
+                'CHANGED: Raw shell is off and administrator MFA is required when their settings row is absent - the case for every install from schema.sql, which seeds no settings. Installs that stored a value keep it. All three are now on Settings > Security Policy; previously none had any control',
+                'CHANGED: Administrator pages show a red banner while OPNMGR_MASTER_KEY is unset (secrets stored in plaintext), and scripts/create_admin.php generates the key if it is missing',
+                'ADDED: tests/role_gate_test.php fails CI when any login-gated page writes, queues or executes without a role check; tests/role_gate_behaviour_test.php drives the fixed endpoints as readonly and technician',
+            ],
+        ],
         [
             'version' => '3.80.0',
             'date' => '2026-11-06',

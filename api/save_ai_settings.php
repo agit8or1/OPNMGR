@@ -4,7 +4,7 @@
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-requireLogin();
+require_permission('firewall.manage'); // role check, not just login (3.80.1)
 header('Content-Type: application/json');
 
 $input = json_decode(file_get_contents('php://input'), true);

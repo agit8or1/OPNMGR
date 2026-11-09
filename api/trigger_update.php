@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-requireLogin();
+// Installing firmware takes the firewall down; readonly accounts must not be
+// able to start it. Before 3.80.1 any signed-in user could.
+require_permission('update.install');
 require_once __DIR__ . '/../inc/logging.php';
 
 header('Content-Type: application/json');
@@ -54,7 +56,14 @@ try {
     $result = $stmt->execute([$firewall_id]);
     
     if ($result && $stmt->rowCount() > 0) {
-        // Log the update trigger
+        // Operator actions belong in the audit log, not only the app log.
+        audit_log('update.trigger', [
+            'firewall_id' => $firewall_id,
+            'object_type' => 'firewall',
+            'object_id'   => (string)$firewall_id,
+            'message'     => "Firmware update requested for {$firewall['hostname']}",
+            'metadata'    => ['source' => 'dashboard'],
+        ]);
         log_info('dashboard', "Update triggered via dashboard for firewall: {$firewall['hostname']}", null, $firewall_id, [
             'action' => 'update_triggered',
             'source' => 'dashboard'

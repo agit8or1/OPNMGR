@@ -28,6 +28,8 @@ try {
             echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
             exit;
         }
+        // add/toggle/delete change blocking policy: operators only (3.80.1)
+        require_permission('firewall.manage');
     }
 
     switch ($action) {

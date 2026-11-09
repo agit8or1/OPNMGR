@@ -3,7 +3,7 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 require_once __DIR__ . '/../inc/backup_storage.php';
 require_once __DIR__ . '/../inc/agent_commands.php';
 
-requireLogin();
+require_permission('backup.create'); // role check, not just login (3.80.1)
 
 /**
  * Create Backup API
