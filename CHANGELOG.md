@@ -6,6 +6,19 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.80.2
+**Released**: November 9, 2026 | **Agent**: v1.8.2
+
+### Documentation
+
+- README: every released agent since 1.6.5 signs its requests — stated plainly, with when
+  to move off `compatibility`. It said "1.6.4+" and was still being summarised elsewhere
+  as "signing is server-side only".
+- README security section: the 3.80.1 changes and a link to
+  [GHSA-r7xj-q84q-rpwc](https://github.com/agit8or1/OPNMGR/security/advisories/GHSA-r7xj-q84q-rpwc).
+
+---
+
 ## Version 3.80.1
 **Released**: November 9, 2026 | **Agent**: v1.8.2
 
