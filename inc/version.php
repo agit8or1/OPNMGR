@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-09'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Signed In Is Not Allowed'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Say What Shipped'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -46,6 +46,16 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.80.2',
+            'date' => '2026-11-09',
+            'type' => 'patch',
+            'title' => 'Say What Shipped',
+            'changes' => [
+                'DOCS: README states plainly that every released agent since 1.6.5 signs its requests (it said 1.6.4+, and was still being read as "signing is server-side only"), and how to tell when to leave compatibility mode',
+                'DOCS: README security section covers the 3.80.1 changes - role checks on every action, enrolment-bound first check-in, secure defaults - and links the advisory',
+            ],
+        ],
         [
             'version' => '3.80.1',
             'date' => '2026-11-09',
