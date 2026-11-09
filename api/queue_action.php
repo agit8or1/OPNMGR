@@ -22,6 +22,7 @@ requireLogin();
 
 // --- catalogue -------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    require_permission('command.view');
     $catalog = [];
     foreach (agent_command_catalog() as $id => $entry) {
         $catalog[$id] = [
@@ -85,22 +86,16 @@ if (!$built['ok']) {
     exit;
 }
 
-// HIGH and CRITICAL operations stay admin-only; a technician can run
-// diagnostics and service queries without being able to reboot the fleet.
-if (in_array($built['risk'], ['HIGH', 'CRITICAL'], true) && !isAdmin()) {
-    audit_log('command.action', [
-        'success'     => false,
-        'firewall_id' => $firewall_id,
-        'message'     => 'Non-admin attempted a ' . $built['risk'] . '-risk action: ' . $action,
-        'metadata'    => ['action' => $action],
-    ]);
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'message' => 'This operation requires administrator access',
-    ]);
-    exit;
-}
+// The catalogue says how dangerous an action is; the permission matrix says
+// who may run something that dangerous. LOW/MEDIUM need an operator role
+// (technician or admin), HIGH/CRITICAL need admin. A readonly user can queue
+// nothing. Before 3.80.1 only HIGH/CRITICAL were checked, so a readonly
+// account could start, restart and re-run services and the agent.
+require_permission(risk_to_capability((string)$built['risk']), [
+    'firewall_id' => $firewall_id,
+    'object_type' => 'firewall',
+    'object_id'   => (string)$firewall_id,
+]);
 
 try {
     $queued = queue_firewall_command(

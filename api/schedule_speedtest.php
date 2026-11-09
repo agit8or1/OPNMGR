@@ -18,7 +18,7 @@ if (php_sapi_name() === 'cli') {
 
 // Require authentication for web requests (cron runs via CLI)
 if (php_sapi_name() !== 'cli') {
-    requireLogin();
+    require_permission('command.diagnostic'); // queues commands on every online firewall
 }
 
 try {

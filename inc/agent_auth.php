@@ -101,6 +101,71 @@ if (!function_exists('agent_auth_mode')) {
     }
 }
 
+if (!function_exists('agent_setting_int')) {
+    /** Integer setting with bounds; the default on a missing row or read error. */
+    function agent_setting_int(string $name, int $default, int $min, int $max): int {
+        try {
+            $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
+            $stmt->execute([$name]);
+            $v = $stmt->fetchColumn();
+            if ($v === false || !is_numeric($v)) {
+                return $default;
+            }
+            return max($min, min($max, (int)$v));
+        } catch (Throwable $e) {
+            return $default;
+        }
+    }
+}
+
+if (!function_exists('agent_first_claim_allowed')) {
+    /**
+     * May an agent bind its hardware_id to this (unbound) firewall now?
+     *
+     * Only while an enrolment token redeemed for this firewall is fresh.
+     * Setting agent_claim_window_hours = 0 disables the check (legacy
+     * trust-on-first-use) for operators who add firewalls by hand.
+     *
+     * @since 3.80.1
+     */
+    function agent_first_claim_allowed(int $firewallId): bool {
+        $hours = agent_setting_int('agent_claim_window_hours', 24, 0, 720);
+        if ($hours === 0) {
+            return true;
+        }
+        try {
+            $stmt = db()->prepare(
+                'SELECT 1 FROM enrollment_tokens
+                  WHERE firewall_id = ? AND used = 1 AND used_at IS NOT NULL
+                    AND used_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
+                  LIMIT 1'
+            );
+            $stmt->execute([$firewallId, $hours]);
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('OPNMGR: could not check enrolment claim window: ' . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+if (!function_exists('agent_reissue_window_open')) {
+    /**
+     * Whether an issued-but-unadopted credential may still be re-sent.
+     * Same window as the first claim; 0 means no limit.
+     *
+     * @since 3.80.1
+     */
+    function agent_reissue_window_open(array $firewall): bool {
+        $hours = agent_setting_int('agent_claim_window_hours', 24, 0, 720);
+        if ($hours === 0) {
+            return true;
+        }
+        $issued = strtotime((string)($firewall['api_key_issued_at'] ?? ''));
+        return $issued !== false && $issued > time() - $hours * 3600;
+    }
+}
+
 if (!function_exists('agent_auth_fail')) {
     /**
      * Reject an agent request.
@@ -304,7 +369,7 @@ if (!function_exists('authenticateAgentRequest')) {
         try {
             $stmt = db()->prepare(
                 'SELECT id, hostname, hardware_id, agent_api_key, agent_api_secret,
-                        api_key_confirmed, agent_signing_supported, agent_auth_failures
+                        api_key_confirmed, api_key_issued_at, agent_signing_supported, agent_auth_failures
                    FROM firewalls WHERE id = ?'
             );
             $stmt->execute([$firewallId]);
@@ -320,8 +385,21 @@ if (!function_exists('authenticateAgentRequest')) {
 
         // --- hardware_id -----------------------------------------------------
         // A firewall with no stored hardware_id is claimed by the first agent to
-        // present one (trust on first use); thereafter it is pinned.
+        // present one; thereafter it is pinned.
+        //
+        // Before 3.80.1 that claim was open to anyone who could guess a
+        // firewall id (they are sequential): the claimant was then handed the
+        // api_key and signing secret below. hardware_id is not a secret and
+        // the agent derives its own, so it cannot be matched against the
+        // installer's. Instead the claim is tied to the single-use enrolment
+        // token: it is accepted only while a token redeemed for *this*
+        // firewall is fresh (agent_claim_window_hours, default 24).
         $storedHardwareId = (string)($firewall['hardware_id'] ?? '');
+        if ($storedHardwareId === '' && !agent_first_claim_allowed($firewallId)) {
+            agent_auth_fail(403, 'hardware_id_unclaimed', $firewallId, [
+                'hint' => 'Issue an enrolment token for this firewall and re-run the installer',
+            ]);
+        }
         if ($storedHardwareId === '') {
             try {
                 db()->prepare('UPDATE firewalls SET hardware_id = ? WHERE id = ? AND (hardware_id IS NULL OR hardware_id = "")')
@@ -358,6 +436,7 @@ if (!function_exists('authenticateAgentRequest')) {
                 )->execute([opnmgr_encrypt($storedKey), opnmgr_encrypt($newSecret), $firewallId]);
 
                 $firewall['agent_api_secret'] = opnmgr_encrypt($newSecret);
+                $firewall['api_key_issued_at'] = date('Y-m-d H:i:s');
                 $issue = ['api_key' => $storedKey, 'api_secret' => $newSecret];
 
                 audit_log_agent('agent.credentials.provisioned', $firewallId, [
@@ -384,9 +463,13 @@ if (!function_exists('authenticateAgentRequest')) {
         } elseif ($keyConfirmed) {
             // Key is mandatory for this firewall and was absent or wrong.
             agent_auth_fail(401, $apiKey === '' ? 'api_key_missing' : 'api_key_mismatch', $firewallId);
-        } else {
+        } elseif (agent_reissue_window_open($firewall)) {
             // Key issued but not yet adopted by the agent. Re-issue it so an
-            // agent that lost its config file can recover.
+            // agent that lost its config file can recover - but only for a
+            // bounded time after issue. Past that, the request still
+            // authenticates on hardware_id (old agents never adopt a key),
+            // it just stops being handed the secret: otherwise anyone who
+            // learned a hardware_id could collect the signing secret forever.
             $issue = ['api_key' => $storedKey, 'api_secret' => opnmgr_decrypt($firewall['agent_api_secret'] ?? null) ?? ''];
         }
 

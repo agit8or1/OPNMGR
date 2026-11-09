@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
-requireLogin();
+require_permission('settings.manage'); // role check, not just login (3.80.1)
 
 $notice = '';
 $logoUrl = '/assets/img/logo.png';

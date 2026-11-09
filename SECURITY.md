@@ -77,9 +77,21 @@ offline. The upgrade is instead per-firewall and self-closing:
    mandatory and a downgrade attempt is rejected.
 3. The same ratchet applies to signatures via `agent_signing_supported`.
 
-The bootstrap window is the weak point, and it is deliberately the same strength as the
-system it replaces. Close it early by setting `agent_auth_mode` to `require_signed`, or
-watch it close on its own as agents update.
+The bootstrap window is the weak point. Since 3.80.1 it is bounded in two ways:
+
+- **Claiming an unbound firewall needs a fresh enrolment token.** A firewall row with no
+  `hardware_id` can be bound by an agent's check-in only within
+  `agent_claim_window_hours` (default 24) of a single-use enrolment token being redeemed
+  *for that firewall*. Before, any caller who guessed a (sequential) firewall id could
+  bind it and be handed its api_key and signing secret. Setting the window to 0 restores
+  trust-on-first-use for firewalls added by hand.
+- **Unadopted credentials are re-sent only within the same window** after issue. An old
+  agent that never presents its key still authenticates on `hardware_id`, but stops being
+  handed the secret.
+
+Close the window entirely by setting `agent_auth_mode` to `require_signed`, or watch it
+close on its own as agents update. All three settings are under **Settings > Security
+Policy**.
 
 ### Modes
 
@@ -112,7 +124,9 @@ Encryption is only for values that must be recovered.
 
 The master key lives in `.env` as `OPNMGR_MASTER_KEY`, never in the database, so a
 database-only compromise — SQL injection, a stolen dump, a replica — does not yield
-plaintext secrets.
+plaintext secrets. **Without it, secrets are stored in plaintext**; since 3.80.1
+`scripts/create_admin.php` generates the key if it is missing, and every administrator
+page shows a red banner until one is configured.
 
 ```bash
 php scripts/generate_master_key.php   # generate; appends to .env, never overwrites
@@ -139,13 +153,27 @@ ping, traceroute, DNS lookup, gateway diagnostics, VPN status and restart, and a
 control.
 
 **Raw shell** (`api/queue_command.php`) — still available, because this is an MSP
-administrator tool. It is administrator-only, can be disabled fleet-wide with
-`raw_command_enabled`, requires an explicit confirmation flag, and always records the
+administrator tool. It is administrator-only, **off unless `raw_command_enabled` is set**
+(since 3.80.1; installs that already stored `1` keep it), refuses when that setting cannot
+be read, requires an explicit confirmation flag, and always records the
 command text, the user, the source IP, the target firewall and the timestamp in the audit
 log before the agent ever sees it.
 
-`queue_firewall_command()` is the only path that inserts into `firewall_commands`, so a
-command cannot be attributed to the wrong firewall or bypass the audit trail.
+`queue_firewall_command()` is the intended path into `firewall_commands`, and records the
+audit entry. Some older endpoints still insert fixed command text directly; the agent
+check-in re-applies the platform gate at delivery, so they cannot bypass it.
+
+## Roles
+
+Signing in is not permission. Every page or endpoint that writes, queues or executes
+checks a capability from `inc/permissions.php` with `require_permission()`, and
+`tests/role_gate_test.php` fails CI when one does not. Before 3.80.1 many checked only
+`requireLogin()`, so the readonly role could create administrators and run commands.
+
+## Two-factor authentication
+
+`require_mfa_for_admins` is **on unless an installation stored `0`** (since 3.80.1).
+Administrators without a second factor are sent to enrol rather than locked out.
 
 ---
 

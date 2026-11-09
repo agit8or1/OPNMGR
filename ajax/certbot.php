@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
-requireLogin();
+require_permission('security.manage'); // issues certificates on this server; was login-only before 3.80.1
 header('Content-Type: application/json');
 $domain = $_GET['domain'] ?? '';
 $email = $_GET['email'] ?? '';

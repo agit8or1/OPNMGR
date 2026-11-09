@@ -1,7 +1,7 @@
 <?php
 // Development > Package Builder
 require_once __DIR__ . '/inc/bootstrap.php';
-requireLogin();
+require_permission('system.maintenance'); // role check, not just login (3.80.1)
 $page_title = "Deployment Package Builder";
 include 'inc/header.php';
 

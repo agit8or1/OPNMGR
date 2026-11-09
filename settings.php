@@ -62,6 +62,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
 
+    // Security policy (3.80.1). These three had no control anywhere: changing
+    // them meant editing the settings table by hand.
+    if (!empty($_POST['save_security_policy'])) {
+      if (function_exists('can') && can('security.manage')) {
+        $claim = (int)($_POST['agent_claim_window_hours'] ?? 24);
+        if ($claim < 0 || $claim > 720) {
+          $notice = 'Enrolment claim window must be between 0 and 720 hours.';
+        } else {
+          save_setting('raw_command_enabled', !empty($_POST['raw_command_enabled']) ? '1' : '0');
+          save_setting('require_mfa_for_admins', !empty($_POST['require_mfa_for_admins']) ? '1' : '0');
+          save_setting('agent_claim_window_hours', (string)$claim);
+          header('Location: /settings.php?notice=' . urlencode('Security policy saved.'));
+          exit;
+        }
+      } else {
+        $notice = 'You do not have permission to change the security policy.';
+      }
+    }
+
     // General Settings (Timezone and FQDN)
     if (!empty($_POST['save_general'])) {
       $timezone = trim($_POST['timezone'] ?? 'UTC');
@@ -358,6 +377,43 @@ include __DIR__ . '/inc/header.php';
             <i class="fas fa-save me-1"></i>Save
           </button>
           <a href="/firewalls.php" class="btn btn-outline-secondary btn-sm">View fleet</a>
+        </form>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <!-- Security policy (3.80.1) -->
+  <?php if (function_exists('can') && can('security.manage')):
+    // A missing row is the secure default: raw shell off, MFA required.
+    $sp_raw   = ($rows['raw_command_enabled'] ?? '0') === '1';
+    $sp_mfa   = ($rows['require_mfa_for_admins'] ?? '1') === '1';
+    $sp_claim = (int)($rows['agent_claim_window_hours'] ?? 24);
+  ?>
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body p-3">
+        <h6 class="card-title"><i class="fas fa-shield-alt me-2 text-danger"></i>Security Policy</h6>
+        <form method="POST" class="mb-0">
+          <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
+          <input type="hidden" name="save_security_policy" value="1">
+          <div class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" role="switch" id="require_mfa_for_admins"
+                   name="require_mfa_for_admins" value="1" <?= $sp_mfa ? 'checked' : '' ?>>
+            <label class="form-check-label small" for="require_mfa_for_admins">Require two-factor authentication for administrators</label>
+          </div>
+          <p class="text-muted small mb-2">Administrators without a second factor are sent to enrol at their next request, not locked out.</p>
+          <div class="form-check form-switch mb-1">
+            <input class="form-check-input" type="checkbox" role="switch" id="raw_command_enabled"
+                   name="raw_command_enabled" value="1" <?= $sp_raw ? 'checked' : '' ?>>
+            <label class="form-check-label small" for="raw_command_enabled">Allow raw shell commands (administrators only)</label>
+          </div>
+          <p class="text-muted small mb-2">Runs free-form commands as root on firewalls. Structured operations work either way.</p>
+          <label class="form-label small mb-1" for="agent_claim_window_hours">Enrolment claim window (hours)</label>
+          <input type="number" class="form-control form-control-sm mb-1" style="max-width:8rem" min="0" max="720"
+                 id="agent_claim_window_hours" name="agent_claim_window_hours" value="<?= $sp_claim ?>">
+          <p class="text-muted small mb-2">An agent may bind itself to an unclaimed firewall only this long after an enrolment token was redeemed for it. 0 restores trust-on-first-use.</p>
+          <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-save me-1"></i>Save</button>
         </form>
       </div>
     </div>

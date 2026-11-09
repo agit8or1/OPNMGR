@@ -85,6 +85,12 @@ try {
         $stmt->execute([$firewall_id, $wan_ip, $lan_ip, $ipv6_address, $opnsense_version]);
     }
     
+    // Record which firewall the token was redeemed for. The agent's first
+    // check-in may bind its hardware_id only while this is fresh
+    // (agent_first_claim_allowed, 3.80.1).
+    db()->prepare('UPDATE enrollment_tokens SET firewall_id = ? WHERE token = ?')
+        ->execute([(int)$firewall_id, $token]);
+
     // The token was claimed above; committing keeps the claim. A failure
     // before this point rolls back and leaves the token usable.
     db()->commit();

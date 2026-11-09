@@ -1,11 +1,20 @@
 <?php
 /**
  * Network Diagnostics API
- * Runs ping or traceroute commands from firewall
+ * Runs ping or traceroute commands from firewall.
+ *
+ * SECURITY (3.80.1): this endpoint used to interpolate `target` into a shell
+ * script inside double quotes, validated only by FILTER_VALIDATE_DOMAIN -
+ * which, without FILTER_FLAG_HOSTNAME, accepts `$(...)`, `;` and quotes. Any
+ * signed-in user, readonly included, could run arbitrary commands as root on
+ * a firewall. It now delegates to the structured catalogue (strict host
+ * validation, escapeshellarg, platform gate, audit) and requires
+ * command.diagnostic.
  */
 require_once __DIR__ . '/../inc/bootstrap.php';
+require_once __DIR__ . '/../inc/agent_commands.php';
 
-requireLogin();
+require_permission('command.diagnostic');
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -21,22 +30,16 @@ if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')))
 }
 
 $firewall_id = (int)($_POST['firewall_id'] ?? 0);
-$command_type = $_POST['command_type'] ?? '';
-$target = $_POST['target'] ?? '';
+$command_type = (string)($_POST['command_type'] ?? '');
+$target = trim((string)($_POST['target'] ?? ''));
 
-if (!$firewall_id || !$command_type || !$target) {
+if (!$firewall_id || $command_type === '' || $target === '') {
     echo json_encode(['success' => false, 'error' => 'Missing required parameters']);
     exit;
 }
 
-if (!in_array($command_type, ['ping', 'traceroute'])) {
+if (!in_array($command_type, ['ping', 'traceroute'], true)) {
     echo json_encode(['success' => false, 'error' => 'Invalid command type']);
-    exit;
-}
-
-// Basic validation for target (IP or hostname)
-if (!filter_var($target, FILTER_VALIDATE_IP) && !filter_var($target, FILTER_VALIDATE_DOMAIN)) {
-    echo json_encode(['success' => false, 'error' => 'Invalid target IP or hostname']);
     exit;
 }
 
@@ -56,53 +59,27 @@ if ($firewall['status'] !== 'online') {
 }
 
 try {
-    // Create appropriate command
-    if ($command_type === 'ping') {
-        $command = <<<BASH
-#!/bin/sh
-# Ping diagnostic from OPNsense firewall
-TARGET="$target"
-echo "=== PING TEST TO \$TARGET ==="
-echo "Started: \$(date)"
-echo ""
-
-# Ping with 4 packets, 5 second timeout
-ping -c 4 -W 5000 "\$TARGET" 2>&1
-
-echo ""
-echo "Completed: \$(date)"
-BASH;
-    } else {
-        $command = <<<BASH
-#!/bin/sh
-# Traceroute diagnostic from OPNsense firewall  
-TARGET="$target"
-echo "=== TRACEROUTE TO \$TARGET ==="
-echo "Started: \$(date)"
-echo ""
-
-# Traceroute with max 30 hops, 5 second timeout
-traceroute -m 30 -w 5 "\$TARGET" 2>&1
-
-echo ""
-echo "Completed: \$(date)"
-BASH;
+    $built = build_structured_command($command_type, ['target' => $target], platform_firewall($firewall_id));
+    if (!$built['ok']) {
+        echo json_encode(['success' => false, 'error' => $built['error']]);
+        exit;
     }
-    
-    $description = ucfirst($command_type) . " diagnostic to " . $target;
-    
-    // Queue command for firewall
-    $stmt = db()->prepare("
-        INSERT INTO firewall_commands (firewall_id, command, description, command_type, status)
-        VALUES (?, ?, ?, 'shell', 'pending')
-    ");
-    $stmt->execute([$firewall_id, $command, $description]);
-    
-    $command_id = db()->lastInsertId();
-    
+
+    $description = ucfirst($command_type) . ' diagnostic to ' . $target;
+    $queued = queue_firewall_command($firewall_id, $built['command'], $description, [
+        'is_raw'     => false,
+        'action'     => $command_type,
+        'parameters' => $built['params'],
+        'risk'       => $built['risk'],
+    ]);
+    if (!$queued['ok']) {
+        echo json_encode(['success' => false, 'error' => $queued['error']]);
+        exit;
+    }
+
     echo json_encode([
         'success' => true,
-        'command_id' => $command_id,
+        'command_id' => $queued['command_id'],
         'message' => $description . ' queued for execution'
     ]);
     

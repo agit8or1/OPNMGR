@@ -288,7 +288,11 @@ function mfa_enrolment_required(): bool {
     try {
         $stmt = db()->prepare('SELECT `value` FROM settings WHERE `name` = ?');
         $stmt->execute(['require_mfa_for_admins']);
-        if ((string) ($stmt->fetchColumn() ?: '0') !== '1') {
+        // No row means required (3.80.1): a fresh install from schema.sql
+        // has no settings rows, and opt-in MFA left every administrator on a
+        // password alone. Installs that stored '0' keep it.
+        $v = $stmt->fetchColumn();
+        if ($v !== false && (string) $v !== '1') {
             return false;
         }
 

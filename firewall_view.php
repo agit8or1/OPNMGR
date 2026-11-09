@@ -6,6 +6,7 @@ $message = '';
 
 // Handle edit request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_firewall'])) {
+    require_permission('firewall.manage'); // viewing is open to all roles; editing is not (3.80.1)
     if (!csrf_verify($_POST['csrf'] ?? '')) {
         $message = '<div class="alert alert-danger">CSRF verification failed.</div>';
     } else {

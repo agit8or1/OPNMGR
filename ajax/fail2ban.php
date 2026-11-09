@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
-requireLogin();
+require_permission('security.manage'); // role check, not just login (3.80.1)
 header('Content-Type: application/json');
 
 $jail = trim($_GET['jail'] ?? $_POST['jail'] ?? '');

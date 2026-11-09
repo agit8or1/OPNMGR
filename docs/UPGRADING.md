@@ -18,6 +18,26 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.80.1
+
+Security release. No migrations. Three behaviours change on some installs:
+
+- **Raw shell and admin MFA defaults.** If your `settings` table has no
+  `raw_command_enabled` row, raw shell is now off; with no `require_mfa_for_admins` row,
+  administrators are sent to enrol in two-factor at their next request. Check with
+  `SELECT name, value FROM settings WHERE name IN ('raw_command_enabled','require_mfa_for_admins');`
+  and change either on **Settings > Security Policy**.
+- **First check-in needs an enrolment token.** A firewall with no `hardware_id` is
+  claimed by its agent only within `agent_claim_window_hours` (default 24) of an
+  enrolment token being redeemed for it. Already-bound firewalls are unaffected. For
+  firewalls added by hand, issue a token or set the window to 0.
+- **Master key banner.** If `OPNMGR_MASTER_KEY` is unset, administrators now see a red
+  banner. Run `php scripts/generate_master_key.php`, back up `.env`, then
+  `php scripts/encrypt_secrets.php`.
+
+Users with the readonly role also lose access to actions they were never meant to have
+(queueing commands, triggering updates, editing firewalls, creating users).
+
 ## Upgrading to 3.17.0
 
 No schema changes.

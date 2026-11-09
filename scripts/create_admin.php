@@ -24,6 +24,17 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../config.php';
 
+// Install-time master key (3.80.1). Creating the first admin is the one step
+// every install runs; generating the key here means a skipped
+// generate_master_key.php no longer leaves secrets in plaintext. The script
+// appends only and never replaces an existing key.
+if (trim((string)(getenv('OPNMGR_MASTER_KEY') ?: ($_ENV['OPNMGR_MASTER_KEY'] ?? ''))) === '') {
+    passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/generate_master_key.php'), $keyRc);
+    if ($keyRc !== 0) {
+        fwrite(STDERR, "Warning: could not generate OPNMGR_MASTER_KEY; secrets will be stored unencrypted until you run scripts/generate_master_key.php.\n");
+    }
+}
+
 /**
  * Read a line from stdin, optionally hiding the typed characters.
  */

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-requireLogin();
+require_permission('agent.restart'); // role check, not just login (3.80.1)
 
 /**
  * Firewall Health Check API

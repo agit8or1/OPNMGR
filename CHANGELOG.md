@@ -2,7 +2,55 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: November 6, 2026
+**Last Updated**: November 9, 2026
+
+---
+
+## Version 3.80.1
+**Released**: November 9, 2026 | **Agent**: v1.8.2
+
+### Security
+
+Signing in was treated as permission. A large set of endpoints called `requireLogin()`
+and nothing else, so the readonly role meant nothing on them.
+
+- **Remote code execution on the manager** (`api/run_diagnostic.php`). The remote command
+  was placed inside a double-quoted local shell string; `escapeshellarg()`'s single quotes
+  are literal there, so `$(...)` in a diagnostic target ran on the manager as www-data,
+  which can read every firewall's SSH key. Any signed-in user.
+- **Root command execution on firewalls** (`api/network_diagnostic.php`). `target` was
+  interpolated into a shell script, guarded only by `FILTER_VALIDATE_DOMAIN`, which accepts
+  quotes, `;` and `$(...)` without `FILTER_FLAG_HOSTNAME`. Now built by the structured
+  catalogue.
+- **Privilege escalation** (`add_user.php`). Any signed-in user could create an
+  administrator. Now requires `user.manage`.
+- `api/queue_action.php` now requires the capability `risk_to_capability()` maps each
+  action's risk to (previously only HIGH/CRITICAL were checked).
+- `api/trigger_update.php` requires `update.install` and writes to the audit log.
+- 20 further state-changing pages now check their capability from the permission matrix.
+- `raw_commands_enabled()` fails closed when the setting cannot be read.
+- **Enrolment-bound first claim.** A firewall with no `hardware_id` could be bound by any
+  check-in that guessed its sequential id, and the claimant was handed its api_key and
+  signing secret. The claim now requires an enrolment token redeemed for that firewall
+  within `agent_claim_window_hours` (default 24; `0` restores trust-on-first-use).
+  Credentials an agent never adopted are re-sent only within the same window.
+
+### Changed — read before upgrading
+
+- **Raw shell is off and administrator MFA is required when their settings row is
+  absent.** That is every install made from `database/schema.sql`, which seeds no
+  settings. Installs whose migrations stored a value keep it. If raw shell disappears or
+  administrators are asked to enrol in two-factor after upgrading, this is why; both are
+  on the new **Settings > Security Policy** card.
+- Administrator pages show a red banner while `OPNMGR_MASTER_KEY` is unset, and
+  `scripts/create_admin.php` generates the key when it is missing.
+- Firewalls added by hand (no enrolment token) need a token issued, or the claim window
+  set to 0, before their agent's first check-in is accepted.
+
+### Added
+
+- `tests/role_gate_test.php` (static, CI), `tests/role_gate_behaviour_test.php` and
+  `tests/secure_defaults_test.php` (test DB).
 
 ---
 
