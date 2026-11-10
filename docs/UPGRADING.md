@@ -33,6 +33,8 @@ Security hardening. No new migrations. What can change on an existing install:
   tunnel resets now require the capability from `inc/permissions.php`; editing a
   firewall's settings on its details page requires `firewall.manage`. Readonly users who
   used these will be refused.
+- **`enroll_firewall_new.php?action=download` serves the standard installer**, the same
+  one as `enroll_firewall.php?action=download`, and only for a live enrolment token.
 - **`migrate.php --status` warns about 0001 and 0003.** Their default settings were
   changed for clean installs; an installation that already applied them keeps the
   values it stored, and the checksum warning for those two files is expected.

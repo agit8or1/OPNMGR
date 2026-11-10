@@ -7,7 +7,7 @@ All notable changes to OPNManager are documented here.
 ---
 
 ## Version 3.80.3
-**Released**: November 9, 2026 | **Agent**: v1.8.2
+**Released**: November 10, 2026 | **Agent**: v1.8.2
 
 ### Security
 

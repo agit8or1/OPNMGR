@@ -11,7 +11,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-09'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-10'); }
 if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Hardening'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
@@ -48,7 +48,7 @@ function getChangelogEntries($limit = 10) {
     $entries = [
         [
             'version' => '3.80.3',
-            'date' => '2026-11-09',
+            'date' => '2026-11-10',
             'type' => 'patch',
             'title' => 'Hardening',
             'changes' => [
