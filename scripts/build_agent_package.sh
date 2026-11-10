@@ -9,7 +9,9 @@
 # the rest of the version machinery already uses - so the package name and the
 # agent's self-reported version cannot disagree.
 #
-# Output: downloads/plugins/os-opnmanager-agent-<version>.tar.gz
+# Output: downloads/plugins/os-opnmanager-agent-<version>.tar.gz, or
+# $OUT_DIR/os-opnmanager-agent-<version>.tar.gz when OUT_DIR is set (the release
+# workflow and stage_agent_package.php --build-local build outside downloads/).
 #
 # The archive is built deterministically (sorted entries, fixed mtime, no owner
 # names) so rebuilding the same source produces the same bytes, and a diff
@@ -19,7 +21,7 @@ set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 SRC="$ROOT/plugin/os-opnmanager-agent/src"
-OUT_DIR="$ROOT/downloads/plugins"
+OUT_DIR="${OUT_DIR:-$ROOT/downloads/plugins}"
 
 if [ ! -d "$SRC" ]; then
     echo "ERROR: agent source tree not found at $SRC" >&2
@@ -57,6 +59,8 @@ if [ -f "$TARBALL" ] && [ "${FORCE:-0}" != "1" ]; then
 fi
 
 mkdir -p "$OUT_DIR"
+LIST=$(mktemp "${TMPDIR:-/tmp}/opnmgr-agent-files.XXXXXX")
+trap 'rm -f "$LIST"' EXIT
 
 # Directories are listed too, not just files: the plugin ships an empty
 # service/templates tree that every previous package contained, and a files-only
@@ -66,17 +70,30 @@ mkdir -p "$OUT_DIR"
 # __pycache__ is build output from whichever Python happened to run; it is not
 # part of the plugin, and its presence is why source and package differed.
 ( cd "$SRC" && find . -mindepth 1 ! -path '*/__pycache__*' | sed 's|^\./||' | LC_ALL=C sort ) \
-    > /tmp/opnmgr-agent-files.$$
+    > "$LIST"
 
-tar czf "$TARBALL" \
+# gzip -n: no name or timestamp in the gzip header, so the bytes depend only on
+# the source. (tar czf already produced exactly this; the explicit pipe keeps it
+# true on a gzip that defaults otherwise.)
+tar cf - \
     -C "$SRC" \
     --owner=0 --group=0 --numeric-owner \
     --mtime='@0' \
     --format=gnu \
     --no-recursion \
-    -T /tmp/opnmgr-agent-files.$$
+    -T "$LIST" | gzip -n > "$TARBALL"
 
-rm -f /tmp/opnmgr-agent-files.$$
+rm -f "$LIST"
+
+# Refuse to emit something the manager would refuse to stage.
+if ! php -r '
+    require "'"$ROOT"'/inc/agent_package.php";
+    $r = agent_package_inspect($argv[1]);
+    if (!$r["ok"]) { fwrite(STDERR, "ERROR: built package is not installable: " . $r["error"] . "\n"); exit(1); }
+' "$TARBALL"; then
+    rm -f "$TARBALL"
+    exit 1
+fi
 
 echo "Built $TARBALL"
 echo "  files:  $(tar tzf "$TARBALL" | grep -vc '/$')"

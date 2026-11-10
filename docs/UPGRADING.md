@@ -18,6 +18,33 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.81.0
+
+One migration, `0035_customer_path_checks`. It adds three tables and two defaulted
+columns. Existing campaigns keep customer checks off.
+
+**Run this once after upgrading, or the enrollment command disappears:**
+
+```bash
+php scripts/stage_agent_package.php
+```
+
+From 3.81.0, Settings, Add Firewall and the firewall reinstall panel show an install
+command only for a verified, staged agent package. A package you already have from
+before 3.81.0 has no record yet, so these pages show *"present but has never been
+verified"* until you run the command above. It rebuilds the agent from the tracked
+source. If the bytes are identical, it adopts your existing package without rewriting
+it. Otherwise it reports the difference and changes nothing. Firewalls that are already
+enrolled, their credentials, the signing keys and agent updates are not affected. A
+staged package is never replaced or deleted.
+
+Install commands now include `OPNMGR_AGENT_SHA256`. Commands copied before the upgrade
+still work, but the installer warns that it could not verify the checksum.
+
+To use customer checks, see [tools/opnmgr-probe/README.md](../tools/opnmgr-probe/README.md).
+
+---
+
 ## Upgrading to 3.80.3
 
 Security hardening. No new migrations. What can change on an existing install:

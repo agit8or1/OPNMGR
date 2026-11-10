@@ -46,7 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = '<div class="alert alert-danger">Your role does not permit starting updates.</div>';
         } else {
             $cid = (int)$_POST['campaign_id'];
-            $r = campaign_start_ring($cid, (string)$_POST['ring']);
+            $r = campaign_start_ring($cid, (string)$_POST['ring'],
+                                     ['override_reason' => (string)($_POST['override_reason'] ?? '')]);
             if ($r['ok']) {
                 $d = campaign_dispatch($cid);
                 $message = sprintf(
@@ -55,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $d['notes'] ? '<br><small>' . htmlspecialchars(implode('; ', array_slice($d['notes'], 0, 5))) . '</small>' : ''
                 );
             } else {
-                $message = '<div class="alert alert-danger">' . htmlspecialchars($r['error']) . '</div>';
+                $message = '<div class="alert alert-' . (!empty($r['held']) ? 'warning' : 'danger') . '">'
+                         . htmlspecialchars($r['error']) . '</div>';
             }
         }
     } elseif (isset($_POST['dispatch'])) {
@@ -161,12 +163,30 @@ include __DIR__ . '/inc/header.php';
                                     <span class="text-muted">/ <?php echo $s['total']; ?></span>
                                     <?php $clean = campaign_ring_is_clean((int)$c['id'], $ring); ?>
                                     <span class="text-muted small">(<?php echo htmlspecialchars($clean['reason']); ?>)</span>
+                                    <?php if ((int)$c['customer_checks'] === 1):
+                                        $gate = cc_ring_gate((int)$c['id'], $ring);
+                                        if ($gate['state'] !== 'none'): ?>
+                                    <div class="ms-2" style="font-size:.75rem">
+                                        <i class="fas fa-route me-1"></i>client paths:
+                                        <span class="badge bg-<?php echo ['pass' => 'success', 'waiting' => 'info', 'stale' => 'warning text-dark', 'fail' => 'danger'][$gate['state']] ?? 'secondary'; ?>">
+                                            <?php echo htmlspecialchars($gate['state']); ?></span>
+                                        <?php foreach ($gate['targets'] as $te):
+                                            foreach ($te['checks'] as $ck):
+                                                if (!$ck['required'] || $ck['state'] === 'pass') continue; ?>
+                                            <div class="<?php echo $ck['state'] === 'fail' ? 'text-danger' : 'text-warning'; ?>">
+                                                <?php echo htmlspecialchars($te['hostname'] . ' → ' . $ck['probe'] . ': ' . $ck['path']
+                                                    . ' (' . $ck['label'] . ') ' . $ck['state'] . ($ck['detail'] !== '' ? ' — ' . $ck['detail'] : '')); ?>
+                                            </div>
+                                        <?php endforeach; endforeach; ?>
+                                    </div>
+                                    <?php endif; endif; ?>
                                 </div>
                             <?php endforeach; ?>
                         </td>
                         <td class="small text-muted">
                             <?php echo (int)$c['auto_progress'] ? 'auto-progress' : 'manual'; ?><br>
                             <?php echo (int)$c['ha_safe'] ? 'HA-safe' : '<span class="text-danger">HA-safe OFF</span>'; ?>
+                            <?php if ((int)$c['customer_checks'] === 1): ?><br><a href="/customer_checks.php">customer checks</a><?php endif; ?>
                         </td>
                         <td class="text-end text-nowrap">
                             <?php if ($canUpdate && !in_array($c['status'], ['completed','cancelled'], true)): ?>
@@ -178,6 +198,10 @@ include __DIR__ . '/inc/header.php';
                                         <option value="<?php echo $r; ?>"><?php echo $r; ?></option>
                                     <?php endforeach; ?>
                                 </select>
+                                <?php if ((int)$c['customer_checks'] === 1): ?>
+                                <input type="text" name="override_reason" class="form-control form-control-sm d-inline-block" style="width:11rem"
+                                       maxlength="200" placeholder="Override reason (if held)" title="Only needed to start a ring over failing or stale customer checks. Audited.">
+                                <?php endif; ?>
                                 <button class="btn btn-sm btn-primary" name="start_ring"
                                         onclick="return confirm('Start this ring? Updates will be dispatched to eligible firewalls.')">Start ring</button>
                                 <button class="btn btn-sm btn-outline-secondary" name="dispatch" title="Re-check held targets">Refresh</button>
@@ -309,6 +333,10 @@ include __DIR__ . '/inc/header.php';
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" name="auto_progress" id="autoProg" value="1">
                         <label class="form-check-label small" for="autoProg">Auto-progress rings</label>
+                    </div>
+                    <div class="form-check form-check-inline" title="Hold the next ring and the second CARP member while a required customer check fails or goes stale">
+                        <input class="form-check-input" type="checkbox" name="customer_checks" id="custChecks" value="1">
+                        <label class="form-check-label small" for="custChecks">Customer path checks</label>
                     </div>
                 </div>
                 <div class="col-md-2 d-grid">

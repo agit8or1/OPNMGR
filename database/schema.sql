@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.80.3.
+-- Generated from the reference installation for OPNManager v3.81.0.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -604,6 +604,60 @@ CREATE TABLE IF NOT EXISTS `config_snapshots` (
   KEY `idx_firewall` (`firewall_id`),
   KEY `idx_hash` (`config_hash`),
   CONSTRAINT `config_snapshots_ibfk_1` FOREIGN KEY (`firewall_id`) REFERENCES `firewalls` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `customer_probe_checks` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `probe_id` int(11) NOT NULL,
+  `check_type` enum('dns','vpn_service','internet_service') NOT NULL COMMENT 'dns: resolve a name; vpn_service: TCP to a private address across the VPN; internet_service: HTTPS to a public host',
+  `label` varchar(100) NOT NULL,
+  `target` varchar(255) NOT NULL COMMENT 'dns: hostname; vpn_service: host:port; internet_service: https URL',
+  `resolver` varchar(45) DEFAULT NULL COMMENT 'dns only: ask this internal resolver instead of the system one',
+  `expect` varchar(64) DEFAULT NULL COMMENT 'dns: address or CIDR the answer must be in; internet_service: HTTP status',
+  `required` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Gates ring promotion when the campaign uses customer checks',
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_probe` (`probe_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `customer_probe_results` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `probe_id` int(11) NOT NULL,
+  `check_id` int(11) NOT NULL,
+  `ok` tinyint(1) NOT NULL,
+  `latency_ms` int(11) DEFAULT NULL,
+  `detail` varchar(255) DEFAULT NULL,
+  `observed_at` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'When the manager received it; the probe clock is not trusted',
+  PRIMARY KEY (`id`),
+  KEY `idx_check_time` (`check_id`,`observed_at`),
+  KEY `idx_probe_time` (`probe_id`,`observed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE IF NOT EXISTS `customer_probes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(11) NOT NULL COMMENT 'Tenant. The probe and every firewall it covers belong to it',
+  `firewall_id` int(11) NOT NULL COMMENT 'The firewall (or one CARP member) the probe sits behind',
+  `name` varchar(100) NOT NULL,
+  `kind` enum('standalone','rem0te') NOT NULL DEFAULT 'standalone',
+  `token_hash` char(64) NOT NULL COMMENT 'sha256 of the probe token; the token itself is shown once',
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `interval_seconds` int(11) NOT NULL DEFAULT 60,
+  `last_seen_at` timestamp NULL DEFAULT NULL,
+  `last_seen_ip` varchar(45) DEFAULT NULL,
+  `probe_version` varchar(32) DEFAULT NULL,
+  `created_by` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_token` (`token_hash`),
+  KEY `idx_customer` (`customer_id`),
+  KEY `idx_firewall` (`firewall_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2153,6 +2207,7 @@ CREATE TABLE IF NOT EXISTS `update_campaign_targets` (
   `dispatched_at` timestamp NULL DEFAULT NULL,
   `completed_at` timestamp NULL DEFAULT NULL,
   `result` text DEFAULT NULL,
+  `customer_baseline` text DEFAULT NULL COMMENT 'JSON: each customer check result just before dispatch',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_campaign_firewall` (`campaign_id`,`firewall_id`),
   KEY `idx_campaign_status` (`campaign_id`,`status`),
@@ -2178,6 +2233,7 @@ CREATE TABLE IF NOT EXISTS `update_campaigns` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `started_at` timestamp NULL DEFAULT NULL,
   `completed_at` timestamp NULL DEFAULT NULL,
+  `customer_checks` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Gate promotion and CARP sequencing on customer-side probe checks',
   PRIMARY KEY (`id`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -2494,6 +2550,9 @@ INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('bulk_max_targets', '200
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_critical', '7');
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_high', '14');
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_medium', '30');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('customer_check_result_retention_days', '14');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('customer_check_settle_minutes', '3');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('customer_check_stale_minutes', '10');
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('default_timezone', 'America/New_York');
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('drift_alert_enabled', '1');
 INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('drift_check_enabled', '1');
@@ -2573,4 +2632,5 @@ INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0031_a
 INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0032_speedtest_accuracy.sql', '0678aafd71c5c18b9fa320fb46c3dfc7080765088ea1625e76d92fd89d4c07ce');
 INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0033_speedtest_cpu_width.sql', '09da9c1742b02e1a82b4eeab6e549ee330a67d18b828071e3b8bf4204806d47c');
 INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0034_speedtest_ookla.sql', '22fc6403a866c49c76826966e5b1f572eed7326e26728cf6b324587c439a97ce');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0035_customer_path_checks.sql', 'e6cb2bd7b9c9f714b78763115c8c3de7837fa01e0c7b3d4f7fe68259a29a8296');
 INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('migration_v3.2.2_add_user_fields.sql', '30344d11a498e64663b68759ac283eb8ba00ba19c09dee0a9fb3f42a3f4304a1');

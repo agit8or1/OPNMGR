@@ -1,0 +1,102 @@
+name: Release agent package
+
+# Builds the OPNsense agent from tracked source when a release is published and
+# attaches the package and its signed release record to that release. Managers
+# download and verify exactly these two files (scripts/stage_agent_package.php).
+#
+# Needs the repository secret OPNMGR_AGENT_RELEASE_KEY: the base64 Ed25519
+# secret whose public half is pinned in config/agent_release_keys.pub. Without
+# it the job stops before uploading anything.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and attach (e.g. v3.81.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-agent-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  agent-package:
+    name: Build, sign and attach the OPNsense agent
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sodium
+          coverage: none
+
+      - name: Tag matches VERSION
+        run: |
+          v="$(cat VERSION)"
+          [ "$TAG" = "v$v" ] || { echo "::error::tag $TAG does not match VERSION $v"; exit 1; }
+
+      - name: Version references agree
+        run: php scripts/check_versions.php
+
+      # The OPNsense plugin, not the pfSense agent (agent/pfsense/) or the
+      # legacy downloads/agent.sh. build_agent_package.sh refuses a tree whose
+      # agent.sh disagrees with AGENT_VERSION and inspects what it built.
+      - name: Build the OPNsense agent twice and require identical bytes
+        run: |
+          OUT_DIR=dist sh scripts/build_agent_package.sh
+          OUT_DIR=rebuild sh scripts/build_agent_package.sh >/dev/null
+          a="$(sha256sum dist/*.tar.gz | cut -d' ' -f1)"
+          b="$(sha256sum rebuild/*.tar.gz | cut -d' ' -f1)"
+          [ "$a" = "$b" ] || { echo "::error::agent build is not reproducible ($a vs $b)"; exit 1; }
+          rm -rf rebuild
+
+      - name: Sign the release record
+        env:
+          OPNMGR_AGENT_RELEASE_KEY: ${{ secrets.OPNMGR_AGENT_RELEASE_KEY }}
+        run: |
+          if [ -z "$OPNMGR_AGENT_RELEASE_KEY" ]; then
+            echo "::error::Repository secret OPNMGR_AGENT_RELEASE_KEY is not set; nothing was uploaded"
+            exit 1
+          fi
+          php scripts/sign_agent_release.php --sign dist/os-opnmanager-agent-*.tar.gz
+
+      - name: Verify as a manager would
+        run: php scripts/sign_agent_release.php --verify dist/os-opnmanager-agent-*.tar.gz
+
+      # Stage into a scratch directory exactly as a clean manager's
+      # --import would, so a release that a manager would refuse never ships.
+      - name: Clean-manager staging check
+        run: |
+          mkdir -p /tmp/stage-check
+          OPNMGR_AGENT_PACKAGE_DIR=/tmp/stage-check php scripts/stage_agent_package.php --import dist
+          OPNMGR_AGENT_PACKAGE_DIR=/tmp/stage-check php scripts/stage_agent_package.php --status
+
+      - name: Attach to the release (never replace different bytes)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum ./* > SHA256SUMS)
+          mkdir -p existing
+          for f in dist/*; do
+            name="$(basename "$f")"
+            if gh release download "$TAG" -p "$name" -D existing 2>/dev/null; then
+              if cmp -s "$f" "existing/$name" || [ "$name" = SHA256SUMS ] || [ "${name%.release.json}" != "$name" ]; then
+                echo "$name already attached"
+                continue
+              fi
+              echo "::error::$name is already attached to $TAG with different contents; refusing to replace it"
+              exit 1
+            fi
+            gh release upload "$TAG" "$f"
+          done

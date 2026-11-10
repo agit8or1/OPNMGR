@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Hardening'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'From the customer side'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -22,6 +22,10 @@ if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Hardening'); }
 // scripts/check_versions.php enforces this against the released artifact.
 if (!defined('AGENT_VERSION')) { define('AGENT_VERSION', '1.8.2'); }
 if (!defined('AGENT_VERSION_DATE')) { define('AGENT_VERSION_DATE', '2026-11-06'); }
+// Oldest manager that can serve AGENT_VERSION (1.8.2 sends Ookla results, which
+// 3.80.0 was the first to accept). Written into signed agent release records;
+// a manager older than this refuses to stage the package.
+if (!defined('AGENT_MIN_MANAGER_VERSION')) { define('AGENT_MIN_MANAGER_VERSION', '3.80.0'); }
 // The pfSense agent (agent/pfsense/) is a separate package with its own
 // version line: it shares the check-in protocol, not the OPNsense plugin.
 if (!defined('PFSENSE_AGENT_VERSION')) { define('PFSENSE_AGENT_VERSION', '1.0.0'); }
@@ -46,6 +50,21 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.81.0',
+            'date' => '2026-11-10',
+            'type' => 'minor',
+            'title' => 'From the customer side',
+            'changes' => [
+                'FIXED: A clean install could not enroll its first firewall: the agent package is not in git, but the install command was shown anyway and failed on the firewall with a 404. The command is now shown only once the matching package is verified and staged, and the page says why and what to run until then',
+                'ADDED: The release workflow builds the OPNsense agent from plugin/os-opnmanager-agent/ (reproducibly, checked twice), signs a release record with the project key pinned in config/agent_release_keys.pub, and attaches both to the GitHub release',
+                'ADDED: scripts/stage_agent_package.php downloads and verifies that release; --import stages copied files offline (or upload them on Add Firewall); --build-local builds from the checkout; --status reports readiness. Missing, corrupted, tampered, untrusted, wrong-version, wrong-platform and too-new packages are refused with what to do',
+                'CHANGED: Install commands carry OPNMGR_AGENT_SHA256 and the installer verifies the package, and the agent version inside it, before it changes anything on the firewall. OPNMGR_VERIFY_ONLY=1 stops after verifying',
+                'CHANGED: A package already on a manager is never replaced or deleted. One with no record (every install before 3.81.0) is adopted when it is byte-identical to a build of the tracked source',
+                'ADDED: Customer checks. A tenant-scoped probe on a customer network (tools/opnmgr-probe, standalone Python, or Rem0te running it) tests internal DNS, a service across the VPN and an internet service',
+                'ADDED: Campaigns can enable customer path checks (off by default). A required check that fails or goes stale holds the next ring and the second member of a CARP pair, and the campaign shows which firewall, probe and path failed. Manual progression stays: a held ring can be started with an audited reason',
+            ],
+        ],
         [
             'version' => '3.80.3',
             'date' => '2026-11-10',

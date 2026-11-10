@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/agent_package.php';
 requireLogin();
 requireAdmin();
 
@@ -16,7 +17,11 @@ $enrollment_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/enroll_firewall.
 $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_enroll.sh "' . $enrollment_url . '" && chmod +x /tmp/opnsense_enroll.sh && bash /tmp/opnsense_enroll.sh';
 
 $server_url = opnmgr_server_url();
-$agent_install_command = 'fetch -o - ' . $server_url . '/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=' . $server_url . ' sh';
+// Shown only once the matching agent package is verified and staged; until
+// then the page says why and how to fix it (inc/agent_package.php).
+$agent_install = agent_install_command();
+$agent_import_flash = $_SESSION['agent_import_flash'] ?? null;
+unset($_SESSION['agent_import_flash']);
 $pfsense_install_prefix = 'fetch -o - ' . $server_url . '/downloads/pfsense/install_opnmgr_agent_pfsense.sh | env OPNMGR_BASE_URL=' . $server_url;
 
 // Suggestions for the customer field of the agent enrollment form.
@@ -79,7 +84,34 @@ $customer_names = db()->query('SELECT name FROM customers ORDER BY name')->fetch
                                 <div class="tab-pane fade show active" id="enrollOpn">
                                 <ol class="mb-0">
                                     <li>Install the agent plugin from a shell on the firewall:
-                                        <code class="d-block p-2 my-1 border rounded"><?php echo htmlspecialchars($agent_install_command); ?></code>
+                                        <?php if ($agent_import_flash): ?>
+                                        <div class="alert alert-<?php echo $agent_import_flash['ok'] ? 'success' : 'danger'; ?> small my-1">
+                                            <?php echo htmlspecialchars($agent_import_flash['message']); ?>
+                                        </div>
+                                        <?php endif; ?>
+                                        <?php if ($agent_install['ok']): ?>
+                                        <code class="d-block p-2 my-1 border rounded"><?php echo htmlspecialchars($agent_install['command']); ?></code>
+                                        <div class="form-text">Agent <?php echo htmlspecialchars($agent_install['readiness']['version']); ?>,
+                                            verified (<?php echo htmlspecialchars($agent_install['readiness']['source']); ?>). The installer checks this checksum before it changes anything.</div>
+                                        <?php else: ?>
+                                        <?php echo agent_install_unavailable_html($agent_install); ?>
+                                        <?php if ($agent_install['code'] !== 'manager_url'): ?>
+                                        <form method="post" action="/api/agent_package_import.php" enctype="multipart/form-data" class="row g-2 align-items-end mb-2">
+                                            <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+                                            <div class="col-md-5">
+                                                <label class="form-label small mb-0" for="agentPkg"><?php echo htmlspecialchars(agent_package_name(agent_expected_version())); ?></label>
+                                                <input class="form-control form-control-sm" type="file" id="agentPkg" name="package" accept=".gz" required>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <label class="form-label small mb-0" for="agentRec"><?php echo htmlspecialchars(agent_release_record_name(agent_expected_version())); ?></label>
+                                                <input class="form-control form-control-sm" type="file" id="agentRec" name="record" accept=".json" required>
+                                            </div>
+                                            <div class="col-md-2 d-grid">
+                                                <button class="btn btn-sm btn-outline-primary" type="submit">Verify &amp; stage</button>
+                                            </div>
+                                        </form>
+                                        <?php endif; ?>
+                                        <?php endif; ?>
                                     </li>
                                     <li>On OPNsense, go to <strong>Services &rarr; OPNManager Agent</strong>.</li>
                                     <li>Paste the key into <strong>Quick Enrollment</strong> and click <strong>Enroll</strong>.</li>

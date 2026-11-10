@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/agent_package.php';
 // ai_enabled() lives here; without it the AI card's status guard is always false
 // and the card would report "Disabled" on an installation where AI is on.
 require_once __DIR__ . '/inc/ai_redaction.php';
@@ -720,7 +721,12 @@ include __DIR__ . '/inc/header.php';
                    placeholder="opnmanager.example.com">
             <small class="form-text text-muted d-block mt-2">
               Fully Qualified Domain Name for this manager. Used in agent install commands:<br>
-              <code class="px-2 py-1 rounded">fetch -o - https://<?php echo htmlspecialchars($manager_fqdn); ?>/downloads/plugins/install_opnmanager_agent.sh | env OPNMGR_BASE_URL=https://<?php echo htmlspecialchars($manager_fqdn); ?> sh</code>
+              <?php $agent_install = agent_install_command(); ?>
+              <?php if ($agent_install['ok']): ?>
+              <code class="px-2 py-1 rounded"><?php echo htmlspecialchars($agent_install['command']); ?></code>
+              <?php else: ?>
+              <?php echo agent_install_unavailable_html($agent_install); ?>
+              <?php endif; ?>
             </small>
           </div>
         </div>

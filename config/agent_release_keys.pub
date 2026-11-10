@@ -1,0 +1,12 @@
+# Ed25519 public keys trusted to sign OPNsense agent releases (one base64 key per line).
+#
+# A manager stages an agent package only if its release record is signed by one
+# of these keys (scripts/stage_agent_package.php, inc/agent_package.php). The
+# matching secret is the repository secret OPNMGR_AGENT_RELEASE_KEY, used by
+# .github/workflows/release.yml. It is never committed.
+#
+# Forks that publish their own releases add their key here, or set
+# OPNMGR_AGENT_RELEASE_PUBKEYS in .env without editing this file.
+#
+# key id 27c1666a2cd1fbd5 (created 2026-11-10)
+R5GI/w7lEv62rzR4laQzJgteBDHS+QnL4/nMVub2uLU=

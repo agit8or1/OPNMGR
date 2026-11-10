@@ -196,6 +196,12 @@ function isActive($page) {
         <span class="sidebar-label">Fleet Updates</span>
       </a>
       <?php endif; ?>
+      <?php if (function_exists('can') && can('customer.view')): ?>
+      <a class="sidebar-item <?php echo isActive('customer_checks.php') ?>" href="/customer_checks.php">
+        <span class="sidebar-icon"><i class="fas fa-route"></i></span>
+        <span class="sidebar-label">Customer Checks</span>
+      </a>
+      <?php endif; ?>
       <?php if (function_exists('can') && can('bulk.operate')): ?>
       <a class="sidebar-item <?php echo isActive('bulk_operations.php') ?>" href="/bulk_operations.php">
         <span class="sidebar-icon"><i class="fas fa-layer-group"></i></span>

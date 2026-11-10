@@ -21,8 +21,10 @@ case "$NAME" in
 esac
 echo "$NAME" | grep -Eq '^[A-Za-z0-9_]+$' || { echo "refusing: bad name" >&2; exit 1; }
 
-MYSQL="mysql"
-[ "$(id -u)" -ne 0 ] && MYSQL="sudo mysql"
+# OPNMGR_TEST_MYSQL names a client command for a server without a root socket,
+# e.g. CI's: "mysql -h 127.0.0.1 -u root -pci-root".
+MYSQL="${OPNMGR_TEST_MYSQL:-mysql}"
+[ -z "${OPNMGR_TEST_MYSQL:-}" ] && [ "$(id -u)" -ne 0 ] && MYSQL="sudo mysql"
 
 APP_USER=$(grep '^DB_USER=' "$ROOT/.env" 2>/dev/null | cut -d= -f2- | tr -d '"'"'" || true)
 APP_USER="${APP_USER:-opnsense_user}"
