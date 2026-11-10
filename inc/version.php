@@ -11,8 +11,8 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
-if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-09'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Say What Shipped'); }
+if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-10'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Hardening'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -46,6 +46,20 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.80.3',
+            'date' => '2026-11-10',
+            'type' => 'patch',
+            'title' => 'Hardening',
+            'changes' => [
+                'SECURITY: Security hardening',
+                'CHANGED: database/schema.sql seeds the default settings and records the migrations it includes, so migrate.php after a fresh import is a no-op. Clean installs start with raw shell off, administrator two-factor required and agent_auth_mode = prefer_signed',
+                'CHANGED: Secrets are never stored in plaintext: without a usable master key they are refused with the reason, the administrator banner names the cause (unset, malformed, or no sodium), and create_admin.php stops if the key is not usable',
+                'CHANGED: More endpoints require a capability from the permission matrix; tests/role_gate_test.php checks each state-changing statement is preceded by a role check and pins every endpoint to its capability',
+                'ADDED: encrypt_secrets.php also encrypts integration destination secrets',
+                'DOCS: The 3.79.2 note on agent auto-update described the reference installation, not the shipped default, which stays off',
+            ],
+        ],
         [
             'version' => '3.80.2',
             'date' => '2026-11-09',
@@ -107,7 +121,7 @@ function getChangelogEntries($limit = 10) {
                 'FIXED: The speedtest chart shifted already-local timestamps back five hours',
                 'ADDED: Per-firewall iperf3 server, streams and provisioned link speed (Edit Firewall); results show as a share of the circuit and say what they measured',
                 'FIXED: firewall_edit.php saved changes for any signed-in user; saving now requires firewall.manage',
-                'CHANGED: Agent auto-update is on: new agent releases are promoted to the fleet when published',
+                'CHANGED: Agent auto-update was switched on for the reference installation, so new agent releases are promoted to its fleet when published. The shipped default stays off (agent_rollout_auto_promote = 0); an administrator can turn it on in Settings',
             ],
         ],
         [

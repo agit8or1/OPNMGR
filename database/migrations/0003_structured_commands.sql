@@ -28,6 +28,7 @@ ALTER TABLE firewall_commands
     ADD INDEX IF NOT EXISTS idx_is_raw (is_raw),
     ADD INDEX IF NOT EXISTS idx_queued_by (queued_by_user_id);
 
+-- Raw shell starts off. INSERT IGNORE keeps any value an install already stored.
 INSERT IGNORE INTO settings (`name`, `value`) VALUES
-    ('raw_command_enabled',        '1'),
+    ('raw_command_enabled',        '0'),
     ('raw_command_admin_only',     '1');

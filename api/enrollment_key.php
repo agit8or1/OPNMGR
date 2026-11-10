@@ -15,6 +15,8 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Authentication required']);
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('firewall.enroll');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

@@ -21,10 +21,12 @@ register_shutdown_function(function () use (&$made) {
     }
 });
 
+// Fixture accounts count as enrolled in two-factor: clean installs require it for
+// administrators (require_mfa_for_admins = 1), and this suite is not about MFA.
 function mk_user(string $role): array {
     global $made;
     $name = '__sess_' . $role . '_' . bin2hex(random_bytes(3));
-    db()->prepare('INSERT INTO users (username, password, role, is_active) VALUES (?,?,?,1)')
+    db()->prepare('INSERT INTO users (username, password, role, is_active, totp_secret) VALUES (?,?,?,1,"enc:v1:test-fixture-enrolled")')
         ->execute([$name, password_hash('correct horse', PASSWORD_DEFAULT), $role]);
     $id = (int)db()->lastInsertId();
     $made[] = $id;

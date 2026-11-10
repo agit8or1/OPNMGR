@@ -45,10 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $code = trim($_POST['verification_code']);
         
         if (verify2FACode($_SESSION['temp_2fa_secret'], $code)) {
-            // Enable 2FA for user
-            enable2FA($userId, $_SESSION['temp_2fa_secret']);
-            unset($_SESSION['temp_2fa_secret']);
-            $message = '<div class="alert alert-success">2FA has been enabled successfully!</div>';
+            // Enable 2FA for user. The TOTP secret is only stored encrypted;
+            // without a master key enrolment is refused with the reason.
+            try {
+                enable2FA($userId, $_SESSION['temp_2fa_secret']);
+                unset($_SESSION['temp_2fa_secret']);
+                $message = '<div class="alert alert-success">2FA has been enabled successfully!</div>';
+            } catch (OpnmgrCryptoUnavailable $e) {
+                $message = '<div class="alert alert-danger">' . htmlspecialchars($e->getMessage(), ENT_QUOTES) . '</div>';
+            }
         } else {
             $message = '<div class="alert alert-danger">Invalid verification code. Please try again.</div>';
         }

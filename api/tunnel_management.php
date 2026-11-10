@@ -16,11 +16,8 @@ $action = $_GET['action'] ?? '';
 // Listing tunnels is a read; killing them, resetting everything and reaping
 // zombies all run privileged commands, so they need the capability rather than
 // merely a logged-in session.
-if (in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'], true)) {
-    require_permission('tunnel.close');
-} else {
-    require_permission('firewall.view');
-}
+require_permission(in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'], true)
+    ? 'tunnel.close' : 'firewall.view');
 
 // CSRF validation for state-changing actions
 if (in_array($action, ['reset_all', 'kill_tunnel', 'cleanup_zombies'])) {

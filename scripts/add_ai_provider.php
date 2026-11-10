@@ -36,6 +36,13 @@ if (!preg_match('/^[a-z]+$/', $provider)) {
     exit(1);
 }
 
+// "never stored in plaintext" is enforced by opnmgr_encrypt(); say so before
+// asking for the key rather than after.
+if (!opnmgr_crypto_available()) {
+    fwrite(STDERR, 'ERROR: ' . opnmgr_crypto_status()['message'] . "\n");
+    exit(1);
+}
+
 // Read without echo when this is a terminal; fall back to a plain read when the
 // key is piped in, so the script works unattended too.
 if (stream_isatty(STDIN)) {

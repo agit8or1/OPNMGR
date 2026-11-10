@@ -10,6 +10,8 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('tunnel.close');
 
 // Validate CSRF token
 if (!csrf_verify($_POST['csrf_token'] ?? '')) {

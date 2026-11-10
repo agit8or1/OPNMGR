@@ -18,6 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify($_POST['csrf'] ?? '')) {
         $message = 'CSRF validation failed. Please try again.';
         $message_type = 'danger';
+    } elseif (isset($_POST['save_ai_provider']) && !opnmgr_crypto_available()) {
+        // API keys are only ever stored encrypted.
+        $message = opnmgr_crypto_status()['message'];
+        $message_type = 'danger';
     } elseif (isset($_POST['save_ai_provider'])) {
         $provider = $_POST['provider'];
         $api_key = trim((string) ($_POST['api_key'] ?? ''));
@@ -87,6 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($api_key === '') {
             $message = "No new key entered - the stored key is unchanged.";
             $message_type = 'info';
+        } elseif (!opnmgr_crypto_available()) {
+            $message = opnmgr_crypto_status()['message'];
+            $message_type = 'danger';
         } else {
             $stmt = db()->prepare("UPDATE ai_settings SET api_key = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([opnmgr_encrypt($api_key), $provider_id]);

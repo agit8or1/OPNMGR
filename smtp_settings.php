@@ -51,10 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // Save settings
                 try {
+                    // Encrypted at rest, and written first: without a master key
+                    // it is refused and nothing else is changed.
+                    save_secret_setting('smtp_password', $smtp_password);
                     save_setting('smtp_host', $smtp_host);
                     save_setting('smtp_port', $smtp_port);
                     save_setting('smtp_username', $smtp_username);
-                    save_secret_setting('smtp_password', $smtp_password);  // encrypted at rest
                     save_setting('smtp_encryption', $smtp_encryption);
                     save_setting('smtp_from_email', $smtp_from_email);
                     save_setting('smtp_from_name', $smtp_from_name);
@@ -69,6 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $smtp_encryption = $rows['smtp_encryption'] ?? 'tls';
                     $smtp_from_email = $rows['smtp_from_email'] ?? '';
                     $smtp_from_name = $rows['smtp_from_name'] ?? 'OPNsense Manager';
+                } catch (OpnmgrCryptoUnavailable $e) {
+                    $notice = '<div class="alert alert-danger">' . htmlspecialchars($e->getMessage(), ENT_QUOTES) . '</div>';
                 } catch (Exception $e) {
                     error_log("smtp_settings.php error: " . $e->getMessage());
                     $notice = '<div class="alert alert-danger">An internal error occurred while saving settings.</div>';

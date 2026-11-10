@@ -167,7 +167,8 @@ actions without any inbound exposure.
 
 * Secrets (all URLs, tokens, signing/inbound secrets) are encrypted at rest
   (`opnmgr_encrypt`), masked in the UI (blank on edit keeps the value), absent
-  from audit entries. Configure `OPNMGR_MASTER_KEY`, otherwise they are stored plain.
+  from audit entries. Without a usable `OPNMGR_MASTER_KEY` a destination cannot be
+  saved (since 3.80.3).
 * Every request resolves DNS once, checks all answers, pins the chosen IP with
   `CURLOPT_RESOLVE`, never follows redirects (a 3xx is a failure), caps the
   response size, and refuses private, loopback, link-local, CGNAT, multicast,

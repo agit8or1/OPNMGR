@@ -12,6 +12,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Get action
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// Reading status is open to every role; every other action stops or rebuilds
+// tunnels and nginx configuration (3.80.3).
+require_permission($action === 'status' ? 'firewall.view' : 'tunnel.close');
+
 // CSRF validation for POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
@@ -20,9 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
-
-// Get action
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 switch ($action) {
     case 'status':

@@ -25,14 +25,28 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../config.php';
 
 // Install-time master key (3.80.1). Creating the first admin is the one step
-// every install runs; generating the key here means a skipped
-// generate_master_key.php no longer leaves secrets in plaintext. The script
+// every install runs, so it generates the key when it is missing. The script
 // appends only and never replaces an existing key.
+//
+// Since 3.80.3 it stops if the result is not a usable key (generation failed,
+// the existing key is malformed, or sodium is missing): OPNManager refuses to
+// store secrets without one, so an administrator created now could not enrol
+// in the two-factor authentication their account requires.
 if (trim((string)(getenv('OPNMGR_MASTER_KEY') ?: ($_ENV['OPNMGR_MASTER_KEY'] ?? ''))) === '') {
     passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg(__DIR__ . '/generate_master_key.php'), $keyRc);
     if ($keyRc !== 0) {
-        fwrite(STDERR, "Warning: could not generate OPNMGR_MASTER_KEY; secrets will be stored unencrypted until you run scripts/generate_master_key.php.\n");
+        fwrite(STDERR, "ERROR: could not generate OPNMGR_MASTER_KEY. Fix the problem above and run scripts/generate_master_key.php, then re-run this script.\n");
+        exit(1);
     }
+}
+// Re-read .env in a fresh process: a key appended just now is not in this
+// process's environment.
+$keyCheck = 'require ' . var_export(__DIR__ . '/../config.php', true) . '; require ' . var_export(__DIR__ . '/../inc/crypto.php', true) . ';'
+          . ' $s = opnmgr_crypto_status(); if (!$s["ok"]) { fwrite(STDERR, $s["message"] . "\n"); exit(1); }';
+passthru(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($keyCheck), $keyRc);
+if ($keyRc !== 0) {
+    fwrite(STDERR, "ERROR: OPNMGR_MASTER_KEY is not usable (see above). No administrator was created.\n");
+    exit(1);
 }
 
 /**

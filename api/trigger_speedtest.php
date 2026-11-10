@@ -18,6 +18,8 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'error' => 'Authentication required']);
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('command.diagnostic');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

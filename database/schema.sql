@@ -1,7 +1,7 @@
 -- =============================================================================
 -- OPNManager - Database Schema
 -- =============================================================================
--- Generated from the reference installation for OPNManager v3.80.0.
+-- Generated from the reference installation for OPNManager v3.80.3.
 -- Regenerate with: scripts/generate_schema.sh
 --
 -- This file creates the database, every table, and the static reference data
@@ -2446,3 +2446,131 @@ UNLOCK TABLES;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+
+-- -----------------------------------------------------------------------------
+-- Data seeded by the migrations
+-- -----------------------------------------------------------------------------
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('automated_backup', 'Nightly configuration backup of every firewall.', 'Daily at 01:00', 'active', '1', NULL, NULL, 'scripts/automated_backup.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('auto_reset_stale_agents', 'Detects stale agents and attempts to restart them.', 'Hourly', 'active', '1', NULL, NULL, 'scripts/auto_reset_stale_agents.php', '60', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('check_backup_health', 'Checks every firewall has a recent, valid backup.', 'Daily at 04:00', 'active', '1', NULL, NULL, 'scripts/check_backup_health.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('cleanup_old_reports', 'Removes AI reports past the retention window.', 'Daily at 03:00', 'active', '1', NULL, NULL, 'cron/cleanup_old_reports.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('cleanup_stuck_commands', 'Requeues or settles commands left in flight.', 'Hourly at :30', 'active', '1', NULL, NULL, 'cron/cleanup_stuck_commands.php', '60', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('evaluate_alerts', 'Evaluates alert conditions and raises or resolves them.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'cron/evaluate_alerts.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('integration_dispatch', 'Routes outbox events, fires escalations and delivers to integration destinations.', 'Every minute', 'active', '1', NULL, NULL, 'cron/integration_dispatch.php', '1', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('integration_poll', 'Polls ticketing destinations for status changes and prunes integration history.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'cron/integration_poll.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('monitor_agent_health', 'Marks firewalls offline and reports stuck commands.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'scripts/monitor_agent_health.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('nginx_tunnel_cleanup', 'Removes nginx proxy configs for finished sessions.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'scripts/manage_nginx_tunnel_proxy.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('nightly_backups', 'Configuration backup, second pass.', 'Daily at 02:00', 'active', '1', NULL, NULL, 'cron/nightly_backups.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('policy_compliance', 'Evaluates template compliance against the newest backups.', 'Hourly', 'active', '1', NULL, NULL, 'cron/policy_compliance.php', '60', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('policy_reconcile', 'Advances policy deployments: verify read-back, confirm or roll back.', 'Every 2 minutes', 'active', '1', NULL, NULL, 'cron/policy_reconcile.php', '2', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('prune_backups', 'Applies the backup retention window.', 'Daily at 03:30', 'active', '1', NULL, NULL, 'cron/prune_backups.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('prune_telemetry', 'Applies retention to the telemetry and system log tables.', 'Not scheduled - add to crontab with --apply', 'active', '1', NULL, NULL, 'cron/prune_telemetry.php', NULL, NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('report_prune', 'Deletes generated reports past the retention setting.', 'Daily at 03:30', 'active', '1', NULL, NULL, 'cron/report_prune.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('report_run', 'Queues due report schedules, builds queued reports, sends deliveries. Does nothing for schedules/delivery until enabled.', 'Every 10 minutes', 'active', '1', NULL, NULL, 'cron/report_run.php', '10', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('run_auto_scans', 'Runs AI security scans for firewalls that enabled them.', 'Daily at 02:00', 'active', '1', NULL, NULL, 'scripts/run_auto_scans.php', '1440', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('schedule_speedtest', 'Queues speedtests that are due per firewall interval.', 'Hourly', 'active', '1', NULL, NULL, 'api/schedule_speedtest.php', '60', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('ssh_access_cleanup', 'Expires temporary SSH access sessions.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'scripts/manage_ssh_access.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('tunnel_health_monitor', 'Re-establishes dead SSH tunnels and reaps expired ones.', 'Every 2 minutes', 'active', '1', NULL, NULL, 'cron/tunnel_health_monitor.php', '2', NULL, NULL, NULL);
+INSERT IGNORE INTO `scheduled_tasks` (`task_name`, `description`, `schedule`, `status`, `enabled`, `last_run`, `next_run`, `script_path`, `expected_interval_minutes`, `last_status`, `last_duration_ms`, `last_message`) VALUES ('vpn_topology_refresh', 'Refreshes the VPN configuration cache, records counter movement and prunes old diagnostic runs.', 'Every 5 minutes', 'active', '1', NULL, NULL, 'cron/vpn_topology_refresh.php', '5', NULL, NULL, NULL);
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('agent_auth_mode', 'prefer_signed');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('agent_rollout_stage', 'held');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('agent_rollout_version', '');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('agent_signature_window', '300');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_agent_min_version', '1.5.0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_auto_resolve_enabled', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_cpu_threshold', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_disk_threshold', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_memory_threshold', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_notify_max_repeats', '4');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_notify_repeat_minutes', '60');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('alert_sustained_minutes', '15');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('auto_reset_stale_agents_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('backup_fileless_grace_hours', '48');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('backup_max_bytes', '52428800');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('backup_retention_days', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('backup_retention_min_keep', '3');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('backup_storage_path', '/var/lib/opnmgr/backups');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('bulk_max_targets', '200');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_critical', '7');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_high', '14');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('cert_warn_days_medium', '30');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('default_timezone', 'America/New_York');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('drift_alert_enabled', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('drift_check_enabled', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('health_gateway_latency_warn', '150');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('health_gateway_loss_warn', '5');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('integrations_inbound_window_seconds', '300');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('integrations_legacy_email_owner', 'legacy');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('integrations_reopen_window_minutes', '1440');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('log_retention_days', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('platform_verification_stale_hours', '24');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('policy_apply_lab_firewall_ids', '');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('policy_manager_source_ips', '');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('policy_max_backup_age_minutes', '60');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('policy_recovery_window_seconds', '900');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('policy_verify_minutes', '20');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('raw_command_admin_only', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('raw_command_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_ai_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_ai_monthly_token_budget', '200000');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_delivery_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_retention_days', '400');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_schedules_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_share_enabled', '0');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('report_share_max_hours', '168');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('require_mfa_for_admins', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('restore_require_pre_backup', '1');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('restore_verify_minutes', '20');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('session_absolute_timeout', '43200');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('session_idle_timeout', '3600');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('speedtest_duration', '10');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('speedtest_iperf_servers', 'iperf.he.net,bouygues.iperf.fr,speedtest.wtnet.de,iperf.par2.as49434.net');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('speedtest_ookla_terms_accepted_at', '');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('speedtest_ookla_terms_accepted_by', '');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('speedtest_streams', '16');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('telemetry_retention_days', '90');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('update_ha_settle_minutes', '10');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('update_ring_soak_hours', '24');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('vpn_probe_rate_firewall_per_hour', '20');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('vpn_probe_rate_user_per_hour', '30');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('vpn_ra_idle_days', '14');
+INSERT IGNORE INTO `settings` (`name`, `value`) VALUES ('vpn_stale_minutes', '30');
+
+-- -----------------------------------------------------------------------------
+-- Migration baseline: everything above already includes these migrations.
+-- -----------------------------------------------------------------------------
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0001_agent_auth_and_audit.sql', 'ce451086675c5be78c391c5a5f240b9d655e6e4a2a18d0a28c21437aacd4907e');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0002_backup_integrity.sql', 'c30840f642aafffdd2405b992ed08b9cef3ff40fa3ba276f720502ecd32bd09f');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0003_structured_commands.sql', 'b97872931cec66d3db0a5c5fc20d834b8e4455cd89f2755df66ec49204054b70');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0004_separate_agent_credentials.sql', '0a1a35b3b113ee0bdfb50619af8a4b00bf36b99bb361d15f32f0f1f3fb2ba723');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0005_widen_secret_columns.sql', '42ea8c6f3f39cf819b6aa94607ce38f7512ac655912a6bdc69c6e7805a85f30f');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0006_tunnel_session_ownership.sql', '8129bc2c4ad4b2aa091262e3ddee720c80c257c3bc95c24e0dd9985485b36908');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0007_msp_staff_roles.sql', '147c8b5dc79dcd1d2a7dd9a6af965ad3dfdb36b1eb4d01c517d6084b7056e4c6');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0008_customers_and_sites.sql', '9520e7aff9ccb06c6d0aa2cd3413fca4795270bdb7a7a6789090dc065e0dee97');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0009_config_drift.sql', '4d84e54b198b68efc4be5ec91aa2f7d74a6a863bbe6ac5cd23e56251ec985d3e');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0010_firewall_health.sql', '15180ee905ef49a0c2068c069dd4b66139e5514b1cdd94a3b4415c01748dd8dc');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0011_incidents_and_maintenance.sql', '9d0596ce56ffe4bffaa395c2851ff88356b09c0d682c8dc5e599b5e82cf7f570');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0012_fleet_updates_and_bulk.sql', 'fcbd12b55cf6c91cd7b369ac38c974bc0d85dcf61dcda2cb79435a864cfb1a37');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0013_restore_jobs.sql', '1ffa7bca039af5b5a2ccb1d480d6a3b96977a91a92f9f92f8323ef8c1a433135');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0014_backup_retention_days.sql', '2e7845a7eda30945a8648c1c21332210a8dad26405e0a07f0b41f4b06e4a2645');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0015_revalidate_firewall_fks.sql', 'f57077af8160a137ee1022ff7d95850f89bd5e28391e132dc74f393a7fdfc504');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0016_backup_fileless_grace.sql', '6d54729a8c6a08f95836bafeefe2f56da3ccdf933cc91f1befa2e3f448bb79c8');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0017_drop_license_subsystem.sql', 'ec1cb9ab9ffa27824ceb898e40613e6f3ff724aa6448c26e5fbebc3f7fcacab9');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0018_real_scheduled_tasks.sql', 'c673ca356685700b8803619caeab90af7b05c7eb7fb2cb01e3bf9fc0d4bf5563');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0019_telemetry_retention.sql', '832804ec892f6ad383e6b8d9b5cbeeb1a4807c512628e52edec9ee32d5825ed5');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0020_register_remaining_jobs.sql', '8c57efb12e5b256611203e29ad10fb2f14efb2d032a26e695c85b4735658cb3d');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0021_staged_agent_rollout.sql', 'd97ac44979ea6c3d7fc2ce527358dd41c8d041279dc02a12f459610565d48fc5');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0022_ai_scan_token_usage.sql', 'f3dd74b7a8c3bc0fc9390c37808001696e9ec87aa8d6ec03e3a528d8ce1fe96a');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0023_alert_policies.sql', 'd40b8cae7ab6569c5cb7325c255d620a1b30f6d68aedf314cf402b8b8c9ab986');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0024_platform_detection.sql', '9c5054a403304efc68247b741d6a9d572ec0a0b26ae0b5c15fbb2709db24205b');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0025_policy_templates.sql', 'fcb660742552c21b226ad85f937226524df05b074c36c32a769227c436191f3d');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0026_vpn_topology.sql', 'b1837e386caa15108d1bac9e8bd1d90542d67f0ef7d821696d6d028c5f7d244a');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0027_customer_reports.sql', '73459905779f50334c8788d92414c112cd46995457eab5cfd77dd25395590593');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0028_integrations.sql', '937b854f640c9460af123a2953bbbb110f104d6fe6661ca6217f600309709884');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0029_staff_customer_scopes.sql', '5ea3a294d544166deeb60203fa8d9cd3fac53e95e8cc53ef5f7670cd01cfcaa3');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0030_session_version.sql', '8662b107d4627045b1761872676946b1c8704140171c9c5e54d6c16dfa835c24');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0031_auto_reset_default_off.sql', '5076d067b73b939dbf4a5c7e6913d780ea17a381558cd57a284490c7c7596c8a');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0032_speedtest_accuracy.sql', '0678aafd71c5c18b9fa320fb46c3dfc7080765088ea1625e76d92fd89d4c07ce');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0033_speedtest_cpu_width.sql', '09da9c1742b02e1a82b4eeab6e549ee330a67d18b828071e3b8bf4204806d47c');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('0034_speedtest_ookla.sql', '22fc6403a866c49c76826966e5b1f572eed7326e26728cf6b324587c439a97ce');
+INSERT IGNORE INTO `schema_migrations` (`migration`, `checksum`) VALUES ('migration_v3.2.2_add_user_fields.sql', '30344d11a498e64663b68759ac283eb8ba00ba19c09dee0a9fb3f42a3f4304a1');

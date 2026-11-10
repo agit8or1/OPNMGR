@@ -287,6 +287,9 @@ if (PHP_SAPI !== 'cli') {
         echo json_encode(['success' => false, 'error' => 'Unauthorized']);
         exit;
     }
+    // A scan sends the firewall's configuration to the AI provider and stores
+    // the result; the same capability as changing its AI scan settings (3.80.3).
+    require_permission('firewall.manage');
 
     $input = json_decode(file_get_contents('php://input'), true);
 

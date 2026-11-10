@@ -6,6 +6,8 @@
  *    within the window after an enrolment token was redeemed for it.
  *  - An issued-but-unadopted credential stops being re-sent after the window.
  *  - With no settings row, raw shell is off and admin MFA is required.
+ *  - A clean install (schema.sql + migrate.php) stores those secure values,
+ *    and the migrations that seed them never overwrite a stored value (3.80.3).
  *
  *   tests/lib/make_test_db.sh && DB_NAME=opnsense_fw_test php tests/secure_defaults_test.php
  */
@@ -28,7 +30,7 @@ register_shutdown_function(function () use (&$made, $savedSettings) {
         }
         db()->prepare('DELETE FROM firewalls WHERE id = ?')->execute([$id]);
     }
-    db()->exec("DELETE FROM settings WHERE name IN ('raw_command_enabled','require_mfa_for_admins','agent_claim_window_hours')");
+    db()->exec("DELETE FROM settings WHERE name IN ('raw_command_enabled','require_mfa_for_admins','agent_claim_window_hours','agent_auth_mode')");
     foreach ($savedSettings as $k => $v) {
         db()->prepare('INSERT INTO settings (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)')->execute([$k, $v]);
     }
@@ -51,6 +53,43 @@ function first_checkin(int $fwId, string $hw): array {
     return call_endpoint('agent_checkin.php', ['body' => ['firewall_id' => $fwId, 'hardware_id' => $hw, 'agent_version' => '1.8.2']]);
 }
 $bound = fn(int $id) => (string)db()->query("SELECT COALESCE(hardware_id,'') FROM firewalls WHERE id = $id")->fetchColumn();
+
+// ===========================================================================
+// Before anything below changes a setting: the test database is a clean
+// install (schema.sql, then migrate.php), so what it stores is what a new
+// installation gets. Deleting the rows first, as this suite used to, only
+// tested the code default and missed migrations re-seeding insecure values.
+T::group('A clean install stores secure values');
+
+T::eq('0', $savedSettings['raw_command_enabled'] ?? null, 'schema.sql + migrate.php: raw shell stored off');
+T::eq('1', $savedSettings['require_mfa_for_admins'] ?? null, 'schema.sql + migrate.php: admin MFA stored required');
+T::eq('prefer_signed', $savedSettings['agent_auth_mode'] ?? null, 'schema.sql + migrate.php: agents prefer_signed');
+
+$pending = shell_exec('DB_NAME=' . escapeshellarg((string)getenv('DB_NAME')) . ' php '
+    . escapeshellarg(TEST_ROOT . '/scripts/migrate.php') . ' --status 2>&1');
+T::ok(is_string($pending) && preg_match('/\b0 pending\b/', $pending) && !str_contains($pending, 'WARNING'),
+    'every migration is recorded as applied, with its current checksum');
+
+// The migrations that seed these rows, run again where the rows are absent
+// (an install whose first migrate.php predates the schema baseline).
+db()->exec("DELETE FROM settings WHERE name IN ('raw_command_enabled','require_mfa_for_admins','agent_auth_mode')");
+db()->exec("DELETE FROM schema_migrations WHERE migration IN ('0001_agent_auth_and_audit.sql','0003_structured_commands.sql')");
+exec('DB_NAME=' . escapeshellarg((string)getenv('DB_NAME')) . ' php '
+    . escapeshellarg(TEST_ROOT . '/scripts/migrate.php') . ' 2>&1', $out, $rc);
+T::eq(0, $rc, 'migrations 0001 and 0003 re-apply cleanly');
+$seeded = db()->query("SELECT name, value FROM settings WHERE name IN
+    ('raw_command_enabled','require_mfa_for_admins','agent_auth_mode')")->fetchAll(PDO::FETCH_KEY_PAIR);
+T::eq('0', $seeded['raw_command_enabled'] ?? null, 'migrations seed raw shell off');
+T::eq('1', $seeded['require_mfa_for_admins'] ?? null, 'migrations seed admin MFA required');
+T::eq('prefer_signed', $seeded['agent_auth_mode'] ?? null, 'migrations seed prefer_signed');
+
+// And never overwrite a value an installation stored.
+db()->exec("UPDATE settings SET value = '1' WHERE name = 'raw_command_enabled'");
+db()->exec("DELETE FROM schema_migrations WHERE migration IN ('0001_agent_auth_and_audit.sql','0003_structured_commands.sql')");
+exec('DB_NAME=' . escapeshellarg((string)getenv('DB_NAME')) . ' php '
+    . escapeshellarg(TEST_ROOT . '/scripts/migrate.php') . ' 2>&1');
+T::eq('1', (string)db()->query("SELECT value FROM settings WHERE name = 'raw_command_enabled'")->fetchColumn(),
+    'a stored raw_command_enabled=1 survives the migrations re-running');
 
 db()->exec("UPDATE settings SET value = 'compatibility' WHERE name = 'agent_auth_mode'");
 db()->exec("DELETE FROM settings WHERE name = 'agent_claim_window_hours'");

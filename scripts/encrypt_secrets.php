@@ -6,7 +6,8 @@ opnmgr_block_direct_web_access(__FILE__);
  * Encrypt stored secrets in place.
  *
  * Walks the known credential columns and encrypts any value still held as
- * plaintext. Values already carrying the enc:v1: envelope are skipped, so this
+ * plaintext - anything written before encryption existed, or (before 3.80.3)
+ * while the master key was missing or invalid. Run it once the key is valid. Values already carrying the enc:v1: envelope are skipped, so this
  * is idempotent and safe to run on every upgrade.
  *
  * Requires OPNMGR_MASTER_KEY in .env (scripts/generate_master_key.php). Without
@@ -80,6 +81,13 @@ try {
     $total += encrypt_column($pdo, 'ai_settings', 'id', 'api_key', $dryRun);
 } catch (Throwable $e) {
     fwrite(STDERR, "  skipped ai_settings.api_key: " . $e->getMessage() . "\n");
+}
+
+// --- integration destination secrets (webhook URLs, tokens) -----------------
+try {
+    $total += encrypt_column($pdo, 'integration_destinations', 'id', 'secrets_enc', $dryRun);
+} catch (Throwable $e) {
+    fwrite(STDERR, "  skipped integration_destinations.secrets_enc: " . $e->getMessage() . "\n");
 }
 
 // --- settings (named credential keys only) ---------------------------------
