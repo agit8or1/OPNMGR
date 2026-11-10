@@ -20,12 +20,20 @@
  *      settled, before the second is eligible
  *   4. stops and holds rather than guessing when health cannot be confirmed
  *
+ * Customer-side checks (3.81.0, per campaign, off by default) add what the
+ * firewall's own check-in cannot show: whether workstations behind it still
+ * resolve internal names, reach services across the VPN and reach the
+ * internet. See inc/customer_checks.php. When a campaign uses them, a required
+ * check that fails or goes stale holds the next ring and the second member of
+ * a CARP pair; nothing else about dispatch or ordering changes.
+ *
  * @since 3.16.0
  */
 
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/agent_commands.php';
 require_once __DIR__ . '/maintenance.php';
+require_once __DIR__ . '/customer_checks.php';
 
 if (!defined('UPDATE_RINGS')) {
     define('UPDATE_RINGS', ['canary', 'pilot', 'production']);
@@ -254,9 +262,9 @@ if (!function_exists('campaign_create')) {
             db()->prepare(
                 'INSERT INTO update_campaigns
                     (name, description, target_version, operation, status, auto_progress,
-                     reboot_if_required, respect_maintenance, ha_safe,
+                     reboot_if_required, respect_maintenance, ha_safe, customer_checks,
                      created_by_user_id, created_by_username)
-                 VALUES (?,?,?,?,"draft",?,?,?,?,?,?)'
+                 VALUES (?,?,?,?,"draft",?,?,?,?,?,?,?)'
             )->execute([
                 substr($name, 0, 255),
                 substr(trim((string)($data['description'] ?? '')), 0, 512) ?: null,
@@ -266,6 +274,7 @@ if (!function_exists('campaign_create')) {
                 !empty($data['reboot_if_required']) ? 1 : 0,
                 array_key_exists('respect_maintenance', $data) ? (!empty($data['respect_maintenance']) ? 1 : 0) : 1,
                 array_key_exists('ha_safe', $data) ? (!empty($data['ha_safe']) ? 1 : 0) : 1,
+                !empty($data['customer_checks']) ? 1 : 0,
                 $_SESSION['user_id'] ?? null,
                 $_SESSION['username'] ?? null,
             ]);
@@ -289,7 +298,8 @@ if (!function_exists('campaign_create')) {
             'object_id'   => (string)$campaignId,
             'message'     => sprintf('Update campaign "%s" created over %d firewall(s)', $name, count($firewalls)),
             'metadata'    => ['operation' => $operation, 'targets' => count($firewalls),
-                              'auto_progress' => !empty($data['auto_progress'])],
+                              'auto_progress' => !empty($data['auto_progress']),
+                              'customer_checks' => !empty($data['customer_checks'])],
         ]);
 
         return ['ok' => true, 'error' => '', 'id' => $campaignId];
@@ -303,8 +313,13 @@ if (!function_exists('campaign_start_ring')) {
      * Explicit: nothing advances a campaign except this being called, either by
      * an operator or by the dispatcher when auto_progress is on and the
      * previous ring has soaked cleanly.
+     *
+     * With customer checks on, starting a later ring is held while an earlier
+     * ring's required customer checks are failing, stale or not yet in. An
+     * operator can start it anyway by giving $opts['override_reason'], which
+     * is audited; progression stays a human decision.
      */
-    function campaign_start_ring(int $campaignId, string $ring): array {
+    function campaign_start_ring(int $campaignId, string $ring, array $opts = []): array {
         if (!in_array($ring, UPDATE_RINGS, true)) {
             return ['ok' => false, 'error' => 'Unknown ring'];
         }
@@ -326,6 +341,29 @@ if (!function_exists('campaign_start_ring')) {
         $count->execute([$campaignId, $ring]);
         if ((int)$count->fetchColumn() === 0) {
             return ['ok' => false, 'error' => 'No firewalls in the ' . $ring . ' ring for this campaign'];
+        }
+
+        if ((int)($campaign['customer_checks'] ?? 0) === 1) {
+            $held = [];
+            foreach (array_slice(UPDATE_RINGS, 0, (int)array_search($ring, UPDATE_RINGS, true)) as $earlier) {
+                $gate = cc_ring_gate($campaignId, $earlier);
+                if (!$gate['ok']) {
+                    $held[] = $earlier . ': ' . implode('; ', array_slice($gate['reasons'], 0, 3));
+                }
+            }
+            if ($held) {
+                $override = trim((string)($opts['override_reason'] ?? ''));
+                if ($override === '') {
+                    return ['ok' => false, 'held' => true, 'error' => 'Held by customer checks - ' . implode(' | ', $held)
+                        . '. Fix the path, wait for a fresh result, or start anyway with a reason.'];
+                }
+                audit_log('update.campaign.customer_check_override', [
+                    'object_type' => 'update_campaign',
+                    'object_id'   => (string)$campaignId,
+                    'message'     => sprintf('Ring %s started over held customer checks: %s', $ring, substr($override, 0, 200)),
+                    'metadata'    => ['held' => $held, 'reason' => $override],
+                ]);
+            }
         }
 
         db()->prepare(
@@ -433,6 +471,39 @@ if (!function_exists('campaign_dispatch')) {
                 }
             }
 
+            // Customer-side checks: a fresh pre-update baseline, and for the
+            // second member of a CARP pair, healthy client paths after the
+            // first member's update. Runs after HA safety, so BACKUP-first
+            // ordering and partner settling are unchanged.
+            $baseline = null;
+            if ((int)($campaign['customer_checks'] ?? 0) === 1) {
+                $peer = db()->prepare(
+                    'SELECT t.*, f.hostname FROM firewalls me
+                       JOIN update_campaign_targets t ON t.firewall_id = me.ha_peer_firewall_id AND t.campaign_id = ?
+                       JOIN firewalls f ON f.id = t.firewall_id
+                      WHERE me.id = ? AND me.carp_enabled = 1 AND t.status = "succeeded"'
+                );
+                $peer->execute([$campaignId, $fid]);
+                if ($peerTarget = $peer->fetch(PDO::FETCH_ASSOC)) {
+                    $pe = cc_target_evaluation($peerTarget);
+                    if (in_array($pe['state'], ['fail', 'stale', 'waiting'], true)) {
+                        $why = sprintf('Customer checks after HA partner %s updated: %s',
+                            $peerTarget['hostname'], implode('; ', array_slice($pe['reasons'], 0, 2)));
+                        campaign_hold($t['id'], $why);
+                        $out['held']++;
+                        $out['notes'][] = $host . ': ' . $why;
+                        continue;
+                    }
+                }
+                $baseline = cc_baseline_snapshot($fid);
+                if (!$baseline['ok']) {
+                    campaign_hold($t['id'], $baseline['reason']);
+                    $out['held']++;
+                    $out['notes'][] = $host . ': ' . $baseline['reason'];
+                    continue;
+                }
+            }
+
             // Dispatch.
             $action = $campaign['operation'] === 'check' ? 'check_updates' : 'install_updates';
             $built  = build_structured_command($action, [], platform_firewall((int)$fid));
@@ -455,9 +526,12 @@ if (!function_exists('campaign_dispatch')) {
 
             db()->prepare(
                 'UPDATE update_campaign_targets
-                    SET status = "dispatched", command_id = ?, dispatched_at = NOW(), hold_reason = NULL
+                    SET status = "dispatched", command_id = ?, dispatched_at = NOW(), hold_reason = NULL,
+                        customer_baseline = ?
                   WHERE id = ?'
-            )->execute([$queued['command_id'], $t['id']]);
+            )->execute([$queued['command_id'],
+                        $baseline && $baseline['checks'] > 0 ? json_encode($baseline['snapshot'], JSON_UNESCAPED_SLASHES) : null,
+                        $t['id']]);
 
             db()->prepare(
                 'UPDATE firewalls SET last_update_attempt_at = NOW(), last_update_result = "dispatched" WHERE id = ?'
@@ -599,6 +673,16 @@ if (!function_exists('campaign_ring_is_clean')) {
         }
         if ($summary['pending'] + $summary['holding'] + $summary['dispatched'] > 0) {
             return ['clean' => false, 'reason' => 'ring is still in progress'];
+        }
+
+        $cc = db()->prepare('SELECT customer_checks FROM update_campaigns WHERE id = ?');
+        $cc->execute([$campaignId]);
+        if ((int)$cc->fetchColumn() === 1) {
+            $gate = cc_ring_gate($campaignId, $ring);
+            if (!$gate['ok']) {
+                return ['clean' => false, 'reason' => 'customer checks ' . $gate['state'] . ': '
+                    . implode('; ', array_slice($gate['reasons'], 0, 2)), 'customer' => $gate];
+            }
         }
 
         $soak = (int)fleet_update_setting('update_ring_soak_hours', 24);

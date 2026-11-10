@@ -79,6 +79,8 @@ $targets = [
     'firewall_latency'       => ['measured_at', $days],
     'firewall_traffic_stats' => ['recorded_at', $days],
     'system_logs'            => ['timestamp',   $logDays],
+    // Customer probe results (3.81.0): a row per check per minute per probe.
+    'customer_probe_results' => ['observed_at', telemetry_setting('customer_check_result_retention_days', 14, 1)],
 ];
 
 printf("Telemetry retention: %d days   Log retention: %d days   Mode: %s\n\n",

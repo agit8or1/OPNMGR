@@ -231,6 +231,31 @@ jobs:
       - name: Agent package suite
         run: php tests/agent_package_test.php
 
+      # A clean install had no agent package yet showed the install command;
+      # every failure a staged package can have must be refused with a fix.
+      - name: Agent release staging suite
+        run: php tests/agent_release_staging_test.php
+
+      # The README path on a copy of the tree with only tracked files: fresh
+      # database, release built and signed, staged, command shown, installer
+      # verifies (verify-only), enrollment and first check-in.
+      - name: Clean manager to first firewall
+        env:
+          DB_NAME: opnsense_fw_test_clean
+          OPNMGR_TEST_MYSQL: mysql -h 127.0.0.1 -u root -pci-root
+        run: php tests/clean_install_enrollment_test.php
+
+      # Customer-side checks on update rings: healthy rollout, offline probe,
+      # online firewall with a failed client path, CARP pair, tenant scoping.
+      - name: Customer checks suite
+        run: php tests/customer_checks_test.php
+
+      - name: Customer probe unit tests
+        run: python3 -I tools/opnmgr-probe/test_probe.py
+
+      - name: Customer probe end to end (real probe, local manager)
+        run: php tests/customer_probe_e2e_test.php
+
       # The scheduled jobs page described five jobs, three of which had never
       # been scheduled, behind an endpoint that was fatal on every request.
       - name: Scheduled jobs suite

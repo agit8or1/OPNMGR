@@ -2,7 +2,66 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: November 9, 2026
+**Last Updated**: November 10, 2026
+
+---
+
+## Version 3.81.0
+**Released**: November 10, 2026 | **Agent**: v1.8.2 (unchanged)
+
+### Fixed — clean-install enrollment
+
+- A clean install could not enroll its first firewall. `downloads/` is gitignored, so a
+  fresh clone had no `os-opnmanager-agent-<version>.tar.gz`, but Settings and Add
+  Firewall showed the install command anyway, and the firewall then failed on a 404.
+  Now the command appears only after the package for this manager's agent version has
+  been verified and staged. Until then the page shows the reason and the command that
+  fixes it.
+
+### Added
+
+- **Signed agent releases.** `.github/workflows/release.yml` runs when a release is
+  published. It builds the OPNsense agent from `plugin/os-opnmanager-agent/` twice and
+  requires identical bytes, signs a release record (version, SHA-256, size, minimum
+  manager version, source commit) with the project key, verifies and stages the result
+  as a clean manager would, and attaches the package and record to the release. The
+  public key is pinned in `config/agent_release_keys.pub`. The workflow needs the
+  repository secret `OPNMGR_AGENT_RELEASE_KEY`.
+- **`scripts/stage_agent_package.php`.** With no arguments it downloads and verifies the
+  release for this version. `--import <dir>` stages files you copied over yourself (for
+  offline managers), or upload them on Add Firewall. `--build-local` builds from the
+  checkout. `--status` reports readiness. It refuses a package that is missing,
+  corrupted, truncated, tampered with, signed by an untrusted key, the wrong agent
+  version, the pfSense agent, or one that needs a newer manager, and says what to do in
+  each case.
+- **Customer checks.** A probe runs on a customer network: the standalone
+  `tools/opnmgr-probe/opnmgr_probe.py`, or Rem0te running the same script. It belongs to
+  one customer, sits behind one of that customer's firewalls (and covers its CARP
+  partner), and runs only approved checks of three kinds: internal DNS, TCP to a private
+  address across the VPN, and HTTPS to a public host. Configure probes under
+  **Customer Checks**.
+- **Customer path checks on campaigns** (off by default). Before dispatch, each required
+  check needs a fresh result, which is stored as the baseline. After the update, every
+  required check must report healthy again before the ring counts as clean or the next
+  ring can start; a probe that stops reporting holds the ring in the same way. The second
+  member of a CARP pair waits for healthy client paths after the first member's update.
+  The campaign view names the firewall, probe and path that failed, and whether it was
+  already failing before the update.
+
+### Changed
+
+- Install and reinstall commands carry `OPNMGR_AGENT_SHA256`. The installer verifies the
+  download, extracts it to a private temporary directory and checks the agent version
+  inside, all before it changes anything on the firewall. `OPNMGR_VERIFY_ONLY=1` stops
+  after verifying.
+- Staging never replaces or deletes a package. A staged version with different bytes is
+  reported as a conflict. A package already present without a record (every install
+  before 3.81.0) is adopted only if it is byte-identical to a build of the tracked source.
+- A held ring can still be started by hand: give a reason, and it is audited.
+- Migration `0035_customer_path_checks` adds three tables and two nullable/defaulted
+  columns. Existing campaigns are unchanged.
+
+See [docs/UPGRADING.md](docs/UPGRADING.md#upgrading-to-3810).
 
 ---
 

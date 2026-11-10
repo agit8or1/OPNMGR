@@ -8,6 +8,7 @@ header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/inc/security_posture.php';
 require_once __DIR__ . '/inc/agent_version.php';
+require_once __DIR__ . '/inc/agent_package.php';
 require_once __DIR__ . '/inc/alert_policy.php';
 requireLogin();
 
@@ -816,15 +817,18 @@ include __DIR__ . '/inc/header.php';
                                         //
                                         // It exists because the alternative, when an agent stops, is an
                                         // operator at a console composing this from memory.
-                                        $reinstall_base = opnmgr_server_url();
+                                        // Built by agent_install_command(), which shows it only when the
+                                        // agent package is verified and staged, and adds its checksum.
                                         $reinstall_hwid = (string)($firewall['hardware_id'] ?? '');
-                                        if ($reinstall_base !== ''):
-                                            $reinstall_cmd = 'fetch -o - ' . $reinstall_base . '/downloads/plugins/install_opnmanager_agent.sh \\' . "\n"
-                                                . '  | env OPNMGR_BASE_URL=' . $reinstall_base;
-                                            if (preg_match('/^[0-9a-f]{32}$/', $reinstall_hwid)) {
-                                                $reinstall_cmd .= ' \\' . "\n" . '        OPNMGR_HARDWARE_ID=' . $reinstall_hwid;
-                                            }
-                                            $reinstall_cmd .= ' sh';
+                                        $reinstall = agent_install_command([
+                                            'hardware_id' => (string)($firewall['hardware_id'] ?? ''),
+                                            'multiline'   => true,
+                                        ]);
+                                        if (!$reinstall['ok'] && $reinstall['code'] !== 'manager_url'):
+                                            echo agent_install_unavailable_html($reinstall);
+                                        endif;
+                                        if ($reinstall['ok']):
+                                            $reinstall_cmd = $reinstall['command'];
                                         ?>
                                         <div class="mb-3" style="background-color: rgba(108,117,125,0.12); padding: 0.75rem; border-radius: 0.25rem; border-left: 3px solid #6c757d;">
                                             <div class="d-flex justify-content-between align-items-start">
@@ -846,7 +850,7 @@ include __DIR__ . '/inc/header.php';
                                             </small>
                                             <?php endif; ?>
                                         </div>
-                                        <?php else: ?>
+                                        <?php elseif ($reinstall['code'] === 'manager_url'): ?>
                                         <div class="mb-3 text-muted" style="font-size:0.8rem;">
                                             <i class="fas fa-info-circle"></i>
                                             Set this manager's URL in Settings to show a reinstall command.

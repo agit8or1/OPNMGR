@@ -30,6 +30,72 @@ echo "OPNManager Agent Plugin Installer v${PLUGIN_VERSION}"
 echo "=========================================="
 echo ""
 
+# Download and verify first, before anything on this firewall is changed: a
+# missing, truncated or substituted package must leave the box exactly as it
+# was. OPNMGR_AGENT_SHA256 is supplied by the command the manager shows, which
+# it only shows once it has verified and staged the package itself (3.81.0+).
+# OPNMGR_VERIFY_ONLY=1 stops after this step and changes nothing at all.
+sha256_of() {
+    if command -v sha256 >/dev/null 2>&1; then
+        sha256 -q "$1"
+    else
+        sha256sum "$1" | cut -d' ' -f1
+    fi
+}
+
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/opnmanager-agent.XXXXXX") || {
+    echo "ERROR: could not create a temporary directory"
+    exit 1
+}
+trap 'rm -rf "$WORK_DIR"' EXIT
+PACKAGE="$WORK_DIR/opnmanager-agent.tar.gz"
+
+echo "Downloading plugin..."
+if ! fetch -q -o "$PACKAGE" "$PLUGIN_URL" || [ ! -s "$PACKAGE" ]; then
+    echo "ERROR: Failed to download $PLUGIN_URL"
+    echo "       The manager has not staged agent ${PLUGIN_VERSION}, or this firewall cannot reach it."
+    echo "       On the manager: php scripts/stage_agent_package.php --status"
+    exit 1
+fi
+
+if [ -n "$OPNMGR_AGENT_SHA256" ]; then
+    if ! echo "$OPNMGR_AGENT_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+        echo "ERROR: OPNMGR_AGENT_SHA256 is not a SHA-256 checksum"
+        exit 1
+    fi
+    ACTUAL_SHA256=$(sha256_of "$PACKAGE")
+    if [ "$ACTUAL_SHA256" != "$OPNMGR_AGENT_SHA256" ]; then
+        echo "ERROR: The downloaded package does not match the checksum the manager verified."
+        echo "       expected $OPNMGR_AGENT_SHA256"
+        echo "       got      $ACTUAL_SHA256"
+        echo "       Nothing was installed. Re-copy the command from OPNManager; if it"
+        echo "       repeats, something between this firewall and the manager altered it."
+        exit 1
+    fi
+    echo "Package checksum verified: $ACTUAL_SHA256"
+else
+    echo "WARNING: no OPNMGR_AGENT_SHA256 supplied; the package is not checksum-verified."
+    echo "         Copy the install command from OPNManager (3.81.0+), which includes it."
+fi
+
+echo "Extracting plugin..."
+if ! tar -xzf "$PACKAGE" -C "$WORK_DIR"; then
+    echo "ERROR: Failed to extract plugin (corrupt or incomplete download)"
+    exit 1
+fi
+
+PACKAGED_VERSION=$(grep '^AGENT_VERSION=' "$WORK_DIR/opnsense/scripts/OPNsense/OPNManagerAgent/agent.sh" 2>/dev/null \
+                   | head -1 | cut -d'"' -f2)
+if [ "$PACKAGED_VERSION" != "$PLUGIN_VERSION" ]; then
+    echo "ERROR: The package contains agent '${PACKAGED_VERSION:-unknown}', not ${PLUGIN_VERSION}. Nothing was installed."
+    exit 1
+fi
+
+if [ "$OPNMGR_VERIFY_ONLY" = "1" ]; then
+    echo "Verified agent ${PACKAGED_VERSION}. OPNMGR_VERIFY_ONLY=1: nothing installed or changed."
+    exit 0
+fi
+
 # Check if running as root
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: This script must be run as root"
@@ -73,22 +139,7 @@ if [ -n "$OPNMGR_HARDWARE_ID" ]; then
     fi
 fi
 
-echo "Downloading plugin..."
-cd /tmp
-fetch -q "$PLUGIN_URL" -o opnmanager-agent.tar.gz
-
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to download plugin"
-    exit 1
-fi
-
-echo "Extracting plugin..."
-tar -xzf opnmanager-agent.tar.gz
-
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to extract plugin"
-    exit 1
-fi
+cd "$WORK_DIR" || exit 1
 
 echo "Installing plugin files..."
 
@@ -230,7 +281,5 @@ echo "  2. Click Save, then copy the Hardware ID"
 echo "  3. Add firewall in OPNManager using Hardware ID"
 echo ""
 
-# Cleanup
-rm -rf /tmp/opnmanager-agent.tar.gz /tmp/opnsense /tmp/etc
-
+# Cleanup: the EXIT trap removes $WORK_DIR.
 exit 0

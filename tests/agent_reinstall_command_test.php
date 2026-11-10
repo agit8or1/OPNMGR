@@ -40,11 +40,17 @@ check('a reinstall command is rendered', str_contains($page, 'id="reinstallCmd"'
 check('it is bound to this firewall, not a generic example',
     str_contains($page, "\$firewall['hardware_id']"),
     'a generic command lets a rebuilt firewall enrol as a new record');
+// Since 3.81.0 the command is built by agent_install_command() (inc/agent_package.php),
+// which also refuses to build one until the agent package is verified and staged.
+$builder = (string) @file_get_contents($root . '/inc/agent_package.php');
+check('the page builds the command with agent_install_command()',
+    str_contains($page, 'agent_install_command(') && str_contains($page, "'hardware_id' =>"));
 check('the hardware id is validated before being shown',
-    substr_count($page, "preg_match('/^[0-9a-f]{32}$/', \$reinstall_hwid)") >= 2,
+    str_contains($builder, "preg_match('/^[0-9a-f]{32}$/', \$hw)")
+        && str_contains($page, "preg_match('/^[0-9a-f]{32}$/', \$reinstall_hwid)"),
     'a malformed id in a copy-paste command is worse than none');
 check('the manager URL comes from configuration',
-    str_contains($page, 'opnmgr_server_url()'),
+    str_contains($builder, 'opnmgr_server_url()'),
     'never a hardcoded host');
 check('a missing manager URL is explained rather than rendered as a broken command',
     str_contains($page, "Set this manager's URL in Settings"));
