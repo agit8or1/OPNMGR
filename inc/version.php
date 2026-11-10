@@ -12,7 +12,7 @@ $app_version = file_exists($version_file) ? trim(file_get_contents($version_file
 if (!defined('APP_NAME')) { define('APP_NAME', 'OPNManager'); }
 if (!defined('APP_VERSION')) { define('APP_VERSION', $app_version); }
 if (!defined('APP_VERSION_DATE')) { define('APP_VERSION_DATE', '2026-11-10'); }
-if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'From the customer side'); }
+if (!defined('APP_VERSION_NAME')) { define('APP_VERSION_NAME', 'Second factor, first try'); }
 
 // AGENT_VERSION is THE single constant for "newest agent available to install".
 // Its value must match the newest released tarball in downloads/plugins/, because
@@ -50,6 +50,17 @@ function getChangelogEntries($limit = 10) {
     // $limit was accepted and ignored: about.php asks for 3 and rendered the
     // entire history. Slice before returning.
     $entries = [
+        [
+            'version' => '3.81.2',
+            'date' => '2026-11-10',
+            'type' => 'patch',
+            'title' => 'Second factor, first try',
+            'changes' => [
+                'FIXED: Two-factor login rejected every code. twofactor_setup.php stores the TOTP secret as hex, but verify2fa.php base32-decoded it, deriving the wrong key, so enrolment succeeded and every subsequent login failed. Login now uses TwoFactorAuth::verifyStored(), which decodes the stored hex',
+                'IMPROVED: The two-factor challenge page is a standalone page matching the login screen (theme toggle, large code field, one-time-code autofill, back-to-sign-in link) instead of the app layout',
+                'CHANGED: Login page styles moved to assets/css/auth.css, shared by login.php and verify2fa.php',
+            ],
+        ],
         [
             'version' => '3.81.1',
             'date' => '2026-11-10',
