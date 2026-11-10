@@ -27,9 +27,11 @@ foreach (['WebA', 'WebB'] as $n) {
 $mkUsers = [];
 register_shutdown_function(function () use (&$mkUsers) { foreach ($mkUsers as $u) { db()->prepare('DELETE FROM user_customer_scopes WHERE user_id = ?')->execute([$u]); db()->prepare('DELETE FROM users WHERE id = ?')->execute([$u]); } });
 /** A real users row (the session is re-validated against it on every request). $scope: customer ids, or [] for unrestricted. */
+// Fixture accounts count as enrolled in two-factor: clean installs require it for
+// administrators (require_mfa_for_admins = 1), and this suite is not about MFA.
 function user_session(string $role, array $scope = []): array {
     global $mkUsers;
-    db()->prepare('INSERT INTO users (username, password, role, is_active) VALUES (?,?,?,1)')->execute(['__web_' . $role . bin2hex(random_bytes(3)), 'x', $role]);
+    db()->prepare('INSERT INTO users (username, password, role, is_active, totp_secret) VALUES (?,?,?,1,"enc:v1:test-fixture-enrolled")')->execute(['__web_' . $role . bin2hex(random_bytes(3)), 'x', $role]);
     $id = (int)db()->lastInsertId(); $mkUsers[] = $id;
     foreach ($scope as $c) { db()->prepare('INSERT INTO user_customer_scopes (user_id, customer_id) VALUES (?, ?)')->execute([$id, $c]); }
     return ['user_id' => $id, 'username' => 'u' . $id, 'role' => $role, 'session_version' => 0, 'login_time' => time(), 'last_activity' => time(), 'last_regenerated' => time(), 'csrf_token' => 'tok123'];

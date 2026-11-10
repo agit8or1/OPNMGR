@@ -75,7 +75,7 @@ include __DIR__ . '/inc/header.php';
     <p class="text-muted small">Send incident and report events to email, chat and ticketing systems. Nothing is sent until a destination and a routing rule exist.</p>
     <?php integration_nav('integrations.php'); echo $message; ?>
     <?php if (!opnmgr_crypto_available()): ?>
-        <div class="alert alert-warning">No master key is configured, so destination secrets are stored unencrypted. Run <code>php scripts/generate_master_key.php</code>.</div>
+        <div class="alert alert-warning"><?= htmlspecialchars(opnmgr_crypto_status()['message'], ENT_QUOTES) ?> Destinations cannot be saved until this is fixed.</div>
     <?php endif; ?>
 
     <div class="card mb-3"><div class="card-body">

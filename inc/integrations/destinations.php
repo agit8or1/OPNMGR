@@ -66,9 +66,14 @@ if (!function_exists('integration_destination_save')) {
 
         $enum = fn($v, array $ok, $def) => in_array($v, $ok, true) ? $v : $def;
         $cust = ($in['customer_id'] ?? '') === '' ? null : (int)$in['customer_id'];
+        try {
+            $secretsEnc = opnmgr_encrypt(json_encode($secrets, JSON_UNESCAPED_SLASHES));
+        } catch (OpnmgrCryptoUnavailable $e) {
+            return ['ok' => false, 'error' => $e->getMessage(), 'id' => 0];
+        }
         $row = [
             $name, $type, empty($in['disabled']) ? 1 : 0, $cust,
-            json_encode($config, JSON_UNESCAPED_SLASHES), opnmgr_encrypt(json_encode($secrets, JSON_UNESCAPED_SLASHES)),
+            json_encode($config, JSON_UNESCAPED_SLASHES), $secretsEnc,
             $allowInternal ? 1 : 0, $enum($in['ip_change_policy'] ?? 'warn', ['warn', 'block'], 'warn'),
             max(1, min(10, (int)($in['concurrency_limit'] ?? 2))), max(1, min(20, (int)($in['max_attempts'] ?? 6))),
             max(2, min(60, (int)($in['timeout_seconds'] ?? 10))),

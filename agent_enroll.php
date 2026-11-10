@@ -38,40 +38,56 @@ if (empty($token) || empty($hardware_id)) {
     exit;
 }
 
+// One token enrols one agent. The token row is locked and claimed with a
+// conditional UPDATE before the firewall is touched, all in one transaction, so
+// two requests carrying the same token cannot both bind a hardware_id; if the
+// firewall update fails, the claim is rolled back and the token stays usable.
+$pdo = db();
 try {
-    // Look up the enrollment token
-    $stmt = db()->prepare('
-        SELECT id, firewall_id, expires_at, used_at, used
+    $pdo->beginTransaction();
+
+    $stmt = $pdo->prepare('
+        SELECT id, firewall_id, used_at, used, (expires_at > NOW()) AS live
         FROM enrollment_tokens
         WHERE token = ?
+        FOR UPDATE
     ');
     $stmt->execute([$token]);
     $enrollment = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    $refuse = function (int $status, string $message) use ($pdo) {
+        $pdo->rollBack();
+        http_response_code($status);
+        echo json_encode(['success' => false, 'message' => $message]);
+        exit;
+    };
+
     if (!$enrollment) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Invalid enrollment token']);
-        exit;
+        $refuse(404, 'Invalid enrollment token');
     }
-
-    // Check if token is already used
     if ($enrollment['used'] || $enrollment['used_at']) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Enrollment token has already been used']);
-        exit;
+        $refuse(400, 'Enrollment token has already been used');
+    }
+    if (!(int)$enrollment['live']) {
+        $refuse(400, 'Enrollment token has expired');
     }
 
-    // Check if token is expired
-    if (strtotime($enrollment['expires_at']) < time()) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Enrollment token has expired']);
-        exit;
+    $claim = $pdo->prepare('
+        UPDATE enrollment_tokens
+        SET used = 1,
+            used_at = NOW(),
+            hardware_id = ?
+        WHERE id = ? AND used = 0 AND used_at IS NULL AND expires_at > NOW()
+    ');
+    $claim->execute([$hardware_id, $enrollment['id']]);
+    if ($claim->rowCount() !== 1) {
+        $refuse(400, 'Enrollment token has already been used');
     }
 
     $firewall_id = $enrollment['firewall_id'];
 
     // Update the firewall with the hardware_id and mark it as enrolled
-    $stmt = db()->prepare('
+    $stmt = $pdo->prepare('
         UPDATE firewalls
         SET hardware_id = ?,
             hostname = COALESCE(NULLIF(?, ""), hostname),
@@ -83,15 +99,7 @@ try {
     ');
     $stmt->execute([$hardware_id, $hostname, $agent_version, $firewall_id]);
 
-    // Mark the enrollment token as used
-    $stmt = db()->prepare('
-        UPDATE enrollment_tokens
-        SET used = 1,
-            used_at = NOW(),
-            hardware_id = ?
-        WHERE id = ?
-    ');
-    $stmt->execute([$hardware_id, $enrollment['id']]);
+    $pdo->commit();
 
     // Log the successful enrollment
     log_info('enrollment', "Firewall enrolled successfully via token", null, $firewall_id, [
@@ -106,7 +114,10 @@ try {
         'firewall_id' => $firewall_id
     ]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log("Enrollment error: " . $e->getMessage() . " | Trace: " . $e->getTraceAsString());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Internal server error']);

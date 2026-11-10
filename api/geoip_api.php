@@ -20,6 +20,10 @@ $response = ['success' => false, 'error' => null, 'data' => null];
 try {
     $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+    // add/toggle/delete change blocking policy: operators only (3.80.1). Gated
+    // on the action, not the request method, so it holds whatever the method.
+    require_permission(in_array($action, ['add', 'toggle', 'delete'], true) ? 'firewall.manage' : 'firewall.view');
+
     // CSRF validation for state-changing actions
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $csrf_token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
@@ -28,8 +32,6 @@ try {
             echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
             exit;
         }
-        // add/toggle/delete change blocking policy: operators only (3.80.1)
-        require_permission('firewall.manage');
     }
 
     switch ($action) {

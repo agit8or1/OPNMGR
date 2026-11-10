@@ -30,15 +30,21 @@ php scripts/migrate.php             # apply pending migrations
 
 3. **Never edit a migration that has shipped.** The runner warns about checksum
    drift in `--status`, but an already-applied file is not re-run. Add a new
-   migration instead.
+   migration instead. (One deliberate exception: in 3.80.3, 0001 and 0003 had their
+   `INSERT IGNORE` defaults changed to the secure values, which only affects a
+   database where those rows do not exist yet. Installations that applied the old
+   files see a checksum warning for them in `--status`; it is expected.)
 
 4. **Preserve data.** Widening a column, adding a nullable column and
    backfilling, or adding a new table are all fine. Dropping or narrowing a
    column needs an explicit, separately reviewed migration.
 
-5. **Keep `database/schema.sql` in step.** Clean installs load that file, so
-   regenerate it (`scripts/generate_schema.sh`) whenever a migration changes the
-   schema, or fresh installations will be missing the change.
+5. **Regenerate `database/schema.sql` whenever you add or change a migration**
+   (`scripts/generate_schema.sh`). Clean installs load that file. It applies every
+   migration to a scratch copy of the structure, then publishes the result: the
+   structure, the rows the migrations seed, and a `schema_migrations` baseline with
+   each file's checksum, so the first `migrate.php` on a clean install does nothing.
+   CI fails if a clean install still has a pending or changed migration.
 
 6. **Do not put secrets in migrations.** Credentials are generated at runtime by
    the application, never seeded here.

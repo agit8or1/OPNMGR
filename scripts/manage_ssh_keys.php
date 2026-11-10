@@ -188,6 +188,13 @@ function ensure_ssh_key($firewall_id, $force_regenerate = false, $allow_blocking
     }
 
     if ($needs_new_key) {
+        // The private key can only be stored encrypted. Refuse before a key is
+        // generated and deployed, not after, or the firewall would trust a key
+        // the manager never recorded.
+        if (!opnmgr_crypto_available()) {
+            return ['success' => false, 'error' => opnmgr_crypto_status()['message']];
+        }
+
         // Generate new key pair
         error_log("Generating new SSH key pair for firewall {$firewall_id}");
         $key_result = generate_ssh_keypair($firewall_id);

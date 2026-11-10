@@ -35,7 +35,7 @@ $strip = fn(string $s): string => preg_replace(['~//[^\n]*~', '~/\*.*?\*/~s'], '
 // 1. No query built by interpolation, outside a reviewed few.
 // ---------------------------------------------------------------------------
 //
-// prepare() with placeholders is the rule. These five interpolate, and each was
+// prepare() with placeholders is the rule. These interpolate, and each was
 // read: the value is either an int clamped to a range, a ternary between two
 // literal strings, or a table name from a hardcoded list. Removing an entry is
 // fine; adding one means someone should look at it.
@@ -46,6 +46,7 @@ $reviewed = [
     'scripts/encrypt_secrets.php', // table/column from hardcoded call sites
     'scripts/demo_fixture.php',  // table names from a hardcoded array
     'cron/prune_telemetry.php',  // table and column from the $targets map above it
+    'scripts/schema_baseline.php', // table/column names from information_schema of a scratch opnsense_fw_test* DB
 ];
 
 $interpolated = [];

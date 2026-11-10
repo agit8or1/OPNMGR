@@ -386,17 +386,25 @@ if (function_exists('can') && can('settings.manage')) {
             echo '<div class="container-fluid pt-3">' . $opnmgr_signing_banner . '</div>';
         }
 
-        // Without a master key every agent key, SSH key, TOTP secret and
-        // SMTP/AI credential is written to the database in plaintext, and the
-        // only trace used to be one error_log line (3.80.1).
-        if (function_exists('opnmgr_master_key') && (opnmgr_master_key() === null || !extension_loaded('sodium'))) {
-            echo '<div class="container-fluid pt-3"><div class="alert alert-danger mb-0">'
-               . '<i class="fas fa-key me-2"></i><strong>Secrets are stored unencrypted.</strong> '
-               . 'OPNMGR_MASTER_KEY is not set'
-               . (extension_loaded('sodium') ? '' : ' (and the PHP sodium extension is missing)')
-               . ', so firewall API keys, SSH keys, TOTP secrets and mail/AI credentials are in the database as plaintext. '
-               . 'On the server run <code>php scripts/generate_master_key.php</code>, back up <code>.env</code>, '
-               . 'then <code>php scripts/encrypt_secrets.php</code>.</div></div>';
+        // Without a usable master key - unset, malformed, or no sodium
+        // extension - new secrets are refused (3.80.3; before that they were
+        // written in plaintext) and agents, SSH keys, two-factor and mail/AI
+        // credentials cannot be set up. Each cause gets its own fix.
+        if (function_exists('opnmgr_crypto_status')) {
+            $opnmgr_crypto = opnmgr_crypto_status();
+            if (!$opnmgr_crypto['ok']) {
+                $opnmgr_crypto_title = [
+                    'missing_key'   => 'No master key is configured.',
+                    'malformed_key' => 'The master key is invalid.',
+                    'no_sodium'     => 'Secrets cannot be encrypted.',
+                ][$opnmgr_crypto['reason']] ?? 'Secrets cannot be encrypted.';
+                echo '<div class="container-fluid pt-3"><div class="alert alert-danger mb-0">'
+                   . '<i class="fas fa-key me-2"></i><strong>' . htmlspecialchars($opnmgr_crypto_title, ENT_QUOTES) . '</strong> '
+                   . htmlspecialchars($opnmgr_crypto['message'], ENT_QUOTES) . ' '
+                   . 'Until then OPNManager refuses to store new firewall API keys, SSH keys, TOTP secrets and mail/AI credentials. '
+                   . 'Once it is fixed, back up <code>.env</code> and run <code>php scripts/encrypt_secrets.php</code> '
+                   . 'to encrypt anything stored in plaintext before.</div></div>';
+            }
         }
     } catch (Throwable $e) {
         // A warning banner must never be able to take the page down.

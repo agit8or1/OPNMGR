@@ -4,11 +4,15 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 header('Content-Type: application/json');
 
 // Check if user is logged in and is admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    http_response_code(403);
+// Administrators only, as before; settings.manage is the admin-only capability
+// alert policy uses on the firewall page, and is checked against the role as
+// it is now rather than as it was at login.
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
+require_permission('settings.manage');
 
 // Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);

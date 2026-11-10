@@ -44,9 +44,9 @@ if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')))
 
 // Changing a customer's outbound policy is not something a read-only or
 // technician account should be able to do from a toggle.
-if (function_exists('requireAdmin')) {
-    requireAdmin();
-}
+// security.manage is administrator-only, and answers JSON rather than
+// redirecting; the function_exists() guard this replaced could skip the check.
+require_permission('security.manage');
 
 $firewall_id = (int) ($_POST['firewall_id'] ?? 0);
 $enable      = (int) ($_POST['enable'] ?? 0) === 1;

@@ -13,6 +13,10 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
+// Queueing, polling and answering proxied requests all write to the queue;
+// only reading a response is a view.
+require_permission($action === 'get_response' ? 'firewall.view' : 'firewall.manage');
+
 switch ($action) {
     case 'queue_request':
         // queueRequest() inserts an arbitrary method, path, headers and body to
@@ -24,7 +28,6 @@ switch ($action) {
         // proxy.php calls this over HTTP to localhost without forwarding a
         // session cookie, so that call has always been rejected by
         // requireLogin() and is not what this protects - see the release notes.
-        require_permission('firewall.manage');
         if (!csrf_verify($_POST['csrf'] ?? ($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')))) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);

@@ -6,6 +6,35 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.80.3
+**Released**: November 9, 2026 | **Agent**: v1.8.2
+
+### Security
+
+- Security hardening.
+
+### Changed — read before upgrading
+
+- `database/schema.sql` seeds the default settings and records every migration it
+  includes, so `php scripts/migrate.php` after a fresh import changes nothing. Clean
+  installs start with raw shell off, administrator two-factor required and
+  `agent_auth_mode = prefer_signed`. Existing installs keep the values they stored.
+  `migrate.php --status` reports a checksum change for migrations 0001 and 0003; it is
+  expected.
+- Secrets are never stored in plaintext. Without a usable `OPNMGR_MASTER_KEY` (unset,
+  malformed, or no sodium extension) they are refused with the reason, the administrator
+  banner names the cause, and `scripts/create_admin.php` stops if the key is not usable.
+  `scripts/encrypt_secrets.php` now also covers integration destination secrets.
+- More endpoints require a capability from the permission matrix. See
+  [docs/UPGRADING.md](docs/UPGRADING.md#upgrading-to-3803).
+
+### Documentation
+
+- The 3.79.2 note on agent auto-update described the reference installation; the
+  shipped default is off.
+
+---
+
 ## Version 3.80.2
 **Released**: November 9, 2026 | **Agent**: v1.8.2
 
@@ -142,8 +171,11 @@ and nothing else, so the readonly role meant nothing on them.
 
 ### Changed
 
-- Agent auto-update is on (`agent_rollout_auto_promote = 1`): a newly
-  published agent is promoted to the fleet automatically.
+- Agent auto-update was switched on for the reference installation
+  (`agent_rollout_auto_promote = 1`), so a newly published agent is promoted to its
+  fleet automatically. This is not the shipped default: new and upgraded installs keep
+  `0` (staged rollout, promote by hand) unless an administrator turns it on under
+  **Settings**.
 
 ---
 

@@ -245,6 +245,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_alert_policy']))
 
 // Handle configuration updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_config'])) {
+    // Check-in interval, customer, tags and allowed WebGUI IPs: this edits the
+    // firewall.
+    require_permission('firewall.manage');
     if (!csrf_verify($_POST['csrf'] ?? '')) {
         $notice = 'CSRF verification failed.';
     } else {

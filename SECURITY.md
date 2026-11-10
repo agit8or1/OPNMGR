@@ -100,10 +100,12 @@ Set `agent_auth_mode` in the settings table:
 | Mode | Behaviour |
 |---|---|
 | `compatibility` | Signatures verified when present, never required. Default for upgrades. |
-| `prefer_signed` | As above, but required once an agent has proven it can sign. |
+| `prefer_signed` | As above, but required once an agent has proven it can sign. Default for clean installs since 3.80.3. |
 | `require_signed` | Required from every agent, no exceptions. |
 
-Existing installations default to `compatibility`. Move to `prefer_signed` once
+Installations from before 3.80.3 keep the `compatibility` they stored; clean installs
+start at `prefer_signed`, which accepts an agent that has never signed and so cannot
+lock out a new enrolment. On an older installation, move to `prefer_signed` once
 `SELECT hostname, api_key_confirmed FROM firewalls` shows `1` everywhere.
 
 ---
@@ -124,13 +126,15 @@ Encryption is only for values that must be recovered.
 
 The master key lives in `.env` as `OPNMGR_MASTER_KEY`, never in the database, so a
 database-only compromise — SQL injection, a stolen dump, a replica — does not yield
-plaintext secrets. **Without it, secrets are stored in plaintext**; since 3.80.1
-`scripts/create_admin.php` generates the key if it is missing, and every administrator
-page shows a red banner until one is configured.
+plaintext secrets. **Without a usable key — unset, malformed, or no sodium extension —
+new secrets are refused, not stored** (since 3.80.3). Agent credentials are not issued, and two-factor enrolment and saving SMTP,
+AI or integration credentials fail with the reason. `scripts/create_admin.php`
+generates the key if it is missing and stops if the result is not usable, and every
+administrator page shows a red banner naming the cause until it is fixed.
 
 ```bash
 php scripts/generate_master_key.php   # generate; appends to .env, never overwrites
-php scripts/encrypt_secrets.php       # backfill existing plaintext; idempotent
+php scripts/encrypt_secrets.php       # encrypt anything stored in plaintext before; idempotent
 ```
 
 Back the key up. Encrypted values cannot be recovered without it, and changing it makes
@@ -154,7 +158,8 @@ control.
 
 **Raw shell** (`api/queue_command.php`) — still available, because this is an MSP
 administrator tool. It is administrator-only, **off unless `raw_command_enabled` is set**
-(since 3.80.1; installs that already stored `1` keep it), refuses when that setting cannot
+(since 3.80.1; installs that already stored `1` keep it, and clean installs store `0`
+since 3.80.3), refuses when that setting cannot
 be read, requires an explicit confirmation flag, and always records the
 command text, the user, the source IP, the target firewall and the timestamp in the audit
 log before the agent ever sees it.
@@ -166,13 +171,17 @@ check-in re-applies the platform gate at delivery, so they cannot bypass it.
 ## Roles
 
 Signing in is not permission. Every page or endpoint that writes, queues or executes
-checks a capability from `inc/permissions.php` with `require_permission()`, and
-`tests/role_gate_test.php` fails CI when one does not. Before 3.80.1 many checked only
-`requireLogin()`, so the readonly role could create administrators and run commands.
+checks a capability from `inc/permissions.php` with `require_permission()` before it
+does so. `tests/role_gate_test.php` reads each file's PHP tokens and fails CI when any
+state-changing statement is not preceded by a role check in its own or an enclosing
+block, and pins every such endpoint to the capability it declares, so a new endpoint
+cannot be added without one. Before 3.80.1 many checked only `requireLogin()`, so the
+readonly role could create administrators and run commands.
 
 ## Two-factor authentication
 
 `require_mfa_for_admins` is **on unless an installation stored `0`** (since 3.80.1).
+Clean installs store `1` (since 3.80.3).
 Administrators without a second factor are sent to enrol rather than locked out.
 
 ---

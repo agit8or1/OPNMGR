@@ -87,6 +87,20 @@ function sign_headers(string $secret, string $method, string $path, string $body
 
 register_shutdown_function([Fixture::class, 'cleanup']);
 
+// These cases were written for agent_auth_mode = compatibility. Clean installs
+// now start at prefer_signed, under which a firewall that has signed once (fwA
+// does, below) must keep signing - so pin the mode here and restore it after.
+$savedAuthMode = db()->query("SELECT value FROM settings WHERE name = 'agent_auth_mode'")->fetchColumn();
+db()->exec("INSERT INTO settings (name, value) VALUES ('agent_auth_mode', 'compatibility')
+            ON DUPLICATE KEY UPDATE value = VALUES(value)");
+register_shutdown_function(function () use ($savedAuthMode) {
+    if ($savedAuthMode === false) {
+        db()->exec("DELETE FROM settings WHERE name = 'agent_auth_mode'");
+    } else {
+        db()->prepare("UPDATE settings SET value = ? WHERE name = 'agent_auth_mode'")->execute([$savedAuthMode]);
+    }
+});
+
 // ===========================================================================
 $fwA = Fixture::firewall('a');
 $fwB = Fixture::firewall('b');

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/inc/bootstrap_agent.php';
+require_once __DIR__ . '/inc/enrollment_script.php';
 
 // Handle script download requests
 if (isset($_GET['action']) && $_GET['action'] === 'download' && isset($_GET['token'])) {
@@ -72,13 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+    $pdo = db();
     try {
-        // Verify token
-        $stmt = db()->prepare("SELECT id FROM enrollment_tokens WHERE token = ? AND expires_at > NOW() AND used = FALSE");
-        $stmt->execute([$token]);
-        $token_record = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$token_record) {
+        // Claim the token before writing anything: a conditional UPDATE inside
+        // a transaction, so a token enrols exactly one firewall even when two
+        // requests carry it at once, and a failed write releases it again.
+        $pdo->beginTransaction();
+        if (!enrollment_token_claim((string)$token, (string)$hardware_id)) {
+            $pdo->rollBack();
             echo json_encode(['success' => false, 'message' => 'Invalid or expired enrollment token']);
             exit;
         }
@@ -100,17 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $firewall_id = db()->lastInsertId();
         }
         
-        // Mark token as used
-        $stmt = db()->prepare("UPDATE enrollment_tokens SET used = TRUE WHERE token = ?");
-        $stmt->execute([$token]);
-        
+        $pdo->commit();
+
         echo json_encode([
             'success' => true,
             'message' => 'Firewall enrolled successfully',
             'firewall_id' => $firewall_id
         ]);
         
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         error_log("enroll_firewall_new.php error: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Internal server error']);
     }

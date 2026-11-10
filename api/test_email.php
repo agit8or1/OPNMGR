@@ -10,6 +10,8 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('settings.manage');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

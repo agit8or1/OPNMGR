@@ -19,6 +19,8 @@ if (!isset($_SESSION['user_id'])) {
     echo "Unauthorized\n";
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('system.maintenance');
 
 if (!function_exists('exec')) {
     echo "Configuration testing is unavailable: exec() is disabled on this server.\n";

@@ -133,14 +133,31 @@ jobs:
           sed -e 's/`opnsense_fw`/`opnsense_fw_test`/g' database/schema.sql \
             | mysql -h 127.0.0.1 -u root -pci-root
 
+      # schema.sql records every migration it already contains, so the first
+      # migrate.php on a clean install applies nothing. Before 3.80.3 it re-ran
+      # every migration, and those stored their old defaults (raw shell on,
+      # admin MFA off). Regenerate schema.sql with scripts/generate_schema.sh
+      # when a migration is added or changed.
       - name: Run migrations (must be a no-op on a fresh schema)
         run: |
-          php scripts/migrate.php
-          php scripts/migrate.php --status
+          out="$(php scripts/migrate.php)"
+          echo "$out"
+          echo "$out" | grep -q '^Database is up to date' \
+            || { echo "FAIL: migrate.php applied migrations on a fresh schema.sql - regenerate it"; exit 1; }
+          if php scripts/migrate.php --status | grep -E 'PENDING|WARNING'; then
+            echo "FAIL: schema.sql baseline is missing a migration or has a stale checksum"; exit 1
+          fi
+
+      - name: Clean install stores secure defaults
+        run: |
+          q() { mysql -h 127.0.0.1 -u root -pci-root -N opnsense_fw_test -e "SELECT value FROM settings WHERE name = '$1'"; }
+          test "$(q raw_command_enabled)" = "0"    || { echo "FAIL: raw_command_enabled is not 0"; exit 1; }
+          test "$(q require_mfa_for_admins)" = "1" || { echo "FAIL: require_mfa_for_admins is not 1"; exit 1; }
+          test "$(q agent_auth_mode)" = "prefer_signed" || { echo "FAIL: agent_auth_mode is not prefer_signed"; exit 1; }
 
       - name: Migrations are idempotent
         run: |
-          php scripts/migrate.php
+          php scripts/migrate.php | grep -q '^Database is up to date'
           test "$(php scripts/migrate.php --status | grep -c PENDING)" = "0"
 
       - name: Security regression suite
@@ -315,6 +332,14 @@ jobs:
 
       - name: Secure defaults and enrolment-bound claim suite
         run: php tests/secure_defaults_test.php
+
+      # One enrolment token, one agent - with several requests racing for it.
+      - name: Enrolment token concurrency suite
+        run: php tests/enrollment_race_test.php
+
+      # No secret is stored in plaintext because the master key is unusable.
+      - name: Master key refusal suite
+        run: php tests/crypto_refusal_test.php
 
       - name: Bandwidth test suite
         run: php tests/speedtest_test.php

@@ -71,13 +71,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --- settings --------------------------------------------------------------
--- Existing installations default to 'compatibility' so that already-deployed
--- agents keep checking in. Clean installs are switched to 'prefer_signed' by
--- the installer, not here.
+-- INSERT IGNORE: an installation that already stored a value keeps it, so
+-- these only take effect where the row does not exist yet (a clean install).
+-- prefer_signed accepts an unsigned agent until it has once signed, so it
+-- cannot lock out an agent that does not sign; every agent since 1.6.5 does.
+-- Raw shell starts off and administrator two-factor starts required.
 INSERT IGNORE INTO settings (`name`, `value`) VALUES
-    ('agent_auth_mode',            'compatibility'),
+    ('agent_auth_mode',            'prefer_signed'),
     ('agent_signature_window',     '300'),
     ('session_idle_timeout',       '3600'),
     ('session_absolute_timeout',   '43200'),
-    ('require_mfa_for_admins',     '0'),
-    ('raw_command_enabled',        '1');
+    ('require_mfa_for_admins',     '1'),
+    ('raw_command_enabled',        '0');

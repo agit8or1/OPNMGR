@@ -13,6 +13,8 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
+// Signed in is not enough: this changes state (3.80.3).
+require_permission('agent.update');
 
 // CSRF validation
 if (!csrf_verify($_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {

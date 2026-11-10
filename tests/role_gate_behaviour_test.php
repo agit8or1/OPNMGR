@@ -18,7 +18,7 @@ $fwId = (int)db()->lastInsertId();
 register_shutdown_function(function () use (&$users, $fwId) {
     foreach ($users as $u) { db()->prepare('DELETE FROM users WHERE id = ?')->execute([$u]); }
     db()->exec("DELETE FROM users WHERE username LIKE '__rolegate_created_%'");
-    foreach (['firewall_commands', 'audit_log'] as $t) {
+    foreach (['firewall_commands', 'audit_log', 'enrollment_tokens'] as $t) {
         try { db()->prepare("DELETE FROM {$t} WHERE firewall_id = ?")->execute([$fwId]); } catch (Throwable $e) {}
     }
     db()->prepare('DELETE FROM firewalls WHERE id = ?')->execute([$fwId]);
@@ -101,5 +101,38 @@ $r = call_endpoint('add_user.php', ['method' => 'POST', 'session' => session_as(
     'post' => ['username' => $name, 'password' => 'Password123!x', 'role' => 'admin', 'csrf' => $csrf]]);
 $made = (int)db()->query("SELECT COUNT(*) FROM users WHERE username = " . db()->quote($name))->fetchColumn();
 T::ok($made === 0, "technician: cannot create an admin either ({$r['status']})");
+
+
+// ===========================================================================
+// 3.80.3: these checked a session (often $_SESSION['user_id'] rather than
+// requireLogin(), which the static test did not look at) and no role.
+T::group('Session-only endpoints now check a role');
+
+$r = call_endpoint('api/trigger_speedtest.php', ['method' => 'POST', 'session' => session_as('readonly'),
+    'get' => ['firewall_id' => $fwId], 'post' => ['csrf_token' => $csrf]]);
+T::ok($r['status'] === 403 && $cmdCount() === 0, "trigger_speedtest, readonly: refused, nothing queued ({$r['status']})");
+$r = call_endpoint('api/trigger_speedtest.php', ['method' => 'POST', 'session' => session_as('technician'),
+    'get' => ['firewall_id' => $fwId], 'post' => ['csrf_token' => $csrf]]);
+T::ok($r['status'] !== 403, "trigger_speedtest, technician: allowed ({$r['status']})");
+db()->exec("DELETE FROM firewall_commands WHERE firewall_id = $fwId");
+
+$tokens = fn() => (int)db()->query("SELECT COUNT(*) FROM enrollment_tokens WHERE firewall_id = $fwId")->fetchColumn();
+$r = call_endpoint('api/enrollment_key.php', ['method' => 'POST', 'session' => session_as('readonly'),
+    'body' => json_encode(['firewall_id' => $fwId, 'csrf' => $csrf])]);
+T::ok($r['status'] === 403 && $tokens() === 0, "enrollment_key, readonly: no enrolment token issued ({$r['status']})");
+
+$webgui = fn() => (string)db()->query("SELECT COALESCE(allowed_webgui_ips,'') FROM firewalls WHERE id = $fwId")->fetchColumn();
+$before = $webgui();
+$r = call_endpoint('firewall_details.php', ['method' => 'POST', 'session' => session_as('readonly'), 'get' => ['id' => $fwId],
+    'post' => ['update_config' => '1', 'csrf' => $csrf, 'checkin_interval' => '60', 'allowed_webgui_ips' => '203.0.113.99']]);
+T::ok($webgui() === $before, "firewall_details update_config, readonly: firewall unchanged ({$r['status']})");
+
+$r = call_endpoint('api/request_queue.php', ['method' => 'POST', 'session' => session_as('readonly'),
+    'get' => ['action' => 'submit_response'], 'body' => json_encode(['request_id' => 1, 'status_code' => 200, 'body' => 'forged'])]);
+T::eq(403, $r['status'], 'request_queue submit_response, readonly: refused');
+
+$r = call_endpoint('api/toggle_alerts.php', ['method' => 'POST', 'session' => session_as('technician'),
+    'body' => json_encode(['firewall_id' => $fwId, 'enabled' => 0, 'csrf' => $csrf])]);
+T::eq(403, $r['status'], 'toggle_alerts, technician: still administrators only');
 
 exit(T::summary());

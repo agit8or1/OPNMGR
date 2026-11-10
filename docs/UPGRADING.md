@@ -18,6 +18,32 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.80.3
+
+Security hardening. No new migrations. What can change on an existing install:
+
+- **Secrets need a usable master key.** If `OPNMGR_MASTER_KEY` is unset or malformed, or
+  the PHP sodium extension is missing, OPNManager now refuses to store new secrets: new
+  agents are not issued credentials, and two-factor enrolment and saving SMTP, AI or
+  integration credentials fail with the reason. The red banner on administrator pages
+  names the cause. Fix it, back up `.env`, then run `php scripts/encrypt_secrets.php`,
+  which now also covers integration destination secrets.
+- **More endpoints check a role.** Starting tunnels, installing or repairing agents over
+  SSH, issuing enrolment keys, AI scans, on-demand speedtests, reverse-proxy setup and
+  tunnel resets now require the capability from `inc/permissions.php`; editing a
+  firewall's settings on its details page requires `firewall.manage`. Readonly users who
+  used these will be refused.
+- **`migrate.php --status` warns about 0001 and 0003.** Their default settings were
+  changed for clean installs; an installation that already applied them keeps the
+  values it stored, and the checksum warning for those two files is expected.
+- **Clean installs:** `database/schema.sql` now seeds the default settings and records
+  every migration it contains, so `migrate.php` after a fresh import is a no-op. Clean
+  installs start with raw shell off, administrator two-factor required and
+  `agent_auth_mode = prefer_signed`. To check what an existing install stored:
+  `SELECT name, value FROM settings WHERE name IN ('raw_command_enabled','require_mfa_for_admins','agent_auth_mode');`
+
+---
+
 ## Upgrading to 3.80.1
 
 Security release. No migrations. Three behaviours change on some installs:
