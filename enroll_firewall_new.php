@@ -2,53 +2,10 @@
 require_once __DIR__ . '/inc/bootstrap_agent.php';
 require_once __DIR__ . '/inc/enrollment_script.php';
 
-// Handle script download requests
-if (isset($_GET['action']) && $_GET['action'] === 'download' && isset($_GET['token'])) {
-    $token = $_GET['token'];
-    $panel_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
-    
-    $script = '#!/bin/bash
-set -e
-
-PANEL_URL="' . $panel_url . '"
-ENROLLMENT_TOKEN="' . $token . '"
-
-echo "=== OPNsense Firewall Enrollment ==="
-echo "Hostname: $(hostname)"
-echo "Firewall IP: $(ifconfig | grep "inet " | grep -v "127.0.0.1" | head -1 | awk "{print $2}")"
-
-# Generate hardware ID from MAC address
-HARDWARE_ID="mac-$(ifconfig | grep ether | head -1 | awk "{print $2}")"
-FIREWALL_HOSTNAME=$(hostname)
-FIREWALL_IP=$(ifconfig | grep "inet " | grep -v "127.0.0.1" | head -1 | awk "{print $2}")
-
-echo "Hardware ID: $HARDWARE_ID"
-echo "Enrolling firewall with management panel..."
-
-# Send enrollment request
-response=$(curl -s -X POST "$PANEL_URL/enroll_firewall.php" \
-    -H "Content-Type: application/json" \
-    -d "{\"hostname\":\"$FIREWALL_HOSTNAME\",\"hardware_id\":\"$HARDWARE_ID\",\"ip_address\":\"$FIREWALL_IP\",\"wan_ip\":\"$FIREWALL_IP\",\"token\":\"$ENROLLMENT_TOKEN\"}")
-
-# Check response
-if echo "$response" | grep -q success; then
-    echo "✅ Enrollment successful!"
-    echo ""
-    echo "=== Enrollment Complete ==="
-    echo "Your firewall has been registered with the management panel."
-    echo "It will check in automatically within the next 2 minutes."
-else
-    echo "❌ Enrollment failed!"
-    echo "Response: $response"
-    exit 1
-fi
-';
-    
-    // Return the script
-    header('Content-Type: application/x-shellscript');
-    header('Content-Disposition: attachment; filename="opnsense_enroll.sh"');
-    echo $script;
-    exit;
+// Handle script download requests. Like enroll_firewall.php, this renders the
+// one validated installer instead of building its own from request values.
+if (isset($_GET['action']) && $_GET['action'] === 'download') {
+    enrollment_serve_installer();
 }
 
 // Handle enrollment callback (POST from firewall)

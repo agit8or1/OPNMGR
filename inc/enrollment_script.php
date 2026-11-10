@@ -2,9 +2,10 @@
 /**
  * OPNMGR enrollment installer: the one place a shell installer is rendered.
  *
- * Four endpoints used to build the legacy enrollment script, each its own way
+ * Five endpoints used to build the legacy enrollment script, each its own way
  * (api/get_enroll_script.php, api/get_enroll_script_http.php,
- * api/get_enrollment_script.php, enroll_firewall.php?action=download). They
+ * api/get_enrollment_script.php, enroll_firewall.php?action=download and,
+ * until 3.80.3, enroll_firewall_new.php?action=download). They
  * accepted any non-empty token and pasted it between double quotes:
  *
  *     ENROLLMENT_TOKEN="__ENROLLMENT_TOKEN__"

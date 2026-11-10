@@ -52,6 +52,7 @@ $endpoints = [
     ['api/get_enroll_script_http.php', []],
     ['api/get_enrollment_script.php', []],
     ['enroll_firewall.php', ['action' => 'download']],
+    ['enroll_firewall_new.php', ['action' => 'download']],
 ];
 
 $hostile = [
