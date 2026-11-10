@@ -8,8 +8,8 @@
  *
  *   php scripts/stage_agent_package.php
  *       Make enrollment ready. Already staged: re-verifies and stops. A package
- *       already on disk with no record (installs before 3.81.0) is adopted if it
- *       is byte-identical to a fresh build of the tracked source. Otherwise the
+ *       already on disk with no record (installs before 3.81.0) is adopted, as is,
+ *       if its contents match a fresh build of the tracked source. Otherwise the
  *       package and its signed record are downloaded from this version's GitHub
  *       release and verified.
  *
@@ -193,14 +193,17 @@ if (in_array($ready['code'], ['package_corrupted', 'signature_invalid', 'untrust
 }
 
 if ($ready['code'] === 'unverified') {
-    echo "Found " . agent_package_name($version) . " with no record; comparing it with a build of the tracked source...\n";
+    echo "Found " . agent_package_name($version) . " with no record; comparing its contents with a build of the tracked source...\n";
     $b = stage_build_local($root, $version);
     if (!$b['ok']) {
         stage_fail($b);
     }
     $existing = $dir . '/' . agent_package_name($version);
-    if (hash_equals(hash_file('sha256', $existing), hash_file('sha256', $b['path']))) {
-        $r = agent_package_stage_local($b['path'], ['source' => 'adopted-matches-source', 'source_commit' => $b['commit']]);
+    // Contents, not bytes: packages built before 3.81.1 carry the building
+    // checkout's permission bits, which no other checkout reproduces.
+    $have = agent_package_content_digest($existing);
+    if ($have !== null && hash_equals($have, (string)agent_package_content_digest($b['path']))) {
+        $r = agent_package_stage_local($existing, ['source' => 'adopted-matches-source', 'source_commit' => $b['commit']]);
         stage_cleanup($b['tmp']);
         $r['ok'] ? stage_done($r, false) : stage_fail($r);
     }

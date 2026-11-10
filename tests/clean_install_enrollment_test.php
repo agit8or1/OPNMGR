@@ -179,6 +179,12 @@ T::group('3. The release workflow\'s output');
 $rel = $work . '/release';
 $r = sh('OUT_DIR=' . escapeshellarg($rel) . ' sh scripts/build_agent_package.sh', $mgr);
 T::eq(0, $r['rc'], 'build_agent_package.sh builds the OPNsense agent from tracked source');
+// A clone has no empty directories and its own umask; neither may change the bytes.
+$devBuild = $work . '/devbuild';
+sh('OUT_DIR=' . escapeshellarg($devBuild) . ' sh scripts/build_agent_package.sh', TEST_ROOT);
+T::eq(hash_file('sha256', $devBuild . '/os-opnmanager-agent-' . AGENT_VERSION . '.tar.gz'),
+      hash_file('sha256', $rel . '/os-opnmanager-agent-' . AGENT_VERSION . '.tar.gz'),
+      'the clean copy builds byte-identical to this checkout (reproducible across checkouts)');
 $pkgName = 'os-opnmanager-agent-' . AGENT_VERSION . '.tar.gz';
 $r = sh('php scripts/sign_agent_release.php --sign ' . escapeshellarg("{$rel}/{$pkgName}"), $mgr,
         ['OPNMGR_AGENT_RELEASE_KEYS_FILE' => '/dev/null', 'OPNMGR_AGENT_RELEASE_PUBKEYS' => $releasePub,

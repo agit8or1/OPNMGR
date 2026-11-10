@@ -14,8 +14,10 @@
 # workflow and stage_agent_package.php --build-local build outside downloads/).
 #
 # The archive is built deterministically (sorted entries, fixed mtime, no owner
-# names) so rebuilding the same source produces the same bytes, and a diff
-# against a published artifact means the source really changed.
+# names, no group/other write bits) so the same source produces the same bytes on
+# any checkout: modes then depend only on the exec bit git records, not on the
+# umask of whoever cloned it. Packages built before 3.81.1 carry this host's 775
+# modes; stage_agent_package.php compares contents, not bytes, to adopt them.
 
 set -eu
 
@@ -69,6 +71,11 @@ trap 'rm -f "$LIST"' EXIT
 #
 # __pycache__ is build output from whichever Python happened to run; it is not
 # part of the plugin, and its presence is why source and package differed.
+# Git does not track empty directories, so a clean clone lacks this tree, which
+# every package has shipped (configd looks for templates under it). Create it
+# rather than let the package depend on which checkout built it.
+mkdir -p "$SRC/opnsense/service/templates/OPNsense/OPNManagerAgent"
+
 ( cd "$SRC" && find . -mindepth 1 ! -path '*/__pycache__*' | sed 's|^\./||' | LC_ALL=C sort ) \
     > "$LIST"
 
@@ -78,6 +85,7 @@ trap 'rm -f "$LIST"' EXIT
 tar cf - \
     -C "$SRC" \
     --owner=0 --group=0 --numeric-owner \
+    --mode=go-w \
     --mtime='@0' \
     --format=gnu \
     --no-recursion \

@@ -218,9 +218,29 @@ mkdir($stage);
 copy($pkg, "{$stage}/{$PKG}");
 T::eq('unverified', agent_package_readiness()['code'], 'an unrecorded package is not trusted: unverified');
 $r = stage_cli('');
-T::eq(0, $r['rc'], 'the default run adopts it when it is byte-identical to the tracked source');
+T::eq(0, $r['rc'], 'the default run adopts it when its contents match the tracked source');
 T::ok(str_contains($r['out'], 'adopted-matches-source'), 'and records how it was verified');
 T::eq($goodSha, hash_file('sha256', "{$stage}/{$PKG}"), 'without rewriting it');
+
+// Built before 3.81.1 on a checkout with umask 002: same files, group-writable
+// modes, so different bytes. Its contents still match the source.
+exec('rm -rf ' . escapeshellarg($stage));
+mkdir($stage);
+$legacyTree = $work . '/legacytree';
+mkdir($legacyTree);
+exec('tar xzf ' . escapeshellarg($pkg) . ' -C ' . escapeshellarg($legacyTree) . ' && chmod -R g+w ' . escapeshellarg($legacyTree));
+exec('cd ' . escapeshellarg($legacyTree) . ' && find . -mindepth 1 | sed "s|^./||" | LC_ALL=C sort > ../legacy.list && tar cf - --owner=0 --group=0 --numeric-owner --mtime=@0 --format=gnu --no-recursion -T ../legacy.list | gzip -n > ' . escapeshellarg("{$stage}/{$PKG}"));
+$legacySha = hash_file('sha256', "{$stage}/{$PKG}");
+T::ok($legacySha !== $goodSha, 'a pre-3.81.1 build (group-writable modes) has different bytes');
+T::eq(agent_package_content_digest($pkg), agent_package_content_digest("{$stage}/{$PKG}"), 'but the same contents');
+$r = stage_cli('');
+T::ok($r['rc'] === 0 && str_contains($r['out'], 'adopted-matches-source'), 'so it is adopted');
+T::eq($legacySha, hash_file('sha256', "{$stage}/{$PKG}"), 'byte for byte as it was: firewalls keep the package they installed');
+T::eq($legacySha, agent_package_readiness()['sha256'] ?? null, 'and the install command carries its checksum');
+
+$built = (string)shell_exec('tar tvzf ' . escapeshellarg($pkg));
+T::ok(!preg_match('/^.....w/m', $built) && !preg_match('/^........w/m', $built), 'the build has no group- or other-writable entries');
+T::ok(str_contains($built, 'opnsense/service/templates/OPNsense/OPNManagerAgent/'), 'and includes the empty templates tree');
 
 exec('rm -rf ' . escapeshellarg($stage));
 mkdir($stage);

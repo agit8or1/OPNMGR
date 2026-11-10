@@ -51,6 +51,16 @@ function getChangelogEntries($limit = 10) {
     // entire history. Slice before returning.
     $entries = [
         [
+            'version' => '3.81.1',
+            'date' => '2026-11-10',
+            'type' => 'patch',
+            'title' => 'From the customer side',
+            'changes' => [
+                'FIXED: The agent package now builds to identical bytes on any checkout. File modes no longer follow the building checkout\'s umask, and the empty service/templates tree, which git does not track, is always included. 3.81.0\'s release build differed from the installed 1.8.2 for this reason',
+                'FIXED: Adopting a pre-3.81.0 package compares contents (paths, exec bits, file bytes), not raw bytes, and still keeps the package unchanged',
+            ],
+        ],
+        [
             'version' => '3.81.0',
             'date' => '2026-11-10',
             'type' => 'minor',
@@ -60,7 +70,7 @@ function getChangelogEntries($limit = 10) {
                 'ADDED: The release workflow builds the OPNsense agent from plugin/os-opnmanager-agent/ (reproducibly, checked twice), signs a release record with the project key pinned in config/agent_release_keys.pub, and attaches both to the GitHub release',
                 'ADDED: scripts/stage_agent_package.php downloads and verifies that release; --import stages copied files offline (or upload them on Add Firewall); --build-local builds from the checkout; --status reports readiness. Missing, corrupted, tampered, untrusted, wrong-version, wrong-platform and too-new packages are refused with what to do',
                 'CHANGED: Install commands carry OPNMGR_AGENT_SHA256 and the installer verifies the package, and the agent version inside it, before it changes anything on the firewall. OPNMGR_VERIFY_ONLY=1 stops after verifying',
-                'CHANGED: A package already on a manager is never replaced or deleted. One with no record (every install before 3.81.0) is adopted when it is byte-identical to a build of the tracked source',
+                'CHANGED: A package already on a manager is never replaced or deleted. One with no record (every install before 3.81.0) is adopted, unchanged, when its contents match a build of the tracked source',
                 'ADDED: Customer checks. A tenant-scoped probe on a customer network (tools/opnmgr-probe, standalone Python, or Rem0te running it) tests internal DNS, a service across the VPN and an internet service',
                 'ADDED: Campaigns can enable customer path checks (off by default). A required check that fails or goes stale holds the next ring and the second member of a CARP pair, and the campaign shows which firewall, probe and path failed. Manual progression stays: a held ring can be started with an audited reason',
             ],
