@@ -18,6 +18,14 @@ a database backup first.
 
 ---
 
+## Upgrading to 3.81.1
+
+No migrations. Agent packages are now built identically on any checkout (see the
+changelog). If you upgrade straight from 3.80.x, follow the 3.81.0 steps below. The
+`stage_agent_package.php` run adopts your existing 1.8.2 package as it is.
+
+---
+
 ## Upgrading to 3.81.0
 
 One migration, `0035_customer_path_checks`. It adds three tables and two defaulted
@@ -33,8 +41,9 @@ From 3.81.0, Settings, Add Firewall and the firewall reinstall panel show an ins
 command only for a verified, staged agent package. A package you already have from
 before 3.81.0 has no record yet, so these pages show *"present but has never been
 verified"* until you run the command above. It rebuilds the agent from the tracked
-source. If the bytes are identical, it adopts your existing package without rewriting
-it. Otherwise it reports the difference and changes nothing. Firewalls that are already
+source. If the contents match (the same files, bytes and exec bits), it adopts your
+existing package without rewriting it. Otherwise it reports the difference and changes
+nothing. Firewalls that are already
 enrolled, their credentials, the signing keys and agent updates are not affected. A
 staged package is never replaced or deleted.
 

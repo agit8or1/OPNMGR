@@ -6,6 +6,27 @@ All notable changes to OPNManager are documented here.
 
 ---
 
+## Version 3.81.1
+**Released**: November 10, 2026 | **Agent**: v1.8.2 (unchanged)
+
+### Fixed
+
+- The agent package was not reproducible across checkouts. It took each file's
+  permission bits from the checkout that built it, and the empty
+  `opnsense/service/templates/` tree exists only in checkouts where someone created it,
+  because git does not track empty directories. So the 3.81.0 release workflow built
+  1.8.2 with the same files but different bytes from the package already installed
+  across the fleet. Builds now drop group/other write bits and always create that tree,
+  so any checkout produces the same bytes. `tests/clean_install_enrollment_test.php`
+  checks this.
+- Adopting a package from before 3.81.0 compares contents (paths, types, exec bits and
+  file bytes) instead of raw bytes. Those packages carry the old permission bits, so they
+  never matched a new build. They are still kept byte for byte.
+- The v3.81.0 release assets were removed: they were the mismatched build. Use the
+  v3.81.1 assets.
+
+---
+
 ## Version 3.81.0
 **Released**: November 10, 2026 | **Agent**: v1.8.2 (unchanged)
 
@@ -56,7 +77,7 @@ All notable changes to OPNManager are documented here.
   after verifying.
 - Staging never replaces or deletes a package. A staged version with different bytes is
   reported as a conflict. A package already present without a record (every install
-  before 3.81.0) is adopted only if it is byte-identical to a build of the tracked source.
+  before 3.81.0) is adopted only if its contents match a build of the tracked source.
 - A held ring can still be started by hand: give a reason, and it is audited.
 - Migration `0035_customer_path_checks` adds three tables and two nullable/defaulted
   columns. Existing campaigns are unchanged.

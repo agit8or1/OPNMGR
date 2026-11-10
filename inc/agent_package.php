@@ -375,6 +375,42 @@ if (!function_exists('agent_package_inspect')) {
     }
 }
 
+if (!function_exists('agent_package_content_digest')) {
+    /**
+     * A digest of what a package installs: each entry's path and type, whether a
+     * file is executable, and each file's bytes. Ignores compression, owner,
+     * mtime and permission bits other than exec - the things that differ between
+     * two builds of the same source on different checkouts.
+     */
+    function agent_package_content_digest(string $path): ?string {
+        $inspect = agent_package_inspect($path);
+        if (!$inspect['ok']) {
+            return null;
+        }
+        exec('LC_ALL=C tar -tvzf ' . escapeshellarg($path) . ' 2>/dev/null', $lines, $rc1);
+        exec('LC_ALL=C tar -tzf ' . escapeshellarg($path) . ' 2>/dev/null', $names, $rc2);
+        if ($rc1 !== 0 || $rc2 !== 0 || count($lines) !== count($names)) {
+            return null;
+        }
+        $rows = [];
+        foreach ($names as $i => $member) {
+            $name = preg_replace('#^\./#', '', $member);
+            if ($name === '' || $name === '.' || $name === './') {
+                continue;
+            }
+            $mode = (string)substr($lines[$i], 0, 10);
+            if ($mode[0] === 'd') {
+                $rows[] = 'd ' . rtrim($name, '/');
+                continue;
+            }
+            $data = (string)shell_exec('tar -xzOf ' . escapeshellarg($path) . ' ' . escapeshellarg($member) . ' 2>/dev/null');
+            $rows[] = sprintf('f %s %s %s', $name, strpbrk(substr($mode, 1), 'x') !== false ? 'x' : '-', hash('sha256', $data));
+        }
+        sort($rows, SORT_STRING);
+        return hash('sha256', implode("\n", $rows));
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Staging
 // ---------------------------------------------------------------------------
@@ -502,8 +538,8 @@ if (!function_exists('agent_package_stage_local')) {
      *
      * Trust comes from the source tree rather than a signature, so the record
      * says so. Also used to adopt a package that was already on the manager
-     * before 3.81.0 (no record) when it is byte-identical to a fresh build -
-     * the build is reproducible, so identical bytes mean identical source.
+     * before 3.81.0 (no record) when its contents match a fresh build
+     * (agent_package_content_digest): the package is kept byte for byte.
      */
     function agent_package_stage_local(string $builtPath, array $meta = [], ?string $dir = null): array {
         $dir = $dir ?? agent_package_dir();
@@ -596,7 +632,7 @@ if (!function_exists('agent_package_readiness')) {
         return agent_package_error('unverified', sprintf(
             '%s is present but has never been verified (no signed release record). It predates 3.81.0 or was copied in by hand',
             agent_package_name($version)), [
-            'php scripts/stage_agent_package.php adopts it if it is byte-identical to the tracked source, or verifies a signed release',
+            'php scripts/stage_agent_package.php adopts it as-is if its contents match the tracked source, or verifies a signed release',
         ]);
     }
 }
