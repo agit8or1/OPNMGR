@@ -1,16 +1,7 @@
 <?php
-// Direct agent download - bypass redirects
-$file = '/var/www/opnsense/downloads/opnsense_agent_v3.6.1.sh';
-
-if (!file_exists($file)) {
-    http_response_code(404);
-    die('File not found');
-}
-
-header('Content-Type: application/x-sh');
-header('Content-Disposition: attachment; filename="opnsense_agent_v3.6.1.sh"');
-header('Content-Length: ' . filesize($file));
-header('Cache-Control: no-cache');
-
-readfile($file);
-exit;
+// Retired in 3.81.3. This served the pre-1.0 shell agent (v3.6.1), which
+// disabled TLS verification, to anyone who asked. Current agents install from
+// /downloads/plugins/ with a checksum (see Add Firewall in OPNManager).
+http_response_code(410);
+header('Content-Type: text/plain');
+echo "This agent download has been retired. Use the install command on OPNManager's Add Firewall page.\n";

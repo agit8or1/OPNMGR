@@ -128,20 +128,33 @@ if (!function_exists('agent_first_claim_allowed')) {
      *
      * @since 3.80.1
      */
-    function agent_first_claim_allowed(int $firewallId): bool {
+    function agent_first_claim_allowed(int $firewallId, ?string $hardwareId = null): bool {
         $hours = agent_setting_int('agent_claim_window_hours', 24, 0, 720);
         if ($hours === 0) {
             return true;
         }
         try {
             $stmt = db()->prepare(
-                'SELECT 1 FROM enrollment_tokens
+                'SELECT hardware_id FROM enrollment_tokens
                   WHERE firewall_id = ? AND used = 1 AND used_at IS NOT NULL
-                    AND used_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
-                  LIMIT 1'
+                    AND used_at > DATE_SUB(NOW(), INTERVAL ? HOUR)'
             );
             $stmt->execute([$firewallId, $hours]);
-            return (bool)$stmt->fetchColumn();
+            $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            if (!$rows) {
+                return false;
+            }
+            // When the installer reported the device's hardware_id while
+            // redeeming the token, only that device may claim. Before 3.81.3
+            // any hardware_id was accepted for the whole window, so whoever
+            // checked in first (knowing only the sequential firewall id) won.
+            foreach ($rows as $tokenHw) {
+                $tokenHw = (string)$tokenHw;
+                if ($tokenHw === '' || ($hardwareId !== null && hash_equals($tokenHw, $hardwareId))) {
+                    return true;
+                }
+            }
+            return false;
         } catch (Throwable $e) {
             error_log('OPNMGR: could not check enrolment claim window: ' . $e->getMessage());
             return false;
@@ -395,15 +408,24 @@ if (!function_exists('authenticateAgentRequest')) {
         // token: it is accepted only while a token redeemed for *this*
         // firewall is fresh (agent_claim_window_hours, default 24).
         $storedHardwareId = (string)($firewall['hardware_id'] ?? '');
-        if ($storedHardwareId === '' && !agent_first_claim_allowed($firewallId)) {
+        if ($storedHardwareId === '' && !agent_first_claim_allowed($firewallId, $hardwareId)) {
             agent_auth_fail(403, 'hardware_id_unclaimed', $firewallId, [
                 'hint' => 'Issue an enrolment token for this firewall and re-run the installer',
             ]);
         }
         if ($storedHardwareId === '') {
             try {
-                db()->prepare('UPDATE firewalls SET hardware_id = ? WHERE id = ? AND (hardware_id IS NULL OR hardware_id = "")')
-                    ->execute([$hardwareId, $firewallId]);
+                $bind = db()->prepare('UPDATE firewalls SET hardware_id = ? WHERE id = ? AND (hardware_id IS NULL OR hardware_id = "")');
+                $bind->execute([$hardwareId, $firewallId]);
+                if ($bind->rowCount() !== 1) {
+                    // Another agent claimed this firewall between our read and
+                    // this write; only the stored value counts.
+                    $re = db()->prepare('SELECT hardware_id FROM firewalls WHERE id = ?');
+                    $re->execute([$firewallId]);
+                    if (!hash_equals((string)$re->fetchColumn(), $hardwareId)) {
+                        agent_auth_fail(403, 'hardware_id_mismatch', $firewallId);
+                    }
+                }
                 $firewall['hardware_id'] = $hardwareId;
                 audit_log_agent('agent.hardware_id.bound', $firewallId, [
                     'message' => 'hardware_id bound to firewall on first check-in',
@@ -616,15 +638,20 @@ if (!function_exists('buildAgentReinstallCommand')) {
             );
         }
 
+        // The key travels in a header (authenticateAgentRequest() accepts
+        // X-OPNMGR-API-Key), not the query string, where it was written to the
+        // manager's access log on every use. It is fed to curl on stdin by the
+        // printf builtin, so it is not in any process's argv either. TLS is
+        // verified: the curl fallback
+        // used to pass -k. -f stops an error page being saved and run as sh.
+        // One subshell, so callers can redirect or background the whole thing.
         return sprintf(
-            'HW=$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null); '
+            '(HW=$(cat /usr/local/etc/opnmanager_hardware_id 2>/dev/null); '
             . 'KEY=$(cat /usr/local/etc/opnmanager_api_key 2>/dev/null); '
-            . 'fetch -q -T 30 -o %s "https://%s/%s?firewall_id=%d&hardware_id=$HW&api_key=$KEY" '
-            . '|| curl -sS -k -o %s "https://%s/%s?firewall_id=%d&hardware_id=$HW&api_key=$KEY"; '
-            . 'chmod +x %s && sh %s',
-            $script, $host, $endpoint, $firewallId,
-            $script, $host, $endpoint, $firewallId,
-            $script, $script
+            . 'S=$(mktemp -t %s) && '
+            . 'printf \'X-OPNMGR-API-Key: %%s\\n\' "$KEY" | curl -fsS --max-time 30 -H @- -o "$S" "https://%s/%s?firewall_id=%d&hardware_id=$HW" '
+            . '&& sh "$S"; rc=$?; rm -f "$S"; exit $rc)',
+            basename($script, '.sh'), $host, $endpoint, $firewallId
         );
     }
 }

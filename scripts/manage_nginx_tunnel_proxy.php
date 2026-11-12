@@ -68,7 +68,13 @@ function create_nginx_config($session_id, $https_port, $http_port, $fw_web_port 
 # HTTPS proxy for SSH tunnel session {$session_id}
 # Auto-generated - do not edit manually
 server {
-    listen {$https_port} ssl http2;
+    # Loopback only. This listener used to be on every interface with no
+    # authentication of its own, so while a tunnel was up anyone who could
+    # reach the manager on this port reached the firewall's web UI, and the
+    # manager's session cookie (cookies are not port-scoped) was forwarded to
+    # the firewall. Operators reach tunnels through tunnel_proxy.php, which
+    # checks the session owner.
+    listen 127.0.0.1:{$https_port} ssl http2;
     server_name {$manager_host};
 
     # SSL configuration
@@ -168,19 +174,25 @@ function remove_nginx_config($session_id) {
     $symlink = "/etc/nginx/sites-enabled/tunnel-session-{$session_id}";
     
     $removed = false;
-    
-    // Remove symlink
-    if (file_exists($symlink)) {
-        unlink($symlink);
+    $session_id = (int)$session_id;
+
+    foreach ([$symlink, $config_file] as $path) {
+        if (!file_exists($path) && !is_link($path)) {
+            continue;
+        }
+        if (!@unlink($path)) {
+            // Not root (the scheduled cleanup runs as an unprivileged user):
+            // remove it through the validating wrapper instead.
+            exec('sudo -n /usr/local/sbin/opnmgr-nginx-wrapper remove-site ' . escapeshellarg("tunnel-session-{$session_id}") . ' 2>&1', $o, $rc);
+        }
+        clearstatcache(true, $path);
+        if (file_exists($path) || is_link($path)) {
+            error_log("Could not remove {$path} for tunnel session {$session_id}");
+            return false;
+        }
         $removed = true;
     }
-    
-    // Remove config file
-    if (file_exists($config_file)) {
-        unlink($config_file);
-        $removed = true;
-    }
-    
+
     if ($removed) {
         // Reload nginx
         exec('sudo systemctl reload nginx 2>&1', $output, $return_code);
@@ -210,8 +222,12 @@ function cleanup_orphaned_configs($pdo) {
             
             // If session is not active, remove config
             if (!in_array($session_id, $active_sessions)) {
-                remove_nginx_config($session_id);
-                $cleaned++;
+                // Count only what was actually removed. This used to count
+                // every attempt, so the log said "Cleaned up 2" while the
+                // files stayed (Permission denied) and their listeners stayed up.
+                if (remove_nginx_config($session_id)) {
+                    $cleaned++;
+                }
             }
         }
     }

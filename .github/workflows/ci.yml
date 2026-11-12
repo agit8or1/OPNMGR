@@ -294,6 +294,11 @@ jobs:
       - name: Role gate suite
         run: php tests/role_gate_test.php
 
+      # 3.81.3: firewall-supplied values escaped, tunnels on loopback, no
+      # root-equivalent sudo rules, enrolment never rewrites a firewall.
+      - name: 3.81.3 hardening suite
+        run: php tests/hardening_3_81_3_test.php
+
       # Two editors for one set of mail settings is how they drifted apart,
       # one of them leaking the stored password and wiping it on a blank save.
       - name: SMTP settings suite

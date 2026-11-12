@@ -323,7 +323,10 @@ function requireLogin() {
 
     // Pages that must stay reachable, or an administrator sent to enrol would
     // have nowhere to do it and no way out.
-    $path = basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '');
+    // The script that is actually running, not the URL: with PATH_INFO,
+    // /dashboard.php/twofactor_setup.php runs dashboard.php but its URL ends
+    // in an exempt name.
+    $path = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
     $exempt = ['twofactor_setup.php', 'verify2fa.php', 'logout.php', 'login.php'];
 
     if (!in_array($path, $exempt, true) && mfa_enrolment_required()) {
@@ -402,6 +405,7 @@ function login($username, $password) {
         if (!empty($user['totp_secret'])) {
             $_SESSION['pending_2fa_user_id'] = $user['id'];
             $_SESSION['pending_2fa_started'] = time();
+            $_SESSION['pending_2fa_tries']   = 0;
             $_SESSION['pending_2fa_ip']      = $_SERVER['REMOTE_ADDR'] ?? '';
 
             if (function_exists('audit_log')) {

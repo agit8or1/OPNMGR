@@ -12,6 +12,9 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['error' => 'Unauthorized']);
     exit;
 }
+// Full session checks (timeouts, revocation, MFA enrolment) and a role,
+// not just the presence of a user id (3.81.3).
+require_permission('agent.update');
 
 $session_id = $_GET['session_id'] ?? '';
 

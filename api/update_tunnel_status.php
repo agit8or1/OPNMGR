@@ -40,8 +40,8 @@ if (!in_array($status, $allowed_statuses)) {
 
 try {
     // Update request status
-    $stmt = db()->prepare('UPDATE request_queue SET status = ?, updated_at = NOW() WHERE id = ?');
-    $stmt->execute([$status, $request_id]);
+    $stmt = db()->prepare('UPDATE request_queue SET status = ?, updated_at = NOW() WHERE id = ? AND firewall_id = ?');
+    $stmt->execute([$status, $request_id, $firewall_id]);
     
     // Log the update
     if ($tunnel_pid > 0) {

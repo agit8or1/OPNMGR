@@ -539,14 +539,14 @@ require_once 'inc/header.php';
                             
                             <button type="button" 
                                     class="btn btn-sm btn-warning" 
-                                    onclick="confirmRestore('<?php echo htmlspecialchars($backup['filename']); ?>')"
+                                    onclick="confirmRestore(<?php echo htmlspecialchars(json_encode($backup['filename']), ENT_QUOTES); ?>)"
                                     title="Restore from this backup">
                                 <i class="fa fa-upload"></i> Restore
                             </button>
                             
                             <button type="button" 
                                     class="btn btn-sm btn-danger" 
-                                    onclick="confirmDelete('<?php echo htmlspecialchars($backup['filename']); ?>')"
+                                    onclick="confirmDelete(<?php echo htmlspecialchars(json_encode($backup['filename']), ENT_QUOTES); ?>)"
                                     title="Delete backup">
                                 <i class="fa fa-trash"></i> Delete
                             </button>

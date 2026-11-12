@@ -15,7 +15,15 @@ requireAdmin();
 
 header('Content-Type: application/json');
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST'
+    || !csrf_verify($_POST['csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+    exit;
+}
+
 $firewall_id = (int)($_POST['firewall_id'] ?? 0);
+require_firewall_scope($firewall_id);
 
 if (!$firewall_id) {
     echo json_encode(['success' => false, 'error' => 'Missing firewall ID']);
@@ -30,7 +38,7 @@ if (!$firewall) {
 
 // Pre-flight cleanup: Remove orphaned tunnels and expired sessions
 // This ensures ports are available and prevents conflicts
-exec("sudo /usr/bin/php " . __DIR__ . "/scripts/manage_ssh_access.php cleanup_expired 2>&1", $cleanup_output, $cleanup_result);
+exec("sudo /usr/bin/php " . __DIR__ . "/scripts/manage_ssh_access.php cleanup 2>&1", $cleanup_output, $cleanup_result);
 if ($cleanup_result !== 0) {
     error_log("WARNING: Cleanup before tunnel creation failed: " . implode("\n", $cleanup_output));
 }

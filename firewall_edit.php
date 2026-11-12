@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // Get firewall ID from URL
 $firewall_id = $_GET['id'] ?? null;
+require_firewall_scope((int)$firewall_id);
 if (!$firewall_id) {
     header('Location: firewalls.php');
     exit;

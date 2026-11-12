@@ -111,6 +111,7 @@ require_once __DIR__ . '/auth.php';
 // 6b. Role-based access control (can(), require_permission())
 // ---------------------------------------------------------------------------
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/scope.php';
 
 // ---------------------------------------------------------------------------
 // 6c. Where this installation lives (opnmgr_server_url / opnmgr_server_host)

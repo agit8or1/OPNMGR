@@ -350,7 +350,7 @@ include __DIR__ . '/inc/header.php';
                                             $wan_tooltip .= "\n⚠️ ESTIMATED DATA - waiting for real config from agent";
                                         }
                                         ?>
-                                        <span class="hover-tooltip" data-tooltip="<?php echo $wan_tooltip; ?>" style="font-family: 'Courier New', monospace;"><?php echo htmlspecialchars($firewall["wan_ip"]); ?></span>
+                                        <span class="hover-tooltip" data-tooltip="<?php echo htmlspecialchars($wan_tooltip, ENT_QUOTES); ?>" style="font-family: 'Courier New', monospace;"><?php echo htmlspecialchars($firewall["wan_ip"]); ?></span>
                                     <?php else: ?>
                                         <span class="text-danger" style="animation: pulse 2s infinite;">Awaiting Agent Data</span>
                                     <?php endif; ?>
@@ -444,7 +444,7 @@ include __DIR__ . '/inc/header.php';
                                         <?php
                                         $lan_tooltip = "🏠 INTERNAL NETWORK\n";
                                         $lan_tooltip .= "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
-                                        $lan_tooltip .= "🔗 LAN IP: " . htmlspecialchars($firewall['lan_ip']) . "\n";
+                                        $lan_tooltip .= "🔗 LAN IP: " . $firewall['lan_ip'] . "\n";
                                         
                                         // Show real network data if available, otherwise detect class/type
                                         $lan_ip = $firewall['lan_ip'];
@@ -470,7 +470,7 @@ include __DIR__ . '/inc/header.php';
                                         }
 
                                         ?>
-                                        <span class="hover-tooltip" data-tooltip="<?php echo $lan_tooltip; ?>" style="font-family: 'Courier New', monospace;"><?php echo htmlspecialchars($firewall["lan_ip"]); ?></span>
+                                        <span class="hover-tooltip" data-tooltip="<?php echo htmlspecialchars($lan_tooltip, ENT_QUOTES); ?>" style="font-family: 'Courier New', monospace;"><?php echo htmlspecialchars($firewall["lan_ip"]); ?></span>
                                     <?php elseif (!empty($firewall["ip_address"])): ?>
                                         <?php
                                         $ip_tooltip = "🔗 NETWORK ADDRESS\n";
@@ -531,24 +531,24 @@ include __DIR__ . '/inc/header.php';
                                                 $tooltip .= "🏗️ Architecture: " . $version_data['architecture'] . "\n";
                                             }
                                         } else {
-                                            $tooltip .= "🛡️ OPNsense: " . htmlspecialchars($fw_version) . "\n";
+                                            $tooltip .= "🛡️ OPNsense: " . $fw_version . "\n";
                                         }
 
                                         if (!empty($firewall['agent_version'])) {
-                                            $tooltip .= "🤖 Agent: v" . htmlspecialchars($firewall['agent_version']) . "\n";
+                                            $tooltip .= "🤖 Agent: v" . $firewall['agent_version'] . "\n";
                                         }
                                         
                                         // Add update info only if updates are actually available
                                         if ($firewall['updates_available'] == 1 && !empty($firewall['available_version'])) {
                                             $tooltip .= "\n📥 UPDATES:\n";
-                                            $tooltip .= "Available: " . htmlspecialchars($firewall['available_version']) . "\n";
+                                            $tooltip .= "Available: " . $firewall['available_version'] . "\n";
                                         }
                                         
                                         if (!empty($firewall['last_update_check'])) {
                                             $tooltip .= "Last Check: " . date('M j, Y H:i', strtotime($firewall['last_update_check']));
                                         }
                                         ?>
-                                        <small class="hover-tooltip" data-tooltip="<?php echo $tooltip; ?>"><?php echo htmlspecialchars($version_display); ?></small>
+                                        <small class="hover-tooltip" data-tooltip="<?php echo htmlspecialchars($tooltip, ENT_QUOTES); ?>"><?php echo htmlspecialchars($version_display); ?></small>
                                     <?php else: ?>
                                         <span class="text-muted">Unknown</span>
                                     <?php endif; ?>
@@ -889,7 +889,7 @@ include __DIR__ . '/inc/header.php';
                                     <?php if (isset($firewall["reboot_required"]) && $firewall["reboot_required"] == 1
                                         && !in_array($firewall["status"], ['updating', 'update_pending'])): ?>
                                         <div class="reboot-badge-wrapper mt-1">
-                                            <span class="badge bg-danger text-white hover-tooltip" style="cursor:pointer;" role="button" onclick="rebootFirewall(<?php echo $firewall['id']; ?>, '<?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>')" data-tooltip="Click to reboot this firewall">
+                                            <span class="badge bg-danger text-white hover-tooltip" style="cursor:pointer;" role="button" data-hostname="<?php echo htmlspecialchars($firewall['hostname'], ENT_QUOTES); ?>" onclick="rebootFirewall(<?php echo (int)$firewall['id']; ?>, this.dataset.hostname)" data-tooltip="Click to reboot this firewall">
                                                 <i class="fas fa-power-off me-1"></i>Reboot Required
                                             </span>
                                         </div>

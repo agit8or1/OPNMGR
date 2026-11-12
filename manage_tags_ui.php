@@ -53,10 +53,10 @@ try {
                                 <?php echo $tag['firewall_count']; ?> firewall<?php echo $tag['firewall_count'] != 1 ? 's' : ''; ?>
                             </small>
                             <div class="btn-group btn-group-sm">
-                                <button class="btn btn-outline-primary btn-sm" onclick="startEditTag(<?php echo $tag['id']; ?>, '<?php echo htmlspecialchars($tag['name']); ?>', '<?php echo htmlspecialchars($tag['color']); ?>')">
+                                <button class="btn btn-outline-primary btn-sm" onclick="startEditTag(<?php echo $tag['id']; ?>, <?php echo htmlspecialchars(json_encode($tag['name']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($tag['color']), ENT_QUOTES); ?>)">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="deleteTag(<?php echo $tag['id']; ?>, '<?php echo htmlspecialchars($tag['name']); ?>')" <?php echo $tag['firewall_count'] > 0 ? 'disabled title="Cannot delete tag with existing firewalls"' : ''; ?>>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteTag(<?php echo $tag['id']; ?>, <?php echo htmlspecialchars(json_encode($tag['name']), ENT_QUOTES); ?>)" <?php echo $tag['firewall_count'] > 0 ? 'disabled title="Cannot delete tag with existing firewalls"' : ''; ?>>
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>

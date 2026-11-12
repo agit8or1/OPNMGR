@@ -76,13 +76,20 @@ function auto_onboard_firewall($firewall_id) {
         'priority' => 3
     ];
 
-    // 4. Add SSH key for management server
-    $ssh_key = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBiN17ZRfM+3/bylcYO/NHmgTnASMGx5YtCMUS5qSEuL opnmgr-to-firewall';
-    $commands[] = [
-        'command' => "mkdir -p /root/.ssh && chmod 700 /root/.ssh && grep -q 'opnmgr-to-firewall' /root/.ssh/authorized_keys 2>/dev/null || echo '$ssh_key' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && echo SSH_KEY_OK",
-        'description' => 'Onboarding: Add SSH key',
-        'priority' => 4
-    ];
+    // 4. Add this firewall's own management key. This used to be one
+    // hard-coded key, the same for every firewall and every installation,
+    // published in the source.
+    require_once __DIR__ . '/../inc/ssh_authorized_key.php';
+    $pubStmt = db()->prepare('SELECT ssh_public_key FROM firewalls WHERE id = ?');
+    $pubStmt->execute([(int)$firewall_id]);
+    $keyCommand = opnmgr_authorized_key_command((string)$pubStmt->fetchColumn(), 'SSH_KEY_OK');
+    if ($keyCommand !== null) {
+        $commands[] = [
+            'command' => $keyCommand,
+            'description' => 'Onboarding: Add SSH key',
+            'priority' => 4
+        ];
+    }
 
     // 5. Add SSH firewall rule
     $commands[] = [

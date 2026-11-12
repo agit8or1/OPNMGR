@@ -56,8 +56,8 @@ if (!$session) {
     die('Session not found');
 }
 
-// Ownership check. Sessions created before 3.12.0 have no recorded owner; those
-// stay reachable by any signed-in user so existing tunnels are not orphaned.
+// Ownership check. A session with no recorded owner (created before 3.12.0)
+// is reachable by admins only; it used to be open to any signed-in user.
 $supplied_token = (string)($_GET['token'] ?? '');
 $session_owner  = $session['created_by_user_id'] ?? null;
 $token_ok       = !empty($session['access_token'])
@@ -65,8 +65,7 @@ $token_ok       = !empty($session['access_token'])
                   && hash_equals((string)$session['access_token'], $supplied_token);
 
 if (!$token_ok
-    && $session_owner !== null
-    && (int)$session_owner !== (int)($_SESSION['user_id'] ?? 0)
+    && ($session_owner === null || (int)$session_owner !== (int)($_SESSION['user_id'] ?? 0))
     && !isAdmin()) {
     audit_log('tunnel.proxy.denied', [
         'success'     => false,
@@ -78,6 +77,7 @@ if (!$token_ok
     http_response_code(403);
     die('This tunnel session belongs to another user');
 }
+require_firewall_scope((int)$session['firewall_id']);
 
 // Check if session is still active
 if ($session['status'] !== 'active') {
@@ -163,7 +163,12 @@ $response_headers = [];
 $content_type = '';
 
 // Cookie jar file - unique per session to isolate different tunnel sessions
-$cookie_jar = sys_get_temp_dir() . "/tunnel_cookies_{$session_id}.txt";
+$cookie_dir = sys_get_temp_dir() . '/opnmgr_tunnel_cookies';
+if (!is_dir($cookie_dir)) {
+    @mkdir($cookie_dir, 0700, true);
+}
+@chmod($cookie_dir, 0700);
+$cookie_jar = $cookie_dir . "/tunnel_cookies_{$session_id}.txt";
 
 // Check if we should force fresh login (delete cookies)
 // ONLY delete cookies on GET requests with fresh=1, NOT on POST (login submission)
@@ -218,11 +223,6 @@ curl_setopt_array($ch, [
             return $len;
         }
         
-        // Debug: Log all headers
-        if (strpos(strtolower($header), 'cookie') !== false) {
-            error_log("Tunnel proxy session {$session_id}: Header: {$header}");
-        }
-        
         // Capture content-type (but we'll validate it later based on file extension)
         if (stripos($header, 'content-type:') === 0) {
             $content_type = trim(substr($header, 13));
@@ -232,7 +232,6 @@ curl_setopt_array($ch, [
         // This fixes the domain mismatch issue with curl's automatic cookie handling
         if (stripos($header, 'set-cookie:') === 0) {
             $cookie = trim(substr($header, 11));
-            error_log("Tunnel proxy session {$session_id}: Received Set-Cookie: {$cookie}");
             // Parse cookie: "name=value; path=/; HttpOnly"
             $parts = explode(';', $cookie);
             $name_value = explode('=', $parts[0], 2);
@@ -263,7 +262,7 @@ curl_setopt_array($ch, [
                 
                 // Write all cookies back to file
                 file_put_contents($cookie_jar, implode("\n", $existing_cookies) . "\n");
-                error_log("Tunnel proxy session {$session_id}: Saved cookie {$name}={$value}");
+                @chmod($cookie_jar, 0600);
             }
         }
         
@@ -351,7 +350,6 @@ if (file_exists($cookie_jar)) {
     if (!empty($cookies)) {
         $cookie_header = "Cookie: " . implode('; ', $cookies);
         $forward_headers[] = $cookie_header;
-        error_log("Tunnel proxy session {$session_id}: Sending cookies: {$cookie_header}");
     }
 }
 
@@ -486,6 +484,7 @@ while ($redirect_count < $max_redirects && in_array($http_code, [301, 302, 303, 
                     }
                     $existing_cookies[] = "127.0.0.1\tFALSE\t/\tFALSE\t0\t{$name}\t{$value}";
                     file_put_contents($cookie_jar, implode("\n", $existing_cookies) . "\n");
+                @chmod($cookie_jar, 0600);
                 }
             }
             

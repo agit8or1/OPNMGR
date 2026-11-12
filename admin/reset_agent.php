@@ -174,7 +174,7 @@ $firewalls = $stmt->fetchAll();
                                     </td>
                                     <td><?= htmlspecialchars($fw['agent_version'] ?: 'Unknown') ?></td>
                                     <td>
-                                        <form method="POST" style="display: inline;" onsubmit="return confirm('Reset agent for <?= htmlspecialchars($fw['hostname']) ?>?');">
+                                        <form method="POST" style="display: inline;" onsubmit="return confirm(<?= htmlspecialchars(json_encode('Reset agent for ' . $fw['hostname'] . '?'), ENT_QUOTES) ?>);">
                                             <input type="hidden" name="firewall_id" value="<?= (int)$fw['id'] ?>">
                                             <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                                             <button type="submit" class="btn btn-sm btn-warning">

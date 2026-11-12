@@ -1,0 +1,60 @@
+#!/bin/bash
+# OPNManager nginx / tunnel housekeeping wrapper
+#
+# Install as root:root 0755 at /usr/local/sbin/opnmgr-nginx-wrapper and allow
+# www-data to run it through sudo (see deploy/sudoers-opnsense-manager).
+#
+# It replaces sudoers rules that handed www-data `bash -c ...` with wildcards,
+# unrestricted `kill`, unrestricted `truncate` and `rm` with trailing
+# wildcards. Each of those let code running as www-data become root. Every
+# argument here is validated before anything runs as root.
+#
+#   kill-tunnel <pid>          SIGKILL an ssh process (and nothing else)
+#   remove-site <name>         remove tunnel-session-N or firewall-proxy-N
+#   remove-tunnel-sites        remove every tunnel-session-N site
+#   truncate-nginx-log <file>  empty one log file under /var/log/nginx
+#
+# @since 3.81.3
+
+set -euo pipefail
+umask 022
+
+AVAIL=/etc/nginx/sites-available
+ENABLED=/etc/nginx/sites-enabled
+
+die() { echo "opnmgr-nginx-wrapper: $*" >&2; exit 2; }
+
+case "${1:-}" in
+    kill-tunnel)
+        pid="${2:-}"
+        [[ "$pid" =~ ^[0-9]{1,10}$ ]] || die "invalid pid"
+        [ -r "/proc/$pid/comm" ] || die "no such process"
+        comm="$(cat "/proc/$pid/comm")"
+        [ "$comm" = "ssh" ] || die "pid $pid is not an ssh process"
+        tr '\0' ' ' < "/proc/$pid/cmdline" | grep -q -- '-L' || die "pid $pid is not a tunnel"
+        kill -9 "$pid"
+        ;;
+    remove-site)
+        name="${2:-}"
+        [[ "$name" =~ ^(tunnel-session|firewall-proxy)-[0-9]{1,10}$ ]] || die "invalid site name"
+        rm -f -- "$ENABLED/$name" "$AVAIL/$name"
+        ;;
+    remove-tunnel-sites)
+        shopt -s nullglob
+        for f in "$ENABLED"/tunnel-session-* "$AVAIL"/tunnel-session-*; do
+            base="$(basename "$f")"
+            [[ "$base" =~ ^tunnel-session-[0-9]{1,10}$ ]] && rm -f -- "$f"
+        done
+        ;;
+    truncate-nginx-log)
+        file="${2:-}"
+        real="$(realpath -e -- "$file" 2>/dev/null)" || die "no such file"
+        [[ "$real" =~ ^/var/log/nginx/[A-Za-z0-9._-]+\.log$ ]] || die "not an nginx log"
+        [ -f "$real" ] && [ ! -L "$file" ] || die "not a regular file"
+        truncate -s 0 -- "$real"
+        ;;
+    *)
+        echo "usage: $0 {kill-tunnel <pid>|remove-site <name>|remove-tunnel-sites|truncate-nginx-log <file>}" >&2
+        exit 64
+        ;;
+esac

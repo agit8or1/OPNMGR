@@ -10,6 +10,7 @@ requireAdmin();
 
 // Get firewall ID
 $firewall_id = (int)($_GET['id'] ?? 0);
+require_firewall_scope($firewall_id);
 
 if (!$firewall_id) {
     http_response_code(400);
@@ -122,6 +123,7 @@ if (!$firewall) {
 
             const formData = new FormData();
             formData.append('firewall_id', firewallId);
+            formData.append('csrf', <?php echo json_encode(csrf_token()); ?>);
 
             // Accept declares what we can handle, which is what requireLogin()
             // keys off: without it an expired session returns a 302 to the login

@@ -63,16 +63,12 @@ try {
     }
 
     if ($existing) {
-        // Update existing firewall instead of failing
-        $customer_name = !empty($existing['customer_name']) ? $existing['customer_name'] : 'AGIT8OR';
-        $stmt = db()->prepare('UPDATE firewalls SET hostname = ?, hardware_id = ?, ip_address = ?, wan_ip = ?, customer_name = ?, last_checkin = NOW(), status = ? WHERE id = ?');
-        $stmt->execute([$hostname, $hardware_id, $ip_address, $wan_ip, $customer_name, 'online', $existing['id']]);
-        
-        echo json_encode([
-            'success' => true,
-            'message' => 'Firewall re-enrolled successfully (updated existing record)',
-            'firewall_id' => $existing['id']
-        ]);
+        // Never rewrite an enrolled firewall from here: anyone holding a token
+        // could repoint its address and hardware_id (matched by hostname, IP or
+        // the non-secret hardware_id) and lock its real agent out.
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This firewall is already enrolled. Use Reset Agent on its page in OPNManager to re-enrol it.']);
+        exit;
     } else {
         // Add new firewall
         $customer_name = 'AGIT8OR'; // Default customer name

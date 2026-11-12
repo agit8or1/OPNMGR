@@ -241,7 +241,7 @@ include __DIR__ . '/inc/header.php';
                                             <?php echo htmlspecialchars($log['message']); ?>
                                             <?php if (!empty($log['additional_data'])): ?>
                                                 <button class="btn btn-sm btn-outline-info ms-2" 
-                                                        onclick="showAdditionalData('<?php echo htmlspecialchars(addslashes($log['additional_data'])); ?>')">
+                                                        onclick="showAdditionalData(<?php echo htmlspecialchars(json_encode($log['additional_data']), ENT_QUOTES); ?>)">
                                                     <i class="fas fa-info-circle"></i>
                                                 </button>
                                             <?php endif; ?>

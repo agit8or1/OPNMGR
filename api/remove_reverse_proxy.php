@@ -48,7 +48,7 @@ try {
         $link_file = "/etc/nginx/sites-enabled/firewall-proxy-{$firewall_id}";
         
         // Remove files using sudo
-        shell_exec("sudo rm -f " . escapeshellarg($link_file) . " " . escapeshellarg($config_file) . " 2>&1");
+        shell_exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper remove-site " . escapeshellarg("firewall-proxy-" . (int)$firewall_id) . " 2>&1");
         
         // Reload nginx
         shell_exec('sudo systemctl reload nginx 2>&1');

@@ -16,10 +16,10 @@ HOSTNAME=$(hostname)
 
 # Get WAN IP - call our own endpoint instead of external service
 WAN_IP=""
-WAN_IP=$(curl -s -k "$PANEL_URL/api/get_client_ip.php" 2>/dev/null || echo "")
+WAN_IP=$(curl -fsS "$PANEL_URL/api/get_client_ip.php" 2>/dev/null || echo "")
 if [ -z "$WAN_IP" ] || [ "$WAN_IP" = "" ]; then
     # Fallback to ifconfig.me
-    WAN_IP=$(curl -s -k -4 ifconfig.me 2>/dev/null || echo "unknown")
+    WAN_IP=$(curl -fsS -4 ifconfig.me 2>/dev/null || echo "unknown")
 fi
 
 # Get LAN IP from actual LAN interface
@@ -46,7 +46,7 @@ echo "" | tee -a $LOG_FILE
 
 # Step 1: Enroll with the panel
 echo "[1/3] Enrolling firewall with management panel..." | tee -a $LOG_FILE
-RESPONSE=$(curl -s -k --connect-timeout 10 --max-time 15 -X POST "$PANEL_URL/api/enroll.php" \
+RESPONSE=$(curl -sS --connect-timeout 10 --max-time 15 -X POST "$PANEL_URL/api/enroll.php" \
   -H "Content-Type: application/json" \
   -d "{
     \"hostname\": \"$HOSTNAME\",
@@ -154,10 +154,12 @@ echo "" | tee -a $LOG_FILE
 
 # Step 3: Download the management agent
 echo "[3/5] Downloading management agent..." | tee -a $LOG_FILE
-curl -s -k -o "$AGENT_PATH" "$PANEL_URL/download_tunnel_agent.php?firewall_id=$FIREWALL_ID"
-
-if [ ! -f "$AGENT_PATH" ]; then
+# TLS is verified (this used curl -k), and -f makes an HTTP error a failure
+# instead of saving the error page as the agent and scheduling it to run.
+if ! curl -fsS -o "$AGENT_PATH" "$PANEL_URL/download_tunnel_agent.php?firewall_id=$FIREWALL_ID"; then
+    rm -f "$AGENT_PATH"
     echo "❌ Failed to download agent!" | tee -a $LOG_FILE
+    echo "   Use the agent install command on OPNManager's Add Firewall page instead." | tee -a $LOG_FILE
     exit 1
 fi
 

@@ -84,3 +84,37 @@ if (!function_exists('scope_sql')) {
         return [$column . ' IN (' . implode(',', array_fill(0, count($ids), '?')) . ')', $ids];
     }
 }
+
+if (!function_exists('require_firewall_scope')) {
+    /**
+     * Stop the request unless the signed-in user's customer scope covers this
+     * firewall. Pages that take a firewall id from the request call this after
+     * their role check, so a technician scoped to one customer cannot reach
+     * another customer's firewall by changing the id.
+     *
+     * @since 3.81.3
+     */
+    function require_firewall_scope(int $firewallId): void {
+        if ($firewallId > 0 && scope_can_firewall($firewallId)) {
+            return;
+        }
+        if (function_exists('audit_log')) {
+            audit_log('authz.scope_denied', [
+                'firewall_id' => $firewallId,
+                'success'     => false,
+                'message'     => 'Firewall outside the user\'s customer scope',
+            ]);
+        }
+        http_response_code(404);
+        $wantsJson = str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/')
+            || str_contains($_SERVER['REQUEST_URI'] ?? '', '/ajax/')
+            || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+        if ($wantsJson) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Firewall not found']);
+        } else {
+            echo 'Firewall not found';
+        }
+        exit;
+    }
+}

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/src/TwoFactorAuth.php';
 require_once __DIR__ . '/inc/secrets.php';
+require_once __DIR__ . '/inc/brute_force_protection.php';
 
 // This page read $_SESSION['user_id'] - which is only set once a session is
 // fully authenticated, so by the time anyone could reach it the second factor
@@ -10,6 +11,7 @@ require_once __DIR__ . '/inc/secrets.php';
 // The window is deliberately short. A pending session is an accepted password
 // with no second factor yet, and it should not sit open indefinitely.
 const PENDING_2FA_TTL = 300;
+const PENDING_2FA_MAX_TRIES = 5;
 
 $pending_id = $_SESSION['pending_2fa_user_id'] ?? null;
 $started    = (int) ($_SESSION['pending_2fa_started'] ?? 0);
@@ -36,11 +38,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([':id' => $pending_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Wrong codes count against the same (username, address) lockout as wrong
+    // passwords, and one pending session gets at most PENDING_2FA_MAX_TRIES
+    // guesses. Without this a known password allowed unlimited TOTP guesses.
+    $bfp       = new BruteForceProtection(db());
+    $bfpUser   = $user ? (string)$user['username'] : ('#' . (int)$pending_id);
+    $bfpIp     = $_SERVER['REMOTE_ADDR'] ?? '';
+    $tries     = (int)($_SESSION['pending_2fa_tries'] ?? 0);
+    $lock      = $bfp->is_locked_out($bfpUser, $bfpIp);
+    if ($lock['locked'] || $tries >= PENDING_2FA_MAX_TRIES) {
+        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+        header('Location: /login.php'); exit;
+    }
+
     // The stored TOTP secret is encrypted at rest; opnmgr_decrypt() returns
     // legacy plaintext unchanged so pre-encryption enrolments keep working.
     $s = $user ? opnmgr_decrypt((string) $user['totp_secret']) : '';
 
-    if ($s && TwoFactorAuth::verify($s, $code)) {
+    if ($s && TwoFactorAuth::verifyStored($s, $code)) {
         // Promote the pending session to an authenticated one. This used to
         // call clear2FA(), a function defined nowhere in the codebase - so
         // entering the *correct* code produced a fatal error, while a wrong
@@ -48,7 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // completed even by someone who reached this page.
         session_regenerate_id(true);
 
-        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip']);
+        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+        $bfp->clear_attempts($bfpUser, $bfpIp);
 
         $_SESSION['user_id']          = $user['id'];
         $_SESSION['username']         = $user['username'];
@@ -79,6 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /dashboard.php'); exit;
     } else {
         $err = 'Invalid code';
+        $_SESSION['pending_2fa_tries'] = $tries + 1;
+        $failed = $bfp->record_failed_attempt($bfpUser, $bfpIp);
+        if ($failed['locked'] || $_SESSION['pending_2fa_tries'] >= PENDING_2FA_MAX_TRIES) {
+            unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+            header('Location: /login.php'); exit;
+        }
         if (function_exists('audit_log')) {
             audit_log('auth.login.2fa_failed', [
                 'success'     => false,
@@ -90,23 +112,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     }
 }
-include __DIR__ . '/inc/header.php';
+$brand = 'OPNManager';
+try {
+    $rows = db()->query('SELECT `name`,`value` FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!empty($rows['brand_name'])) $brand = $rows['brand_name'];
+} catch (Exception $e) {}
 ?>
-<h4 class="text-center mb-2" style="font-weight:600">Two Factor Verification</h4>
-<div class="card card-dark p-2" style="background:transparent;border:1px solid rgba(255,255,255,0.03)">
-  <?php if ($err) echo '<div class="alert alert-danger">'.htmlspecialchars($err).'</div>'; ?>
-  <div class="row justify-content-center" style="margin-top:12px">
-    <div class="col-12 col-sm-8 col-md-4">
-      <form method="post" class="text-center">
-        <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
-        <div class="mb-2">
-          <input name="code" class="form-control form-control-md text-center" placeholder="6-digit code" autofocus inputmode="numeric" pattern="[0-9]{6}" maxlength="6" style="letter-spacing:4px">
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo htmlentities($brand) ?> - Two-Factor Verification</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/assets/js/theme.js"></script>
+    <link rel="stylesheet" href="/assets/css/auth.css">
+</head>
+<body>
+    <button class="theme-toggle-login" onclick="toggleTheme()" title="Toggle theme">
+        <i class="fas fa-sun"></i>
+    </button>
+
+    <div class="login-wrapper">
+        <div class="login-header">
+            <div class="brand-icon"><i class="fas fa-key"></i></div>
+            <h1>Two-Factor Verification</h1>
+            <div class="subtitle"><?php echo htmlentities($brand) ?></div>
         </div>
-        <div>
-          <button class="btn btn-primary btn-sm">Verify</button>
+
+        <div class="login-card">
+            <?php if ($err): ?>
+                <div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i><?php echo htmlspecialchars($err); ?></div>
+            <?php endif; ?>
+            <p class="auth-help">Enter the 6-digit code from your authenticator app.</p>
+            <form method="post">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+                <div class="mb-3">
+                    <label for="code" class="visually-hidden">Verification code</label>
+                    <input id="code" name="code" class="form-control code-input" placeholder="000000"
+                           required autofocus autocomplete="one-time-code" inputmode="numeric"
+                           pattern="[0-9]{6}" maxlength="6">
+                </div>
+                <button type="submit" class="btn btn-login">
+                    <i class="fas fa-check me-2"></i>Verify
+                </button>
+            </form>
+            <a href="/logout.php" class="auth-link"><i class="fas fa-arrow-left me-1"></i>Back to sign in</a>
         </div>
-      </form>
+
+        <div class="login-footer">
+            Firewall Management Platform
+        </div>
     </div>
-  </div>
-</div>
-<?php include __DIR__ . '/inc/footer.php';
+</body>
+</html>

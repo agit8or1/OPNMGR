@@ -2,7 +2,34 @@
 
 All notable changes to OPNManager are documented here.
 
-**Last Updated**: November 10, 2026
+**Last Updated**: November 11, 2026
+
+---
+
+## Version 3.81.3
+**Released**: November 11, 2026 | **Agent**: v1.8.2 (unchanged)
+
+### Security hardening
+
+- Values a firewall reports (WAN/LAN network fields, version details, command output, diagnostic output) are escaped wherever they are rendered, and the network fields are validated at check-in
+- Inline onclick/onsubmit handlers pass values as JSON instead of HTML-escaped strings inside JavaScript quotes
+- Agent auto-update passes the staged package's SHA-256 to the installer, as the manual install already did, and offers no update when no verified package is staged
+- Two-factor codes are limited per sign-in and count toward the account lockout; a correct password no longer resets the counter
+- Login lockouts are per (username, address) with an address-wide limit, so one address cannot lock an account out everywhere
+- Disabling two-factor requires a current code; the MFA-enrolment exemption checks the running script, not the URL
+- First agent check-in must present the hardware ID the installer reported when redeeming its token; the bind checks it won
+- Enrolment tokens create firewalls only; they no longer rewrite an existing firewall matched by hostname, address or hardware ID
+- Per-session tunnel listeners bind to loopback; stale listeners are removed by the scheduled cleanup, which now reports failures
+- Tunnel sessions without a recorded owner are admin-only; firewall cookies are no longer written to the error log
+- Customer scope is enforced on firewall pages, tunnels, command log, request queue and AI scans
+- Agent endpoints only change the authenticated firewall's own rows (check_firewall, update_tunnel_status, record_bandwidth_test)
+- CSRF checks added to the security scanner, documentation trigger, tunnel start and AI scan (JSON only)
+- Onboarding deploys the firewall's own management key instead of a shared built-in key; public keys are validated and shell-quoted
+- Agent reinstall commands send the API key in a header via stdin, verify TLS and use a private temporary file
+- Deployment packages download through Package Builder; nginx denies /packages/, /config/, /sql/, /download/ and stray files at the web root
+- The Pushover API token is no longer rendered back into the page
+- tunnel_auto_login.php, tunnel_direct.php, get_firewall_id.php, api/setup_reverse_proxy.php and ajax/certbot.php (unused); download_agent.php returns 410
+- deploy/opnmgr-nginx-wrapper replaces broad sudo rules for kill, truncate, rm and bash -c with validated subcommands
 
 ---
 

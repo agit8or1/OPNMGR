@@ -33,7 +33,7 @@ if (isset($_GET['download']) && file_exists($logFile)) {
 // Handle clear BEFORE any output (POST only with CSRF token)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear']) && file_exists($logFile)) {
     if (csrf_verify($_POST['csrf_token'] ?? '')) {
-        shell_exec('sudo truncate -s 0 ' . escapeshellarg($logFile));
+        shell_exec('sudo /usr/local/sbin/opnmgr-nginx-wrapper truncate-nginx-log ' . escapeshellarg($logFile));
     }
     header('Location: ?type=' . $logType);
     exit;

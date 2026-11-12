@@ -62,6 +62,7 @@ function queueRequest() {
         echo json_encode(['error' => 'Missing firewall_id']);
         return;
     }
+    require_firewall_scope($firewall_id);
     
     try {
         $stmt = db()->prepare("INSERT INTO request_queue 
@@ -97,6 +98,8 @@ function pollRequests() {
         return;
     }
     
+    require_firewall_scope($firewall_id);
+
     try {
         $stmt = db()->prepare("SELECT id, client_id, method, path, headers, body 
             FROM request_queue 
@@ -139,6 +142,17 @@ function submitResponse() {
         echo json_encode(['error' => 'Missing request_id']);
         return;
     }
+
+    // Only someone whose scope covers the request's firewall may answer it.
+    $owner = db()->prepare('SELECT firewall_id FROM request_queue WHERE id = ?');
+    $owner->execute([$request_id]);
+    $fwId = $owner->fetchColumn();
+    if ($fwId === false) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Request not found']);
+        return;
+    }
+    require_firewall_scope((int)$fwId);
     
     try {
         $stmt = db()->prepare("UPDATE request_queue SET 
@@ -170,7 +184,7 @@ function getResponse() {
     }
     
     try {
-        $stmt = db()->prepare("SELECT response_status, response_headers, response_body, status 
+        $stmt = db()->prepare("SELECT response_status, response_headers, response_body, status, firewall_id 
             FROM request_queue WHERE client_id = ? ORDER BY created_at DESC LIMIT 1");
         
         $stmt->execute([$client_id]);
@@ -180,6 +194,8 @@ function getResponse() {
             echo json_encode(['status' => 'not_found']);
             return;
         }
+
+        require_firewall_scope((int)$response['firewall_id']);
         
         if ($response['status'] !== 'completed') {
             echo json_encode(['status' => 'pending']);

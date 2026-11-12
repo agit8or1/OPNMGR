@@ -291,12 +291,21 @@ if (PHP_SAPI !== 'cli') {
     // the result; the same capability as changing its AI scan settings (3.80.3).
     require_permission('firewall.manage');
 
+    // A JSON body is the CSRF defence here: a cross-site form can only send
+    // text/plain, urlencoded or multipart, and was read as JSON regardless.
+    if (stripos((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') !== 0) {
+        http_response_code(415);
+        echo json_encode(['success' => false, 'error' => 'Expected application/json']);
+        exit;
+    }
+
     $input = json_decode(file_get_contents('php://input'), true);
 
     if (!isset($input['firewall_id'])) {
         echo json_encode(['success' => false, 'error' => 'Firewall ID is required']);
         exit;
     }
+    require_firewall_scope((int)$input['firewall_id']);
 
     $result = opnmgr_run_ai_scan(
         (int) $input['firewall_id'],

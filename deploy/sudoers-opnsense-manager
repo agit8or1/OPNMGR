@@ -1,0 +1,24 @@
+# OPNManager: what www-data may run as root.
+#
+# Install with:  sudo install -m 0440 -o root -g root deploy/sudoers-opnsense-manager /etc/sudoers.d/opnsense-manager
+#                sudo visudo -c
+#
+# Every entry is either a fixed command line or a root-owned wrapper that
+# validates its own arguments. Before 3.81.3 this file allowed
+# `/bin/bash -c mv /tmp/firewall-proxy-*.conf ...`: a sudoers `*` also matches
+# spaces and `;`, so any code running as www-data could run anything as root.
+# Bare /bin/kill and /usr/bin/truncate, and `rm` rules ending in `*` (which
+# accept extra file names), were root-equivalent too. They are replaced by
+# /usr/local/sbin/opnmgr-nginx-wrapper (deploy/opnmgr-nginx-wrapper).
+#
+# The php entries pass a fixed script path; arguments after the script are
+# the script's own argv and cannot change which file php runs.
+
+Cmnd_Alias OPNMGR_TUNNEL = /usr/bin/php /var/www/opnsense/scripts/manage_nginx_tunnel_proxy.php *, \
+                           /usr/bin/php /var/www/opnsense/scripts/manage_ssh_access.php *
+Cmnd_Alias OPNMGR_NGINX  = /usr/sbin/nginx -t, \
+                           /bin/systemctl reload nginx, \
+                           /usr/local/sbin/opnmgr-nginx-wrapper
+Cmnd_Alias OPNMGR_READ   = /usr/bin/ss -tlnp
+
+www-data ALL=(root) NOPASSWD: OPNMGR_TUNNEL, OPNMGR_NGINX, OPNMGR_READ

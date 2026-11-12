@@ -20,6 +20,9 @@ if (!isset($_SESSION['user_id'])) {
     echo "Unauthorized\n";
     exit;
 }
+// Full session checks (timeouts, revocation, MFA enrolment) and a role,
+// not just the presence of a user id (3.81.3).
+require_permission('system.maintenance');
 
 $host = parse_url((string) (getenv('APP_URL') ?: ($_ENV['APP_URL'] ?? '')), PHP_URL_HOST)
      ?: ($_SERVER['HTTP_HOST'] ?? 'localhost');
