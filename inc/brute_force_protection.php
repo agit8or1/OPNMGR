@@ -24,15 +24,35 @@ class BruteForceProtection {
         // Create table if it doesn't exist
         $this->create_table_if_not_exists();
 
+        // Lockouts are per (username, address) pair. They used to match
+        // username OR address, so anyone on the internet could keep a named
+        // account locked out of every address by failing its password five
+        // times. An address that fails across many usernames is still stopped
+        // by the address-wide limit below.
         $stmt = $this->pdo->prepare("
             SELECT failed_attempts, last_failed, locked_until
             FROM login_attempts
-            WHERE (username = ? OR ip_address = ?)
+            WHERE username = ? AND ip_address = ?
             AND locked_until > NOW()
             LIMIT 1
         ");
         $stmt->execute([$username, $ip_address]);
         $result = $stmt->fetch();
+
+        if (!$result) {
+            $stmt = $this->pdo->prepare("
+                SELECT SUM(failed_attempts) AS total, MAX(last_failed) AS last_failed
+                FROM login_attempts
+                WHERE ip_address = ?
+                AND last_failed > (NOW() - INTERVAL ? SECOND)
+            ");
+            $stmt->execute([$ip_address, $this->lockout_time]);
+            $ipRow = $stmt->fetch();
+            if ($ipRow && (int)$ipRow['total'] >= $this->max_attempts * 4) {
+                $until = strtotime($ipRow['last_failed']) + $this->lockout_time;
+                $result = ['locked_until' => date('Y-m-d H:i:s', $until)];
+            }
+        }
 
         if ($result) {
             $remaining_time = strtotime($result['locked_until']) - time();
@@ -56,8 +76,7 @@ class BruteForceProtection {
         $stmt = $this->pdo->prepare("
             SELECT failed_attempts, last_failed
             FROM login_attempts
-            WHERE username = ? OR ip_address = ?
-            ORDER BY last_failed DESC
+            WHERE username = ? AND ip_address = ?
             LIMIT 1
         ");
         $stmt->execute([$username, $ip_address]);
@@ -117,7 +136,7 @@ class BruteForceProtection {
 
         $stmt = $this->pdo->prepare("
             DELETE FROM login_attempts
-            WHERE username = ? OR ip_address = ?
+            WHERE username = ? AND ip_address = ?
         ");
         $stmt->execute([$username, $ip_address]);
     }

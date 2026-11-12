@@ -1,9 +1,12 @@
 <?php
 require_once __DIR__ . '/../inc/bootstrap.php';
 
-requireLogin();
+require_permission('firewall.view');
 
 $firewall_id = (int)($_GET['firewall_id'] ?? 0);
+if ($firewall_id) {
+    require_firewall_scope($firewall_id);
+}
 $timezone = $_GET['timezone'] ?? 'America/New_York'; // Default to EST
 
 if (!$firewall_id) {

@@ -435,7 +435,7 @@ function close_ssh_access($session_id) {
     
     // Kill the SSH tunnel process (use kill -9 for force kill)
     $port = $session['tunnel_port'];
-    $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r sudo kill -9 2>/dev/null";
+    $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r -n1 sudo -n /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel 2>/dev/null";
     exec($kill_cmd, $output, $return_code);
     // Return code 123 means xargs found no processes (already dead), which is fine
     $tunnel_killed = ($return_code === 0 || $return_code === 123);
@@ -478,7 +478,7 @@ function cleanup_expired_sessions() {
         
         // Kill the SSH tunnel process (use kill -9 for force kill)
         $port = $session['tunnel_port'];
-        $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r sudo kill -9 2>/dev/null";
+        $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r -n1 sudo -n /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel 2>/dev/null";
         exec($kill_cmd, $output, $return_code);
         // Return code 123 means xargs found no processes (already dead), which is fine
         if ($return_code === 0 || $return_code === 123) {
@@ -511,7 +511,7 @@ function cleanup_expired_sessions() {
     
     $orphaned_killed = 0;
     foreach ($closed_ports as $port) {
-        $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r sudo kill -9 2>/dev/null";
+        $kill_cmd = "ps aux | grep 'ssh.*-L {$port}:' | grep -v grep | awk '{print \$2}' | xargs -r -n1 sudo -n /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel 2>/dev/null";
         exec($kill_cmd, $output, $return_code);
         if ($return_code === 0) {
             $orphaned_killed++;

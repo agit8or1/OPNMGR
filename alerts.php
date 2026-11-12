@@ -51,7 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify($_POST['csrf'] ?? ($_P
         $pushover_token = trim($_POST['pushover_api_token'] ?? '');
         
         db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_enabled'")->execute([$pushover_enabled]);
-        db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_api_token'")->execute([$pushover_token]);
+        // The saved token is never sent back to the browser, so an empty field
+        // means "keep the current one"; tick the clear box to remove it.
+        if ($pushover_token !== '' || isset($_POST['pushover_clear_token'])) {
+            db()->prepare("UPDATE alert_settings SET setting_value = ? WHERE setting_name = 'pushover_api_token'")->execute([$pushover_token]);
+        }
         
         $notice = 'Pushover settings saved successfully.';
         header('Location: /alerts.php?notice=' . urlencode($notice));
@@ -199,12 +203,17 @@ include __DIR__ . '/inc/header.php';
                                         Pushover API Token
                                         <i class="fas fa-info-circle text-info" title="Get from pushover.net/apps"></i>
                                     </label>
-                                    <input type="text" class="form-control font-monospace" 
-                                           id="pushover_api_token" name="pushover_api_token" 
-                                           value="<?php echo htmlspecialchars($settings['pushover_api_token']); ?>"
-                                           placeholder="30-character token from pushover.net/apps"
+                                    <input type="password" class="form-control font-monospace" autocomplete="off"
+                                           id="pushover_api_token" name="pushover_api_token" value=""
+                                           placeholder="<?php echo $settings['pushover_api_token'] !== '' ? 'Saved - leave blank to keep' : '30-character token from pushover.net/apps'; ?>"
                                            maxlength="30">
-                                    <small class="text-muted">Your application's API token from Pushover</small>
+                                    <small class="text-muted">Your application's API token from Pushover. The saved token is not shown.</small>
+                                    <?php if ($settings['pushover_api_token'] !== ''): ?>
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="pushover_clear_token" name="pushover_clear_token" value="1">
+                                        <label class="form-check-label" for="pushover_clear_token">Remove the saved token</label>
+                                    </div>
+                                    <?php endif; ?>
                                 </div>
                                 
                                 <div class="alert alert-info">
@@ -477,7 +486,7 @@ function testEmail() {
 }
 
 function testPushover() {
-    const testUserKey = prompt('Enter Pushover user key to send test alert to:', '<?php echo htmlspecialchars($settings['pushover_api_token']); ?>');
+    const testUserKey = prompt('Enter Pushover user key to send test alert to:', '');
     if (!testUserKey) {
         return;
     }

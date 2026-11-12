@@ -151,7 +151,7 @@ function resetAllTunnels() {
         // 1. Kill all SSH tunnels
         exec("ps aux | grep 'ssh.*-L 0.0.0.0:' | grep -v grep | awk '{print $2}'", $pids);
         foreach ($pids as $pid) {
-            exec("sudo kill -9 " . escapeshellarg($pid), $output, $return);
+            exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel " . escapeshellarg($pid), $output, $return);
             if ($return === 0) {
                 $results['ssh_killed']++;
             } else {
@@ -160,8 +160,8 @@ function resetAllTunnels() {
         }
         
         // 2. Remove all nginx tunnel configs
-        exec("sudo rm -f /etc/nginx/sites-enabled/tunnel-session-* 2>&1", $output, $return);
-        exec("sudo rm -f /etc/nginx/sites-available/tunnel-session-* 2>&1", $output2, $return2);
+        exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper remove-tunnel-sites 2>&1", $output, $return);
+        $return2 = $return;
         if ($return === 0 && $return2 === 0) {
             exec("ls /etc/nginx/sites-available/tunnel-session-* 2>/dev/null | wc -l", $count_output);
             $results['nginx_removed'] = (int)$count_output[0];
@@ -221,7 +221,7 @@ function killTunnel($session_id) {
         $port = (int)$session['tunnel_port'];
         exec("ps aux | grep 'ssh.*-L 0.0.0.0:$port' | grep -v grep | awk '{print $2}'", $pids);
         foreach ($pids as $pid) {
-            exec("sudo kill -9 " . escapeshellarg($pid));
+            exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel " . escapeshellarg($pid));
             $results['ssh_killed'] = true;
         }
         
@@ -279,7 +279,7 @@ function cleanupZombieTunnels() {
             $port = (int)$session['tunnel_port'];
             if (isset($running_ports[$port])) {
                 $pid = $running_ports[$port];
-                exec("sudo kill -9 $pid");
+                exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel " . escapeshellarg((string)$pid));
                 $results['zombies_killed']++;
             }
         }

@@ -48,10 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($existing) {
-            // Update existing
-            $stmt = db()->prepare("UPDATE firewalls SET hostname = ?, wan_ip = ?, status = 'online', last_checkin = NOW() WHERE id = ?");
-            $stmt->execute([$hostname, $wan_ip, $existing['id']]);
-            $firewall_id = $existing['id'];
+            // Never rewrite an enrolled firewall from an enrolment token.
+            $pdo->rollBack();
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'This firewall is already enrolled. Use Reset Agent on its page in OPNManager to re-enrol it.']);
+            exit;
         } else {
             // Create new
             $stmt = db()->prepare("INSERT INTO firewalls (hostname, hardware_id, ip_address, wan_ip, status, customer_name, last_checkin) VALUES (?, ?, ?, ?, 'online', 'AGIT8OR', NOW())");

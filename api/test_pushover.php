@@ -19,6 +19,9 @@ if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'error' => 'Unauthorized']);
     exit;
 }
+// Full session checks (timeouts, revocation, MFA enrolment) and a role,
+// not just the presence of a user id (3.81.3).
+require_permission('settings.manage');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

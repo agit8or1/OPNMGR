@@ -2,6 +2,7 @@
 require_once __DIR__ . '/inc/bootstrap.php';
 require_once __DIR__ . '/src/TwoFactorAuth.php';
 require_once __DIR__ . '/inc/secrets.php';
+require_once __DIR__ . '/inc/brute_force_protection.php';
 
 // This page read $_SESSION['user_id'] - which is only set once a session is
 // fully authenticated, so by the time anyone could reach it the second factor
@@ -10,6 +11,7 @@ require_once __DIR__ . '/inc/secrets.php';
 // The window is deliberately short. A pending session is an accepted password
 // with no second factor yet, and it should not sit open indefinitely.
 const PENDING_2FA_TTL = 300;
+const PENDING_2FA_MAX_TRIES = 5;
 
 $pending_id = $_SESSION['pending_2fa_user_id'] ?? null;
 $started    = (int) ($_SESSION['pending_2fa_started'] ?? 0);
@@ -36,6 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([':id' => $pending_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Wrong codes count against the same (username, address) lockout as wrong
+    // passwords, and one pending session gets at most PENDING_2FA_MAX_TRIES
+    // guesses. Without this a known password allowed unlimited TOTP guesses.
+    $bfp       = new BruteForceProtection(db());
+    $bfpUser   = $user ? (string)$user['username'] : ('#' . (int)$pending_id);
+    $bfpIp     = $_SERVER['REMOTE_ADDR'] ?? '';
+    $tries     = (int)($_SESSION['pending_2fa_tries'] ?? 0);
+    $lock      = $bfp->is_locked_out($bfpUser, $bfpIp);
+    if ($lock['locked'] || $tries >= PENDING_2FA_MAX_TRIES) {
+        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+        header('Location: /login.php'); exit;
+    }
+
     // The stored TOTP secret is encrypted at rest; opnmgr_decrypt() returns
     // legacy plaintext unchanged so pre-encryption enrolments keep working.
     $s = $user ? opnmgr_decrypt((string) $user['totp_secret']) : '';
@@ -48,7 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // completed even by someone who reached this page.
         session_regenerate_id(true);
 
-        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip']);
+        unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+        $bfp->clear_attempts($bfpUser, $bfpIp);
 
         $_SESSION['user_id']          = $user['id'];
         $_SESSION['username']         = $user['username'];
@@ -79,6 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: /dashboard.php'); exit;
     } else {
         $err = 'Invalid code';
+        $_SESSION['pending_2fa_tries'] = $tries + 1;
+        $failed = $bfp->record_failed_attempt($bfpUser, $bfpIp);
+        if ($failed['locked'] || $_SESSION['pending_2fa_tries'] >= PENDING_2FA_MAX_TRIES) {
+            unset($_SESSION['pending_2fa_user_id'], $_SESSION['pending_2fa_started'], $_SESSION['pending_2fa_ip'], $_SESSION['pending_2fa_tries']);
+            header('Location: /login.php'); exit;
+        }
         if (function_exists('audit_log')) {
             audit_log('auth.login.2fa_failed', [
                 'success'     => false,

@@ -120,9 +120,8 @@ function queue_emergency_reset($firewall_id, string $reinstall_host) {
                      'ps aux | grep -i agent | grep -v grep | awk \'{print $2}\' | xargs kill -9 2>/dev/null; ' .
                      'rm -rf /tmp/*agent* /usr/local/bin/*agent* /usr/local/opnsense_agent 2>/dev/null; ' .
                      'sleep 5; ' .
-                     buildAgentReinstallCommand($reinstall_host, (int)$firewall_id) . ' && ' .
-                     'chmod +x /tmp/reinstall_agent.sh && ' .
-                     'sh /tmp/reinstall_agent.sh > /tmp/agent_reinstall.log 2>&1 &';
+                     buildAgentReinstallCommand($reinstall_host, (int)$firewall_id) .
+                     ' > /var/log/opnmanager_agent_reinstall.log 2>&1 &';
 
     // Check if command already queued
     $check_sql = "SELECT id FROM firewall_commands
@@ -183,7 +182,7 @@ function ssh_reset_agent($hostname, $wan_ip, $firewall_id, $ssh_key_path, $timeo
 
         // Download and execute reinstall script
         $reset_script = buildAgentReinstallCommand($reinstall_host, (int)$firewall_id)
-                      . ' > /tmp/agent_reinstall.log 2>&1 &';
+                      . ' > /var/log/opnmanager_agent_reinstall.log 2>&1 &';
 
         $ssh_command = 'ssh -i ' . escapeshellarg((string)$ssh_key_path)
             . ' -o BatchMode=yes -o ConnectTimeout=' . (int)$timeout

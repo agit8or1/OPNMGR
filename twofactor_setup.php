@@ -58,8 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = '<div class="alert alert-danger">Invalid verification code. Please try again.</div>';
         }
     } elseif (isset($_POST['disable_2fa'])) {
-        disable2FA($userId);
-        $message = '<div class="alert alert-success">2FA has been disabled.</div>';
+        // A current code is required, so a stolen or unattended session cannot
+        // remove the account's second factor on its own.
+        require_once __DIR__ . '/src/TwoFactorAuth.php';
+        $stored = opnmgr_decrypt((string)($user['totp_secret'] ?? ''));
+        $code   = trim((string)($_POST['disable_code'] ?? ''));
+        if ($stored !== '' && TwoFactorAuth::verifyStored($stored, $code)) {
+            disable2FA($userId);
+            $user = getUserById($userId);
+            $message = '<div class="alert alert-success">2FA has been disabled.</div>';
+        } else {
+            $message = '<div class="alert alert-danger">Enter a current code from your authenticator app to disable 2FA.</div>';
+        }
     }
 }
 
@@ -91,6 +101,10 @@ require_once __DIR__ . '/inc/header.php';
                         </div>
                         <form method="post">
                             <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token()); ?>">
+                            <div class="mb-2" style="max-width: 220px;">
+                                <label for="disable_code" class="form-label">Current code</label>
+                                <input type="text" name="disable_code" id="disable_code" class="form-control" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+                            </div>
                             <button type="submit" name="disable_2fa" class="btn btn-danger" onclick="return confirm('Are you sure you want to disable 2FA?')">
                                 <i class="fa fa-times me-2"></i>Disable 2FA
                             </button>

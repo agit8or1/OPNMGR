@@ -132,6 +132,10 @@ include __DIR__ . '/inc/header.php';
 </div>
 
 <script>
+function escHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
         function loadHealthData() {
             // Load system health data
             fetch('/api/health_monitor.php?action=get_system_health')
@@ -192,10 +196,10 @@ include __DIR__ . '/inc/header.php';
                     servicesHtml += '<div class="card h-100 ' + borderClass + '">';
                     servicesHtml += '<div class="card-body">';
                     servicesHtml += '<div class="d-flex justify-content-between align-items-center">';
-                    servicesHtml += '<h6 class="card-title mb-0">' + key.replace('_', ' ').toUpperCase() + '</h6>';
-                    servicesHtml += '<span class="badge bg-' + statusClass + '">' + component.status + '</span>';
+                    servicesHtml += '<h6 class="card-title mb-0">' + escHtml(key.replace('_', ' ').toUpperCase()) + '</h6>';
+                    servicesHtml += '<span class="badge bg-' + statusClass + '">' + escHtml(component.status) + '</span>';
                     servicesHtml += '</div>';
-                    servicesHtml += '<p class="card-text mt-2 mb-0">' + component.message + '</p>';
+                    servicesHtml += '<p class="card-text mt-2 mb-0">' + escHtml(component.message) + '</p>';
                     servicesHtml += '</div></div></div>';
                 }
                 servicesHtml += '</div>';
@@ -234,10 +238,10 @@ include __DIR__ . '/inc/header.php';
                 infoHtml += '<div class="col-md-6">';
                 infoHtml += '<h6 class="text-primary"><i class="bi bi-server"></i> Server Information</h6>';
                 infoHtml += '<table class="table table-sm">';
-                infoHtml += '<tr><td><strong>Hostname:</strong></td><td>' + systemInfo.server.hostname + '</td></tr>';
-                infoHtml += '<tr><td><strong>OS:</strong></td><td>' + systemInfo.server.os + '</td></tr>';
-                infoHtml += '<tr><td><strong>PHP Version:</strong></td><td>' + systemInfo.server.php_version + '</td></tr>';
-                infoHtml += '<tr><td><strong>Uptime:</strong></td><td>' + systemInfo.server.uptime.trim() + '</td></tr>';
+                infoHtml += '<tr><td><strong>Hostname:</strong></td><td>' + escHtml(systemInfo.server.hostname) + '</td></tr>';
+                infoHtml += '<tr><td><strong>OS:</strong></td><td>' + escHtml(systemInfo.server.os) + '</td></tr>';
+                infoHtml += '<tr><td><strong>PHP Version:</strong></td><td>' + escHtml(systemInfo.server.php_version) + '</td></tr>';
+                infoHtml += '<tr><td><strong>Uptime:</strong></td><td>' + escHtml(systemInfo.server.uptime.trim()) + '</td></tr>';
                 infoHtml += '</table>';
                 infoHtml += '</div>';
                 
@@ -245,10 +249,10 @@ include __DIR__ . '/inc/header.php';
                 infoHtml += '<div class="col-md-6">';
                 infoHtml += '<h6 class="text-info"><i class="bi bi-gear"></i> Application Information</h6>';
                 infoHtml += '<table class="table table-sm">';
-                infoHtml += '<tr><td><strong>Version:</strong></td><td>' + systemInfo.application.version + '</td></tr>';
-                infoHtml += '<tr><td><strong>Customer:</strong></td><td>' + systemInfo.application.customer_name + '</td></tr>';
-                infoHtml += '<tr><td><strong>Instance ID:</strong></td><td>' + systemInfo.application.instance_id + '</td></tr>';
-                infoHtml += '<tr><td><strong>Main Server:</strong></td><td>' + systemInfo.application.main_server + '</td></tr>';
+                infoHtml += '<tr><td><strong>Version:</strong></td><td>' + escHtml(systemInfo.application.version) + '</td></tr>';
+                infoHtml += '<tr><td><strong>Customer:</strong></td><td>' + escHtml(systemInfo.application.customer_name) + '</td></tr>';
+                infoHtml += '<tr><td><strong>Instance ID:</strong></td><td>' + escHtml(systemInfo.application.instance_id) + '</td></tr>';
+                infoHtml += '<tr><td><strong>Main Server:</strong></td><td>' + escHtml(systemInfo.application.main_server) + '</td></tr>';
                 infoHtml += '</table>';
                 infoHtml += '</div>';
                 
@@ -272,9 +276,9 @@ include __DIR__ . '/inc/header.php';
                     alertsHtml += '<div class="d-flex align-items-center">';
                     alertsHtml += '<i class="bi bi-' + icon + ' me-2 fs-5"></i>';
                     alertsHtml += '<div class="flex-grow-1">';
-                    alertsHtml += '<strong>' + alert.severity.toUpperCase() + '</strong>';
-                    alertsHtml += '<div>' + alert.message + '</div>';
-                    alertsHtml += '<small class="text-muted">' + alert.timestamp + '</small>';
+                    alertsHtml += '<strong>' + escHtml(String(alert.severity).toUpperCase()) + '</strong>';
+                    alertsHtml += '<div>' + escHtml(alert.message) + '</div>';
+                    alertsHtml += '<small class="text-muted">' + escHtml(alert.timestamp) + '</small>';
                     alertsHtml += '</div>';
                     alertsHtml += '</div>';
                     alertsHtml += '</div>';

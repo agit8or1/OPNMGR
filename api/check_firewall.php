@@ -35,11 +35,14 @@ if (empty($hostname)) {
     exit;
 }
 try {
-    $stmt = db()->prepare('SELECT id, hostname, ip_address FROM firewalls WHERE hostname = ?');
-    $stmt->execute([$hostname]);
+    // Only the authenticated firewall's own record. This looked the hostname
+    // up across the fleet and rewrote whichever firewall it matched, so one
+    // agent could change another firewall's address.
+    $stmt = db()->prepare('SELECT id, hostname, ip_address FROM firewalls WHERE hostname = ? AND id = ?');
+    $stmt->execute([$hostname, $firewall_id]);
     $firewall = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($firewall) {
-        if (!empty($ip_address) && $firewall['ip_address'] !== $ip_address) {
+        if (!empty($ip_address) && filter_var($ip_address, FILTER_VALIDATE_IP) && $firewall['ip_address'] !== $ip_address) {
             $update_stmt = db()->prepare('UPDATE firewalls SET ip_address = ?, last_checkin = NOW() WHERE id = ?');
             $update_stmt->execute([$ip_address, $firewall['id']]);
         }

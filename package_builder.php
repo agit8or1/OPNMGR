@@ -2,6 +2,23 @@
 // Development > Package Builder
 require_once __DIR__ . '/inc/bootstrap.php';
 require_permission('system.maintenance'); // role check, not just login (3.80.1)
+
+// Packages hold the application source, so they are served through this page
+// to signed-in maintainers only. /packages/ used to be a public directory.
+if (isset($_GET['download'])) {
+    $name = basename((string)$_GET['download']);
+    $path = '/var/www/opnsense/packages/' . $name;
+    if (!preg_match('/^opnsense_deploy_\d{8}_\d{6}\.tar\.gz$/', $name) || !is_file($path)) {
+        http_response_code(404);
+        exit('Package not found');
+    }
+    audit_log('package.download', ['object_type' => 'package', 'object_id' => $name, 'success' => true]);
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . $name . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+}
 $page_title = "Deployment Package Builder";
 include 'inc/header.php';
 
@@ -85,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_package'])) 
         // Create packages directory if it doesn't exist
         $packages_dir = '/var/www/opnsense/packages';
         if (!is_dir($packages_dir)) {
-            mkdir($packages_dir, 0755, true);
+            mkdir($packages_dir, 0750, true);
         }
         
         // Generate unique package name with timestamp
@@ -119,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_package'])) 
             $package_generated = true;
             
             // Generate download URL
-            $package_url = "https://" . $_SERVER['HTTP_HOST'] . "/packages/{$package_filename}";
+            $package_url = opnmgr_server_url() . "/package_builder.php?download=" . rawurlencode($package_filename);
             
             // Log package creation to system_logs
             $stmt = db()->prepare("INSERT INTO system_logs (firewall_id, category, message, level, timestamp) VALUES (NULL, 'deployment', ?, 'INFO', NOW())");
@@ -150,7 +167,7 @@ if (is_dir($packages_dir)) {
                 'filename' => $file,
                 'size' => filesize($filepath),
                 'created' => filemtime($filepath),
-                'url' => "https://" . $_SERVER['HTTP_HOST'] . "/packages/{$file}"
+                'url' => opnmgr_server_url() . '/package_builder.php?download=' . rawurlencode($file)
             ];
         }
     }
@@ -396,16 +413,17 @@ if (is_dir($packages_dir)) {
                 <button class="copy-btn" onclick="copyToClipboard()">
                     <i class="fa fa-copy me-2"></i> Copy URL
                 </button>
-                <a href="/packages/<?= htmlspecialchars($package_filename) ?>" class="download-btn" style="margin-left: 10px;">
+                <a href="/package_builder.php?download=<?= htmlspecialchars(rawurlencode($package_filename)) ?>" class="download-btn" style="margin-left: 10px;">
                     <i class="fa fa-download me-2"></i> Download
                 </a>
                 
                 <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #3a3f4b;">
                     <h5 style="color: #81c784;">Installation Instructions</h5>
                     <pre style="background: #1a1d23; padding: 15px; border-radius: 4px; overflow-x: auto; color: #e0e0e0;">
+# Download the package above (it needs your signed-in session), then copy it over:
+scp <?= htmlspecialchars($package_filename) ?> target-server:/var/www/
 # On the target server:
 cd /var/www
-wget <?= htmlspecialchars($package_url) ?>
 
 tar xzf <?= htmlspecialchars($package_filename) ?>
 
@@ -448,10 +466,10 @@ nano inc/db.php
                                 <a href="<?= htmlspecialchars($pkg['url']) ?>" class="download-btn">
                                     <i class="fa fa-download me-1"></i> Download
                                 </a>
-                                <button class="copy-btn" onclick="copyUrl('<?= htmlspecialchars($pkg['url']) ?>')">
+                                <button class="copy-btn" onclick="copyUrl(<?php echo htmlspecialchars(json_encode($pkg['url']), ENT_QUOTES); ?>)">
                                     <i class="fa fa-copy me-1"></i> Copy URL
                                 </button>
-                                <button class="delete-btn" onclick="deletePackage('<?= htmlspecialchars($pkg['filename']) ?>')">
+                                <button class="delete-btn" onclick="deletePackage(<?php echo htmlspecialchars(json_encode($pkg['filename']), ENT_QUOTES); ?>)">
                                     <i class="fa fa-trash me-1"></i> Delete
                                 </button>
                             </td>

@@ -110,11 +110,12 @@ function generate_ssh_keypair($firewall_id) {
 function deploy_ssh_key_to_firewall($firewall_id, $public_key) {
     // Queue command to deploy public key to firewall
     // FIXED: Append to authorized_keys instead of overwriting (preserves existing keys)
-    $command = sprintf(
-        'mkdir -p /root/.ssh && chmod 700 /root/.ssh && grep -qF "%s" /root/.ssh/authorized_keys 2>/dev/null || echo "%s" >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && echo SSH_KEY_DEPLOYED',
-        addslashes($public_key),
-        addslashes($public_key)
-    );
+    require_once __DIR__ . '/../inc/ssh_authorized_key.php';
+    $command = opnmgr_authorized_key_command((string)$public_key);
+    if ($command === null) {
+        error_log("Refusing to deploy a malformed public key to firewall {$firewall_id}");
+        return ['success' => false, 'error' => 'Malformed public key'];
+    }
     
     $cmd_id = queue_command($firewall_id, $command, 'Deploy new SSH public key');
     

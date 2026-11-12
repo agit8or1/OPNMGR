@@ -165,10 +165,10 @@ include __DIR__ . '/inc/header.php';
                       ?>
                     </div>
                     <div class="d-flex gap-1">
-                      <button class="btn btn-outline-light btn-xs" title="Ban IP" onclick="showBanModal('<?php echo htmlspecialchars($j); ?>')">
+                      <button class="btn btn-outline-light btn-xs" title="Ban IP" onclick="showBanModal(<?php echo htmlspecialchars(json_encode($j), ENT_QUOTES); ?>)">
                         <i class="fas fa-ban"></i>
                       </button>
-                      <button class="btn btn-outline-light btn-xs" title="Unban All" onclick="unbanAll('<?php echo htmlspecialchars($j); ?>')">
+                      <button class="btn btn-outline-light btn-xs" title="Unban All" onclick="unbanAll(<?php echo htmlspecialchars(json_encode($j), ENT_QUOTES); ?>)">
                         <i class="fas fa-check"></i>
                       </button>
                     </div>

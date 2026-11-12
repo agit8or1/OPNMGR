@@ -12,8 +12,9 @@ $enrollment_token = bin2hex(random_bytes(32));
 $stmt = db()->prepare('INSERT INTO enrollment_tokens (token, expires_at) VALUES (?, DATE_ADD(NOW(), INTERVAL 24 HOUR))');
 $stmt->execute([$enrollment_token]);
 
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
-$enrollment_url = $protocol . '://' . $_SERVER['HTTP_HOST'] . '/enroll_firewall.php?action=download&token=' . $enrollment_token;
+// Built from this installation's configured URL, not the request's Host header
+// and scheme: a plain-http page produced an http:// installer URL.
+$enrollment_url = opnmgr_server_url() . '/enroll_firewall.php?action=download&token=' . $enrollment_token;
 $wget_command = 'pkg update && pkg install -y wget && wget -q -O /tmp/opnsense_enroll.sh "' . $enrollment_url . '" && chmod +x /tmp/opnsense_enroll.sh && bash /tmp/opnsense_enroll.sh';
 
 $server_url = opnmgr_server_url();

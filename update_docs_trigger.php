@@ -1,18 +1,19 @@
 <?php
 // Development > Update Documentation Trigger
 require_once __DIR__ . '/inc/bootstrap.php';
+// Full login checks (timeouts, MFA enrolment) before the admin test, and both
+// before any output so the redirect can take effect.
+requireLogin();
+requireAdmin();
 require_once 'inc/header.php';
-
-// Only admins can access
-if (!isAdmin()) {
-    header('Location: /dashboard.php');
-    exit;
-}
 
 $message = '';
 $messageType = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify($_POST['csrf'] ?? '')) {
+    $message = 'Your session expired. Reload the page and try again.';
+    $messageType = 'danger';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $version = trim($_POST['version'] ?? '');
     $description = trim($_POST['description'] ?? '');
     
@@ -150,6 +151,7 @@ if (file_exists($analysisScript)) {
         <div class="col-md-8">
             <h4 class="mb-3">Release Information</h4>
             <form method="POST" action="">
+                <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                 <div class="mb-3">
                     <label class="form-label fw-bold" style="color: #e8f0f8;">Current Version</label>
                     <input type="text" class="form-control" value="<?php echo htmlspecialchars($currentVersion); ?>" readonly style="background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.2);">

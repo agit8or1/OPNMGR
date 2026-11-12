@@ -57,13 +57,22 @@ if (isset($_GET['saved']) && $_GET['saved'] == '1') {
     $config_status = 'success';
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrf_verify($_POST['csrf'] ?? '')) {
+    http_response_code(403);
+    $config_message = 'Your session expired. Reload the page and try again.';
+    $config_status = 'danger';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     switch ($action) {
         case 'save_api_key':
             $api_key = trim($_POST['snyk_api_key'] ?? '');
-            if (!empty($api_key)) {
+            // A token is a UUID-like string. Anything else (newlines above
+            // all) would be written into .env as extra settings.
+            if ($api_key !== '' && !preg_match('/^[A-Za-z0-9_-]{8,128}$/', $api_key)) {
+                $config_message = 'That does not look like a Snyk API token.';
+                $config_status = 'danger';
+            } elseif (!empty($api_key)) {
                 // Save to .env file
                 $env_file = __DIR__ . '/.env';
                 $env_content = file_exists($env_file) ? file_get_contents($env_file) : '';
@@ -646,6 +655,7 @@ include __DIR__ . '/inc/header.php';
 
                             <?php if ($snyk_update_available): ?>
                                 <form method="post" class="mt-3">
+                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                                     <input type="hidden" name="action" value="update_snyk">
                                     <button type="submit" class="btn btn-warning btn-sm w-100">
                                         <i class="fas fa-arrow-up me-2"></i>Update Snyk to Latest
@@ -660,6 +670,7 @@ include __DIR__ . '/inc/header.php';
                             <?php if (!$snyk_available): ?>
                                 <p class="text-muted mb-3">Snyk is not installed. Click below to install automatically:</p>
                                 <form method="post">
+                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                                     <input type="hidden" name="action" value="install_snyk">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-download me-2"></i>Install Snyk Now
@@ -668,6 +679,7 @@ include __DIR__ . '/inc/header.php';
                                 <small class="text-muted d-block mt-2">This will automatically install Node.js, npm, and Snyk if needed.</small>
                             <?php else: ?>
                                 <form method="post">
+                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
                                     <input type="hidden" name="action" value="save_api_key">
                                     <div class="mb-3">
                                         <label class="form-label" style="color: var(--text);">
@@ -713,6 +725,7 @@ include __DIR__ . '/inc/header.php';
     <?php endif; ?>
 
     <form method="post" id="scan-form">
+                                    <input type="hidden" name="csrf" value="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES); ?>">
         <input type="hidden" name="action" value="run_selected_scans">
 
         <div class="row mb-3">

@@ -18,6 +18,7 @@ requireAdmin();
 
 // Get firewall ID and path
 $firewall_id = (int)($_GET['fw_id'] ?? 0);
+require_firewall_scope($firewall_id);
 $path = $_GET['path'] ?? '/';
 
 if (!$firewall_id) {

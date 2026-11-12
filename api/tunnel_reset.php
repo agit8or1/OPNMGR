@@ -107,7 +107,7 @@ function getTunnelStatus() {
     }
     
     // Get listening nginx ports
-    exec("sudo ss -tlnp 2>/dev/null | grep nginx | grep -oP ':\K(810[0-9]|811[0-9])' | sort -n | uniq", $listening_ports);
+    exec("sudo /usr/bin/ss -tlnp 2>/dev/null | grep nginx | grep -oP ':\K(810[0-9]|811[0-9])' | sort -n | uniq", $listening_ports);
     
     echo json_encode([
         'success' => true,
@@ -133,7 +133,7 @@ function resetAllTunnels() {
     exec("ps aux | grep 'ssh.*-L 0.0.0.0:' | grep -v grep | awk '{print $2}'", $pids);
     
     foreach ($pids as $pid) {
-        exec("sudo kill -9 $pid 2>&1", $output, $result);
+        exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel " . escapeshellarg((string)$pid) . " 2>&1", $output, $result);
         if ($result === 0) {
             $log[] = "  ✓ Killed SSH tunnel PID $pid";
         } else {
@@ -166,7 +166,7 @@ function resetAllTunnels() {
     
     foreach ($configs as $config) {
         $basename = basename($config);
-        exec("sudo rm -f /etc/nginx/sites-enabled/$basename /etc/nginx/sites-available/$basename 2>&1", $output, $result);
+        exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper remove-site " . escapeshellarg($basename) . " 2>&1", $output, $result);
         if ($result === 0) {
             $log[] = "  ✓ Removed $basename";
         } else {
@@ -252,7 +252,7 @@ function killTunnel($pid) {
         return;
     }
     
-    exec("sudo kill -9 $pid 2>&1", $output, $result);
+    exec("sudo /usr/local/sbin/opnmgr-nginx-wrapper kill-tunnel " . escapeshellarg((string)$pid) . " 2>&1", $output, $result);
     
     if ($result === 0) {
         echo json_encode([

@@ -161,12 +161,20 @@ if (is_array($wan_interface_stats)) {
 }
 
 // New network configuration fields
-$wan_netmask = trim($input['wan_netmask'] ?? '');
-$wan_gateway = trim($input['wan_gateway'] ?? '');
-$wan_dns_primary = trim($input['wan_dns_primary'] ?? '');
-$wan_dns_secondary = trim($input['wan_dns_secondary'] ?? '');
-$lan_netmask = trim($input['lan_netmask'] ?? '');
-$lan_network = trim($input['lan_network'] ?? '');
+// These are addresses, masks and CIDRs. They are rendered on the firewall
+// list, so anything that is not address-shaped is dropped here rather than
+// stored: a firewall (or its stolen credentials) could otherwise plant markup
+// that runs in an administrator's browser.
+$netField = static function ($v): string {
+    $v = is_scalar($v) ? trim((string)$v) : '';
+    return (strlen($v) <= 64 && preg_match('/^[0-9A-Fa-fx:.\/%]*$/', $v)) ? $v : '';
+};
+$wan_netmask = $netField($input['wan_netmask'] ?? '');
+$wan_gateway = $netField($input['wan_gateway'] ?? '');
+$wan_dns_primary = $netField($input['wan_dns_primary'] ?? '');
+$wan_dns_secondary = $netField($input['wan_dns_secondary'] ?? '');
+$lan_netmask = $netField($input['lan_netmask'] ?? '');
+$lan_network = $netField($input['lan_network'] ?? '');
 // Handle opnsense_version - can be string or object
 $opnsense_version = $input['opnsense_version'] ?? '';
 if (is_array($opnsense_version) || is_object($opnsense_version)) {
@@ -762,14 +770,24 @@ function checkAgentUpdate($current_agent_version, $firewall_id) {
 
         // Check if this is a plugin-based agent (v1.x)
         if (strpos($current_clean, '1.') === 0) {
-            // Plugin-based agent - use plugin installer
+            // Plugin-based agent - use plugin installer. The package's SHA-256
+            // goes with the command, as it does for a manual install, so the
+            // installer refuses a package that is not the verified, staged one.
+            // Auto-update used to omit it, and the installer then only warned.
+            require_once __DIR__ . '/inc/agent_package.php';
+            $ready = agent_package_readiness();
+            if (empty($ready['ok']) || !preg_match('/^[0-9a-f]{64}$/', (string)($ready['sha256'] ?? ''))) {
+                error_log('agent_checkin.php: agent package not verified/staged; not offering an update: ' . ($ready['error'] ?? 'unknown'));
+                return ['update_available' => false, 'latest_version' => $latest_agent_version];
+            }
+            $env = "env OPNMGR_BASE_URL=https://{$server_name} OPNMGR_AGENT_SHA256={$ready['sha256']}";
             return [
                 'update_available' => true,
                 'latest_version' => $latest_agent_version,
                 'update_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh"
-                                    . " | env OPNMGR_BASE_URL=https://{$server_name} sh > /tmp/agent_update.log 2>&1 &",
+                                    . " | {$env} sh > /var/log/opnmanager_agent_update.log 2>&1 &",
                 'manual_reinstall_command' => 'fetch -o - ' . "https://{$server_name}/downloads/plugins/install_opnmanager_agent.sh"
-                                    . " | env OPNMGR_BASE_URL=https://{$server_name} sh"
+                                    . " | {$env} sh"
             ];
         } elseif ($current_clean === '2.1.2') {
             // Special self-healing for v2.1.2 agents
@@ -1004,7 +1022,7 @@ function checkPfsenseAgentUpdate(string $current, array $fw): array {
     return [
         'update_available'         => true,
         'latest_version'           => $latest,
-        'update_command'           => $cmd . ' > /tmp/opnmgr_agent_update.log 2>&1 &',
+        'update_command'           => $cmd . ' > /var/log/opnmgr_agent_update.log 2>&1 &',
         'manual_reinstall_command' => $cmd,
     ];
 }

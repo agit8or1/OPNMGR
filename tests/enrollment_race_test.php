@@ -134,7 +134,13 @@ lock_firewall_row($fw3);
 $res = parallel_requests('enroll_firewall_new.php',
     array_map(fn($h) => ['token' => $tok3, 'hardware_id' => $h, 'hostname' => '__race_legacy_' . $h, 'ip_address' => $ip, 'wan_ip' => $ip], $hw),
     hold_firewall_row($fw3));
+// Since 3.81.3 a token never rewrites an enrolled firewall: the one request
+// that claims the token is refused (409) because the address matches $fw3,
+// and the rest lose the token race. Nothing may succeed, and $fw3 is untouched.
 $wins = count(array_filter($res, fn($r) => ($r['success'] ?? false) === true));
-T::eq(1, $wins, "exactly one of {$N} concurrent legacy enrolments succeeds");
+T::eq(0, $wins, "no concurrent legacy enrolment rewrites an existing firewall");
+$row = db()->query("SELECT hostname, hardware_id FROM firewalls WHERE id = {$fw3}")->fetch(PDO::FETCH_ASSOC);
+T::eq('__race_legacy__', $row['hostname'] ?? null, 'the existing firewall keeps its hostname');
+T::eq(true, empty($row['hardware_id']), 'the existing firewall keeps its (empty) hardware_id');
 
 exit(T::summary());

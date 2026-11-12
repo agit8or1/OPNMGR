@@ -35,7 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // '2fa' is truthy, so it has to be tested before the success branch:
         // the password was right but the session is not authenticated yet.
         if ($login_result === '2fa') {
-            $bfp->clear_attempts($username, $ip_address);
+            // Failures are not cleared until the second factor is accepted
+            // (verify2fa.php). Clearing them here let an attacker who had the
+            // password reset the counter before every new batch of TOTP guesses.
             error_log("LOGIN: Password accepted, awaiting 2FA - Username: {$username}, IP: {$ip_address}");
             header('Location: /verify2fa.php');
             exit;

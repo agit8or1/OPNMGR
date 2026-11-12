@@ -13,6 +13,7 @@ require_once __DIR__ . '/inc/alert_policy.php';
 requireLogin();
 
 $id = (int)($_GET['id'] ?? 0);
+require_firewall_scope($id);
 if (!$id) {
     header('Location: /firewalls.php');
     exit;
@@ -1630,7 +1631,7 @@ function addDiagnosticOutput(text, type = 'info') {
     const terminal = document.getElementById('diagnosticOutput');
     const timestamp = new Date().toLocaleTimeString();
     const color = type === 'error' ? '#ff5555' : type === 'success' ? '#50fa7b' : '#00ff00';
-    terminal.innerHTML += `<span style="color: #6272a4">[${timestamp}]</span> <span style="color: ${color}">${text}</span>\n`;
+    terminal.innerHTML += `<span style="color: #6272a4">[${timestamp}]</span> <span style="color: ${color}">${escapeHtml(text)}</span>\n`;
     terminal.scrollTop = terminal.scrollHeight;
 }
 
@@ -2230,25 +2231,25 @@ function loadCommandLog() {
                             statusBadge = '<span class="badge bg-warning text-white">Pending</span>';
                             break;
                         default:
-                            statusBadge = '<span class="badge bg-secondary">' + cmd.status + '</span>';
+                            statusBadge = '<span class="badge bg-secondary">' + escapeHtml(cmd.status) + '</span>';
                     }
                     
                     // Output preview/button
                     let outputButton = '';
                     if (cmd.result && cmd.result.length > 0 && cmd.result !== 'success' && cmd.result !== 'failed') {
                         // Show "View Output" button for substantial output
-                        const outputPreview = cmd.result.substring(0, 40).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const outputPreview = escapeHtml(cmd.result.substring(0, 40));
                         const isTruncated = cmd.result.length > 40 ? '...' : '';
                         outputButton = `
-                            <small class="d-inline-block me-2 text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${cmd.result}">
+                            <small class="d-inline-block me-2 text-muted" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(cmd.result)}">
                                 ${outputPreview}${isTruncated}
                             </small>
-                            <button class="btn btn-sm btn-outline-info" onclick="showCommandOutput(${cmd.id}, '${(cmd.description || cmd.command || '').replace(/'/g, "\\'")}')">
+                            <button class="btn btn-sm btn-outline-info" data-desc="${escapeHtml(cmd.description || cmd.command || '')}" onclick="showCommandOutput(${parseInt(cmd.id, 10)}, this.dataset.desc)">
                                 <i class="fas fa-eye me-1"></i>View
                             </button>
                         `;
                     } else if (cmd.result) {
-                        outputButton = `<span class="badge bg-${cmd.result === 'success' ? 'success' : 'warning text-white'}">${cmd.result}</span>`;
+                        outputButton = `<span class="badge bg-${cmd.result === 'success' ? 'success' : 'warning text-white'}">${escapeHtml(cmd.result)}</span>`;
                     } else {
                         outputButton = '<small class="text-muted">-</small>';
                     }
@@ -2257,8 +2258,8 @@ function loadCommandLog() {
                     const timeStr = cmd.created_at_formatted || new Date(cmd.created_at).toLocaleString();
                     
                     row.innerHTML = `
-                        <td><small>${timeStr}</small></td>
-                        <td class="small">${cmd.description || 'N/A'}</td>
+                        <td><small>${escapeHtml(timeStr)}</small></td>
+                        <td class="small">${escapeHtml(cmd.description || 'N/A')}</td>
                         <td>${statusBadge}</td>
                         <td><small class="text-muted">${duration}</small></td>
                         <td class="text-end">${outputButton}</td>
@@ -2309,10 +2310,10 @@ function showCommandOutput(commandId, description) {
                                 <h5 style="color:white;margin:0;">Command Output</h5>
                                 <button onclick="this.closest('div').parentElement.remove()" style="background:none;border:none;color:#cbd5e0;font-size:24px;cursor:pointer;">&times;</button>
                             </div>
-                            <p style="color:#e2e8f0;margin-bottom:10px;"><strong>Command:</strong> ${description}</p>
-                            <p style="color:#e2e8f0;margin-bottom:10px;"><strong>Status:</strong> ${command.status}</p>
+                            <p style="color:#e2e8f0;margin-bottom:10px;"><strong>Command:</strong> ${escapeHtml(description)}</p>
+                            <p style="color:#e2e8f0;margin-bottom:10px;"><strong>Status:</strong> ${escapeHtml(command.status)}</p>
                             <p style="color:#e2e8f0;margin-bottom:15px;"><strong>Output:</strong></p>
-                            <pre style="background:#1a202c;color:#e2e8f0;padding:15px;border-radius:4px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${output}</pre>
+                            <pre style="background:#1a202c;color:#e2e8f0;padding:15px;border-radius:4px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(output)}</pre>
                         </div>
                     `;
                     
@@ -3877,7 +3878,7 @@ function escapeHtml(text) {
         '"': '&quot;',
         "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return String(text ?? '').replace(/[&<>"']/g, m => map[m]);
 }
 
 function initializeSSHKeys() {

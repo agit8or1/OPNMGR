@@ -58,11 +58,13 @@ try {
     $existingFirewall = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($existingFirewall) {
-        $firewall_id = $existingFirewall['id'];
-        
-        // Update existing firewall
-        $stmt = db()->prepare("UPDATE firewalls SET wan_ip = ?, ipv6_address = ?, version = ?, last_checkin = NOW() WHERE id = ?");
-        $stmt->execute([$wan_ip, $ipv6_address, $opnsense_version, $firewall_id]);
+        // A token enrols a new firewall; it never rewrites one that exists.
+        // Matching by hostname let anyone holding a token repoint an enrolled
+        // firewall's addresses (and this token) at a host of their choosing.
+        db()->rollBack();
+        http_response_code(409);
+        echo json_encode(['success' => false, 'message' => 'This firewall is already enrolled. Use Reset Agent on its page in OPNManager to re-enrol it.']);
+        exit;
     } else {
         // Create new firewall
         $stmt = db()->prepare("INSERT INTO firewalls (hostname, ip_address, wan_ip, ipv6_address, version, enrolled_at, last_checkin) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
@@ -90,6 +92,13 @@ try {
     // (agent_first_claim_allowed, 3.80.1).
     db()->prepare('UPDATE enrollment_tokens SET firewall_id = ? WHERE token = ?')
         ->execute([(int)$firewall_id, $token]);
+    // The installer's hardware_id is what the first check-in must present
+    // (agent_first_claim_allowed()), so pin it on the firewall now.
+    $enrollHw = trim((string)($data['hardware_id'] ?? ''));
+    if ($enrollHw !== '') {
+        db()->prepare('UPDATE firewalls SET hardware_id = ? WHERE id = ? AND (hardware_id IS NULL OR hardware_id = "")')
+            ->execute([$enrollHw, (int)$firewall_id]);
+    }
 
     // The token was claimed above; committing keeps the claim. A failure
     // before this point rolls back and leaves the token usable.

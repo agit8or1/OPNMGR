@@ -142,7 +142,7 @@ switch ($tool) {
 
 // Execute command via SSH with connection cleanup
 $ssh_command = sprintf(
-    'ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=1 root@%s %s 2>&1',
+    'ssh -i %s -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/etc/opnmgr/known_hosts -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=1 root@%s %s 2>&1',
     escapeshellarg($key_path),
     escapeshellarg($ssh_host),
     escapeshellarg($command)

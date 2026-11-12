@@ -345,7 +345,7 @@ function get_current_version() {
                                                 <form method="post" style="display: inline;">
                                                     <input type="hidden" name="action" value="apply_update">
                                                     <input type="hidden" name="update_id" value="<?php echo htmlspecialchars($update['id']); ?>">
-                                                    <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Apply update <?php echo htmlspecialchars($update['version']); ?>? This action cannot be undone.')">
+                                                    <button type="submit" class="btn btn-success btn-sm" onclick="return confirm(<?php echo htmlspecialchars(json_encode('Apply update ' . $update['version'] . '? This action cannot be undone.'), ENT_QUOTES); ?>)">
                                                         <i class="fas fa-download me-1"></i>Apply Update
                                                     </button>
                                                 </form>
